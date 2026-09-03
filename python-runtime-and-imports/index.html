@@ -1,0 +1,177 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Python Runtime, Imports, and Systems Notes</title></head><body><main><article><div class=article-header><h1>Python Runtime, Imports, and Systems Notes</h1><div class=aux>Last update: 2026-03-24 15:05:43 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/c/>C</a>
+|
+<a href=/tags/glib/>Glib</a>
+|
+<a href=/tags/hugo/>Hugo</a>
+|
+<a href=/tags/python/>Python</a>
+|
+<a href=/tags/systems/>Systems</a></div></div><div class=article-content><p>Python invocation decides both the code that executes and the first entry on
+<code>sys.path</code>. The surrounding notes cover supporting runtime concepts encountered
+when building tools and static sites.</p><h2 id=choose-a-python-invocation-form>Choose a Python Invocation Form
+<a href=#choose-a-python-invocation-form class=heading-anchor><span>#</span></a></h2><p>Python builds <code>sys.path</code> from a context-dependent first entry,
+<code>PYTHONPATH</code> when set, the standard library and extension locations, and
+site-specific paths. Options such as <code>-S</code> and <code>-P</code> alter that construction.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Command</th><th>Executed Entry Point</th><th>Initial Import Context</th></tr></thead><tbody><tr><td><code>python path/to/script.py</code></td><td>A script file</td><td>The script directory</td></tr><tr><td><code>python path/to/directory</code></td><td><code>directory/__main__.py</code></td><td>The directory</td></tr><tr><td><code>python archive.zip</code></td><td><code>__main__.py</code> in a ZIP file</td><td>The ZIP file</td></tr><tr><td><code>python -m package.module</code></td><td>A module found through import resolution</td><td>The current directory</td></tr></tbody></table></div></div><p><code>-P</code> or <code>PYTHONSAFEPATH</code> prevents Python from prepending the script directory
+or current directory. Use it in commands where importing an adjacent,
+untrusted file would be unsafe.</p><p>Run an application as an installed module rather than executing an internal
+file:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>project/
+</span></span><span style=display:flex><span>  pyproject.toml
+</span></span><span style=display:flex><span>  src/
+</span></span><span style=display:flex><span>    example/
+</span></span><span style=display:flex><span>      __init__.py
+</span></span><span style=display:flex><span>      __main__.py
+</span></span><span style=display:flex><span>      cli.py</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>python -m example</span></span></code></pre></div></div></div><p>Module execution preserves package context, so explicit relative imports work.
+Executing <code>src/example/cli.py</code> directly sets <code>__package__</code> differently and
+breaks imports such as <code>from . import config</code>.</p><h2 id=resolve-imports-predictably>Resolve Imports Predictably
+<a href=#resolve-imports-predictably class=heading-anchor><span>#</span></a></h2><p>For <code>import a.b.c</code>, Python resolves top-level <code>a</code> from <code>sys.path</code>, then looks
+for <code>b</code> in <code>a</code>, and finally <code>c</code> in <code>b</code>. The resulting module object is cached
+in <code>sys.modules</code>; later imports of the same fully qualified name reuse it.</p><p>An absolute import starts at <code>sys.path</code>:</p><div class=jose-wrapper><div class=jose-tools><span>python</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> example <span style=color:#f92672>import</span> cli</span></span></code></pre></div></div></div><p>A relative import starts at the current package:</p><div class=jose-wrapper><div class=jose-tools><span>python</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> . <span style=color:#f92672>import</span> cli
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> ..shared <span style=color:#f92672>import</span> config</span></span></code></pre></div></div></div><p>Avoid local names such as <code>json.py</code>, <code>email.py</code>, or <code>requests.py</code>. Such files
+can shadow the standard library or an installed dependency depending on the
+invocation directory. Diagnose resolution with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>python -c <span style=color:#e6db74>&#39;import sys; print(*sys.path, sep=&#34;\n&#34;)&#39;</span>
+</span></span><span style=display:flex><span>python -c <span style=color:#e6db74>&#39;import example; print(example.__file__)&#39;</span></span></span></code></pre></div></div></div><p>An <code>__init__.py</code> creates a regular package and can define a deliberately small
+public API. Namespace packages can span distribution boundaries without that
+file, but a regular package has clearer ownership for an application.
+<code>__main__.py</code> is the entry point for <code>python -m package</code>.</p><h2 id=package-applications-and-dependencies>Package Applications and Dependencies
+<a href=#package-applications-and-dependencies class=heading-anchor><span>#</span></a></h2><p>Define a console script in <code>pyproject.toml</code> for a stable installed command:</p><div class=jose-wrapper><div class=jose-tools><span>toml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-toml data-lang=toml><span style=display:flex><span>[<span style=color:#a6e22e>project</span>.<span style=color:#a6e22e>scripts</span>]
+</span></span><span style=display:flex><span><span style=color:#a6e22e>example</span> = <span style=color:#e6db74>&#34;example.cli:main&#34;</span></span></span></code></pre></div></div></div><p>The generated launcher imports the project from its installation environment,
+so it does not depend on the caller&rsquo;s current directory.</p><p><code>pip</code> resolves all declared requirements into one compatible graph. A private
+package service can proxy PyPI, host internal projects, or provide both. Put
+credentials in a keyring, environment variable, user configuration, or CI
+secret rather than in <code>pyproject.toml</code>:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>python -m pip install <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --index-url <span style=color:#e6db74>&#39;https://token@packages.example.test/api/pypi/simple&#39;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  internal-package</span></span></code></pre></div></div></div><p>Do not print that URL in build logs. For public and private dependencies,
+prefer one trusted virtual index that proxies PyPI over an untrusted
+<code>--extra-index-url</code>: pip considers candidates from configured indexes without
+giving an index a security priority. A public project that reuses an internal
+name can otherwise be selected.</p><p>Use constraints or a lock file to make builds repeatable:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>python -m pip install -r requirements.txt -c constraints.txt
+</span></span><span style=display:flex><span>python -m pip check</span></span></code></pre></div></div></div><p><code>pip check</code> validates installed declared requirements. A clean virtual
+environment exposes missing declarations and accidental global imports.</p><h2 id=select-a-regular-expression-dialect>Select a Regular-Expression Dialect
+<a href=#select-a-regular-expression-dialect class=heading-anchor><span>#</span></a></h2><p>Regular expressions have incompatible dialects. POSIX Basic Regular
+Expressions (BRE), POSIX Extended Regular Expressions (ERE), and Perl
+Compatible Regular Expressions (PCRE) share concepts but not syntax or
+features.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Feature</th><th>POSIX BRE</th><th>POSIX ERE</th><th>PCRE-Style Engines</th></tr></thead><tbody><tr><td>Grouping</td><td><code>\(...\)</code></td><td><code>(...)</code></td><td><code>(...)</code>, plus noncapturing groups</td></tr><tr><td>Alternation</td><td><code>|</code> in common implementations</td><td>`</td><td>`</td></tr><tr><td>Repetition</td><td><code>\{m,n\}</code></td><td><code>{m,n}</code></td><td><code>{m,n}</code></td></tr><tr><td>Lazy quantifier</td><td>No</td><td>No</td><td><code>*?</code>, <code>+?</code>, <code>??</code></td></tr><tr><td>Lookaround</td><td>No</td><td>No</td><td>Supported by many engines</td></tr></tbody></table></div></div><p>POSIX matching chooses the leftmost longest match. A PCRE-style engine often
+uses ordered backtracking and honors lazy quantifiers. GNU <code>sed</code> defaults to
+BRE, <code>sed -E</code> selects ERE, and <code>grep -P</code> requests a PCRE-compatible engine
+when that build supports it. <code>grep -P</code> remains line-oriented unless input is
+deliberately transformed.</p><p>Choose the dialect exposed by the tool rather than copying a pattern from a
+different engine. Quote shell arguments so the shell cannot interpret
+backslashes, brackets, dollar signs, or exclamation marks before the regex
+engine sees them.</p><h2 id=avoid-races-in-bit-interleaving>Avoid Races in Bit Interleaving
+<a href=#avoid-races-in-bit-interleaving class=heading-anchor><span>#</span></a></h2><p>Consider a zeroed byte array where one thread sets all even-numbered bits and
+another sets all odd-numbered bits. A non-atomic read-modify-write sequence is
+not safe:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>old = byte
+</span></span><span style=display:flex><span>byte = old | mask</span></span></code></pre></div></div></div><p>Both threads can read zero. One writes an even-bit mask and the other writes
+an odd-bit mask, so the later store overwrites the earlier store. The final
+byte can lack bits even though the masks do not overlap. In C or C++, a data
+race has undefined behavior; POSIX threads do not make ordinary memory
+updates atomic.</p><p>Use an atomic read-modify-write operation:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>atomic_fetch_or_explicit</span>(<span style=color:#f92672>&amp;</span>words[index], mask, memory_order_relaxed);</span></span></code></pre></div></div></div><p><code>memory_order_relaxed</code> is enough when the only requirement is an atomic
+accumulation. Use acquire-release synchronization only when the flag also
+publishes or consumes related data.</p><p>Atomicity does not remove cache contention. Adjacent words can share a cache
+line, and writes from separate cores then cause coherence traffic known as
+false sharing. Partition the array by cache-line-sized regions, batch masks
+per word, or assign one owner per word when throughput matters.</p><h2 id=drive-glibs-main-loop-model>Drive GLib&rsquo;s Main-Loop Model
+<a href=#drive-glibs-main-loop-model class=heading-anchor><span>#</span></a></h2><p>GLib separates event sources, contexts, and loops:</p><ul><li>A <code>GSource</code> represents an event producer such as an idle callback, timeout,
+file descriptor, or child-process watch.</li><li>A <code>GMainContext</code> owns sources and performs prepare, poll, check, and
+dispatch iterations.</li><li>A <code>GMainLoop</code> repeatedly iterates a context until asked to quit.</li></ul><p>The thread-default context matters for asynchronous APIs. Push the intended
+context before creating an operation when callbacks must return to a
+particular thread:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>g_main_context_push_thread_default</span>(context);
+</span></span><span style=display:flex><span><span style=color:#75715e>/* Create asynchronous operations here. */</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_context_pop_thread_default</span>(context);</span></span></code></pre></div></div></div><p>Attach a source to the selected context and retain ownership rules carefully:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>GSource <span style=color:#f92672>*</span>source <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_timeout_source_new_seconds</span>(<span style=color:#ae81ff>1</span>);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_set_callback</span>(source, on_tick, user_data, NULL);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_attach</span>(source, context);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_unref</span>(source);</span></span></code></pre></div></div></div><p>Calling <code>g_main_loop_run()</code> on a context that another thread owns can deadlock
+or violate thread-affinity assumptions. Move work between threads with an
+explicit synchronization design, then invoke a callback in the destination
+context.</p><h2 id=define-gobject-types-and-signals>Define GObject Types and Signals
+<a href=#define-gobject-types-and-signals class=heading-anchor><span>#</span></a></h2><p>GObject combines a runtime type registry, inheritance, interfaces, properties,
+and signals. A final type has an instance structure and class structure that
+are not intended for subclasses:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>G_DECLARE_FINAL_TYPE</span>(FooBar, foo_bar, FOO, BAR, GObject)</span></span></code></pre></div></div></div><p>The declaration provides <code>foo_bar_get_type()</code>, cast and type-check macros, and
+autoptr cleanup support. <code>G_DEFINE_FINAL_TYPE</code> or <code>G_DEFINE_TYPE</code> in one C
+translation unit implements registration and requires <code>foo_bar_init()</code> and
+<code>foo_bar_class_init()</code>.</p><p>For a derivable public base type, use <code>G_DECLARE_DERIVABLE_TYPE</code>. The public
+instance structure must contain only the parent instance because subclasses
+embed it. Store implementation fields in private data:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>G_DEFINE_TYPE_WITH_PRIVATE</span>(FooBar, foo_bar, G_TYPE_OBJECT)</span></span></code></pre></div></div></div><p><code>G_ADD_PRIVATE</code> registers the private allocation, and the generated
+<code>foo_bar_get_instance_private()</code> retrieves it. An abstract derivable type uses
+<code>G_DEFINE_ABSTRACT_TYPE</code>.</p><p>An interface declaration uses <code>G_DECLARE_INTERFACE</code>; its implementation uses
+<code>G_DEFINE_INTERFACE</code> and supplies a default-interface initializer. A concrete
+type adds an interface with <code>G_IMPLEMENT_INTERFACE</code> inside
+<code>G_DEFINE_TYPE_WITH_CODE</code>. That macro emits registration code during
+<code>*_get_type_once()</code>, so registration happens before callers instantiate the
+type.</p><p>Register a signal in class initialization with <code>g_signal_new</code>, connect a
+handler with <code>g_signal_connect</code>, and emit it with <code>g_signal_emit</code> or a
+generated signal function. Validate signal names, argument types, and the
+thread that emits the signal. <code>GActionMap</code> owns named actions, while
+<code>GActionGroup</code> exposes actions for activation and state changes; applications
+often implement both to register actions locally and publish them to UI code.</p><h2 id=build-hugo-sites-from-templates>Build Hugo Sites from Templates
+<a href=#build-hugo-sites-from-templates class=heading-anchor><span>#</span></a></h2><p>Hugo parses content and configuration, builds a page collection, resolves
+templates, renders output formats, and writes files to the publish directory.
+Page rendering can depend on site-wide collections such as taxonomies and
+regular pages, so treat a build as a site computation rather than a sequence
+of isolated Markdown conversions.</p><p>Template lookup uses kind, output format, language, and layout naming. A
+layout in <code>layouts/</code> overrides a theme layout of the same lookup specificity.
+Use <code>hugo --templateMetrics --templateMetricsHints</code> to locate expensive
+templates and <code>hugo --renderToMemory</code> when a process must inspect generated
+content without publishing it.</p><p>Go template variables, functions, and pipelines compose data:</p><div class=jose-wrapper><div class=jose-tools><span>go-html-template</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go-html-template data-lang=go-html-template><span style=display:flex><span><span style=color:#75715e>{{</span> <span style=color:#a6e22e>$pages</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>where</span> <span style=color:#a6e22e>site</span><span style=color:#a6e22e>.RegularPages</span> <span style=color:#e6db74>&#34;Section&#34;</span> <span style=color:#e6db74>&#34;posts&#34;</span> <span style=color:#75715e>}}</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>{{</span> <span style=color:#66d9ef>range</span> <span style=color:#a6e22e>$pages</span><span style=color:#a6e22e>.ByTitle</span> <span style=color:#75715e>}}</span>
+</span></span><span style=display:flex><span>  &lt;<span style=color:#f92672>a</span> <span style=color:#a6e22e>href</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#75715e>{{</span> <span style=color:#a6e22e>.RelPermalink</span> <span style=color:#75715e>}}</span><span style=color:#e6db74>&#34;</span>&gt;<span style=color:#75715e>{{</span> <span style=color:#a6e22e>.LinkTitle</span> <span style=color:#75715e>}}</span>&lt;/<span style=color:#f92672>a</span>&gt;
+</span></span><span style=display:flex><span><span style=color:#75715e>{{</span> <span style=color:#66d9ef>end</span> <span style=color:#75715e>}}</span></span></span></code></pre></div></div></div><p><code>with</code> changes the dot context only when its value is nonempty. Save the outer
+context in <code>$</code> or a named variable before entering nested ranges. Escape rules
+depend on template type: HTML templates contextually escape output, while
+using <code>safeHTML</code> or <code>safeURL</code> asserts that an input has already been
+validated. Do not mark author-controlled or remote data safe merely to make
+markup render.</p><p>Shortcodes are content-level templates. Angle-bracket calls render their
+result as markup, while percent-delimited calls can cause the shortcode output
+to participate in Markdown rendering. Use a normal Markdown section, list,
+table, or blockquote when the content has no reusable rendering behavior.
+Avoid copying a shortcode&rsquo;s CSS or JavaScript into content; keep behavior in
+the site implementation and keep article prose portable.</p><h2 id=encode-transitions-on-a-physical-link>Encode Transitions on a Physical Link
+<a href=#encode-transitions-on-a-physical-link class=heading-anchor><span>#</span></a></h2><p>Line coding converts bits into a physical signal with timing properties. NRZ
+encodings avoid returning to a baseline between bit cells, which saves
+bandwidth but can lose clock recovery during long runs without transitions.</p><p>In NRZI, a transition represents one bit value and no transition represents
+the other. The convention varies by protocol, so state the mapping instead of
+assuming it:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Current level changes at a bit boundary  -&gt; encoded one
+</span></span><span style=display:flex><span>Current level remains unchanged          -&gt; encoded zero</span></span></code></pre></div></div></div><p>USB uses a related convention with bit stuffing: after six consecutive ones,
+the transmitter inserts a zero to force a transition. Optical-disc channels
+also use run-length-limited coding and error correction because a physical
+medium cannot reliably represent arbitrary transition spacing.</p><h2 id=read-a-large-c-project-by-build-boundaries>Read a Large C Project by Build Boundaries
+<a href=#read-a-large-c-project-by-build-boundaries class=heading-anchor><span>#</span></a></h2><p>Generated sources, portability layers, and plugin entry points explain more of
+a C project than its directory names. Sudo provides useful examples:</p><ul><li><code>include/sudo_queue.h</code> is a compatibility copy of BSD queue macros for
+singly linked, tail, doubly linked, and doubly linked tail queues.</li><li><code>lib/utils/</code> contains prefixed implementations and fallback functions. A
+compatibility header can map an unavailable <code>getdelim</code> to
+<code>sudo_getdelim</code>, so callers retain a portable API.</li><li>Parser files such as <code>gram.c</code> and <code>gram.h</code> derive from <code>gram.y</code>; lexer files
+derive from Flex input. Build flags can set a parser prefix, explaining a
+generated symbol name absent from handwritten source.</li><li>Release tarballs retain generated files so a normal build does not require
+Flex, Bison, or a development-only regeneration mode.</li></ul><p>Read <code>Makefile.in</code> and generated-file comments before modifying a generated
+C file. Change the grammar, lexer, or input definition, regenerate through
+the project&rsquo;s documented build target, and review the generated diff.</p><h2 id=curate-changelogs-as-durable-records>Curate Changelogs as Durable Records
+<a href=#curate-changelogs-as-durable-records class=heading-anchor><span>#</span></a></h2><p>A changelog should describe a released behavior, compatibility effect, or
+operator action. Development diary entries, abandoned experiments, and
+unverified links do not provide release value.</p><p>For native static linking, distinguish archive production from executable
+linking. Autoconf options such as <code>--disable-shared --enable-static</code> control
+whether a project builds shared libraries and archives; they do not guarantee
+that a final executable has no dynamic dependencies. Inspect the actual link
+command with <code>make -n</code> or the build&rsquo;s verbose mode, then pass linker flags
+where the final executable link is performed. Verify the result with the
+platform&rsquo;s dependency inspection tool, such as <code>ldd</code> on Linux or <code>otool -L</code> on
+macOS. Static linkage can still fail when a required static archive or system
+component is unavailable.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/python-runtime-and-imports/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

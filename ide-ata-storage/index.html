@@ -1,0 +1,73 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>IDE ATA Storage</title></head><body><main><article><div class=article-header><h1>IDE ATA Storage</h1><div class=aux>Last update: 2024-10-07 13:10:27 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/storage/>Storage</a>
+|
+<a href=/tags/ata/>Ata</a>
+|
+<a href=/tags/ide/>Ide</a></div></div><div class=article-content><p>Integrated Drive Electronics moved disk-specific control logic onto the drive and
+standardized the host-facing registers and commands. The resulting ATA family
+dominated PC storage before Serial ATA, but several related names describe different
+parts of that history.</p><h2 id=terminology>Terminology
+<a href=#terminology class=heading-anchor><span>#</span></a></h2><p>Four terms should not be treated as exact synonyms:</p><ul><li><strong>IDE</strong> means Integrated Drive Electronics, the architectural change that placed
+controller logic with the mechanism. Enhanced IDE (EIDE) was a later collection
+of extensions and product terminology.</li><li><strong>ATA</strong> began as the AT Attachment interface and now names the standards family,
+including commands, registers, protocols, and device behavior.</li><li><strong>PATA</strong> is the retrospective name for ATA&rsquo;s parallel electrical interface after
+Serial ATA required a distinction.</li><li><strong>ATAPI</strong> defines a packet-command protocol over ATA transport. Optical drives and
+other devices use it to carry commands derived from the SCSI command sets rather
+than pretending to be ATA disks.</li></ul><p>SATA changes cabling, signaling, and topology while retaining much of the ATA command
+model. A modern ATA command description can therefore apply beyond a 40-pin IDE
+ribbon cable.</p><h2 id=host-channel-and-device-topology>Host, Channel, and Device Topology
+<a href=#host-channel-and-device-topology class=heading-anchor><span>#</span></a></h2><p>A host adapter exposes one or more ATA channels. A parallel channel has shared
+command, control, and 16-bit data signals and can attach up to two devices. The
+devices are conventionally called master and slave, or device 0 and device 1. Those
+names select bus identities; they do not mean that one drive routes all commands to
+the other.</p><p>Jumpers can assign identities explicitly. Cable-select mode instead uses the
+<code>CSEL</code> conductor and connector wiring to determine them. The host writes the device
+bit in the Device/Head register, waits for selection to settle as the standard
+requires, and then accesses the selected device&rsquo;s register set. Only one command
+protocol occupies the shared channel at a time under traditional operation.</p><p>Original cables used 40 conductors. Faster Ultra DMA modes require an 80-conductor
+cable with the same 40-pin connectors; additional ground conductors reduce
+crosstalk. Shared signaling, short cable limits, and timing margins constrained
+further parallel scaling, which helped motivate SATA&rsquo;s point-to-point links.</p><h2 id=the-task-file-and-device-identification>The Task File and Device Identification
+<a href=#the-task-file-and-device-identification class=heading-anchor><span>#</span></a></h2><p>Software controls a legacy ATA device through a command-block register set often
+called the <strong>task file</strong>, plus control-block registers. Register roles include:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Register</th><th>Role</th></tr></thead><tbody><tr><td>Data</td><td>16-bit PIO data transfers and IDENTIFY words</td></tr><tr><td>Features / Error</td><td>Command parameters when written; error details when read</td></tr><tr><td>Sector Count</td><td>Transfer count or command parameter</td></tr><tr><td>LBA Low, Mid, High</td><td>Address bytes or command-specific values</td></tr><tr><td>Device/Head</td><td>Device selection and upper legacy address bits</td></tr><tr><td>Command / Status</td><td>Starts a command when written; reports state when read</td></tr><tr><td>Device Control / Alternate Status</td><td>Reset, interrupt control, and status without acknowledgement side effects</td></tr></tbody></table></div></div><p>The host loads parameters and writes the command register last. It then follows the
+command&rsquo;s specified PIO or DMA protocol while interpreting status bits such as
+<code>BSY</code>, <code>DRQ</code>, <code>ERR</code>, and <code>DRDY</code>. Polling arbitrary registers while <code>BSY</code> is set can
+violate the protocol because only specified status accesses are valid during that
+phase.</p><p><code>IDENTIFY DEVICE</code> returns 256 16-bit words describing an ATA disk. Defined words
+report the model and serial strings, supported command sets, active transfer modes,
+logical-sector properties, queueing features, and addressable capacity. ATAPI devices
+answer <code>IDENTIFY PACKET DEVICE</code> instead. Reserved bits and words must not be inferred,
+and support and enablement bits are distinct: a feature can be implemented but not
+currently enabled.</p><h2 id=chs-lba28-and-lba48>CHS, LBA28, and LBA48
+<a href=#chs-lba28-and-lba48 class=heading-anchor><span>#</span></a></h2><p>Early commands exposed cylinder, head, and sector fields for BIOS and DOS
+compatibility. Device firmware translated those values because reported geometry
+ceased to match physical media. Logical block addressing instead numbers sectors
+linearly.</p><p>The original ATA LBA form carries 28 address bits: 24 in the three LBA registers and
+four in Device/Head. With 512-byte sectors, its address space is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>2^28 sectors × 512 bytes = 128 GiB = 137,438,953,472 bytes</span></span></code></pre></div></div></div><p>LBA48 commands expand the address to 48 bits and the sector count to 16 bits. On the
+legacy task file, software writes the high-order bytes before the corresponding
+low-order bytes, then issues an <code>EXT</code> command such as <code>READ SECTORS EXT</code>. At 512 bytes
+per sector, 48 bits address 128 PiB. Actual devices and operating systems can impose
+smaller limits, and drives with larger logical sectors change byte capacity without
+changing the LBA count.</p><p>The value zero has command-specific maximum-count semantics in the sector-count
+field—256 sectors for many 28-bit commands and 65,536 for corresponding 48-bit
+commands. Drivers must follow the selected command definition rather than interpret
+zero as an empty request.</p><h2 id=pio-dma-and-ultra-dma>PIO, DMA, and Ultra DMA
+<a href=#pio-dma-and-ultra-dma class=heading-anchor><span>#</span></a></h2><p>ATA transfer modes describe how sector data crosses the host interface:</p><ul><li><strong>Programmed I/O (PIO)</strong> makes the processor read or write the Data register for
+every word. The device uses <code>DRQ</code> to delimit data phases.</li><li><strong>Single-word and multiword DMA</strong> let a host DMA engine transfer data after the
+driver programs memory descriptors and issues an ATA DMA command.</li><li><strong>Ultra DMA (UDMA)</strong> uses source-synchronous strobes, transfers on both strobe
+edges, and adds a CRC over each burst. Higher modes tighten timing and require the
+80-conductor cable on PATA.</li></ul><p>DMA reduces processor-managed data movement, but ATA command setup, completion, error
+handling, cache flushes, and DMA mapping remain driver responsibilities. A CRC error
+protects the cable transfer; it does not provide end-to-end validation of media
+contents.</p><p>The host and device negotiate modes from IDENTIFY data and <code>SET FEATURES</code>. Selecting
+a mode unsupported by the cable, controller, or device can corrupt transfers, thus
+drivers apply platform limits rather than choosing the largest device-advertised
+number.</p><h2 id=the-lasting-block-device-boundary>The Lasting Block-Device Boundary
+<a href=#the-lasting-block-device-boundary class=heading-anchor><span>#</span></a></h2><p>Integrated control and LBA gave operating systems a stable array-of-sectors
+abstraction. Filesystems and partition tables could operate on logical blocks without
+scheduling head movement or encoding a drive&rsquo;s physical geometry. ATA still exposes
+media errors and performance details, but the mechanism decides how an LBA maps to
+tracks, flash pages, spare sectors, or an internal translation layer.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.t13.org/>INCITS T13 technical committee</a></li><li><a href=https://docs.kernel.org/driver-api/libata.html>Linux <code>libata</code> developer documentation</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/ide-ata-storage/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

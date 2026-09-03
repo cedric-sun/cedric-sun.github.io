@@ -1,0 +1,512 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Vector Stores</title></head><body><main><article><div class=article-header><h1>Vector Stores</h1><div class=aux>Last update: 2022-07-27 13:05:34 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ai/>Ai</a>
+|
+<a href=/tags/embeddings/>Embeddings</a>
+|
+<a href=/tags/vector-search/>Vector-Search</a>
+|
+<a href=/tags/rag/>Rag</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spring-ai/>Spring-Ai</a></div></div><div class=article-content><p>A <strong>vector store</strong> stores numeric vectors and retrieves the items whose vectors
+are nearest to a query vector. In AI applications, those vectors are commonly
+<strong>embeddings</strong>: compact numeric representations of text, images, audio, users,
+products, or other objects.</p><p>Vector stores make questions such as these practical:</p><ul><li>Which documentation passages are semantically related to this question?</li><li>Which products resemble the one a customer is viewing?</li><li>Have we processed a support ticket with the same meaning before?</li><li>Which tools are relevant to the user&rsquo;s current goal?</li><li>Which saved memories may matter in this conversation?</li></ul><p>A vector store is not a language model, and it does not generate an answer. It
+is a retrieval component. It finds candidate data; application code or a model
+then decides how to use that data.</p><p>This article explains why vector stores exist, their roles in AI systems,
+popular implementations, and how to use one from Java.</p><h2 id=from-content-to-vectors>From Content to Vectors
+<a href=#from-content-to-vectors class=heading-anchor><span>#</span></a></h2><p>An embedding model maps an input into a fixed-length array of numbers:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>&#34;How can I change my password?&#34;
+</span></span><span style=display:flex><span>        |
+</span></span><span style=display:flex><span>        v
+</span></span><span style=display:flex><span>  embedding model
+</span></span><span style=display:flex><span>        |
+</span></span><span style=display:flex><span>        v
+</span></span><span style=display:flex><span>[0.018, -0.214, 0.092, ..., 0.037]</span></span></code></pre></div></div></div><p>The individual numbers generally have no useful human-readable meaning. Their
+geometry matters: inputs with related meaning tend to produce vectors that are
+near each other in the embedding space.</p><p>Suppose an application has already embedded these passages:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>A: &#34;Reset your password from Account Settings.&#34;
+</span></span><span style=display:flex><span>B: &#34;Invoices are available on the Billing page.&#34;
+</span></span><span style=display:flex><span>C: &#34;Use a security key for passwordless sign-in.&#34;</span></span></code></pre></div></div></div><p>It embeds the query “I forgot my login password” with the same embedding model,
+then searches for the nearest stored vectors. Passage A should rank highly even
+though the query and passage do not share exactly the same words.</p><p>Each stored record usually contains more than a vector:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>id:          handbook:authentication:17
+</span></span><span style=display:flex><span>vector:      [0.018, -0.214, ...]
+</span></span><span style=display:flex><span>content:     Reset your password from Account Settings.
+</span></span><span style=display:flex><span>metadata:
+</span></span><span style=display:flex><span>  tenant_id: acme
+</span></span><span style=display:flex><span>  document_id: handbook:authentication
+</span></span><span style=display:flex><span>  version: 8
+</span></span><span style=display:flex><span>  language: en
+</span></span><span style=display:flex><span>  section: Password Recovery
+</span></span><span style=display:flex><span>  visibility: employee</span></span></code></pre></div></div></div><p>The vector enables similarity search. The ID, original content, and metadata
+let the application interpret, authorize, cite, update, and delete the result.</p><h2 id=why-ordinary-databases-are-not-enough>Why Ordinary Databases Are Not Enough
+<a href=#why-ordinary-databases-are-not-enough class=heading-anchor><span>#</span></a></h2><p>Relational and document databases are excellent at exact conditions:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> tenant_id <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;acme&#39;</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>AND</span> status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;PUBLISHED&#39;</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>AND</span> created_at <span style=color:#f92672>&gt;=</span> DATE <span style=color:#e6db74>&#39;2026-01-01&#39;</span></span></span></code></pre></div></div></div><p>Full-text indexes are excellent at lexical search: tokenization, stemming,
+phrases, spelling, field weighting, and exact terms. They can find passages
+containing <code>password reset</code>.</p><p>Neither operation alone answers “Which items are closest in meaning to this
+new input?” An embedding with 1,536 dimensions is a point in a
+1,536-dimensional space. Finding the nearest points requires vector distance
+operations and specialized indexes.</p><p>This does not mean every AI application needs a vector store.</p><ul><li>A model that calls a deterministic weather API does not need one.</li><li>A small, fixed prompt may fit directly in the model&rsquo;s context.</li><li>Exact identifiers, names, error codes, and legal phrases may be better served
+by full-text or relational search.</li><li>A few hundred vectors can be scanned in memory without a separate database.</li></ul><p>A vector store becomes useful when the application repeatedly searches a
+growing collection by semantic similarity and needs filtering, persistence,
+concurrency, updates, or low latency.</p><h2 id=distance-and-similarity>Distance and Similarity
+<a href=#distance-and-similarity class=heading-anchor><span>#</span></a></h2><p>A search ranks vectors using a metric compatible with the embedding model and
+the way its vectors are normalized.</p><p><strong>Cosine similarity</strong> measures the angle between vectors:</p>\[
+\operatorname{cosine}(a,b) =
+\frac{a \cdot b}{\lVert a \rVert \lVert b \rVert}
+\]<p>It emphasizes direction rather than magnitude and is common for text
+embeddings. A larger cosine similarity means greater similarity.</p><p><strong>Dot product</strong>, or inner product, includes vector magnitude. It is often fast
+and is appropriate when the embedding model was trained for it. For
+unit-normalized vectors, dot product and cosine ranking are equivalent.</p><p><strong>Euclidean distance</strong>, or L2 distance, measures straight-line distance. A
+smaller distance means the vectors are closer.</p><p>Do not choose a metric by name alone. Follow the embedding model&rsquo;s guidance and
+configure the index and query with the same metric. A database may return a
+distance, a similarity, or a transformed score; score thresholds are therefore
+not automatically portable between stores or embedding models.</p><h2 id=exact-and-approximate-search>Exact and Approximate Search
+<a href=#exact-and-approximate-search class=heading-anchor><span>#</span></a></h2><p>An exact nearest-neighbor search compares the query with every eligible vector.
+It gives exact results but its work grows with the collection. This can be
+perfectly adequate for a small corpus or an offline evaluation baseline.</p><p>Large collections normally use <strong>approximate nearest-neighbor</strong> search, or ANN.
+ANN indexes inspect only promising candidates, trading some recall for lower
+latency.</p><h3 id=hnsw>HNSW
+<a href=#hnsw class=heading-anchor><span>#</span></a></h3><p>Hierarchical Navigable Small World, or HNSW, builds a multilayer graph whose
+edges connect nearby vectors. Search traverses the graph toward promising
+neighbors.</p><p>HNSW commonly offers a strong latency-recall tradeoff, but its graph consumes
+memory and can be expensive to build. Parameters controlling graph density,
+construction effort, and search effort affect memory, ingestion speed,
+latency, and recall.</p><h3 id=ivf>IVF
+<a href=#ivf class=heading-anchor><span>#</span></a></h3><p>Inverted-file indexes partition vectors into clusters or lists. At query time,
+the store searches only the most relevant partitions.</p><p>Searching more partitions improves recall but costs more time. Some IVF
+variants require training on representative data, so the index should be
+rebuilt or retuned when the data distribution changes substantially.</p><h3 id=quantization>Quantization
+<a href=#quantization class=heading-anchor><span>#</span></a></h3><p>Quantization stores a compressed representation of vectors. Product
+quantization, scalar quantization, and binary quantization can reduce memory
+and accelerate candidate search at the cost of precision.</p><p>A common design retrieves candidates using compressed vectors and reranks
+those candidates with full-precision vectors or a separate reranker.</p><h3 id=ann-is-a-tunable-system>ANN Is a Tunable System
+<a href=#ann-is-a-tunable-system class=heading-anchor><span>#</span></a></h3><p><code>topK = 10</code> does not guarantee that an approximate index found the true ten
+nearest items. Measure <strong>recall@K</strong> against exact search on representative
+queries, then tune the index for the required balance of:</p><ul><li>recall;</li><li>p50, p95, and p99 latency;</li><li>memory;</li><li>index build time;</li><li>update throughput; and</li><li>cost.</li></ul><p>Vendor benchmarks using different data, filters, hardware, and recall targets
+are not directly comparable.</p><h2 id=roles-in-ai-applications>Roles in AI Applications
+<a href=#roles-in-ai-applications class=heading-anchor><span>#</span></a></h2><h3 id=retrieval-augmented-generation>Retrieval-Augmented Generation
+<a href=#retrieval-augmented-generation class=heading-anchor><span>#</span></a></h3><p>Retrieval-augmented generation, or RAG, is the most familiar use:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>source documents
+</span></span><span style=display:flex><span>  -&gt; parse
+</span></span><span style=display:flex><span>  -&gt; split into chunks
+</span></span><span style=display:flex><span>  -&gt; embed
+</span></span><span style=display:flex><span>  -&gt; vector store
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>user question
+</span></span><span style=display:flex><span>  -&gt; embed
+</span></span><span style=display:flex><span>  -&gt; retrieve relevant chunks
+</span></span><span style=display:flex><span>  -&gt; optionally rerank
+</span></span><span style=display:flex><span>  -&gt; add selected evidence to the prompt
+</span></span><span style=display:flex><span>  -&gt; language model
+</span></span><span style=display:flex><span>  -&gt; answer with citations</span></span></code></pre></div></div></div><p>RAG gives a model current or private information without training the model.
+The vector store is only the retrieval stage. It does not guarantee that the
+retrieved passages are correct, that all relevant passages were found, or that
+the model will faithfully use them.</p><h3 id=semantic-search>Semantic Search
+<a href=#semantic-search class=heading-anchor><span>#</span></a></h3><p>An application can return vector results directly instead of passing them to a
+language model. This is useful for documentation search, support-ticket
+deduplication, media discovery, and related-item features.</p><p>Semantic search is good at paraphrases but can be weak for exact identifiers.
+A query for <code>NullPointerException at PaymentService.java:417</code> may need exact
+token matching more than semantic proximity.</p><h3 id=hybrid-search>Hybrid Search
+<a href=#hybrid-search class=heading-anchor><span>#</span></a></h3><p>Hybrid search combines vector and lexical retrieval:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>vector candidates ----+
+</span></span><span style=display:flex><span>                      +--&gt; rank fusion or reranker --&gt; final results
+</span></span><span style=display:flex><span>keyword candidates ---+</span></span></code></pre></div></div></div><p>This often works better than choosing one search method. Semantic retrieval
+handles paraphrases; lexical retrieval preserves product codes, names, quoted
+phrases, and rare terms. Results can be combined with Reciprocal Rank Fusion,
+weighted scores, or a learned reranker.</p><p>Scores from unrelated retrieval algorithms should not be added without
+normalization. Their numeric ranges have different meanings.</p><h3 id=recommendations-and-similar-items>Recommendations and Similar Items
+<a href=#recommendations-and-similar-items class=heading-anchor><span>#</span></a></h3><p>Products, documents, users, and behavior sequences can be embedded. Nearest
+neighbors then provide candidate recommendations. Business rules still need to
+remove unavailable, unsafe, already-consumed, or unauthorized items before
+ranking and presentation.</p><h3 id=agent-memory>Agent Memory
+<a href=#agent-memory class=heading-anchor><span>#</span></a></h3><p>An agent can embed selected facts, summaries, or past events and retrieve
+memories relevant to the current task. A vector store is not memory by itself:
+the application must decide what is worth remembering, when it expires, how it
+is corrected, and who may access it.</p><p>Saving every conversation message indefinitely creates noise and privacy
+obligations. Retrieval similarity also does not imply that a memory is true or
+still current.</p><h3 id=semantic-caching>Semantic Caching
+<a href=#semantic-caching class=heading-anchor><span>#</span></a></h3><p>A semantic cache reuses a prior result when a new request is sufficiently
+similar. This can reduce model cost and latency, but it is risky when small
+differences matter:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>&#34;Can user Alice read account 42?&#34;
+</span></span><span style=display:flex><span>&#34;Can user Bob read account 42?&#34;</span></span></code></pre></div></div></div><p>The questions are semantically close but may require opposite answers. Cache
+keys and filters must include tenant, authorization scope, model and prompt
+version, tool state, locale, and other correctness dimensions. Do not use
+semantic similarity to bypass a fresh authorization or financial decision.</p><h3 id=tool-and-example-selection>Tool and Example Selection
+<a href=#tool-and-example-selection class=heading-anchor><span>#</span></a></h3><p>Applications with hundreds of tools can embed tool descriptions and retrieve a
+small candidate set for the model. The same technique selects few-shot
+examples, policies, workflows, or prompt fragments related to the current
+request.</p><p>Retrieval narrows the model&rsquo;s choices; it must not grant permissions. The
+application still enforces which retrieved tools the user may invoke.</p><h2 id=ingestion-is-half-the-system>Ingestion Is Half the System
+<a href=#ingestion-is-half-the-system class=heading-anchor><span>#</span></a></h2><p>Search quality depends on what was indexed.</p><h3 id=parse-and-normalize>Parse and Normalize
+<a href=#parse-and-normalize class=heading-anchor><span>#</span></a></h3><p>Extract meaningful text from HTML, PDF, office documents, source repositories,
+or application records. Remove repeated navigation and boilerplate without
+discarding headings, tables, code boundaries, or other useful structure.</p><p>Optical character recognition, table extraction, and malformed PDFs can
+introduce errors before the embedding model sees the content.</p><h3 id=chunk-deliberately>Chunk Deliberately
+<a href=#chunk-deliberately class=heading-anchor><span>#</span></a></h3><p>Embedding an entire manual as one vector produces an average representation
+that may match no specific question. Split content into independently useful
+chunks.</p><p>Chunks that are too large mix topics and consume model context. Chunks that are
+too small lose definitions and relationships. Preserve headings and parent
+document identifiers, and use overlap only when it measurably helps.</p><p>There is no universally correct token count. Evaluate chunking against real
+questions and source formats.</p><h3 id=add-operational-metadata>Add Operational Metadata
+<a href=#add-operational-metadata class=heading-anchor><span>#</span></a></h3><p>Useful metadata includes:</p><ul><li>tenant and access classification;</li><li>source and parent document IDs;</li><li>source URI and title;</li><li>language;</li><li>version or content hash;</li><li>chunk position;</li><li>creation and expiration time; and</li><li>embedding model and indexing generation.</li></ul><p>Metadata is essential for access control and lifecycle management, not merely
+display.</p><h3 id=make-indexing-repeatable>Make Indexing Repeatable
+<a href=#make-indexing-repeatable class=heading-anchor><span>#</span></a></h3><p>An ingestion pipeline should support:</p><ul><li>stable IDs or deterministic upserts;</li><li>retries without duplicate chunks;</li><li>replacement of all chunks from an updated source;</li><li>deletion when a source is deleted;</li><li>checkpoints and dead-letter handling;</li><li>rate-limit-aware embedding batches; and</li><li>an atomic switch from an old index generation to a new one.</li></ul><p>Changing the embedding model or dimensions normally requires re-embedding the
+whole corpus. Build a new collection or table generation, validate it, then
+switch traffic. Do not mix incompatible embeddings in one searchable vector
+field.</p><h2 id=retrieval-is-more-than-topk>Retrieval Is More Than <code>topK</code>
+<a href=#retrieval-is-more-than-topk class=heading-anchor><span>#</span></a></h2><p>A robust retrieval pipeline often performs:</p><ol><li>query normalization or rewriting;</li><li>query embedding;</li><li>mandatory metadata filtering;</li><li>vector and possibly lexical candidate retrieval;</li><li>deduplication or diversity selection;</li><li>reranking;</li><li>a relevance or evidence-quality decision; and</li><li>context assembly within a token budget.</li></ol><p><code>topK</code> is the candidate count, not a quality guarantee. A fixed similarity
+threshold is also fragile across query types and model migrations.</p><h3 id=filter-before-disclosure>Filter Before Disclosure
+<a href=#filter-before-disclosure class=heading-anchor><span>#</span></a></h3><p>Authorization must be applied by the store or retrieval layer before content
+reaches the model:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>tenant_id = authenticated tenant
+</span></span><span style=display:flex><span>AND classification IN caller&#39;s allowed classifications
+</span></span><span style=display:flex><span>AND active = true</span></span></code></pre></div></div></div><p>Do not retrieve across all tenants and ask the model to ignore forbidden
+documents. Post-filtering can leak content and can also return too few results.</p><p>ANN indexes and selective filters interact in implementation-specific ways.
+Some stores prefilter efficiently; others retrieve candidates and then filter,
+or require tuning to continue searching after many candidates are rejected.
+Test with the same filter selectivity used in production.</p><h3 id=rerank-candidates>Rerank Candidates
+<a href=#rerank-candidates class=heading-anchor><span>#</span></a></h3><p>Embedding similarity is useful for inexpensive candidate generation. A
+cross-encoder or model-based reranker can examine the query and each candidate
+together and produce a more precise final order.</p><p>For example, retrieve 50 candidates, rerank them, and give the best 5 to the
+chat model. This improves precision but adds latency and cost.</p><h2 id=popular-implementations>Popular Implementations
+<a href=#popular-implementations class=heading-anchor><span>#</span></a></h2><p>“Vector database” is often used broadly. Some products are dedicated vector
+databases; others add vector fields and ANN indexes to an existing relational,
+search, document, graph, or cache system.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Implementation</th><th>Type</th><th>Java Access</th><th>Good Starting Point When</th></tr></thead><tbody><tr><td><a href=https://github.com/pgvector/pgvector>pgvector</a></td><td>PostgreSQL extension</td><td>JDBC, Hibernate Vector, R2DBC, Spring AI</td><td>Data already lives in PostgreSQL and SQL joins, transactions, and operations simplicity matter</td></tr><tr><td><a href=https://www.elastic.co/guide/en/elasticsearch/reference/current/knn-search.html>Elasticsearch</a></td><td>Search engine</td><td>Elasticsearch Java API Client, Spring AI</td><td>The application needs mature full-text, filtering, aggregations, and hybrid search</td></tr><tr><td><a href=https://docs.opensearch.org/latest/vector-search/>OpenSearch</a></td><td>Open-source search engine</td><td>OpenSearch Java client, Spring AI</td><td>The team already operates OpenSearch or needs its lexical/vector search stack</td></tr><tr><td><a href=https://qdrant.tech/documentation/>Qdrant</a></td><td>Dedicated vector database</td><td>Official gRPC Java client, Spring AI</td><td>Payload filtering and a focused open-source vector service are priorities</td></tr><tr><td><a href=https://milvus.io/docs/>Milvus</a></td><td>Distributed vector database</td><td>Milvus Java SDK, Spring AI</td><td>The corpus and throughput justify a specialized, horizontally scalable system</td></tr><tr><td><a href=https://docs.weaviate.io/weaviate>Weaviate</a></td><td>Vector database/search platform</td><td>Weaviate Java client, Spring AI</td><td>The team wants collections, vectorization integrations, hybrid search, and managed or self-hosted options</td></tr><tr><td><a href=https://docs.pinecone.io/>Pinecone</a></td><td>Managed vector database</td><td>Official Java SDK, Spring AI</td><td>A managed service and low operational burden are more important than self-hosting</td></tr><tr><td><a href=https://redis.io/docs/latest/develop/ai/search-and-query/vectors/>Redis</a></td><td>In-memory/data platform with vector search</td><td>Jedis, Lettuce, Spring AI</td><td>Redis is already present and low-latency search over a memory-resident working set fits the cost model</td></tr><tr><td><a href=https://www.mongodb.com/docs/atlas/atlas-vector-search/>MongoDB Atlas Vector Search</a></td><td>Managed document database/search</td><td>MongoDB Java driver, Spring Data, Spring AI</td><td>Source documents and metadata already use Atlas</td></tr><tr><td><a href=https://learn.microsoft.com/azure/search/vector-search-overview>Azure AI Search</a></td><td>Managed search service</td><td>Azure SDK for Java, Spring AI</td><td>The application is on Azure and needs integrated lexical, vector, and semantic ranking</td></tr></tbody></table></div></div><p>Other valid choices include Cassandra-compatible systems, Neo4j, cloud data
+warehouses, embedded libraries, and managed database services with vector
+extensions. FAISS and Apache Lucene provide vector indexing primitives but are
+libraries rather than complete remote databases with application-level
+multi-tenancy, backups, and service operations.</p><h3 id=how-to-choose>How to Choose
+<a href=#how-to-choose class=heading-anchor><span>#</span></a></h3><p>Start with requirements, not benchmark headlines:</p><ul><li>corpus size and vector dimensions;</li><li>query and update throughput;</li><li>p95 and p99 latency at a stated recall target;</li><li>metadata filter complexity and selectivity;</li><li>lexical and hybrid-search requirements;</li><li>consistency, update, and deletion semantics;</li><li>backup, replication, regional, and disaster-recovery needs;</li><li>self-hosted versus managed operation;</li><li>tenant isolation and encryption;</li><li>supported Java client and framework integration;</li><li>observability and index-tuning controls; and</li><li>total cost, including vector memory and replicas.</li></ul><p>If PostgreSQL already stores the source data and the expected corpus is
+moderate, pgvector is often the simplest first implementation. If search is a
+core product capability, Elasticsearch or OpenSearch may avoid building a
+second lexical system. A dedicated or managed vector database becomes
+attractive when vector workload, scale, isolation, or operational ownership
+deserves its own service.</p><p>The best choice can be the existing system that meets measured requirements.
+Adding a new distributed database solely because it is marketed for AI creates
+another source of truth, network hop, backup plan, and on-call burden.</p><h2 id=java-integration-options>Java Integration Options
+<a href=#java-integration-options class=heading-anchor><span>#</span></a></h2><p>A Java application can integrate at three levels.</p><p><strong>Framework abstraction</strong></p><p>Spring AI&rsquo;s <code>VectorStore</code> provides a common document, metadata, ingestion, and
+similarity-search API. This is convenient for RAG and permits substantial
+application code reuse between supported stores.</p><p><strong>Vendor SDK</strong></p><p>Dedicated Java clients expose provider-specific features. Qdrant, Milvus,
+Pinecone, Weaviate, Elasticsearch, OpenSearch, Redis, and other systems provide
+Java SDKs or supported Java clients. Use them when the application needs native
+hybrid queries, index controls, collection management, asynchronous bulk
+operations, or features absent from a framework abstraction.</p><p><strong>Native database protocol</strong></p><p>For pgvector, ordinary PostgreSQL JDBC and SQL are sufficient. This gives full
+control and integrates naturally with transactions and relational joins.</p><p>An abstraction is not a portability guarantee. Dimensions, score meanings,
+filter syntax, index creation, hybrid search, and consistency remain
+store-specific. Keep provider-specific configuration behind an application
+retrieval interface rather than spreading it through controllers and prompts.</p><h2 id=integrating-pgvector-with-spring-ai>Integrating pgvector with Spring AI
+<a href=#integrating-pgvector-with-spring-ai class=heading-anchor><span>#</span></a></h2><p>The following example uses Spring AI 2.0, PostgreSQL, and pgvector.</p><h3 id=add-dependencies>Add Dependencies
+<a href=#add-dependencies class=heading-anchor><span>#</span></a></h3><p>Import the Spring AI BOM, add one embedding-model starter, and add the pgvector
+store starter:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.ai<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>spring-ai-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>2.0.0<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.ai<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>spring-ai-starter-model-openai<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.ai<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>spring-ai-starter-vector-store-pgvector<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.postgresql<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>postgresql<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;scope&gt;</span>runtime<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p>The vector store needs an <code>EmbeddingModel</code>. It does not use the chat model to
+create embeddings.</p><h3 id=configure-the-store>Configure the Store
+<a href=#configure-the-store class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>spring</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>datasource</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>url</span>: <span style=color:#ae81ff>jdbc:postgresql://localhost:5432/knowledge</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>username</span>: <span style=color:#ae81ff>knowledge_app</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>password</span>: <span style=color:#ae81ff>${KNOWLEDGE_DB_PASSWORD}</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>ai</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>openai</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>api-key</span>: <span style=color:#ae81ff>${OPENAI_API_KEY}</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>embedding</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>options</span>:
+</span></span><span style=display:flex><span>          <span style=color:#f92672>model</span>: <span style=color:#ae81ff>text-embedding-3-small</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>vectorstore</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>pgvector</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>initialize-schema</span>: <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>index-type</span>: <span style=color:#ae81ff>HNSW</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>distance-type</span>: <span style=color:#ae81ff>COSINE_DISTANCE</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>schema-name</span>: <span style=color:#ae81ff>ai</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>table-name</span>: <span style=color:#ae81ff>knowledge_chunk</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>schema-validation</span>: <span style=color:#66d9ef>true</span></span></span></code></pre></div></div></div><p>Spring AI can initialize the schema when
+<code>spring.ai.vectorstore.pgvector.initialize-schema=true</code>, but the default is
+<code>false</code>. Production systems should normally manage the extension, table,
+indexes, ownership, and migrations through Flyway, Liquibase, or the existing
+database-change process rather than granting schema privileges to the
+application.</p><p>If dimensions are not configured, Spring AI can obtain them from the embedding
+model when creating the table. Once the vector column exists, changing to a
+model with different dimensions requires a new compatible schema and
+re-indexing.</p><h3 id=ingest-documents>Ingest Documents
+<a href=#ingest-documents class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.document.Document;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.transformer.splitter.TokenTextSplitter;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.vectorstore.VectorStore;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.stereotype.Service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Service</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>KnowledgeIndexer</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> VectorStore vectorStore;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> SourceDocumentRepository sources;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> TokenTextSplitter splitter;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>KnowledgeIndexer</span>(
+</span></span><span style=display:flex><span>            VectorStore vectorStore,
+</span></span><span style=display:flex><span>            SourceDocumentRepository sources) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>vectorStore</span> <span style=color:#f92672>=</span> vectorStore;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>sources</span> <span style=color:#f92672>=</span> sources;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>splitter</span> <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> TokenTextSplitter();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>index</span>(String tenantId, String sourceId) {
+</span></span><span style=display:flex><span>        SourceDocument source <span style=color:#f92672>=</span> sources.<span style=color:#a6e22e>require</span>(tenantId, sourceId);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        Document document <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Document(
+</span></span><span style=display:flex><span>                source.<span style=color:#a6e22e>text</span>(),
+</span></span><span style=display:flex><span>                Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;tenant_id&#34;</span>, tenantId,
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;source_id&#34;</span>, source.<span style=color:#a6e22e>id</span>(),
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;title&#34;</span>, source.<span style=color:#a6e22e>title</span>(),
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;version&#34;</span>, source.<span style=color:#a6e22e>version</span>(),
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;active&#34;</span>, <span style=color:#66d9ef>true</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        List<span style=color:#f92672>&lt;</span>Document<span style=color:#f92672>&gt;</span> chunks <span style=color:#f92672>=</span> splitter.<span style=color:#a6e22e>apply</span>(List.<span style=color:#a6e22e>of</span>(document));
+</span></span><span style=display:flex><span>        vectorStore.<span style=color:#a6e22e>add</span>(chunks);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>This illustrates the data path, not a complete synchronization design. A
+production indexer needs deterministic chunk IDs, replacement or tombstoning
+of the prior source version, retries, batching, and a record of which embedding
+generation produced each vector.</p><p>Spring AI batches embedding requests to stay within embedding-model token
+limits. Batching does not replace chunking: a single oversized document still
+needs to be split deliberately.</p><h3 id=search-with-an-authorization-filter>Search with an Authorization Filter
+<a href=#search-with-an-authorization-filter class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.document.Document;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.vectorstore.SearchRequest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.vectorstore.VectorStore;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.stereotype.Service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Service</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>KnowledgeSearch</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> VectorStore vectorStore;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>KnowledgeSearch</span>(VectorStore vectorStore) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>vectorStore</span> <span style=color:#f92672>=</span> vectorStore;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> List<span style=color:#f92672>&lt;</span>Document<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>search</span>(
+</span></span><span style=display:flex><span>            String tenantId,
+</span></span><span style=display:flex><span>            String query,
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>int</span> limit) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> filters <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> FilterExpressionBuilder();
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> authorizationFilter <span style=color:#f92672>=</span> filters.<span style=color:#a6e22e>and</span>(
+</span></span><span style=display:flex><span>                filters.<span style=color:#a6e22e>eq</span>(<span style=color:#e6db74>&#34;tenant_id&#34;</span>, tenantId),
+</span></span><span style=display:flex><span>                filters.<span style=color:#a6e22e>eq</span>(<span style=color:#e6db74>&#34;active&#34;</span>, <span style=color:#66d9ef>true</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        SearchRequest request <span style=color:#f92672>=</span> SearchRequest.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>query</span>(query)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>topK</span>(limit)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>similarityThreshold</span>(0.<span style=color:#a6e22e>72</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>filterExpression</span>(authorizationFilter)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> vectorStore.<span style=color:#a6e22e>similaritySearch</span>(request);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring AI&rsquo;s portable filter expression is converted to the native store
+filter. The structured builder keeps values separate from the filter language
+and avoids constructing an expression by concatenating user-controlled text.</p><p>The tenant ID must come from authenticated application context, not from a
+model-generated argument. Tune the similarity threshold with evaluation data.
+If weak retrieval should result in “I do not know,” make that an explicit
+application decision rather than assuming the store always returns useful
+evidence.</p><h3 id=use-results-in-rag>Use Results in RAG
+<a href=#use-results-in-rag class=heading-anchor><span>#</span></a></h3><p>For a straightforward question-answering flow, Spring AI can connect the store
+to <code>ChatClient</code> through <code>QuestionAnswerAdvisor</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.chat.client.ChatClient;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.vectorstore.SearchRequest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.vectorstore.VectorStore;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>KnowledgeAssistant</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> ChatClient chatClient;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> VectorStore vectorStore;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>KnowledgeAssistant</span>(
+</span></span><span style=display:flex><span>            ChatClient.<span style=color:#a6e22e>Builder</span> builder,
+</span></span><span style=display:flex><span>            VectorStore vectorStore) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>chatClient</span> <span style=color:#f92672>=</span> builder.<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>vectorStore</span> <span style=color:#f92672>=</span> vectorStore;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> String <span style=color:#a6e22e>answer</span>(String tenantId, String question) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> filter <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> FilterExpressionBuilder()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>eq</span>(<span style=color:#e6db74>&#34;tenant_id&#34;</span>, tenantId)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> search <span style=color:#f92672>=</span> SearchRequest.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>topK</span>(8)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>similarityThreshold</span>(0.<span style=color:#a6e22e>72</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>filterExpression</span>(filter)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> advisor <span style=color:#f92672>=</span> QuestionAnswerAdvisor.<span style=color:#a6e22e>builder</span>(vectorStore)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>searchRequest</span>(search)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>user</span>(question)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>advisors</span>(advisor)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>content</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The example creates a filtered Advisor for each request instead of registering
+one global, unfiltered Advisor. <code>tenantId</code> must come from trusted
+authentication context. More elaborate RAG flows can use
+<code>RetrievalAugmentationAdvisor</code> to customize query rewriting, retrieval,
+document joining, reranking, and prompt augmentation.</p><p>Preserve source IDs and titles so the response can cite evidence. A citation
+proves which chunk was supplied; it does not prove that the chunk is true or
+that the answer accurately reflects it.</p><h2 id=using-pgvector-directly-with-jdbc>Using pgvector Directly with JDBC
+<a href=#using-pgvector-directly-with-jdbc class=heading-anchor><span>#</span></a></h2><p>Applications that do not use Spring AI can call an embedding API, store the
+result, and query pgvector with JDBC.</p><p>Add the pgvector JDBC type:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>com.pgvector<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>pgvector<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>0.1.6<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>Create the extension and table through a database migration:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> EXTENSION <span style=color:#66d9ef>IF</span> <span style=color:#66d9ef>NOT</span> <span style=color:#66d9ef>EXISTS</span> vector;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>TABLE</span> knowledge_chunk (
+</span></span><span style=display:flex><span>    id text <span style=color:#66d9ef>PRIMARY</span> <span style=color:#66d9ef>KEY</span>,
+</span></span><span style=display:flex><span>    tenant_id text <span style=color:#66d9ef>NOT</span> <span style=color:#66d9ef>NULL</span>,
+</span></span><span style=display:flex><span>    source_id text <span style=color:#66d9ef>NOT</span> <span style=color:#66d9ef>NULL</span>,
+</span></span><span style=display:flex><span>    content text <span style=color:#66d9ef>NOT</span> <span style=color:#66d9ef>NULL</span>,
+</span></span><span style=display:flex><span>    metadata jsonb <span style=color:#66d9ef>NOT</span> <span style=color:#66d9ef>NULL</span>,
+</span></span><span style=display:flex><span>    embedding vector(<span style=color:#ae81ff>1536</span>) <span style=color:#66d9ef>NOT</span> <span style=color:#66d9ef>NULL</span>
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>INDEX</span> knowledge_chunk_tenant_idx
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>ON</span> knowledge_chunk (tenant_id);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>INDEX</span> knowledge_chunk_embedding_hnsw_idx
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>ON</span> knowledge_chunk
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>USING</span> hnsw (embedding vector_cosine_ops);</span></span></code></pre></div></div></div><p>The dimension <code>1536</code> must match the selected embedding model. The operator
+class must match the query metric.</p><p>With the <a href=https://github.com/pgvector/pgvector-java>pgvector Java library</a>
+registered on the PostgreSQL connection, a query can bind a <code>PGvector</code> value:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> com.pgvector.PGvector;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.sql.Connection;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.ArrayList;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> javax.sql.DataSource;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>PgVectorKnowledgeSearch</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String SQL <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>            SELECT id,
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                   source_id,
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                   content,
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                   1 - (embedding &lt;=&gt; ?) AS similarity
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>              FROM knowledge_chunk
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>             WHERE tenant_id = ?
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>             ORDER BY embedding &lt;=&gt; ?
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>             LIMIT ?
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>            &#34;&#34;&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> DataSource dataSource;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> EmbeddingClient embeddings;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>PgVectorKnowledgeSearch</span>(
+</span></span><span style=display:flex><span>            DataSource dataSource,
+</span></span><span style=display:flex><span>            EmbeddingClient embeddings) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>dataSource</span> <span style=color:#f92672>=</span> dataSource;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>embeddings</span> <span style=color:#f92672>=</span> embeddings;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> List<span style=color:#f92672>&lt;</span>SearchHit<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>search</span>(
+</span></span><span style=display:flex><span>            String tenantId,
+</span></span><span style=display:flex><span>            String text,
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>int</span> limit) <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>float</span><span style=color:#f92672>[]</span> query <span style=color:#f92672>=</span> embeddings.<span style=color:#a6e22e>embed</span>(text);
+</span></span><span style=display:flex><span>        PGvector vector <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> PGvector(query);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>try</span> (Connection connection <span style=color:#f92672>=</span> dataSource.<span style=color:#a6e22e>getConnection</span>()) {
+</span></span><span style=display:flex><span>            PGvector.<span style=color:#a6e22e>registerTypes</span>(connection);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>try</span> (<span style=color:#66d9ef>var</span> statement <span style=color:#f92672>=</span> connection.<span style=color:#a6e22e>prepareStatement</span>(SQL)) {
+</span></span><span style=display:flex><span>                statement.<span style=color:#a6e22e>setObject</span>(1, vector);
+</span></span><span style=display:flex><span>                statement.<span style=color:#a6e22e>setString</span>(2, tenantId);
+</span></span><span style=display:flex><span>                statement.<span style=color:#a6e22e>setObject</span>(3, vector);
+</span></span><span style=display:flex><span>                statement.<span style=color:#a6e22e>setInt</span>(4, limit);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>try</span> (<span style=color:#66d9ef>var</span> rows <span style=color:#f92672>=</span> statement.<span style=color:#a6e22e>executeQuery</span>()) {
+</span></span><span style=display:flex><span>                    List<span style=color:#f92672>&lt;</span>SearchHit<span style=color:#f92672>&gt;</span> hits <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ArrayList<span style=color:#f92672>&lt;&gt;</span>();
+</span></span><span style=display:flex><span>                    <span style=color:#66d9ef>while</span> (rows.<span style=color:#a6e22e>next</span>()) {
+</span></span><span style=display:flex><span>                        hits.<span style=color:#a6e22e>add</span>(<span style=color:#66d9ef>new</span> SearchHit(
+</span></span><span style=display:flex><span>                                rows.<span style=color:#a6e22e>getString</span>(<span style=color:#e6db74>&#34;id&#34;</span>),
+</span></span><span style=display:flex><span>                                rows.<span style=color:#a6e22e>getString</span>(<span style=color:#e6db74>&#34;source_id&#34;</span>),
+</span></span><span style=display:flex><span>                                rows.<span style=color:#a6e22e>getString</span>(<span style=color:#e6db74>&#34;content&#34;</span>),
+</span></span><span style=display:flex><span>                                rows.<span style=color:#a6e22e>getDouble</span>(<span style=color:#e6db74>&#34;similarity&#34;</span>)));
+</span></span><span style=display:flex><span>                    }
+</span></span><span style=display:flex><span>                    <span style=color:#66d9ef>return</span> hits;
+</span></span><span style=display:flex><span>                }
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>EmbeddingClient</code> is an application interface around the chosen embedding
+provider. The query embeds text before opening the database connection so a
+slow remote model call does not occupy a JDBC connection.</p><p>The SQL uses <code>&lt;=></code>, pgvector&rsquo;s cosine-distance operator. Subtracting the
+distance from 1 produces cosine similarity. Both <code>ORDER BY</code> and <code>LIMIT</code> are
+important for index use. Bind vectors and filters as parameters; do not insert
+them into SQL strings.</p><p>Direct SQL is useful when vector search must join transactional data:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#66d9ef>c</span>.id, <span style=color:#66d9ef>c</span>.content
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> knowledge_chunk <span style=color:#66d9ef>c</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>JOIN</span> document_acl a <span style=color:#66d9ef>ON</span> a.source_id <span style=color:#f92672>=</span> <span style=color:#66d9ef>c</span>.source_id
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> <span style=color:#66d9ef>c</span>.tenant_id <span style=color:#f92672>=</span> <span style=color:#f92672>?</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>AND</span> a.principal_id <span style=color:#f92672>=</span> <span style=color:#f92672>?</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ORDER</span> <span style=color:#66d9ef>BY</span> <span style=color:#66d9ef>c</span>.embedding <span style=color:#f92672>&lt;=&gt;</span> <span style=color:#f92672>?</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>LIMIT</span> <span style=color:#ae81ff>10</span>;</span></span></code></pre></div></div></div><p>However, verify query plans and ANN recall with realistic filters. A relational
+join does not automatically guarantee that the query planner will combine the
+ANN index and authorization predicates efficiently.</p><h2 id=operating-a-vector-store>Operating a Vector Store
+<a href=#operating-a-vector-store class=heading-anchor><span>#</span></a></h2><p>Treat a vector store as production data infrastructure.</p><p>Monitor:</p><ul><li>ingestion lag and failures;</li><li>embedding API latency, rate limits, and cost;</li><li>vector count by tenant and generation;</li><li>deleted or orphaned chunks;</li><li>query latency and timeout rate;</li><li>candidates examined and filter selectivity where available;</li><li>index build and memory usage;</li><li>exact-versus-ANN recall on a benchmark set; and</li><li>retrieval quality on real application questions.</li></ul><p>Back up source content, metadata, and synchronization state. Embeddings can be
+recomputed, but doing so may be slow and expensive. Know whether the chosen
+store&rsquo;s backup includes index structures or rebuilds them during restore.</p><p>Deletion deserves special attention. Removing a source from the primary
+application must eventually remove all of its chunks, vectors, lexical-index
+entries, caches, and replicas. Privacy deletion is not complete while an old
+embedding generation still contains the content.</p><h2 id=common-mistakes>Common Mistakes
+<a href=#common-mistakes class=heading-anchor><span>#</span></a></h2><p><strong>Using vectors for exact lookup</strong></p><p>Fetch an order by order ID with a database key, not semantic similarity.</p><p><strong>Embedding whole documents</strong></p><p>One vector for a long, multi-topic document gives poor passage-level
+retrieval.</p><p><strong>Mixing embedding models</strong></p><p>Vectors from different models or dimensions generally do not inhabit a
+compatible space.</p><p><strong>Treating similarity as truth</strong></p><p>A close passage is related, not necessarily correct, current, or authoritative.</p><p><strong>Ignoring lexical search</strong></p><p>Vector search often misses exact codes, names, and rare strings that a text
+index handles well.</p><p><strong>Filtering after retrieval</strong></p><p>This can disclose unauthorized data and destroy recall for allowed data.</p><p><strong>Using a universal threshold</strong></p><p>Similarity scores change with models, metrics, stores, corpora, and query
+types.</p><p><strong>Skipping evaluation</strong></p><p>A fluent generated answer can hide retrieval failure. Measure retrieval
+recall, ranking, citation support, and end-to-end answer quality separately.</p><p><strong>Adding a database before measuring</strong></p><p>An in-memory exact scan or existing PostgreSQL/search platform may satisfy the
+initial workload with much less operational complexity.</p><h2 id=further-reading>Further Reading
+<a href=#further-reading class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-ai/reference/api/vectordbs.html>Spring AI Vector Databases</a></li><li><a href=https://docs.spring.io/spring-ai/reference/api/vectordbs/pgvector.html>Spring AI pgvector Integration</a></li><li><a href=https://github.com/pgvector/pgvector>pgvector</a></li><li><a href=https://qdrant.tech/documentation/>Qdrant Documentation</a></li><li><a href=https://milvus.io/docs/>Milvus Documentation</a></li><li><a href=https://docs.weaviate.io/weaviate>Weaviate Documentation</a></li><li><a href=https://docs.pinecone.io/>Pinecone Documentation</a></li><li><a href=/spring-ai/>Spring AI</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/vector-stores/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

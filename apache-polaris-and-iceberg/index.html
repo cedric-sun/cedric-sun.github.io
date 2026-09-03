@@ -1,0 +1,266 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Apache Polaris and Apache Iceberg</title></head><body><main><article><div class=article-header><h1>Apache Polaris and Apache Iceberg</h1><div class=aux>Last update: 2026-07-22 11:58:00 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/apache-polaris/>Apache Polaris</a>
+|
+<a href=/tags/apache-iceberg/>Apache Iceberg</a>
+|
+<a href=/tags/data-lakehouse/>Data Lakehouse</a>
+|
+<a href=/tags/spark/>Spark</a>
+|
+<a href=/tags/data-platforms/>Data Platforms</a></div></div><div class=article-content><p>Apache Polaris is a catalog service for Apache Iceberg tables. Apache Iceberg
+is an open table format for large analytical datasets. Neither project is a
+general-purpose computation engine:</p><ul><li>Polaris identifies tables, governs access, and coordinates changes to the
+current Iceberg metadata.</li><li>Iceberg defines how table state, snapshots, manifests, data files, and delete
+files fit together.</li><li>Spark, Flink, Trino, and other engines plan and execute computations.</li><li>HDFS or object storage holds the Iceberg metadata and table data files.</li></ul><p>Keeping those responsibilities separate prevents a common category error:
+Polaris is not an alternative to Spark. A Spark deployment can use Polaris as
+its Iceberg catalog.</p><h2 id=place-each-component-in-the-stack>Place Each Component in the Stack
+<a href=#place-each-component-in-the-stack class=heading-anchor><span>#</span></a></h2><p>A typical deployment has four distinct layers:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>SQL client, notebook, scheduler, or application
+</span></span><span style=display:flex><span>                         |
+</span></span><span style=display:flex><span>                         v
+</span></span><span style=display:flex><span>Compute engine: Spark, Flink, Trino, or another Iceberg client
+</span></span><span style=display:flex><span>             |                              |
+</span></span><span style=display:flex><span>             | Iceberg REST requests        | file I/O
+</span></span><span style=display:flex><span>             v                              v
+</span></span><span style=display:flex><span>Apache Polaris                         Object storage or HDFS
+</span></span><span style=display:flex><span>             |                              |
+</span></span><span style=display:flex><span>             | current metadata pointer     | Iceberg metadata,
+</span></span><span style=display:flex><span>             `----------------------------&gt; | manifests, and data files</span></span></code></pre></div></div></div><p>The control path and data path are separate:</p><ol><li>The engine asks Polaris to resolve a namespace and table.</li><li>Polaris returns information needed to load the current Iceberg table
+metadata.</li><li>The engine reads metadata, manifests, and data files from storage.</li><li>The engine performs scans, joins, aggregations, and writes.</li><li>For a write, the engine asks Polaris to atomically commit a new table
+metadata version.</li></ol><p>Table rows do not flow through Polaris. Consequently, adding Polaris does not
+provide compute capacity or make a slow query faster by itself.</p><h2 id=understand-what-iceberg-adds>Understand What Iceberg Adds
+<a href=#understand-what-iceberg-adds class=heading-anchor><span>#</span></a></h2><p>Parquet, ORC, and Avro describe individual files. They do not define which
+files constitute a table at a particular moment. Iceberg adds that table-level
+state.</p><p>An Iceberg table is represented by a metadata tree:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Catalog entry
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    v
+</span></span><span style=display:flex><span>Current table metadata JSON
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    +--&gt; schemas, partition specifications, properties
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    `--&gt; snapshots
+</span></span><span style=display:flex><span>           |
+</span></span><span style=display:flex><span>           v
+</span></span><span style=display:flex><span>      manifest list
+</span></span><span style=display:flex><span>           |
+</span></span><span style=display:flex><span>           v
+</span></span><span style=display:flex><span>        manifests
+</span></span><span style=display:flex><span>           |
+</span></span><span style=display:flex><span>           +--&gt; data files
+</span></span><span style=display:flex><span>           `--&gt; delete files</span></span></code></pre></div></div></div><p>Each committed snapshot describes a complete, consistent table state. Readers
+that loaded an older snapshot can continue using it while a writer prepares
+and commits a newer one.</p><p>This model supplies capabilities that a directory of Parquet files does not
+supply on its own:</p><ul><li>atomic table changes;</li><li>snapshot isolation and time travel;</li><li>schema evolution based on stable field identifiers;</li><li>hidden partitioning and partition-spec evolution;</li><li>file-level statistics for scan planning;</li><li>row-level delete and update representations in table-format versions that
+support them; and</li><li>optimistic concurrency between writers.</li></ul><p>Iceberg normally treats data and metadata files as immutable. A write produces
+new files and then attempts to replace the catalog&rsquo;s current metadata pointer.
+The new files become visible together only after that commit succeeds.</p><h2 id=understand-what-polaris-adds>Understand What Polaris Adds
+<a href=#understand-what-polaris-adds class=heading-anchor><span>#</span></a></h2><p>Iceberg requires a catalog to map a logical table name to its current metadata
+and to coordinate commits. Apache Polaris provides that catalog through the
+Iceberg REST Catalog API.</p><p>Polaris is responsible for concerns such as:</p><ul><li>catalogs, namespaces, and table identifiers;</li><li>the authoritative pointer to current Iceberg table metadata;</li><li>atomic commit checks and conflict detection;</li><li>authentication and catalog authorization;</li><li>integration with storage credentials; and</li><li>a standard REST interface usable by multiple engines.</li></ul><p>The REST interface matters because each compute engine can implement one
+Iceberg REST client instead of implementing every catalog backend separately.
+It plays a role similar to the Hive Metastore Thrift API, but the table and
+transaction models are different.</p><p>Polaris does not:</p><ul><li>execute SQL;</li><li>schedule YARN applications;</li><li>run Spark executors;</li><li>store table rows in its service database;</li><li>replace Parquet, ORC, or Avro; or</li><li>turn arbitrary files into an Iceberg table automatically.</li></ul><h2 id=compare-polaris-with-hive-metastore>Compare Polaris with Hive Metastore
+<a href=#compare-polaris-with-hive-metastore class=heading-anchor><span>#</span></a></h2><p>Polaris and Hive Metastore are both catalog services, but they should not be
+treated as interchangeable implementations of the same metadata model.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Concern</th><th>Hive Metastore</th><th>Polaris with Iceberg</th></tr></thead><tbody><tr><td>Primary API</td><td>HMS Thrift API</td><td>Iceberg REST Catalog API</td></tr><tr><td>Table state</td><td>Table, partition, and storage-descriptor records</td><td>Pointer to Iceberg&rsquo;s current table metadata</td></tr><tr><td>File tracking</td><td>Commonly inferred from table and partition locations</td><td>Explicitly tracked through snapshots and manifests</td></tr><tr><td>Partitioning</td><td>Partition columns and catalog partition records</td><td>Hidden transforms stored in Iceberg metadata</td></tr><tr><td>Commit model</td><td>Depends on Hive table and transaction type</td><td>Optimistic Iceberg metadata commits</td></tr><tr><td>Multi-engine use</td><td>Engines implement HMS-compatible clients</td><td>Engines implement the Iceberg REST protocol</td></tr></tbody></table></div></div><p>For a Hive expert, a useful approximation is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>HMS       = catalog plus Hive-oriented table and partition metadata
+</span></span><span style=display:flex><span>Polaris   = catalog and commit coordinator for Iceberg metadata
+</span></span><span style=display:flex><span>Iceberg   = table state that HMS-style tables traditionally lack</span></span></code></pre></div></div></div><p>The approximation is not an API compatibility claim. Moving a table from HMS
+to Polaris requires an Iceberg-aware migration or registration procedure, not
+changing a Thrift URI to a REST URI.</p><h2 id=compare-polaris-with-spark>Compare Polaris with Spark
+<a href=#compare-polaris-with-spark class=heading-anchor><span>#</span></a></h2><p>Spark and Polaris occupy different layers:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Capability</th><th>Apache Polaris</th><th>Apache Spark</th></tr></thead><tbody><tr><td>Resolve table names</td><td>Yes</td><td>Through a configured catalog</td></tr><tr><td>Coordinate Iceberg commits</td><td>Yes</td><td>Produces a commit and submits it</td></tr><tr><td>Execute SQL</td><td>No</td><td>Yes</td></tr><tr><td>Run distributed transformations</td><td>No</td><td>Yes</td></tr><tr><td>Schedule tasks and executors</td><td>No</td><td>Yes</td></tr><tr><td>Read and write data files</td><td>Normally no</td><td>Yes</td></tr><tr><td>Provide streaming or machine-learning APIs</td><td>No</td><td>Yes</td></tr></tbody></table></div></div><p>Their normal relationship is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Spark driver
+</span></span><span style=display:flex><span>   |---- load and commit table metadata ----&gt; Polaris
+</span></span><span style=display:flex><span>   |
+</span></span><span style=display:flex><span>   `---- schedule tasks --------------------&gt; Spark executors
+</span></span><span style=display:flex><span>                                                   |
+</span></span><span style=display:flex><span>                                                   `--&gt; Iceberg files in storage</span></span></code></pre></div></div></div><p>The driver uses an Iceberg client to communicate with Polaris. Executors read
+and write the files selected by the planned Iceberg scan or write. Polaris is
+not in the executor data path.</p><h2 id=integrate-compute-engines>Integrate Compute Engines
+<a href=#integrate-compute-engines class=heading-anchor><span>#</span></a></h2><p>Every engine needs three independent connections:</p><ol><li>a network and authentication path to the Polaris REST endpoint;</li><li>a Polaris catalog identifier, called a warehouse by the Iceberg REST API;
+and</li><li>a supported method for accessing the Iceberg files in object storage or
+HDFS.</li></ol><p>The examples below show the important integration boundary rather than a
+complete production configuration. Property names and supported Iceberg
+features change between engine releases. Use mutually supported engine,
+connector, Iceberg, and Polaris versions.</p><h3 id=integrate-apache-doris>Integrate Apache Doris™
+<a href=#integrate-apache-doris class=heading-anchor><span>#</span></a></h3><p>Apache Doris 3.1 and later can configure Polaris as an Iceberg REST catalog.
+Doris uses OAuth 2.0 credentials to obtain a Polaris token and can request
+temporary object-storage credentials from Polaris:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>CATALOG</span> polaris_vended PROPERTIES (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;type&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;iceberg&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;warehouse&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;analytics_catalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.catalog.type&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;rest&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.uri&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;https://polaris.example.com/api/catalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.security.type&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;oauth2&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.oauth2.credential&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;&lt;client-id&gt;:&lt;client-secret&gt;&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.oauth2.server-uri&#39;</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#39;https://polaris.example.com/api/catalog/v1/oauth/tokens&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.oauth2.scope&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;PRINCIPAL_ROLE:doris_role&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.vended-credentials-enabled&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;true&#39;</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>The Doris frontend resolves Iceberg objects through Polaris, while Doris
+backend or compute nodes read the selected data files from storage. Grant the
+Polaris principal only the required catalog privileges and configure the
+Polaris catalog with a storage role that can vend appropriately scoped
+credentials.</p><p>If credential vending is disabled, Doris needs its own storage credentials.
+That changes the storage authorization path but not the Polaris catalog path.
+Test reads and writes separately because an identity may be able to load table
+metadata while lacking permission to access or create data files.</p><h3 id=integrate-apache-flink>Integrate Apache Flink®
+<a href=#integrate-apache-flink class=heading-anchor><span>#</span></a></h3><p>Flink uses the Iceberg connector and registers Polaris as an Iceberg REST
+catalog. A representative Flink SQL catalog definition is:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>CATALOG</span> polaris <span style=color:#66d9ef>WITH</span> (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;type&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;iceberg&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;catalog-impl&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;org.apache.iceberg.rest.RESTCatalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;uri&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;https://polaris.example.com/api/catalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;warehouse&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;analytics_catalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;credential&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;&lt;client-id&gt;:&lt;client-secret&gt;&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;scope&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;PRINCIPAL_ROLE:flink_role&#39;</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>The Flink distribution must contain an Iceberg Flink runtime compatible with
+that exact Flink release, plus the file-I/O dependencies required by the
+storage backend. Catalog authentication and storage authentication are
+separate even when the REST response includes vended credentials.</p><p>For streaming writes, files become visible only when the Iceberg sink commits
+a successful checkpoint. A job can therefore have files in storage while its
+latest records remain absent from the current Iceberg snapshot. Monitor Flink
+checkpoints and Iceberg commits together rather than treating file creation as
+proof of table visibility.</p><h3 id=integrate-apache-spark>Integrate Apache Spark™
+<a href=#integrate-apache-spark class=heading-anchor><span>#</span></a></h3><p>Spark configures an Iceberg <code>SparkCatalog</code> whose backend is the REST catalog:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>spark.sql.catalog.polaris=org.apache.iceberg.spark.SparkCatalog
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.type=rest
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.uri=https://polaris.example.com/api/catalog
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.warehouse=analytics_catalog
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.credential=&lt;client-id&gt;:&lt;client-secret&gt;
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.scope=PRINCIPAL_ROLE:spark_role</span></span></code></pre></div></div></div><p>Use the catalog in multipart names such as
+<code>polaris.sales.orders</code>. The Spark driver loads and commits metadata through
+Polaris; executors read and write Iceberg files directly. The Spark
+distribution needs Iceberg runtime artifacts built for its Spark and Scala
+versions.</p><p>Spark&rsquo;s Iceberg SQL extensions may be required for procedures and row-level
+commands beyond basic reads and writes. Support also depends on the table&rsquo;s
+Iceberg format version. Polaris accepting a commit does not imply that every
+other engine can interpret features written by that Spark version.</p><h3 id=integrate-dremio-oss>Integrate Dremio® OSS
+<a href=#integrate-dremio-oss class=heading-anchor><span>#</span></a></h3><p>Dremio OSS does not currently expose the Iceberg REST Catalog source needed
+for a supported direct connection to Polaris. Do not assume that the presence
+of Iceberg readers in Dremio OSS implies REST catalog support, and do not
+document an Enterprise-only source as an OSS integration.</p><p>Dremio Enterprise editions provide an <strong>Iceberg REST Catalog Source</strong> that can
+use a Polaris endpoint and vended credentials. That configuration is not
+portable to the OSS edition. For an all-open-source deployment, use a
+Polaris-compatible engine such as Spark, Flink, Trino, Doris, or a supported
+StarRocks release, or verify that a future Dremio OSS release has explicitly
+added the source before designing around it.</p><h3 id=integrate-starrocks>Integrate StarRocks
+<a href=#integrate-starrocks class=heading-anchor><span>#</span></a></h3><p>StarRocks configures Polaris as the REST backend of an external Iceberg
+catalog:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>EXTERNAL</span> <span style=color:#66d9ef>CATALOG</span> polaris
+</span></span><span style=display:flex><span>PROPERTIES (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;type&#34;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;iceberg&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.type&#34;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;rest&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.uri&#34;</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;https://polaris.example.com/api/catalog&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.warehouse&#34;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;analytics_catalog&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.security&#34;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;oauth2&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.oauth2.credential&#34;</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;&lt;client-id&gt;:&lt;client-secret&gt;&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.oauth2.scope&#34;</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;PRINCIPAL_ROLE:starrocks_role&#34;</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>StarRocks frontend and backend or compute nodes must be able to reach the
+catalog and storage services required by their roles. Storage credential
+properties depend on S3, an S3-compatible service, Azure, GCS, or HDFS.
+Credential vending for REST catalogs is release-dependent; current StarRocks
+documentation identifies it as available from version 4.0.</p><p>Check the StarRocks support matrix before enabling Iceberg v2 delete files,
+newer format versions, writes, or maintenance operations. Being able to query
+a basic Parquet-backed table does not prove support for every snapshot
+feature another engine may commit.</p><h3 id=integrate-trino>Integrate Trino
+<a href=#integrate-trino class=heading-anchor><span>#</span></a></h3><p>Trino uses its Iceberg connector with <code>rest</code> as the catalog type. A catalog
+properties file contains settings similar to:</p><div class=jose-wrapper><div class=jose-tools><span>properties</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-properties data-lang=properties><span style=display:flex><span><span style=color:#a6e22e>connector.name</span><span style=color:#f92672>=</span><span style=color:#e6db74>iceberg</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.catalog.type</span><span style=color:#f92672>=</span><span style=color:#e6db74>rest</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.rest-catalog.uri</span><span style=color:#f92672>=</span><span style=color:#e6db74>https://polaris.example.com/api/catalog</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.rest-catalog.warehouse</span><span style=color:#f92672>=</span><span style=color:#e6db74>analytics_catalog</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.rest-catalog.security</span><span style=color:#f92672>=</span><span style=color:#e6db74>OAUTH2</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.rest-catalog.vended-credentials-enabled</span><span style=color:#f92672>=</span><span style=color:#e6db74>true</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>fs.s3.enabled</span><span style=color:#f92672>=</span><span style=color:#e6db74>true</span></span></span></code></pre></div></div></div><p>Add the supported OAuth credentials, Polaris realm header when the deployment
+requires one, and storage-specific properties through a protected secret and
+configuration mechanism. Do not place real client secrets directly in a
+world-readable catalog properties file.</p><p>Trino&rsquo;s coordinator communicates with Polaris during planning and commits,
+while workers read and write Iceberg files. Trino also exposes Iceberg
+maintenance procedures, but their availability and semantics depend on the
+connector release. Coordinate snapshot expiration, orphan-file removal, and
+data-file optimization across engines so that independent maintenance jobs do
+not use conflicting retention policies.</p><h2 id=follow-an-iceberg-read>Follow an Iceberg Read
+<a href=#follow-an-iceberg-read class=heading-anchor><span>#</span></a></h2><p>Consider a query issued through Spark SQL:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> customer_id, <span style=color:#66d9ef>SUM</span>(amount)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> lake.sales.orders
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> order_date <span style=color:#f92672>&gt;=</span> DATE <span style=color:#e6db74>&#39;2026-08-01&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> customer_id;</span></span></code></pre></div></div></div><p>A simplified read proceeds as follows:</p><ol><li>Spark resolves <code>lake.sales.orders</code> through the configured Polaris catalog.</li><li>Spark loads the table&rsquo;s current Iceberg metadata and selects a snapshot.</li><li>Iceberg evaluates the query predicate against partition information and
+manifest statistics.</li><li>Spark plans tasks only for data and delete files that may match.</li><li>Executors read those files directly from storage.</li><li>Spark performs the aggregation and returns the result.</li></ol><p>Polaris participates in name resolution and authorization. Iceberg supplies
+the snapshot and file-planning model. Spark supplies the SQL semantics,
+optimizer, scheduler, and runtime.</p><h2 id=follow-an-iceberg-write>Follow an Iceberg Write
+<a href=#follow-an-iceberg-write class=heading-anchor><span>#</span></a></h2><p>An append illustrates the commit boundary:</p><ol><li>The engine loads the current Iceberg table metadata from Polaris.</li><li>Distributed tasks write new data files to storage.</li><li>The engine writes new manifests, a manifest list, and table metadata.</li><li>The engine asks Polaris to replace the old metadata pointer with the new
+one, conditional on the base version still being current.</li><li>Polaris commits the pointer atomically or rejects the stale update.</li><li>On a conflict, the Iceberg client decides whether the operation can be
+safely retried against the new current state.</li></ol><p>Files written before a failed commit are not part of the table merely because
+they exist in the table directory. They are orphan files until cleanup removes
+them or a later valid operation references them.</p><p>This is why applications must not write directly into an Iceberg table
+location and then expect the files to appear. Visibility is controlled by
+committed Iceberg metadata, not directory listing.</p><h2 id=explain-the-lakehouse-label>Explain the Lakehouse Label
+<a href=#explain-the-lakehouse-label class=heading-anchor><span>#</span></a></h2><p>The term <em>lakehouse</em> combines two properties:</p><ul><li><strong>Lake:</strong> table data remains in HDFS or object storage, commonly in open file
+formats and accessible by multiple engines.</li><li><strong>Warehouse:</strong> the table layer supplies schemas, transactions, snapshots,
+governance, and predictable SQL behavior.</li></ul><p>In this stack, the label applies to the complete architecture rather than to
+Polaris alone:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Lake storage
+</span></span><span style=display:flex><span>    + Iceberg table semantics
+</span></span><span style=display:flex><span>    + Polaris catalog and governance
+</span></span><span style=display:flex><span>    + SQL compute engines
+</span></span><span style=display:flex><span>    = an open lakehouse architecture</span></span></code></pre></div></div></div><p>Polaris contributes catalog interoperability and governance. Iceberg
+contributes warehouse-like table semantics over lake storage. Compute engines
+provide the actual analytical processing.</p><h2 id=separate-namespaces-from-storage-paths>Separate Namespaces from Storage Paths
+<a href=#separate-namespaces-from-storage-paths class=heading-anchor><span>#</span></a></h2><p>A logical identifier such as <code>sales.orders</code> is not a filesystem path.
+Polaris resolves the identifier to Iceberg metadata, while that metadata
+ultimately references files in storage.</p><p>This separation allows administrators to:</p><ul><li>change logical organization without exposing storage layout to users;</li><li>enforce access at catalog and namespace boundaries;</li><li>use different storage locations for different catalogs or namespaces; and</li><li>give several engines a consistent view of the same tables.</li></ul><p>Storage permissions still matter. Catalog authorization can permit a table
+operation while the engine lacks permission to read the referenced objects.
+Conversely, direct storage access can bypass catalog policy if users receive
+unrestricted bucket credentials.</p><h2 id=design-authentication-and-storage-access-together>Design Authentication and Storage Access Together
+<a href=#design-authentication-and-storage-access-together class=heading-anchor><span>#</span></a></h2><p>A secure request crosses at least two authorization boundaries:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>User or workload
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    | authenticate and authorize catalog operation
+</span></span><span style=display:flex><span>    v
+</span></span><span style=display:flex><span>Polaris
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Compute engine
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    | authorize object reads and writes
+</span></span><span style=display:flex><span>    v
+</span></span><span style=display:flex><span>Object storage or HDFS</span></span></code></pre></div></div></div><p>Deployments can use fixed engine credentials or a supported credential-vending
+design. Credential vending gives an authenticated client scoped, temporary
+storage access instead of distributing broad, long-lived storage credentials.
+Its exact behavior depends on the Polaris release, storage backend, and engine
+integration.</p><p>Catalog policy and storage policy must agree. Test both control-plane denial
+and data-plane denial:</p><ul><li>Can the principal discover the catalog and namespace?</li><li>Can it load or modify the table?</li><li>Can its engine read existing metadata and data files?</li><li>Can a writer create files and complete a catalog commit?</li><li>Can credentials access unrelated prefixes after the operation?</li></ul><p>TLS, secret storage, credential rotation, audit records, and clock
+synchronization remain deployment responsibilities.</p><h2 id=operate-the-catalog-as-a-control-plane-service>Operate the Catalog as a Control-Plane Service
+<a href=#operate-the-catalog-as-a-control-plane-service class=heading-anchor><span>#</span></a></h2><p>Polaris is outside the query data path, but its availability affects table
+discovery and commits. Operate it as durable control-plane infrastructure:</p><ul><li>run the supported high-availability topology;</li><li>protect and back up its persistent state;</li><li>monitor request latency, error rates, authentication failures, and commit
+conflicts;</li><li>retain audit records for catalog and privilege changes;</li><li>coordinate server and client upgrades against supported Iceberg APIs; and</li><li>test restoration without assuming that storage files reconstruct every
+catalog object or policy.</li></ul><p>Monitor storage separately for failed-write debris, expired snapshots, small
+files, oversized manifests, and delete-file accumulation. Those are Iceberg
+table-maintenance concerns rather than evidence that Polaris should scan or
+rewrite table data.</p><h2 id=avoid-common-misconceptions>Avoid Common Misconceptions
+<a href=#avoid-common-misconceptions class=heading-anchor><span>#</span></a></h2><h3 id=polaris-is-not-a-compute-engine>Polaris Is Not a Compute Engine
+<a href=#polaris-is-not-a-compute-engine class=heading-anchor><span>#</span></a></h3><p>Polaris does not compete with Spark, Flink, or Trino. Those engines use
+Polaris.</p><h3 id=iceberg-is-not-a-file-format>Iceberg Is Not a File Format
+<a href=#iceberg-is-not-a-file-format class=heading-anchor><span>#</span></a></h3><p>Iceberg is a table format. Its data files commonly use Parquet, ORC, or Avro.</p><h3 id=a-catalog-is-not-the-tables-entire-metadata-tree>A Catalog Is Not the Table&rsquo;s Entire Metadata Tree
+<a href=#a-catalog-is-not-the-tables-entire-metadata-tree class=heading-anchor><span>#</span></a></h3><p>Polaris maintains catalog state and the current table metadata reference.
+Iceberg metadata files and manifests are normally stored alongside table data
+in HDFS or object storage.</p><h3 id=object-store-files-are-not-automatically-table-rows>Object-Store Files Are Not Automatically Table Rows
+<a href=#object-store-files-are-not-automatically-table-rows class=heading-anchor><span>#</span></a></h3><p>Only files referenced by a committed Iceberg snapshot belong to the table.
+Directory presence alone is insufficient.</p><h3 id=rest-compatibility-does-not-guarantee-identical-sql>REST Compatibility Does Not Guarantee Identical SQL
+<a href=#rest-compatibility-does-not-guarantee-identical-sql class=heading-anchor><span>#</span></a></h3><p>Two engines can share a Polaris catalog and the same Iceberg tables while
+differing in SQL syntax, type handling, supported Iceberg features, write
+semantics, and authorization integration. Verify the exact engine, connector,
+Iceberg format version, and Polaris release combination.</p><h2 id=choose-the-components-deliberately>Choose the Components Deliberately
+<a href=#choose-the-components-deliberately class=heading-anchor><span>#</span></a></h2><p>Polaris is useful when several Iceberg-capable engines need a shared,
+vendor-neutral REST catalog and a central authorization boundary. It is less
+useful when an environment has no Iceberg tables or when an existing catalog
+already satisfies interoperability, governance, and operational requirements.</p><p>Evaluate the layers independently:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Decision</th><th>Questions</th></tr></thead><tbody><tr><td>Compute engine</td><td>Which SQL, batch, streaming, or ML workloads must run?</td></tr><tr><td>Catalog</td><td>Which engines support its API, and how are privileges managed?</td></tr><tr><td>Table format</td><td>Which Iceberg versions and features can every writer handle?</td></tr><tr><td>File format</td><td>Which types, compression codecs, and readers are required?</td></tr><tr><td>Storage</td><td>What consistency, latency, lifecycle, and credential model applies?</td></tr></tbody></table></div></div><p>No single component makes the stack a lakehouse. The architecture works when
+the catalog, table format, engines, and storage agree on commits, security, and
+supported features.</p><h2 id=official-references>Official References
+<a href=#official-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://polaris.apache.org/>Apache Polaris</a></li><li><a href=https://iceberg.apache.org/docs/latest/>Apache Iceberg documentation</a></li><li><a href=https://iceberg.apache.org/spec/>Iceberg table specification</a></li><li><a href=https://iceberg.apache.org/rest-catalog-spec/>Iceberg REST Catalog specification</a></li><li><a href=https://doris.apache.org/docs/3.x/lakehouse/best-practices/doris-polaris/>Apache Doris and Polaris integration</a></li><li><a href=https://polaris.apache.org/guides/flink/>Apache Polaris and Flink guide</a></li><li><a href=https://polaris.apache.org/guides/spark/>Apache Polaris and Spark guide</a></li><li><a href=https://docs.dremio.com/current/data-sources/lakehouse-catalogs/iceberg-rest-catalog/>Dremio Iceberg REST Catalog documentation</a></li><li><a href=https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/>StarRocks Iceberg catalog documentation</a></li><li><a href=https://polaris.apache.org/guides/trino/>Apache Polaris and Trino guide</a></li><li><a href=https://trino.io/docs/current/connector/iceberg.html>Trino Iceberg connector documentation</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/apache-polaris-and-iceberg/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,53 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>AUR Package Dependencies</title></head><body><main><article><div class=article-header><h1>AUR Package Dependencies</h1><div class=aux>Last update: 2025-03-16 08:23:44 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/arch-linux/>Arch-Linux</a>
+|
+<a href=/tags/aur/>Aur</a>
+|
+<a href=/tags/packages/>Packages</a></div></div><div class=article-content><p>An AUR repository supplies a <code>PKGBUILD</code>: executable packaging metadata, not a
+binary package or a dependency resolver. Building a package safely therefore
+requires distinguishing the dependencies that make the build possible from the
+dependencies installed on the resulting system.</p><h2 id=dependency-classes-in-pkgbuild>Dependency Classes in <code>PKGBUILD</code>
+<a href=#dependency-classes-in-pkgbuild class=heading-anchor><span>#</span></a></h2><p><code>PKGBUILD(5)</code> defines dependency arrays with different lifetimes:</p><ul><li><code>depends</code> declares packages required to run the installed package.</li><li><code>makedepends</code> declares tools and libraries required only while building.</li><li><code>checkdepends</code> declares packages needed by <code>check()</code>.</li></ul><p>Version constraints use pacman&rsquo;s dependency syntax, for example
+<code>depends=('libfoo>=2')</code>. Split packages can have package-specific dependency
+arrays such as <code>package_client() { depends=('libclient') }</code>.</p><p>Do not move a runtime library into <code>makedepends</code> merely because the package
+builds without it. Conversely, do not retain a compiler in <code>depends</code> when no
+installed file requires it. Accurate arrays allow pacman to plan upgrades and
+removals correctly.</p><h2 id=makepkg-builds-pacman-installs><code>makepkg</code> Builds; <code>pacman</code> Installs
+<a href=#makepkg-builds-pacman-installs class=heading-anchor><span>#</span></a></h2><p>Run <code>makepkg</code> as an unprivileged user. It downloads and verifies sources,
+checks dependencies, executes <code>prepare()</code>, <code>build()</code>, <code>check()</code>, and
+<code>package()</code>, and creates an archive for pacman. <code>makepkg -i</code> installs that
+archive only after a successful build; pacman performs the installation.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git clone https://aur.archlinux.org/example.git
+</span></span><span style=display:flex><span>cd example
+</span></span><span style=display:flex><span>makepkg --cleanbuild --syncdeps
+</span></span><span style=display:flex><span>sudo pacman -U ./*.pkg.tar.zst</span></span></code></pre></div></div></div><p><code>--syncdeps</code> asks pacman to install missing dependencies. Thus it resolves
+only packages available in configured binary repositories. It cannot obtain an
+AUR dependency because the AUR distributes build recipes, not repository
+packages.</p><p>Avoid <code>--nodeps</code> and never run <code>makepkg</code> with <code>sudo</code>; bypassing dependency
+checks can produce an incorrectly linked package, while root executes
+unreviewed <code>PKGBUILD</code> shell code with unnecessary privileges.</p><h2 id=build-an-aur-dependency-chain>Build an AUR Dependency Chain
+<a href=#build-an-aur-dependency-chain class=heading-anchor><span>#</span></a></h2><p>Resolve AUR dependencies in dependency order. Inspect every recipe before
+executing it, build the leaves first, and install their resulting archives so
+the next package&rsquo;s dependency test succeeds.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># Build and install the AUR dependency first.</span>
+</span></span><span style=display:flex><span>git clone https://aur.archlinux.org/example-library.git
+</span></span><span style=display:flex><span>cd example-library
+</span></span><span style=display:flex><span>makepkg --cleanbuild --syncdeps
+</span></span><span style=display:flex><span>sudo pacman -U ./*.pkg.tar.zst
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Then build the dependent package.</span>
+</span></span><span style=display:flex><span>cd ../example
+</span></span><span style=display:flex><span>makepkg --cleanbuild --syncdeps</span></span></code></pre></div></div></div><p>An AUR helper may automate graph traversal, but it does not replace review:
+each <code>PKGBUILD</code>, <code>.SRCINFO</code>, source URL, patch, and install script remains
+part of the trusted build input. Check version constraints across the complete
+chain before building.</p><h2 id=use-a-clean-chroot-for-reproducibility>Use a Clean Chroot for Reproducibility
+<a href=#use-a-clean-chroot-for-reproducibility class=heading-anchor><span>#</span></a></h2><p>Host-installed packages can conceal missing declarations. A clean chroot
+starts from a defined Arch base and makes missing <code>makedepends</code> and
+<code>checkdepends</code> visible. With <code>devtools</code> configured, build from the package
+directory with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>extra-x86_64-build</span></span></code></pre></div></div></div><p>Build prerequisite AUR packages into a local repository or install their
+verified archives into the chroot before building dependents. Recreate or
+update the chroot deliberately when testing a dependency chain, and retain
+build logs and package archives for investigation. A successful clean-chroot
+build demonstrates declared build inputs; it does not prove that the recipe
+or its upstream sources are safe.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/aur-dependencies/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,68 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java Annotations</title></head><body><main><article><div class=article-header><h1>Java Annotations</h1><div class=aux>Last update: 2021-01-10 11:11:46 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/annotations/>Annotations</a>
+|
+<a href=/tags/java/>Java</a></div></div><div class=article-content><p>An annotation is metadata attached to a declaration or type use. It is not a
+general-purpose object literal: an annotation type is a special interface whose
+members describe the permitted metadata.</p><h2 id=declaring-annotation-types>Declaring Annotation Types
+<a href=#declaring-annotation-types class=heading-anchor><span>#</span></a></h2><p>Annotation members have no parameters or type parameters, and may not declare a
+<code>throws</code> clause. A member type is limited to a primitive, <code>String</code>, <code>Class</code>,
+an enum type, an annotation type, or a one-dimensional array of one of those
+types. Values must be compile-time constants, class literals, enum constants,
+annotations, or arrays thereof. <code>null</code> is never an annotation element value.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Retention</span>(RetentionPolicy.<span style=color:#a6e22e>RUNTIME</span>)
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Target</span>({ElementType.<span style=color:#a6e22e>TYPE</span>, ElementType.<span style=color:#a6e22e>METHOD</span>})
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#a6e22e>@interface</span> Retry {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> <span style=color:#a6e22e>attempts</span>() <span style=color:#66d9ef>default</span> 3;
+</span></span><span style=display:flex><span>    Class<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>extends</span> Throwable<span style=color:#f92672>&gt;[]</span> <span style=color:#a6e22e>retryOn</span>() <span style=color:#66d9ef>default</span> {};
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>@Target</code> constrains where an annotation may occur; relevant locations include
+declarations, type uses, type parameters, modules, and record components. If it
+is absent, the annotation may be written in any declaration context, but not in
+a type context. <code>@Retention</code> controls whether the compiler discards it
+(<code>SOURCE</code>), records it in the class file (<code>CLASS</code>, the default), or records it
+for reflection (<code>RUNTIME</code>). <code>@Inherited</code> affects only queries on <code>Class</code>, only
+for annotations on classes, and only along the superclass chain. It does not
+inherit annotations from interfaces, methods, fields, parameters, or type uses.</p><p>Defaults are compiled into the annotation type rather than copied into every
+use. Changing a default can therefore alter the result observed from an old
+client class file when it is run with the new annotation type.</p><h2 id=reflection-and-access-boundaries>Reflection and Access Boundaries
+<a href=#reflection-and-access-boundaries class=heading-anchor><span>#</span></a></h2><p><code>Class</code>, <code>Method</code>, <code>Field</code>, <code>Constructor</code>, <code>Parameter</code>, <code>Package</code>, and <code>Module</code>
+implement <code>AnnotatedElement</code>. The <code>getDeclared*</code> methods inspect annotations
+directly present on that element. The non-declared methods can include inherited
+class annotations; <code>getAnnotationsByType</code> and
+<code>getDeclaredAnnotationsByType</code> also unpack repeatable containers.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Retry<span style=color:#f92672>[]</span> policies <span style=color:#f92672>=</span> operation.<span style=color:#a6e22e>getAnnotationsByType</span>(Retry.<span style=color:#a6e22e>class</span>);</span></span></code></pre></div></div></div><p>Runtime retention makes metadata visible; it does not grant access to a member
+or make private state safe to expose. Reflection must still pass Java language
+access checks and, for named modules, strong-encapsulation checks. <code>trySetAccessible</code>
+can only suppress applicable language checks when the package is opened to the
+caller; command-line <code>--add-opens</code> is a deployment decision, not a library
+contract. The legacy <code>SecurityManager</code> is deprecated for removal, so security
+design must use module boundaries, process permissions, input validation, and
+explicit APIs instead of assuming a global reflection policy.</p><p>Inspection alone should not be used as an initialization mechanism. Reflective
+construction and invocation can initialize a class, and annotation member
+access can require linked types to be resolved. Keep static initialization free
+of required configuration and externally visible side effects.</p><h2 id=repeatable-annotations>Repeatable Annotations
+<a href=#repeatable-annotations class=heading-anchor><span>#</span></a></h2><p><code>@Repeatable</code> names a container annotation whose sole required member is an
+array of the repeated annotation type. The container must have retention at
+least as long as the repeated type and a compatible target.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Repeatable</span>(Labels.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@interface</span> Label { String <span style=color:#a6e22e>value</span>(); }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@interface</span> Labels { Label<span style=color:#f92672>[]</span> <span style=color:#a6e22e>value</span>(); }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Label</span>(<span style=color:#e6db74>&#34;read&#34;</span>) <span style=color:#a6e22e>@Label</span>(<span style=color:#e6db74>&#34;write&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Permission</span> {}</span></span></code></pre></div></div></div><p>For multiple occurrences, the language models the declaration as an implicitly
+declared container; class-file consumers therefore see the same container form
+as an explicit <code>@Labels({ ... })</code> declaration. A single <code>@Label</code> is not
+generally byte-for-byte equivalent to a single-element explicit container.
+<code>getAnnotation(Label.class)</code> does not unpack a container, whereas
+<code>getAnnotationsByType(Label.class)</code> does.</p><h2 id=class-files-and-proxy-instances>Class Files and Proxy Instances
+<a href=#class-files-and-proxy-instances class=heading-anchor><span>#</span></a></h2><p>Runtime-visible declaration annotations are stored in class-file attributes
+such as <code>RuntimeVisibleAnnotations</code>; parameter and type-use annotations have
+separate attributes. The compiler validates the annotation grammar and encodes
+element values. The VM verifies class-file structure, while core reflection
+parses the attributes on demand and exposes the result through
+<code>AnnotatedElement</code>.</p><p>The reflection implementation represents a returned runtime annotation as an
+object implementing the annotation interface, commonly a dynamic proxy in
+OpenJDK. Clients must treat that representation as unspecified. Rely on
+<code>annotationType()</code>, declared member methods, and the <code>Annotation</code> equality,
+hash-code, and string contracts rather than the proxy class or identity.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html>JLS §9.6–§9.7, Annotation Interfaces and Annotations</a></li><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.7.5>JLS §9.7.5, Multiple Annotations of the Same Type</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/reflect/AnnotatedElement.html>JDK <code>AnnotatedElement</code> API</a></li><li><a href=https://openjdk.org/jeps/411>JEP 411, Deprecate the Security Manager</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-annotations/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

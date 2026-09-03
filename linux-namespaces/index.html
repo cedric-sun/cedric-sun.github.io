@@ -1,0 +1,85 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Namespaces</title></head><body><main><article><div class=article-header><h1>Linux Namespaces</h1><div class=aux>Last update: 2021-11-21 04:00:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/kernel/>Kernel</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/namespaces/>Namespaces</a></div></div><div class=article-content><p>Namespaces partition names and resource views that would otherwise be global.
+Each task has one namespace instance of each supported type, and tasks in the
+same instance observe the same instance-specific resources. Namespaces do not,
+by themselves, constrain CPU, memory, or I/O consumption; cgroups provide those
+resource controls.</p><p>Linux exposes eight namespace types. Time namespaces were added in Linux 5.6;
+the other types predate that release. The namespace flags in
+<a href=https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/sched.h><code>include/uapi/linux/sched.h</code></a>
+are the version-specific source of truth.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Type</th><th>Creation flag</th><th>Isolated resource</th></tr></thead><tbody><tr><td>Cgroup</td><td><code>CLONE_NEWCGROUP</code></td><td>Cgroup-root view</td></tr><tr><td>IPC</td><td><code>CLONE_NEWIPC</code></td><td>System V IPC objects and POSIX message queues</td></tr><tr><td>Network</td><td><code>CLONE_NEWNET</code></td><td>Network devices, protocol stacks, routing tables, firewall state, and port space</td></tr><tr><td>Mount</td><td><code>CLONE_NEWNS</code></td><td>Mount table and mount-propagation relationships</td></tr><tr><td>PID</td><td><code>CLONE_NEWPID</code></td><td>Process-ID number space and PID 1 semantics</td></tr><tr><td>Time</td><td><code>CLONE_NEWTIME</code></td><td>Offsets for monotonic and boot-time clocks</td></tr><tr><td>User</td><td><code>CLONE_NEWUSER</code></td><td>User and group ID mappings, credentials, and scoped capabilities</td></tr><tr><td>UTS</td><td><code>CLONE_NEWUTS</code></td><td>Hostname and NIS domain name</td></tr></tbody></table></div></div><p>The initial system starts with one instance of each type. Namespace identity is
+not a portable, globally meaningful 32-bit ID. Instead, <code>/proc/PID/ns</code> exposes
+namespace handles as symbolic links such as <code>net:[4026531840]</code>; the number
+identifies that kernel object&rsquo;s inode in the namespace filesystem.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>ls -l /proc/self/ns
+</span></span><span style=display:flex><span>lsns
+</span></span><span style=display:flex><span>readlink /proc/self/ns/net</span></span></code></pre></div></div></div><h2 id=creating-and-joining-namespaces>Creating and Joining Namespaces
+<a href=#creating-and-joining-namespaces class=heading-anchor><span>#</span></a></h2><p><code>clone(2)</code> and <code>clone3(2)</code> create a child in new namespaces when passed one or
+more <code>CLONE_NEW*</code> flags. <code>unshare(2)</code> makes the calling task use newly created
+namespaces, subject to each namespace type&rsquo;s rules. PID and time namespace
+unsharing instead affects subsequently created children; the caller remains in
+its current PID or time namespace. <code>setns(2)</code> joins a namespace referred to by
+an open file descriptor. The <code>unshare(1)</code> and <code>nsenter(1)</code> tools are convenient
+front ends for experiments and administration.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># New user, mount, and PID namespaces; the child becomes PID 1 in its PID namespace.</span>
+</span></span><span style=display:flex><span>unshare --user --map-root-user --mount --pid --fork --mount-proc sh
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Join the mount namespace of an existing process.</span>
+</span></span><span style=display:flex><span>sudo nsenter --target <span style=color:#e6db74>&#34;</span>$PID<span style=color:#e6db74>&#34;</span> --mount sh</span></span></code></pre></div></div></div><p>Namespace operations are not interchangeable:</p><ul><li>A new PID namespace affects subsequently created children. A task cannot move
+itself into another PID namespace; <code>setns()</code> into one makes future children
+visible there.</li><li>A new mount namespace initially copies the caller&rsquo;s mount table. Shared mount
+propagation can still transfer mounts across namespaces, so container setup
+commonly makes the relevant tree private or slave before mounting filesystems.</li><li>Network namespaces begin with a loopback device that must be brought up. Moving
+a veth endpoint into the namespace is a common way to connect it.</li><li>User-namespace creation has credential and mapping rules that differ from the
+other namespace types. Do not assume that a successful <code>setns()</code> grants host
+privileges.</li></ul><p>The kernel checks capabilities in the relevant user namespaces and rejects
+unsafe transitions. Callers should use the syscall manual pages and the target
+kernel source for exact error conditions because they vary by namespace type and
+kernel release.</p><h2 id=handles-and-lifetime>Handles and Lifetime
+<a href=#handles-and-lifetime class=heading-anchor><span>#</span></a></h2><p><code>/proc/PID/ns/&lt;type></code> can be opened as a namespace file descriptor. The
+namespace remains alive while tasks or namespace file descriptors refer to it.
+A bind mount of such an entry also holds a reference, which lets a supervisor
+retain a namespace after its last process exits:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>sudo mkdir -p /run/netns/demo
+</span></span><span style=display:flex><span>sudo touch /run/netns/demo
+</span></span><span style=display:flex><span>sudo mount --bind /proc/<span style=color:#e6db74>&#34;</span>$PID<span style=color:#e6db74>&#34;</span>/ns/net /run/netns/demo
+</span></span><span style=display:flex><span>ip netns exec demo ip link</span></span></code></pre></div></div></div><p>The bind mount must be unmounted when no longer needed. Treat namespace handles
+as authority-bearing objects: access to <code>/proc/PID/ns</code> is subject to <code>/proc</code>
+visibility and ptrace-style access checks, and an inherited descriptor can allow
+the recipient to call <code>setns()</code>.</p><h2 id=user-namespaces-and-id-mappings>User Namespaces and ID Mappings
+<a href=#user-namespaces-and-id-mappings class=heading-anchor><span>#</span></a></h2><p>A user namespace maps a contiguous range of IDs inside the namespace to IDs in
+its parent user namespace. The creator can often obtain a namespace-local
+effective UID 0 with <code>--map-root-user</code>, but that identity has no automatic
+privilege over unmapped host IDs or global host resources.</p><p>For an unprivileged setup, a supervisor commonly writes <code>uid_map</code>, then writes
+<code>deny</code> to <code>setgroups</code>, and then writes <code>gid_map</code>. The ordering prevents a process
+from gaining group-based access through an unmapped group transition. Mapping
+rules are intentionally restrictive; delegated ranges and the <code>newuidmap</code> and
+<code>newgidmap</code> helpers handle mappings the caller cannot write directly.</p><p>Capabilities are evaluated relative to a user namespace. A process with
+<code>CAP_SYS_ADMIN</code> in a child user namespace can perform operations governed by that
+namespace, such as configuring its mount namespace, but it lacks that capability
+in the initial user namespace. Kernel objects owned by an ancestor namespace,
+device access, and LSM policy still form security boundaries.</p><h2 id=composition-for-containers>Composition for Containers
+<a href=#composition-for-containers class=heading-anchor><span>#</span></a></h2><p>A container is a composition of isolation mechanisms rather than one namespace.
+One practical setup order is:</p><ol><li>Create a user namespace and install deliberate UID/GID mappings, because it
+supplies namespace-scoped capabilities for later setup.</li><li>Create a mount namespace, change propagation deliberately, and construct the
+filesystem view.</li><li>Create a PID namespace, fork the intended init process, and mount a new
+<code>/proc</code> from the mount namespace so process reporting matches the PID view.</li><li>Create or join network, IPC, UTS, time, and cgroup namespaces as required;
+configure network links from a privileged host-side manager.</li><li>Place the workload in a host-managed cgroup before execution and retain
+namespace file descriptors for inspection and teardown.</li></ol><p>PID 1 deserves explicit handling because it reaps orphaned children and has
+special signal behavior. A minimal container command that merely creates a PID
+namespace can therefore leave zombies or ignore termination signals; a runtime
+needs an init/reaper or equivalent supervision.</p><p>Mount namespaces control filesystem mount visibility, whereas <code>chroot(2)</code> only
+changes pathname resolution. Combining both with careful mount propagation is
+necessary to avoid exposing or receiving unintended mounts.</p><h2 id=cgroups-and-cgroup-namespaces>Cgroups and Cgroup Namespaces
+<a href=#cgroups-and-cgroup-namespaces class=heading-anchor><span>#</span></a></h2><p>A cgroup namespace virtualizes the path to a task&rsquo;s cgroup root. It changes what
+the task reads from <code>/proc/PID/cgroup</code> and from a cgroup filesystem mounted in
+that namespace, which prevents an inner workload from discovering ancestor
+paths. It does not create an independent cgroup hierarchy and does not weaken
+host CPU, memory, I/O, or PID limits.</p><p>For a complete namespace ABI description, consult the relevant
+<a href=https://man7.org/linux/man-pages/man7/namespaces.7.html><code>namespaces(7)</code> manual page</a>
+alongside the target release&rsquo;s
+<a href=https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/kernel/nsproxy.c>kernel source</a>.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-namespaces/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

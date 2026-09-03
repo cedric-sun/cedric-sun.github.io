@@ -1,0 +1,150 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>JUnit 5 Architecture, Maven Setup, and JUnit 4 Migration</title></head><body><main><article><div class=article-header><h1>JUnit 5 Architecture, Maven Setup, and JUnit 4 Migration</h1><div class=aux>Last update: 2026-08-17 10:18:23 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/junit/>Junit</a>
+|
+<a href=/tags/maven/>Maven</a>
+|
+<a href=/tags/testing/>Testing</a></div></div><div class=article-content><p>JUnit 5 separates the API used to write tests from the infrastructure that
+discovers and executes them. The separation lets Maven, IDEs, and custom
+launchers run several test models through one interface.</p><p>The examples target JUnit 5.13.4. JUnit 6 retains the same architecture, but a
+project that must remain on JUnit 5 should use the
+<a href=https://docs.junit.org/5.13.4/user-guide/>versioned JUnit 5 documentation</a>.</p><h2 id=platform-jupiter-and-vintage>Platform, Jupiter, and Vintage
+<a href=#platform-jupiter-and-vintage class=heading-anchor><span>#</span></a></h2><p>JUnit 5 consists of three components:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Component</th><th>Responsibility</th></tr></thead><tbody><tr><td>JUnit Platform</td><td>Discovers tests and launches registered test engines. Maven Surefire and IDEs integrate at this level.</td></tr><tr><td>JUnit Jupiter</td><td>Defines the JUnit 5 programming model, extension API, and test engine.</td></tr><tr><td>JUnit Vintage</td><td>Runs JUnit 3 and JUnit 4 tests on the Platform during migration.</td></tr></tbody></table></div></div><p>A Jupiter test imports <code>@Test</code> and assertions from <code>org.junit.jupiter.api</code>.
+Surefire asks the Platform to discover tests, then
+<code>junit-jupiter-engine</code> executes the discovered methods. Application code does
+not depend on any JUnit component because test dependencies use Maven&rsquo;s
+<code>test</code> scope.</p><h2 id=minimal-maven-project>Minimal Maven Project
+<a href=#minimal-maven-project class=heading-anchor><span>#</span></a></h2><p>The following layout keeps production and test classes separate:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>junit-hello/
+</span></span><span style=display:flex><span>├── pom.xml
+</span></span><span style=display:flex><span>└── src
+</span></span><span style=display:flex><span>    ├── main/java/com/example/Greeter.java
+</span></span><span style=display:flex><span>    └── test/java/com/example/GreeterTest.java</span></span></code></pre></div></div></div><p>Use <code>org.junit.jupiter:junit-jupiter</code> for the smallest maintainable POM. The
+artifact aggregates the Jupiter API, parameterized-test support, and runtime
+engine.</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;project</span> <span style=color:#a6e22e>xmlns=</span><span style=color:#e6db74>&#34;http://maven.apache.org/POM/4.0.0&#34;</span>
+</span></span><span style=display:flex><span>         <span style=color:#a6e22e>xmlns:xsi=</span><span style=color:#e6db74>&#34;http://www.w3.org/2001/XMLSchema-instance&#34;</span>
+</span></span><span style=display:flex><span>         <span style=color:#a6e22e>xsi:schemaLocation=</span><span style=color:#e6db74>&#34;http://maven.apache.org/POM/4.0.0
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                             https://maven.apache.org/xsd/maven-4.0.0.xsd&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;modelVersion&gt;</span>4.0.0<span style=color:#f92672>&lt;/modelVersion&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>com.example<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>junit-hello<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>1.0-SNAPSHOT<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;properties&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;maven.compiler.release&gt;</span>17<span style=color:#f92672>&lt;/maven.compiler.release&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;junit.version&gt;</span>5.13.4<span style=color:#f92672>&lt;/junit.version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/properties&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.junit.jupiter<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>junit-jupiter<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>${junit.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;build&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;plugins&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;plugin&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.maven.plugins<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;artifactId&gt;</span>maven-surefire-plugin<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;version&gt;</span>3.5.4<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;/plugin&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/plugins&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/build&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/project&gt;</span></span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>package</span> com.example;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Greeter</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> String <span style=color:#a6e22e>greet</span>(String name) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (name <span style=color:#f92672>==</span> <span style=color:#66d9ef>null</span> <span style=color:#f92672>||</span> name.<span style=color:#a6e22e>isBlank</span>()) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> IllegalArgumentException(<span style=color:#e6db74>&#34;name must not be blank&#34;</span>);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#e6db74>&#34;Hello, &#34;</span> <span style=color:#f92672>+</span> name;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>package</span> com.example;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertThrows;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreeterTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> Greeter greeter <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Greeter();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>greetsByName</span>() {
+</span></span><span style=display:flex><span>        assertEquals(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>, greeter.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>rejectsBlankNames</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> error <span style=color:#f92672>=</span> assertThrows(
+</span></span><span style=display:flex><span>                IllegalArgumentException.<span style=color:#a6e22e>class</span>,
+</span></span><span style=display:flex><span>                () <span style=color:#f92672>-&gt;</span> greeter.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34; &#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(<span style=color:#e6db74>&#34;name must not be blank&#34;</span>, error.<span style=color:#a6e22e>getMessage</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Run the test through Maven:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mvn test</span></span></code></pre></div></div></div><p>Jupiter test classes and methods may have package-private visibility. Test
+methods must not be <code>private</code> or <code>static</code>, although lifecycle and extension
+rules permit <code>static</code> in specific places.</p><h2 id=choosing-junit-artifacts>Choosing JUnit Artifacts
+<a href=#choosing-junit-artifacts class=heading-anchor><span>#</span></a></h2><p>Add another artifact only when its capability is required:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Artifact</th><th>When to Add It</th></tr></thead><tbody><tr><td><code>junit-jupiter</code></td><td>Prefer the aggregate dependency for an application test suite. It already includes API, parameters, and engine.</td></tr><tr><td><code>junit-jupiter-api</code></td><td>Compile tests or extensions against the API while managing runtime engines separately.</td></tr><tr><td><code>junit-jupiter-engine</code></td><td>Execute Jupiter tests when using fine-grained dependencies instead of <code>junit-jupiter</code>. Use test runtime scope.</td></tr><tr><td><code>junit-jupiter-params</code></td><td>Add <code>@ParameterizedTest</code> support to a fine-grained setup. The aggregate dependency already includes it.</td></tr><tr><td><code>junit-vintage-engine</code></td><td>Run unchanged JUnit 3 or JUnit 4 tests through the Platform.</td></tr><tr><td><code>junit-jupiter-migrationsupport</code></td><td>Temporarily adapt selected JUnit 4 rules and <code>@Ignore</code> while converting tests to Jupiter.</td></tr><tr><td><code>junit-platform-suite</code></td><td>Declare suites with Platform suite annotations.</td></tr><tr><td><code>junit-platform-launcher</code></td><td>Discover and execute tests programmatically, or implement test tooling. Application test suites do not need it directly.</td></tr><tr><td><code>junit-platform-console-standalone</code></td><td>Run tests outside Maven or an IDE from one executable JAR. Keep the JAR outside the project POM.</td></tr></tbody></table></div></div><p>Import the JUnit BOM when a build declares several JUnit artifacts because the
+BOM keeps Platform, Jupiter, and Vintage versions compatible:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.junit<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>junit-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>${junit.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span></span></span></code></pre></div></div></div><p>Artifact declarations covered by the BOM can omit <code>&lt;version></code>.</p><p>An explicit <code>junit-platform-launcher</code> dependency was necessary with Surefire
+releases before 3.0. Current Surefire 3.x releases align the launcher with the
+Platform on the test runtime classpath, so adding a launcher to an ordinary
+test suite creates another version to manage without adding test capability.</p><h2 id=jupiter-programming-model>Jupiter Programming Model
+<a href=#jupiter-programming-model class=heading-anchor><span>#</span></a></h2><p>Jupiter provides focused annotations for common test structures:</p><ul><li><code>@BeforeEach</code> and <code>@AfterEach</code> establish per-test fixtures.</li><li><code>@BeforeAll</code> and <code>@AfterAll</code> establish class-level fixtures.</li><li><code>@ParameterizedTest</code> executes one test body with data from
+<code>@ValueSource</code>, <code>@CsvSource</code>, <code>@MethodSource</code>, or another argument source.</li><li><code>@Nested</code> groups related cases while preserving lifecycle semantics.</li><li><code>@Tag</code> classifies tests for build-time inclusion or exclusion.</li><li><code>@ExtendWith</code> registers extensions for parameter resolution, callbacks,
+conditional execution, and other cross-cutting behavior.</li></ul><p>Tests should assert observable results rather than execution order. Jupiter
+does not guarantee a self-evident order from method names, and ordered tests
+share state that makes failures dependent on earlier cases.</p><h2 id=running-junit-4-tests-unchanged>Running JUnit 4 Tests Unchanged
+<a href=#running-junit-4-tests-unchanged class=heading-anchor><span>#</span></a></h2><p>Vintage provides the lowest-risk first migration step because Jupiter and
+JUnit 4 use different Java packages and can coexist in one module:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>junit<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>junit<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>4.13.2<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.junit.vintage<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>junit-vintage-engine<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>${junit.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>Surefire then discovers Jupiter and JUnit 4 tests through the Platform. Keep
+Vintage only while old tests remain because a successful Vintage run does not
+exercise Jupiter&rsquo;s programming or extension model.</p><h2 id=converting-junit-4-tests>Converting JUnit 4 Tests
+<a href=#converting-junit-4-tests class=heading-anchor><span>#</span></a></h2><p>Common source mappings are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>JUnit 4</th><th>Jupiter</th></tr></thead><tbody><tr><td><code>@Before</code> / <code>@After</code></td><td><code>@BeforeEach</code> / <code>@AfterEach</code></td></tr><tr><td><code>@BeforeClass</code> / <code>@AfterClass</code></td><td><code>@BeforeAll</code> / <code>@AfterAll</code></td></tr><tr><td><code>@Ignore</code></td><td><code>@Disabled</code></td></tr><tr><td><code>@Category</code></td><td><code>@Tag</code></td></tr><tr><td><code>@RunWith</code></td><td>One or more <code>@ExtendWith</code> extensions</td></tr><tr><td><code>@Rule</code> / <code>@ClassRule</code></td><td>An extension or Jupiter-native fixture</td></tr><tr><td><code>@Test(expected = E.class)</code></td><td><code>assertThrows(E.class, executable)</code></td></tr></tbody></table></div></div><p><code>@RunWith</code> to <code>@ExtendWith</code> is a conceptual mapping rather than a mechanical
+rename because a JUnit 4 class can have one runner while Jupiter composes
+multiple extensions.</p><p>JUnit 4 places an optional assertion message first:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>assertEquals(<span style=color:#e6db74>&#34;unexpected greeting&#34;</span>, expected, actual);</span></span></code></pre></div></div></div><p>Jupiter places the message last:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>assertEquals(expected, actual, <span style=color:#e6db74>&#34;unexpected greeting&#34;</span>);</span></span></code></pre></div></div></div><p>Existing <code>org.junit.Assert</code> calls can remain while annotations and lifecycle
+code move to Jupiter. Converting assertions separately reduces the size of
+each migration change.</p><p>Rules need individual treatment. The <code>junit-jupiter-migrationsupport</code> artifact
+adapts <code>ExternalResource</code>, <code>Verifier</code>, and <code>ExpectedException</code> rule families;
+<code>@EnableRuleMigrationSupport</code> activates those adapters.
+<code>@EnableJUnit4MigrationSupport</code> also recognizes JUnit 4 <code>@Ignore</code>. Other
+custom rules require a Jupiter extension or a direct fixture rewrite.</p><p>A controlled migration therefore follows three stages:</p><ol><li>Add Vintage and establish one Platform-based test command.</li><li>Convert classes to Jupiter, replacing runners and rules according to their
+behavior rather than their names.</li><li>Remove Vintage, JUnit 4, and migration support after the build contains no
+JUnit 3 or JUnit 4 tests.</li></ol><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.junit.org/5.13.4/user-guide/>JUnit 5 User Guide</a></li><li><a href=https://maven.apache.org/surefire/maven-surefire-plugin/examples/junit-platform.html>Maven Surefire: Using JUnit 5 Platform</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/junit-5/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

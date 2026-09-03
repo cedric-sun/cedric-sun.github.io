@@ -1,0 +1,79 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux x86 Calling Conventions</title></head><body><main><article><div class=article-header><h1>Linux x86 Calling Conventions</h1><div class=aux>Last update: 2025-11-12 00:09:19 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/abi/>Abi</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/x86/>X86</a></div></div><div class=article-content><p>A calling convention is a binary contract for argument placement, results, preserved
+state, and stack layout. Linux x86-64 programs use the System V AMD64 function ABI;
+32-bit programs use the System V i386 ABI. Linux system calls use separate entry
+ABIs and must not be treated as ordinary function calls.</p><h2 id=amd64-function-calls>AMD64 Function Calls
+<a href=#amd64-function-calls class=heading-anchor><span>#</span></a></h2><p>The AMD64 ABI first classifies each argument. Integer-class values, including
+ordinary integers and pointers, use <code>rdi</code>, <code>rsi</code>, <code>rdx</code>, <code>rcx</code>, <code>r8</code>, and <code>r9</code>.
+SSE-class values use <code>xmm0</code> through <code>xmm7</code>. Exhausting one class does not by itself
+exhaust the other; arguments that cannot be assigned according to the classification
+rules go in the stack input area.</p><p>Aggregates are divided into eightbyte classes. A qualifying small structure can
+therefore occupy multiple integer or vector registers, while a memory-class
+structure is passed on the stack. For a memory-class return value, the caller
+allocates storage and passes its address in hidden argument register <code>rdi</code>; the
+callee returns that address in <code>rax</code>.</p><p>Integer-class return values use <code>rax</code> and then <code>rdx</code>; SSE-class results use <code>xmm0</code>
+and then <code>xmm1</code>. Floating-point <code>float</code> and <code>double</code> results use <code>xmm0</code>, while x87
+classes such as <code>long double</code> use the x87 stack as specified by the ABI.</p><p><code>rbx</code>, <code>rbp</code>, <code>r12</code> through <code>r15</code>, and <code>rsp</code> are callee-saved. A callee that changes
+one must restore it before <code>ret</code>. Other general-purpose registers and all vector
+registers are caller-saved under the base System V ABI, so a caller preserves any
+live values it needs after a call.</p><p>Immediately before <code>call</code>, <code>rsp</code> is 16-byte aligned. The pushed eight-byte return
+address means an ordinary callee enters with <code>rsp % 16 == 8</code>. Stack arguments are
+laid out with the padding required by their alignment; they are not simply pushed
+one at a time. The ABI also reserves a 128-byte red zone below the current <code>rsp</code>.
+Leaf userspace functions can use it without adjusting the stack because normal
+signal delivery preserves it. Kernel code and code built with <code>-mno-red-zone</code> must
+not rely on that area.</p><h2 id=variadic-functions>Variadic Functions
+<a href=#variadic-functions class=heading-anchor><span>#</span></a></h2><p>Fixed arguments to a variadic function use the normal classification algorithm. A
+caller additionally sets <code>%al</code> to an upper bound, from 0 through 8, on the number of
+vector argument registers used. Only the low byte is defined for this purpose. A
+handwritten call to <code>printf</code> that leaves <code>%al</code> unspecified therefore violates the
+ABI even if every visible argument appears correct.</p><p>A variadic callee that uses <code>va_start</code> provides a register-save area in its own
+frame and saves the argument registers it may need. AMD64 <code>va_list</code> tracks:</p><ul><li><code>gp_offset</code> and <code>fp_offset</code> within that save area;</li><li><code>overflow_arg_area</code> for arguments passed in memory; and</li><li><code>reg_save_area</code>, the base of the saved register arguments.</li></ul><p><code>va_arg</code> applies type classification and alignment while advancing the relevant
+location. Because default argument promotions apply, a caller passes <code>float</code> as
+<code>double</code> and narrow integer types as <code>int</code> or <code>unsigned int</code> where required.</p><h2 id=i386-function-calls>i386 Function Calls
+<a href=#i386-function-calls class=heading-anchor><span>#</span></a></h2><p>The i386 System V ABI passes ordinary arguments in the stack input area in
+right-to-left order. At entry, <code>0(%esp)</code> contains the return address and <code>4(%esp)</code>
+contains the first argument. The caller removes arguments after return under the
+standard C convention.</p><p><code>ebx</code>, <code>esi</code>, <code>edi</code>, <code>ebp</code>, and <code>esp</code> are callee-saved; <code>eax</code>, <code>ecx</code>, and <code>edx</code> are
+caller-saved. An integer or pointer result uses <code>eax</code>, and a two-word integer can use
+<code>edx:eax</code>; floating-point results use <code>st(0)</code>. Structure return conventions depend
+on classification and can use a hidden destination pointer.</p><p>A conventional frame-pointer prologue is:</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>push</span>    <span style=color:#66d9ef>ebp</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>mov</span>     <span style=color:#66d9ef>ebp</span>, <span style=color:#66d9ef>esp</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>sub</span>     <span style=color:#66d9ef>esp</span>, <span style=color:#66d9ef>local_size</span></span></span></code></pre></div></div></div><p><code>ebp</code> is not intrinsically a frame pointer, so optimized code can omit this sequence.
+Historical i386 code assumed four-byte stack alignment. The current GNU/Linux i386
+ABI requires 16-byte alignment at a call boundary, and compilers can realign entry
+when interoperating with legacy callers. Handwritten assembly must follow the ABI
+selected by its toolchain rather than infer alignment from old examples.</p><h2 id=linux-system-calls>Linux System Calls
+<a href=#linux-system-calls class=heading-anchor><span>#</span></a></h2><p>The x86-64 Linux syscall ABI is:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Purpose</th><th>Registers</th></tr></thead><tbody><tr><td>System-call number</td><td><code>rax</code></td></tr><tr><td>Arguments 1–6</td><td><code>rdi</code>, <code>rsi</code>, <code>rdx</code>, <code>r10</code>, <code>r8</code>, <code>r9</code></td></tr><tr><td>Result</td><td><code>rax</code></td></tr><tr><td>Unconditionally clobbered by <code>syscall</code></td><td><code>rcx</code>, <code>r11</code></td></tr></tbody></table></div></div><p>Hardware saves the user return address in <code>rcx</code> and user flags in <code>r11</code>; the fourth
+argument therefore uses <code>r10</code>, unlike an AMD64 function call. The kernel returns
+either a successful value or a negative error in <code>rax</code>; values from <code>-1</code> through
+<code>-4095</code> encode <code>-errno</code>. A libc wrapper converts such an error to <code>-1</code> and sets
+thread-local <code>errno</code>.</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#75715e>; x86-64 Linux: write(1, message, message_length)
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>mov</span>     <span style=color:#66d9ef>eax</span>, <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>mov</span>     <span style=color:#66d9ef>edi</span>, <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>lea</span>     <span style=color:#66d9ef>rsi</span>, [<span style=color:#66d9ef>rel</span> <span style=color:#66d9ef>message</span>]
+</span></span><span style=display:flex><span><span style=color:#a6e22e>mov</span>     <span style=color:#66d9ef>edx</span>, <span style=color:#66d9ef>message_length</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>syscall</span></span></span></code></pre></div></div></div><p>For an i386 process using <code>int $0x80</code>, <code>eax</code> holds the number, arguments use <code>ebx</code>,
+<code>ecx</code>, <code>edx</code>, <code>esi</code>, <code>edi</code>, and <code>ebp</code>, and <code>eax</code> holds the result. These registers
+are syscall operands even though <code>ebx</code>, <code>esi</code>, <code>edi</code>, and <code>ebp</code> are callee-saved in
+the i386 function ABI; a function containing inline entry code must still preserve
+the function ABI for its caller.</p><h2 id=function-abi-versus-syscall-abi>Function ABI versus Syscall ABI
+<a href=#function-abi-versus-syscall-abi class=heading-anchor><span>#</span></a></h2><p>An AMD64 function call uses <code>rcx</code> for argument four and preserves <code>rbx</code>, <code>rbp</code>, and
+<code>r12</code>–<code>r15</code>; an x86-64 syscall uses <code>r10</code> for argument four and has explicit
+<code>rcx</code>/<code>r11</code> clobbers. A function returns errors according to its declared API,
+whereas the raw kernel boundary uses negative error codes. The syscall instruction
+also changes privilege level and does not push a return address or switch stacks by
+itself; Linux entry code performs the required kernel-stack transition.</p><p>Application code should prefer libc wrappers because they implement both contracts,
+error translation, cancellation behavior where applicable, and vDSO selection.
+Inline assembly must describe register, condition-code, and memory effects to the
+compiler and is appropriate primarily for C libraries and runtimes.</p><p>The <a href=https://gitlab.com/x86-psABIs/x86-64-ABI>System V AMD64 psABI</a>,
+<a href=https://man7.org/linux/man-pages/man2/syscall.2.html><code>syscall(2)</code></a>, and Linux
+<a href=https://github.com/torvalds/linux/blob/master/arch/x86/entry/entry_64.S><code>entry_64.S</code></a>
+are the primary references for these contracts.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-x86-calling-conventions/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

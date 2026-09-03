@@ -1,0 +1,162 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Introduction to Apache Kyuubi</title></head><body><main><article><div class=article-header><h1>Introduction to Apache Kyuubi</h1><div class=aux>Last update: 2026-07-30 07:27:00 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/apache-kyuubi/>Apache Kyuubi</a>
+|
+<a href=/tags/apache-spark/>Apache-Spark</a>
+|
+<a href=/tags/sql/>Sql</a>
+|
+<a href=/tags/data-platforms/>Data Platforms</a></div></div><div class=article-content><p>Apache Kyuubi is a multi-tenant SQL gateway for distributed data systems. It gives people and BI tools a stable JDBC or ODBC endpoint without requiring every user to manage Spark application lifecycles, cluster queues, or engine configuration.</p><p>Kyuubi separates a long-lived client endpoint from the processes that execute queries.
+This distinction is its main architectural contribution:</p><ul><li><strong>Kyuubi servers</strong> authenticate clients, maintain protocol sessions, select engines, and
+forward operations.</li><li><strong>Kyuubi engines</strong> run SQL and consume compute resources. Spark SQL is the most common
+engine, while Kyuubi releases can also integrate with other query engines.</li><li><strong>External services</strong> still provide resource management, metadata, storage,
+authorization policy, and service discovery.</li></ul><p>Kyuubi therefore does not replace Spark, YARN, Kubernetes, a Hive metastore, or object
+storage. It coordinates access to them.</p><h2 id=architecture>Architecture
+<a href=#architecture class=heading-anchor><span>#</span></a></h2><p>A typical Spark-on-YARN deployment looks like this:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Beeline, BI tool, or application
+</span></span><span style=display:flex><span>            |
+</span></span><span style=display:flex><span>            | JDBC/ODBC using the HiveServer2 protocol
+</span></span><span style=display:flex><span>            v
+</span></span><span style=display:flex><span>   Kyuubi server pool
+</span></span><span style=display:flex><span>      |          |
+</span></span><span style=display:flex><span>      |          `----&gt; ZooKeeper or another configured discovery service
+</span></span><span style=display:flex><span>      |
+</span></span><span style=display:flex><span>      | launch, discover, or reuse
+</span></span><span style=display:flex><span>      v
+</span></span><span style=display:flex><span>Spark SQL engine application
+</span></span><span style=display:flex><span>      |----&gt; YARN for driver and executor resources
+</span></span><span style=display:flex><span>      |----&gt; Hive Metastore for table metadata
+</span></span><span style=display:flex><span>      |----&gt; HDFS or object storage for table data
+</span></span><span style=display:flex><span>      `----&gt; Ranger or another authorization system</span></span></code></pre></div></div></div><p>The Kyuubi server stays relatively lightweight because the engine performs parsing,
+planning, scans, joins, shuffles, and writes. Scaling server nodes increases connection
+and operation-handling capacity; it does not by itself add Spark executors.</p><p>The <a href=https://example.org/apache-hive-overview/>Apache Hive / Kyuubi Overview</a>
+compares this design with HiveServer2 and Spark Thrift Server in more detail.</p><h2 id=follow-a-query>Follow a Query
+<a href=#follow-a-query class=heading-anchor><span>#</span></a></h2><p>Suppose Beeline sends this statement:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> region, <span style=color:#66d9ef>SUM</span>(amount)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> lakehouse.sales
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> sale_date <span style=color:#f92672>&gt;=</span> DATE <span style=color:#e6db74>&#39;2026-08-01&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> region;</span></span></code></pre></div></div></div><p>The request normally follows these stages:</p><ol><li>The client opens a transport connection and performs the configured authentication
+exchange with a Kyuubi server.</li><li>Kyuubi creates a protocol session and determines the effective user, engine type,
+engine-sharing scope, and allowed configuration.</li><li>Kyuubi searches for a compatible running engine. If none exists, it submits a new
+engine application to YARN, Kubernetes, or the configured local environment.</li><li>The server waits for the engine to register and then forwards the operation.</li><li>The engine parses and plans the SQL, reads catalog metadata, checks authorization,
+requests compute resources, and accesses table files.</li><li>Kyuubi exposes operation state and logs while the client polls or fetches results.</li><li>Closing the client session releases its operation state. The engine may remain alive
+for reuse or stop according to sharing and timeout policy.</li></ol><p>This explains two characteristic latency patterns. A <strong>cold session</strong> may wait for a
+Spark driver and executors to start; a <strong>warm session</strong> can reuse an existing engine and
+begin planning almost immediately.</p><h2 id=choose-an-engine-share-level>Choose an Engine Share Level
+<a href=#choose-an-engine-share-level class=heading-anchor><span>#</span></a></h2><p>An engine share level defines which sessions may reuse one engine. Names and details
+should be checked against the deployed Kyuubi release, but the standard choices are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Level</th><th>Typical ownership</th><th>Isolation</th><th>Startup cost</th><th>Common use</th></tr></thead><tbody><tr><td><code>CONNECTION</code></td><td>One client connection</td><td>Highest</td><td>Highest</td><td>Large ETL jobs or untrusted session settings</td></tr><tr><td><code>USER</code></td><td>One authenticated user</td><td>Strong</td><td>Moderate</td><td>Interactive SQL with per-user identity</td></tr><tr><td><code>GROUP</code></td><td>One primary user group</td><td>Medium</td><td>Lower</td><td>Teams with common data and queue policy</td></tr><tr><td><code>SERVER_LOCAL</code></td><td>Sessions reaching one Kyuubi server</td><td>Low</td><td>Low</td><td>Controlled service workloads</td></tr><tr><td><code>SERVER</code></td><td>Sessions across the server pool</td><td>Lowest</td><td>Lowest</td><td>Carefully secured shared workloads</td></tr></tbody></table></div></div><p><code>USER</code> is a common default because it balances reuse and isolation. It is not
+automatically the right production choice:</p><ul><li><code>CONNECTION</code> limits cross-session interference but can flood the cluster with drivers.</li><li><code>USER</code> can strand resources when many occasional users each retain an engine.</li><li><code>GROUP</code> improves utilization but requires trustworthy group mapping and compatible
+authorization rules.</li><li>Server-wide sharing places unrelated users in one engine process. Session-level SQL
+authorization must be strong, and administrators must prevent unsafe configuration,
+temporary-view, cache, and resource interactions.</li></ul><p>Sharing is both a security boundary and a capacity decision. Do not select it only to
+reduce startup time.</p><h2 id=understand-engine-lifecycle>Understand Engine Lifecycle
+<a href=#understand-engine-lifecycle class=heading-anchor><span>#</span></a></h2><p>The server and engine have independent lifecycles. A client can reconnect through
+another server node while a remotely deployed engine continues to run, provided the
+selected discovery and recovery behavior supports it.</p><p>An engine typically moves through these states:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>requested -&gt; submitted -&gt; starting -&gt; registered -&gt; active -&gt; idle -&gt; stopped</span></span></code></pre></div></div></div><p>Important controls include:</p><ul><li><strong>Launch timeout:</strong> how long a session waits for resource allocation and engine
+registration.</li><li><strong>Idle timeout:</strong> how long an engine with no active sessions remains available.</li><li><strong>Session and operation timeouts:</strong> when abandoned client state is reclaimed.</li><li><strong>Engine lifetime:</strong> an optional upper bound that periodically replaces long-running
+engines.</li><li><strong>Failure limits and retry policy:</strong> whether Kyuubi retries launch or reports the
+failure to the client.</li></ul><p>Long idle timeouts improve interactive latency but reserve driver memory and may retain
+executors, cached data, class loaders, and catalog state. Short timeouts save resources
+but make users pay the cold-start cost repeatedly. Measure arrival patterns and engine
+startup time before choosing a value.</p><h2 id=separate-configuration-layers>Separate Configuration Layers
+<a href=#separate-configuration-layers class=heading-anchor><span>#</span></a></h2><p>A Kyuubi deployment contains several configuration scopes:</p><ol><li><strong>Server settings</strong> control listeners, authentication, discovery, server timeouts,
+logging, and the rules used to launch engines.</li><li><strong>Engine settings</strong> control the Spark driver, executors, catalogs, extensions,
+classpath, resource queue, and SQL runtime.</li><li><strong>Session settings</strong> affect one logical client session when the administrator allows
+them.</li><li><strong>Statement settings</strong> are SQL commands such as <code>SET</code>, subject to engine and security
+restrictions.</li></ol><p>Configuration can arrive from server files, engine defaults, environment-specific
+templates, JDBC URL parameters, and client properties. The exact precedence and
+allowlist behavior are version-dependent. Administrators should explicitly restrict
+client overrides instead of assuming every <code>spark.*</code> property is harmless.</p><p>For example, allowing a client to select a YARN queue may be useful:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>#spark.yarn.queue=analytics-interactive</span></span></code></pre></div></div></div><p>Allowing arbitrary archives, JARs, extensions, proxy users, event-log destinations, or
+catalog implementations can instead become a code-execution or privilege-escalation
+path. Treat configuration policy as part of the security model.</p><h2 id=connect-with-jdbc>Connect with JDBC
+<a href=#connect-with-jdbc class=heading-anchor><span>#</span></a></h2><p>Kyuubi exposes a HiveServer2-compatible endpoint, so Beeline and many Hive JDBC tools
+can connect without a Kyuubi-specific wire protocol:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>beeline -u <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;jdbc:hive2://sql.example.com:10009/default;ssl=true;principal=kyuubi/sql.example.com@EXAMPLE.COM&#39;</span></span></span></code></pre></div></div></div><p>The URL has several distinct regions:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>jdbc:hive2://host:port/database;session-properties?query-properties#engine-properties</span></span></code></pre></div></div></div><p>Support and interpretation depend on the client and server versions. Keep passwords
+out of shell history and process arguments, use TLS when credentials or query results
+cross an untrusted network, and verify the server certificate and hostname.</p><p>For a complete secured example, the
+<a href=https://example.org/kerberos/#trace-a-kerberized-beeline-to-kyuubi-connection>Kerberos Beeline-to-Kyuubi walkthrough</a>
+explains this URL:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>jdbc:hive2://kyuubi.hadoop.vip.mycompany.com:10010/default;ssl=true;principal=kyuubi/kyuubi.hadoop.vip.mycompany.com@PROD.MYCOMPANY.COM?kyuubi.session.cluster=analytics-prod#spark.yarn.queue=analytics-high-memory</span></span></code></pre></div></div></div><p>It traces DNS and TLS, the ticket-granting ticket, service-ticket acquisition,
+SASL/GSSAPI, Kyuubi&rsquo;s service keytab, YARN submission, and Hadoop delegation tokens.</p><h2 id=deploy-kyuubi>Deploy Kyuubi
+<a href=#deploy-kyuubi class=heading-anchor><span>#</span></a></h2><h3 id=server-nodes>Server Nodes
+<a href=#server-nodes class=heading-anchor><span>#</span></a></h3><p>Run multiple Kyuubi servers behind a stable endpoint or use the supported service
+discovery mode. Keep server nodes interchangeable:</p><ul><li>distribute the same Kyuubi version, engine artifacts, configuration, trust stores,
+and authentication material;</li><li>give each node a unique advertised address where required;</li><li>keep mutable query state in engines or supported shared services rather than on one
+server&rsquo;s local disk;</li><li>drain listeners before upgrades so existing operations can finish; and</li><li>test mixed-version behavior before performing a rolling upgrade.</li></ul><p>A TCP load balancer is simple for clients, while discovery-aware JDBC can expose the
+registered server pool directly. Neither mechanism guarantees that a failed
+connection&rsquo;s in-flight operation is transparently replayed. Clients need bounded
+retries and must understand whether a statement is safe to resubmit.</p><h3 id=spark-engines-on-yarn>Spark Engines on YARN
+<a href=#spark-engines-on-yarn class=heading-anchor><span>#</span></a></h3><p>For YARN deployment, Kyuubi submits an application with a driver and later requests
+executors. Verify:</p><ul><li>the submitter or proxy identity can use the selected queue;</li><li>the engine can localize Spark, Kyuubi engine JARs, Hadoop configuration, keytabs, and
+catalog dependencies;</li><li>the ApplicationMaster can register back to Kyuubi through firewalls;</li><li>driver and executor hosts can reach HMS, storage, KMS, Ranger, and shuffle services;</li><li>queue maximums permit the requested driver and executor shape; and</li><li>engine logs and Spark event logs survive container termination.</li></ul><p>A session stuck at engine creation is often a resource-allocation or callback problem,
+not a JDBC problem.</p><h3 id=engines-on-kubernetes>Engines on Kubernetes
+<a href=#engines-on-kubernetes class=heading-anchor><span>#</span></a></h3><p>On Kubernetes, the corresponding controls are namespaces, service accounts, RBAC,
+pods, images, Secrets, ConfigMaps, persistent or object-backed logs, network policies,
+and resource quotas. Avoid putting long-lived credentials directly in images. Pin
+images by digest, control which session settings can influence pod templates, and
+separate trusted administrative engines from general user engines.</p><h2 id=integrate-catalogs-and-storage>Integrate Catalogs and Storage
+<a href=#integrate-catalogs-and-storage class=heading-anchor><span>#</span></a></h2><p>Kyuubi does not store table metadata. A Spark engine may use Hive Metastore, Iceberg
+catalogs, JDBC catalogs, or other catalog plugins. The engine needs:</p><ul><li>matching client libraries and catalog extensions;</li><li>network access and authentication credentials;</li><li>compatible Hadoop filesystem implementations;</li><li>object-store or HDFS credentials;</li><li>encryption-key access where applicable; and</li><li>warehouse and scratch locations with correct ownership.</li></ul><p>Catalog libraries belong on the engine classpath, not merely on the Kyuubi server
+classpath. A server can accept JDBC sessions even when every query later fails because
+an engine lacks a catalog JAR or cannot reach HMS.</p><h2 id=build-the-security-model>Build the Security Model
+<a href=#build-the-security-model class=heading-anchor><span>#</span></a></h2><p>Security spans multiple hops:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>client -&gt; Kyuubi server -&gt; engine -&gt; metastore/storage/authorization service</span></span></code></pre></div></div></div><p>Each hop answers a different question:</p><ul><li><strong>TLS</strong> protects transport and authenticates endpoints when certificates are
+validated.</li><li><strong>Kerberos, LDAP, PAM, or another configured mechanism</strong> authenticates the client to
+Kyuubi.</li><li><strong>Impersonation or proxy-user rules</strong> determine which identity launches the engine
+and reaches downstream Hadoop services.</li><li><strong>Delegation tokens and service credentials</strong> let a long-running engine access HDFS,
+HMS, KMS, and related services.</li><li><strong>SQL authorization</strong>, often through a policy plugin such as Ranger, decides which
+catalogs, tables, columns, rows, and operations a user may access.</li><li><strong>YARN queues or Kubernetes quotas</strong> constrain compute rather than data privileges.</li></ul><p>Authentication does not imply authorization. Successfully obtaining a Kerberos service
+ticket proves an identity to Kyuubi; it does not grant access to a table.</p><p>Audit records should preserve at least the authenticated user, effective user, client
+address, server, engine application ID, session and operation IDs, normalized statement
+or statement hash, target objects where available, start/end time, outcome, and resource
+queue. Protect audit logs because SQL text may contain sensitive literals.</p><h2 id=operate-and-observe-the-service>Operate and Observe the Service
+<a href=#operate-and-observe-the-service class=heading-anchor><span>#</span></a></h2><p>Monitor the gateway and engines separately.</p><p>Useful <strong>server signals</strong> include:</p><ul><li>open and rejected connections;</li><li>active sessions and operations;</li><li>authentication failures;</li><li>engine launch requests, duration, timeout, and failure rate;</li><li>request queue depth and RPC latency; and</li><li>server heap, garbage collection, threads, and file descriptors.</li></ul><p>Useful <strong>engine signals</strong> include:</p><ul><li>active sessions and statements per engine;</li><li>driver memory and garbage collection;</li><li>executor allocation and loss;</li><li>SQL planning and execution duration;</li><li>shuffle read/write, spill, skew, and failed stages;</li><li>catalog and storage latency; and</li><li>idle duration and termination reason.</li></ul><p>Correlate Kyuubi session and operation identifiers with the Spark application ID. A
+single dashboard that reports only Kyuubi server CPU can look healthy while all queries
+are blocked on YARN capacity or object-storage throttling.</p><p>Set service-level objectives by phase. Connection establishment, cold engine startup,
+warm query startup, and query execution have different causes and should not be combined
+into one latency percentile.</p><h2 id=plan-capacity>Plan Capacity
+<a href=#plan-capacity class=heading-anchor><span>#</span></a></h2><p>Estimate at least four independent limits:</p><ol><li><strong>Server connection capacity:</strong> concurrent transports, sessions, operations, and
+result-fetch traffic.</li><li><strong>Driver capacity:</strong> the number and size of engines retained by the chosen sharing
+policy.</li><li><strong>Executor capacity:</strong> peak and sustained resources required by active SQL.</li><li><strong>Downstream capacity:</strong> HMS connections, object-store requests, HDFS handlers,
+authorization checks, and shuffle bandwidth.</li></ol><p>For <code>USER</code> sharing, a rough driver-memory bound is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>concurrently retained user engines
+</span></span><span style=display:flex><span>  * (driver memory + driver overhead)</span></span></code></pre></div></div></div><p>This is separate from executor demand. Hundreds of mostly idle user engines may exhaust
+queue application limits or driver memory before consuming substantial executor CPU.
+Engine pooling, carefully chosen idle timeouts, and group sharing can reduce that cost,
+but each changes isolation.</p><p>Protect interactive workloads with queue limits, statement timeouts, admission control,
+and maximum result sizes. A JDBC client that fetches millions of rows through Kyuubi is
+usually worse than writing the result to governed storage.</p><h2 id=diagnose-common-failures>Diagnose Common Failures
+<a href=#diagnose-common-failures class=heading-anchor><span>#</span></a></h2><h3 id=the-client-cannot-connect>The Client Cannot Connect
+<a href=#the-client-cannot-connect class=heading-anchor><span>#</span></a></h3><p>Check DNS, load balancer health, listener address, TLS trust and hostname validation,
+authentication configuration, and whether the selected server is registered. A TCP
+connection refusal occurs before engine selection.</p><h3 id=authentication-succeeds-but-the-engine-does-not-start>Authentication Succeeds but the Engine Does Not Start
+<a href=#authentication-succeeds-but-the-engine-does-not-start class=heading-anchor><span>#</span></a></h3><p>Inspect the Kyuubi server log and cluster-manager application state. Common causes are
+queue denial, exhausted application limits, missing engine artifacts, invalid Spark
+configuration, unavailable container images, callback-network restrictions, or an
+identity that cannot submit applications.</p><h3 id=the-engine-starts-but-sql-cannot-resolve-tables>The Engine Starts but SQL Cannot Resolve Tables
+<a href=#the-engine-starts-but-sql-cannot-resolve-tables class=heading-anchor><span>#</span></a></h3><p>Check the engine&rsquo;s catalog configuration and classpath, HMS URI, DNS, TLS or Kerberos
+credentials, warehouse path, and catalog version compatibility. Changing only the
+Kyuubi server classpath will not repair a remote engine.</p><h3 id=queries-fail-with-permission-errors>Queries Fail with Permission Errors
+<a href=#queries-fail-with-permission-errors class=heading-anchor><span>#</span></a></h3><p>Identify which layer denied the request:</p><ul><li>Kyuubi authentication or proxy-user policy;</li><li>SQL authorization policy;</li><li>HMS authorization;</li><li>HDFS permissions or ACLs;</li><li>object-store IAM;</li><li>encryption-key policy; or</li><li>YARN/Kubernetes resource policy.</li></ul><p>Do not hide the failure by giving the Kyuubi service identity broad storage access.
+Verify the authenticated and effective identities end to end.</p><h3 id=warm-queries-become-slow>Warm Queries Become Slow
+<a href=#warm-queries-become-slow class=heading-anchor><span>#</span></a></h3><p>Separate planning from execution. Look for HMS latency, stale statistics, driver garbage
+collection, too many sessions sharing one engine, executor starvation, skew, shuffle
+spill, object-store throttling, or oversized result fetching. Restarting the server may
+temporarily mask an unhealthy engine without identifying the cause.</p><h3 id=clients-lose-results-during-failover>Clients Lose Results During Failover
+<a href=#clients-lose-results-during-failover class=heading-anchor><span>#</span></a></h3><p>Server discovery makes another endpoint available, but it cannot make arbitrary SQL
+operations replay-safe. Determine whether the operation completed, use application-level
+idempotency for writes, and avoid blind retries of <code>INSERT</code>, <code>MERGE</code>, or DDL.</p><h2 id=compare-the-main-options>Compare the Main Options
+<a href=#compare-the-main-options class=heading-anchor><span>#</span></a></h2><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Service</th><th>Client endpoint</th><th>Execution model</th><th>Strong fit</th></tr></thead><tbody><tr><td>HiveServer2</td><td>Hive JDBC/ODBC</td><td>Hive-supported execution engine</td><td>HiveQL and Hive-native operations</td></tr><tr><td>Spark Thrift Server</td><td>Hive JDBC/ODBC</td><td>One managed Spark application</td><td>A simpler shared Spark SQL endpoint</td></tr><tr><td>Kyuubi</td><td>Hive JDBC/ODBC plus engine management</td><td>Isolated or shared engines selected by policy</td><td>Multi-tenant Spark/lakehouse access</td></tr><tr><td>Direct <code>spark-submit</code></td><td>Job submission</td><td>One application per submission</td><td>Scheduled ETL and application-owned lifecycle</td></tr></tbody></table></div></div><p>Kyuubi adds operational machinery and is not automatically faster than Spark Thrift
+Server. Its value comes from engine isolation, lifecycle management, routing, shared
+security controls, and a stable service boundary.</p><h2 id=decide-whether-kyuubi-fits>Decide Whether Kyuubi Fits
+<a href=#decide-whether-kyuubi-fits class=heading-anchor><span>#</span></a></h2><p>Kyuubi is a strong fit when:</p><ul><li>analysts, dashboards, notebooks, and applications need a stable SQL endpoint;</li><li>Spark or another supported backend is already the desired execution engine;</li><li>workloads require per-user, per-group, or per-connection isolation;</li><li>administrators need centralized authentication, audit, configuration policy, queue
+routing, and engine lifecycle management; and</li><li>cold-start latency can be balanced against the cost of retained engines.</li></ul><p>It may be unnecessary when all workloads are scheduled jobs, one trusted team can use a
+single Spark Thrift Server, or another query service already provides the required
+latency, concurrency, governance, and ecosystem support.</p><p>The useful mental model is: <strong>Spark supplies computation; catalogs describe data; the
+cluster manager allocates resources; Kyuubi turns those components into a managed,
+multi-user SQL service.</strong></p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/apache-kyuubi-introduction/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

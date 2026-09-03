@@ -1,0 +1,52 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MySQL Indexes</title></head><body><main><article><div class=article-header><h1>MySQL Indexes</h1><div class=aux>Last update: 2022-06-16 20:46:43 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/mysql/>Mysql</a>
+|
+<a href=/tags/sql/>Sql</a>
+|
+<a href=/tags/databases/>Databases</a>
+|
+<a href=/tags/indexes/>Indexes</a></div></div><div class=article-content><p>InnoDB implements primary and secondary indexes with B+ trees. An index
+reduces I/O when its order matches selective predicates, joins, range scans, or
+ordering requirements; it increases write work and storage for every indexed
+row.</p><h2 id=clustered-and-secondary-indexes>Clustered and Secondary Indexes
+<a href=#clustered-and-secondary-indexes class=heading-anchor><span>#</span></a></h2><p>An InnoDB table stores row data in its clustered index. InnoDB selects the
+declared primary key; otherwise it selects the first suitable non-null unique
+key, or creates an internal hidden key. Declare a short, stable primary key
+because each secondary-index entry stores the primary-key value.</p><p>A secondary index stores its indexed columns and the primary-key value. A query
+that needs columns absent from the secondary index performs a clustered-index
+lookup for each matching entry. Add a covering index only when it removes a
+measured cost; wider indexes reduce page fan-out and increase write overhead.</p><h2 id=composite-indexes>Composite Indexes
+<a href=#composite-indexes class=heading-anchor><span>#</span></a></h2><p>For <code>(tenant_id, created_at, id)</code>, a B+ tree can efficiently locate:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> tenant_id <span style=color:#f92672>=</span> <span style=color:#f92672>?</span> <span style=color:#66d9ef>AND</span> created_at <span style=color:#f92672>&gt;=</span> <span style=color:#f92672>?</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ORDER</span> <span style=color:#66d9ef>BY</span> created_at, id</span></span></code></pre></div></div></div><p>It cannot efficiently seek from <code>created_at</code> alone because tree order begins
+with <code>tenant_id</code>. Equality predicates precede range predicates in a common
+design, followed by columns needed to satisfy ordering or coverage. Verify the
+choice with <code>EXPLAIN ANALYZE</code>; index order depends on actual predicates, data
+distribution, and result size.</p><h2 id=index-types-and-diagnostics>Index Types and Diagnostics
+<a href=#index-types-and-diagnostics class=heading-anchor><span>#</span></a></h2><p><code>UNIQUE</code> enforces an invariant as well as creating an access path. Most InnoDB
+indexes are B-trees. <code>FULLTEXT</code> indexes support token-based text search, and
+<code>SPATIAL</code> indexes over geometry values use R-trees. MySQL also describes hash
+indexes for the <code>MEMORY</code> engine; InnoDB does not expose a general hash index,
+although its adaptive hash index can cache frequently accessed B-tree pages as
+an internal optimization. Prefix indexes can reduce the byte size of long text
+keys, but only if the chosen prefix remains selective.</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>EXPLAIN</span> <span style=color:#66d9ef>ANALYZE</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> id, created_at
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> event
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> tenant_id <span style=color:#f92672>=</span> <span style=color:#ae81ff>7</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>AND</span> created_at <span style=color:#f92672>&gt;=</span> <span style=color:#e6db74>&#39;2026-01-01&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ORDER</span> <span style=color:#66d9ef>BY</span> created_at, id
+</span></span><span style=display:flex><span><span style=color:#66d9ef>LIMIT</span> <span style=color:#ae81ff>100</span>;</span></span></code></pre></div></div></div><p>Inspect actual rows, loop counts, and timing rather than assuming an index is
+used. Statistics, cardinality estimates, and a small result set can make a
+table scan cheaper than an index traversal.</p><p><code>SHOW INDEX</code> reports estimated cardinality, not an exact distinct-value count.
+Refresh stale statistics with <code>ANALYZE TABLE</code> when justified, then compare the
+optimizer estimate with <code>EXPLAIN ANALYZE</code> measurements. An invisible index lets
+administrators test plans as if an index were absent while InnoDB continues to
+maintain it:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>ALTER</span> <span style=color:#66d9ef>TABLE</span> event <span style=color:#66d9ef>ALTER</span> <span style=color:#66d9ef>INDEX</span> event_tenant_created INVISIBLE;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ALTER</span> <span style=color:#66d9ef>TABLE</span> event <span style=color:#66d9ef>ALTER</span> <span style=color:#66d9ef>INDEX</span> event_tenant_created VISIBLE;</span></span></code></pre></div></div></div><p>Do not drop the index until representative queries and constraint requirements
+have been checked. Every additional index consumes pages and adds insert,
+delete, update, redo-log, buffer-pool, backup, and replication work. Thus index
+selection must balance measured read benefit against write amplification and
+operational cost.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://dev.mysql.com/doc/refman/8.4/en/mysql-indexes.html>How MySQL Uses Indexes</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-index-types.html>InnoDB Index Structures</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/invisible-indexes.html>Invisible Indexes</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mysql-indexes/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,143 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Go Language and Templates</title></head><body><main><article><div class=article-header><h1>Go Language and Templates</h1><div class=aux>Last update: 2022-05-03 10:12:40 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/go/>Go</a>
+|
+<a href=/tags/templates/>Templates</a></div></div><div class=article-content><p>Go organizes source into packages and modules, reports recoverable failures as
+values, and provides reflection-based text and HTML templates in its standard
+library. The same design principle connects these areas: make dependencies and
+control flow explicit at the API boundary.</p><h2 id=modules-packages-and-builds>Modules, Packages, and Builds
+<a href=#modules-packages-and-builds class=heading-anchor><span>#</span></a></h2><p>A package is the compilation and namespace boundary formed by non-test <code>.go</code>
+files with the same package declaration in one directory. A module is a
+versioned collection of packages rooted at <code>go.mod</code>. The module path supplies
+the import-path prefix:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mkdir example
+</span></span><span style=display:flex><span>cd example
+</span></span><span style=display:flex><span>go mod init example.com/team/example
+</span></span><span style=display:flex><span>go get golang.org/x/sync@v0.17.0
+</span></span><span style=display:flex><span>go mod tidy
+</span></span><span style=display:flex><span>go test ./...
+</span></span><span style=display:flex><span>go build ./cmd/server</span></span></code></pre></div></div></div><p><code>go get</code> changes module requirements; <code>go install package@version</code> installs a
+command without changing the current module. In current Go releases, module
+mode is the standard dependency model, and a module can live outside <code>GOPATH</code>.
+Nested modules are separate dependency boundaries and are excluded from the
+parent module&rsquo;s package pattern.</p><p>The build cache stores compiled packages and test results under <code>GOCACHE</code>.
+Downloaded module source is stored under <code>GOMODCACHE</code>, commonly
+<code>$GOPATH/pkg/mod</code>. Inspect actual locations with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>go env GOCACHE GOMODCACHE GOPATH</span></span></code></pre></div></div></div><p>Do not point <code>GOCACHE</code> and <code>GOMODCACHE</code> at the same directory because they have
+different layouts and lifecycle rules. CI can cache both, keyed by the Go
+version, target platform, and dependency files, while still treating
+<code>go.sum</code> as the authenticated module-content record.</p><p>A <code>package main</code> containing <code>func main()</code> builds an executable and is not an
+importable library boundary. Put reusable behavior in another package; keep
+flag parsing and process exit decisions in <code>main</code>.</p><h2 id=errors-panic-and-cleanup>Errors, Panic, and Cleanup
+<a href=#errors-panic-and-cleanup class=heading-anchor><span>#</span></a></h2><p>The built-in <code>error</code> interface contains <code>Error() string</code>. Functions return an
+error when a caller can make a local decision:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#a6e22e>f</span>, <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>os</span>.<span style=color:#a6e22e>Open</span>(<span style=color:#a6e22e>path</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Errorf</span>(<span style=color:#e6db74>&#34;open %q: %w&#34;</span>, <span style=color:#a6e22e>path</span>, <span style=color:#a6e22e>err</span>)
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>defer</span> <span style=color:#a6e22e>f</span>.<span style=color:#a6e22e>Close</span>()</span></span></code></pre></div></div></div><p>Wrap with <code>%w</code> when callers should retain access to the cause through
+<code>errors.Is</code> or <code>errors.As</code>. A panic indicates an unrecoverable invariant failure
+inside the current abstraction. Libraries should not use panic as a substitute
+for ordinary error results. A boundary such as an HTTP server may recover a
+panic to isolate one request, log a stack, and convert the failure into an
+error response; recovery does not make partially mutated state valid.</p><p><code>defer</code> evaluates the function value and arguments immediately, then executes
+deferred calls in last-in, first-out order when the surrounding function
+returns or panics. A deferred closure can inspect named return values. Cleanup
+errors still need explicit handling, especially for writable files:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>writeFile</span>(<span style=color:#a6e22e>path</span> <span style=color:#66d9ef>string</span>, <span style=color:#a6e22e>data</span> []<span style=color:#66d9ef>byte</span>) (<span style=color:#a6e22e>err</span> <span style=color:#66d9ef>error</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>f</span>, <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>os</span>.<span style=color:#a6e22e>Create</span>(<span style=color:#a6e22e>path</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>err</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>defer</span> <span style=color:#66d9ef>func</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>closeErr</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>f</span>.<span style=color:#a6e22e>Close</span>(); <span style=color:#a6e22e>err</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>err</span> = <span style=color:#a6e22e>closeErr</span>
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>_</span>, <span style=color:#a6e22e>err</span> = <span style=color:#a6e22e>f</span>.<span style=color:#a6e22e>Write</span>(<span style=color:#a6e22e>data</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>err</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>Close</code> can report delayed write or metadata errors. Read-only close errors are
+less likely to affect the operation&rsquo;s result, but applications can still record
+them where the resource contract requires it.</p><h2 id=declarations-shadowing-and-comma-ok-forms>Declarations, Shadowing, and Comma-Ok Forms
+<a href=#declarations-shadowing-and-comma-ok-forms class=heading-anchor><span>#</span></a></h2><p><code>:=</code> declares at least one new variable in the current lexical block. A nested
+declaration can shadow an outer error:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>var</span> <span style=color:#a6e22e>err</span> <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>var</span> <span style=color:#a6e22e>message</span> []<span style=color:#66d9ef>byte</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>message</span>, <span style=color:#a6e22e>err</span> = <span style=color:#a6e22e>readMessage</span>()
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>break</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>_</span> = <span style=color:#a6e22e>message</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>return</span> <span style=color:#a6e22e>err</span></span></span></code></pre></div></div></div><p>Using <code>message, err := readMessage()</code> inside the loop would declare a new
+<code>err</code>; the outer value would remain unchanged. Keep declarations close to use
+but use assignment when a result must escape the block.</p><p>Three language operations have comma-ok forms:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#a6e22e>value</span>, <span style=color:#a6e22e>present</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>m</span>[<span style=color:#a6e22e>key</span>]       <span style=color:#75715e>// map lookup</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>value</span>, <span style=color:#a6e22e>open</span> <span style=color:#f92672>:=</span> <span style=color:#f92672>&lt;-</span><span style=color:#a6e22e>ch</span>            <span style=color:#75715e>// channel receive</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>value</span>, <span style=color:#a6e22e>matches</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>x</span>.(<span style=color:#a6e22e>Target</span>)   <span style=color:#75715e>// type assertion</span></span></span></code></pre></div></div></div><p>Without the boolean, a failed type assertion panics, while a missing map entry
+and a receive from a closed channel produce zero values. The boolean therefore
+separates a real zero value from absence or closure.</p><p>Within a constant declaration, <code>iota</code> is the zero-based constant index:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Permission</span> <span style=color:#66d9ef>uint8</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> (
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Read</span> <span style=color:#a6e22e>Permission</span> = <span style=color:#ae81ff>1</span> <span style=color:#f92672>&lt;&lt;</span> <span style=color:#66d9ef>iota</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Write</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Execute</span>
+</span></span><span style=display:flex><span>)</span></span></code></pre></div></div></div><p>Insertions can change later values, so persist or transmit an <code>iota</code>-based
+enumeration only when every value is assigned deliberately or compatibility is
+otherwise controlled.</p><h2 id=defined-types-aliases-and-reference-like-values>Defined Types, Aliases, and Reference-Like Values
+<a href=#defined-types-aliases-and-reference-like-values class=heading-anchor><span>#</span></a></h2><p>An alias introduces another spelling for the same type; a definition creates a
+distinct named type with the specified underlying type:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Bytes</span> = []<span style=color:#66d9ef>byte</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>UserID</span> <span style=color:#66d9ef>string</span></span></span></code></pre></div></div></div><p><code>Bytes</code> and <code>[]byte</code> are identical. <code>UserID</code> and <code>string</code> require conversion
+when neither assignment rule applies, and methods can be declared on <code>UserID</code>.</p><p>Slices, maps, channels, functions, and interfaces contain references to runtime
+state and are inexpensive descriptors to copy. Passing a slice by value copies
+its pointer, length, and capacity, not its elements. Copying a map or channel
+value likewise does not duplicate its backing state. A pointer to one of these
+values is needed only when the function must replace the caller&rsquo;s descriptor or
+represent an additional state.</p><p>Go has no class-subtyping relation. A concrete type satisfies an interface by
+having its methods, and embedding promotes selected fields and methods without
+turning one struct into a subtype of another. Method sets differ between <code>T</code>
+and <code>*T</code>: methods with a value receiver belong to both method sets, while a
+pointer-receiver method belongs to <code>*T</code>.</p><h2 id=template-parsing-and-execution>Template Parsing and Execution
+<a href=#template-parsing-and-execution class=heading-anchor><span>#</span></a></h2><p><code>text/template</code> generates arbitrary text. <code>html/template</code> implements the same
+core language but contextually escapes untrusted values for HTML, attributes,
+URLs, JavaScript, and CSS. Use <code>html/template</code> for HTML output; converting
+untrusted text to a trusted content type such as <code>template.HTML</code> bypasses the
+protection.</p><p>Parse templates, register functions before parsing expressions that name them,
+and check execution errors:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>source</span> = <span style=color:#e6db74>`</span><span style=color:#75715e>{{</span><span style=color:#66d9ef>define</span> <span style=color:#e6db74>&#34;row&#34;</span><span style=color:#75715e>}}</span><span style=color:#e6db74>&lt;li&gt;</span><span style=color:#75715e>{{</span><span style=color:#a6e22e>.Name</span><span style=color:#75715e>}}</span><span style=color:#e6db74>&lt;/li&gt;</span><span style=color:#75715e>{{</span><span style=color:#66d9ef>end</span><span style=color:#75715e>}}</span><span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&lt;ul&gt;</span><span style=color:#75715e>{{</span><span style=color:#66d9ef>range</span> <span style=color:#a6e22e>.Items</span><span style=color:#75715e>}}{{</span><span style=color:#66d9ef>template</span> <span style=color:#e6db74>&#34;row&#34;</span> <span style=color:#a6e22e>.</span><span style=color:#75715e>}}{{</span><span style=color:#66d9ef>else</span><span style=color:#75715e>}}</span><span style=color:#e6db74>&lt;li&gt;empty&lt;/li&gt;</span><span style=color:#75715e>{{</span><span style=color:#66d9ef>end</span><span style=color:#75715e>}}</span><span style=color:#e6db74>&lt;/ul&gt;`</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>tmpl</span>, <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>template</span>.<span style=color:#a6e22e>New</span>(<span style=color:#e6db74>&#34;page&#34;</span>).<span style=color:#a6e22e>Option</span>(<span style=color:#e6db74>&#34;missingkey=error&#34;</span>).<span style=color:#a6e22e>Parse</span>(<span style=color:#a6e22e>source</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>err</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>tmpl</span>.<span style=color:#a6e22e>Execute</span>(<span style=color:#a6e22e>output</span>, <span style=color:#a6e22e>data</span>); <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>err</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>An action appears between <code>{{</code> and <code>}}</code>. Dot (<code>.</code>) is the current argument.
+Pipelines pass one command&rsquo;s final value to the next command. <code>if</code>, <code>with</code>, and
+<code>range</code> execute conditionally; <code>range</code> changes dot for each element.
+<code>define</code>, <code>template</code>, and <code>block</code> create and invoke named templates. Variables
+such as <code>{{$root := .}}</code> preserve a value when dot changes.</p><p>A template invocation accepts one pipeline argument:</p><div class=jose-wrapper><div class=jose-tools><span>gotemplate</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-gotemplate data-lang=gotemplate>{{template &#34;card&#34; .}}</code></pre></div></div><p>Pass several logical values by wrapping them in a struct, map, slice, or helper
+result. Prefer a typed view-model struct because field names and ownership stay
+visible in Go:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>CardData</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>User</span>    <span style=color:#a6e22e>User</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Enabled</span> <span style=color:#66d9ef>bool</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>Template.Execute</code> may already have written partial output when an evaluation
+fails. Render into a <code>bytes.Buffer</code> first when the caller requires all-or-nothing
+output. After parsing, a template can execute concurrently provided callers do
+not mutate it and writers are independent.</p><h2 id=editor-and-tooling-boundaries>Editor and Tooling Boundaries
+<a href=#editor-and-tooling-boundaries class=heading-anchor><span>#</span></a></h2><p>The conventional filename suffix is <code>.tmpl</code>, <code>.gotmpl</code>, or a content suffix
+such as <code>.html</code>. Editor support depends on the extension and embedded-language
+grammar; no filename changes Go&rsquo;s template semantics. Format and test the Go
+code with <code>gofmt</code>, <code>go vet</code>, and <code>go test</code>, then execute representative template
+data in tests because the Go compiler cannot type-check reflected field and
+method names inside template source.</p><p>The authoritative references are the <a href=https://go.dev/ref/spec>Go language
+specification</a>, the <a href=https://go.dev/cmd/go/><code>go</code>
+command</a>, and the package documentation for
+<a href=https://pkg.go.dev/text/template><code>text/template</code></a> and
+<a href=https://pkg.go.dev/html/template><code>html/template</code></a>.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/go-language-and-templates/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

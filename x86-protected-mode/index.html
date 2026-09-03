@@ -1,0 +1,150 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>x86 Protected Mode and Privilege</title></head><body><main><article><div class=article-header><h1>x86 Protected Mode and Privilege</h1><div class=aux>Last update: 2022-12-24 15:42:13 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/x86/>X86</a>
+|
+<a href=/tags/x86-64/>X86-64</a>
+|
+<a href=/tags/operating-systems/>Operating Systems</a>
+|
+<a href=/tags/security/>Security</a></div></div><div class=article-content><p>x86 protected mode combines descriptor-based segmentation, controlled control
+transfers, paging, and privileged instructions. Long mode reduces ordinary
+segmentation but retains descriptor tables, privilege levels, interrupt gates,
+and a task-state segment (TSS). Operating systems use those mechanisms to enter
+the kernel and isolate user execution, while page tables provide the primary
+memory-protection boundary on current x86-64 systems.</p><h2 id=table-registers>Table Registers
+<a href=#table-registers class=heading-anchor><span>#</span></a></h2><p>The global descriptor table (GDT) contains code, data, and system descriptors
+shared by a logical processor. <code>GDTR</code> stores the GDT&rsquo;s linear base and byte
+limit. GDT entry zero is conventionally a null descriptor, which makes a
+selector with index zero unusable for ordinary code or data access.</p><p>The local descriptor table (LDT) is an optional table selected through <code>LDTR</code>.
+<code>LDTR</code> contains a selector for an LDT system descriptor in the GDT and caches
+the resolved base, limit, and attributes. A task can have its own LDT in the
+legacy architecture, although current 64-bit operating systems rarely use one.</p><p><code>IDTR</code> stores the linear base and byte limit of the interrupt descriptor table
+(IDT). The IDT is indexed by an exception or interrupt vector, not by an
+ordinary segment selector. Its entries are gates that identify handler code and
+control entry semantics.</p><p>The task register (<code>TR</code>) contains a selector for a TSS descriptor in the GDT and
+caches that descriptor. <code>LGDT</code>, <code>LIDT</code>, <code>LLDT</code>, and <code>LTR</code> load the table state
+under architectural privilege and type checks.</p><h2 id=selectors-and-hidden-caches>Selectors and Hidden Caches
+<a href=#selectors-and-hidden-caches class=heading-anchor><span>#</span></a></h2><p>A 16-bit segment selector contains an index, table indicator (<code>TI</code>), and
+requested privilege level (<code>RPL</code>):</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>15                              3 2   1 0
+</span></span><span style=display:flex><span>+--------------------------------+---+---+
+</span></span><span style=display:flex><span>|             index              | TI|RPL|
+</span></span><span style=display:flex><span>+--------------------------------+---+---+</span></span></code></pre></div></div></div><p><code>TI=0</code> selects the GDT, while <code>TI=1</code> selects the current LDT. The processor
+multiplies the index by the descriptor size, checks the table limit, fetches the
+descriptor, and validates its type, presence, and privilege for the operation.</p><p><code>CS</code>, <code>SS</code>, <code>DS</code>, <code>ES</code>, <code>FS</code>, and <code>GS</code> expose the selector but also contain a
+hidden cache of base, limit, type, and access rights. Memory references use the
+cache rather than reading the descriptor table again. Rewriting a GDT or LDT
+entry therefore does not change a loaded segment; software must reload the
+selector or perform the architecturally required transition.</p><p><code>LDTR</code> and <code>TR</code> also cache resolved descriptors. A context switch that changes a
+GDT, LDT, or TSS must account for those caches rather than treating the visible
+selector as the complete state.</p><h2 id=segment-descriptors>Segment Descriptors
+<a href=#segment-descriptors class=heading-anchor><span>#</span></a></h2><p>Legacy protected-mode code and data descriptors are eight bytes. They encode a
+32-bit base, a 20-bit limit with optional 4 KiB granularity, a descriptor
+privilege level (<code>DPL</code>), present bit, descriptor class, and type-specific flags.</p><ul><li><code>S=1</code> identifies a code or data descriptor; <code>S=0</code> identifies a system
+descriptor or gate.</li><li>A code descriptor selects executable, readable, and conforming behavior.</li><li>A data descriptor selects writable and expand-down behavior.</li><li><code>G</code> scales the limit, while <code>D/B</code> controls the default operand or stack size
+according to descriptor type.</li><li>In long mode, <code>L</code> identifies a 64-bit code segment; invalid combinations with
+<code>D</code> are rejected.</li></ul><p>Segmentation adds the descriptor base to an instruction&rsquo;s effective offset and
+checks the limit and access rights before paging. A flat 32-bit model uses
+base-zero, large-limit segments while retaining the checks.</p><p>In 64-bit mode, normal address generation treats <code>CS</code>, <code>SS</code>, <code>DS</code>, and <code>ES</code>
+bases as zero and does not apply their legacy limits. <code>FS</code> and <code>GS</code> retain
+separately controlled 64-bit bases. Code-segment type, <code>CS</code> privilege, and
+selected <code>SS</code> rules remain architecturally significant.</p><h2 id=system-descriptors-and-gates>System Descriptors and Gates
+<a href=#system-descriptors-and-gates class=heading-anchor><span>#</span></a></h2><p>System descriptors identify LDTs, available or busy TSSs, and legacy gates.
+IA-32 uses eight-byte TSS and LDT descriptors. In 64-bit mode, TSS and LDT
+descriptors occupy sixteen bytes so they can contain a 64-bit base; the upper
+eight bytes consume the next GDT slot.</p><p>A <strong>call gate</strong> names a destination code selector and offset and provides a
+checked path for a far call to the same or a more privileged level. Legacy call
+gates can copy a configured number of parameters to the new stack. A far return
+reverses the privilege transition under another set of checks.</p><p>An IDT entry can be an interrupt gate, trap gate, or, in legacy mode, task gate.
+Interrupt and trap gates contain a handler selector and offset. An interrupt
+gate clears <code>IF</code> on entry; a trap gate preserves it. A 64-bit interrupt or trap
+gate also contains an IST selector used for emergency or dedicated stacks.</p><h2 id=privilege-values>Privilege Values and Effective Checks
+<a href=#privilege-values class=heading-anchor><span>#</span></a></h2><p>x86 defines four privilege levels numbered 0 through 3. A smaller number is
+more privileged. The current privilege level (<code>CPL</code>) is represented by the low
+two bits of <code>CS</code>; kernels commonly run at CPL 0 and applications at CPL 3.
+Rings 1 and 2 exist but are not required by an operating-system design.</p><p>Each descriptor has a <code>DPL</code>, and each selector carries an <code>RPL</code>. For many data
+accesses, the processor forms an effective privilege level:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>EPL = max(CPL, RPL)</span></span></code></pre></div></div></div><p>Access to a normal data segment requires <code>EPL &lt;= DPL</code>, along with type and
+presence checks. Because larger numbers are less privileged, an RPL can
+deliberately reduce the authority of a selector. <code>SS</code> loads use stricter rules:
+the selector RPL and writable data-segment DPL must match CPL.</p><p>Code transfers use rules specific to their mechanism:</p><ul><li>A direct far transfer to a nonconforming code segment does not arbitrarily
+lower CPL; its DPL must match the required current privilege relationship.</li><li>A conforming code segment permits execution from numerically equal or less
+privileged CPLs when its DPL allows it, while CPL remains unchanged. Such a
+transfer does not grant access to the target DPL&rsquo;s data.</li><li>A call-gate selector is checked against the gate DPL using CPL and RPL. The
+gate then controls entry to its destination code segment.</li><li>A software <code>INT n</code> checks the IDT gate DPL against CPL. Processor exceptions
+and external interrupts do not use the gate DPL as a caller authorization
+check because software did not invoke them through <code>INT n</code>.</li></ul><p>No single <code>CPL</code>/<code>DPL</code> comparison describes every operation. Segment loads,
+conforming code, gates, task switches, <code>IRET</code>, port I/O, and privileged
+instructions each define their own checks.</p><h2 id=transitions>Controlled Transitions
+<a href=#transitions class=heading-anchor><span>#</span></a></h2><p>User code cannot load a ring-0 code selector and jump to an arbitrary kernel
+address. A gate, exception, interrupt, task mechanism, or configured syscall
+instruction establishes a controlled entry point and saved return state.</p><p>For an interrupt or exception gate that enters a numerically lower CPL, the
+processor obtains a stack pointer for the destination privilege level from the
+current TSS. It switches stacks, saves the old stack context and return state,
+and begins at the gate&rsquo;s handler. The exact frame, optional error code, and
+saved values depend on execution mode and vector.</p><p>A same-privilege gate normally keeps the current stack. In 64-bit mode, a
+nonzero IDT IST field selects its configured IST stack even without a CPL
+change. Kernel entry code must then save remaining registers, establish ABI
+invariants, validate user-controlled state, and handle nested entry safely.</p><p>Returning with <code>IRET</code> validates and restores the saved destination. A return to
+a less privileged CPL also restores the outer stack. Software must not place
+unchecked selectors, flags, or instruction pointers into an interrupt-return
+frame because return-time validation alone does not express kernel policy.</p><h2 id=interrupts-and-system-calls>Interrupts and System Calls
+<a href=#interrupts-and-system-calls class=heading-anchor><span>#</span></a></h2><p>Exceptions are synchronous consequences of instruction execution. External
+interrupts arrive through an interrupt controller and are delivered when
+priority, masking, and processor state permit. Both ultimately select IDT
+vectors, but only selected exceptions push an architectural error code.</p><p><code>SYSCALL</code>/<code>SYSRET</code> and <code>SYSENTER</code>/<code>SYSEXIT</code> avoid general IDT gate lookup and use
+model-specific registers to establish entry and return state.
+<code>SYSCALL</code> in 64-bit mode saves the next <code>RIP</code> in <code>RCX</code>, saves <code>RFLAGS</code> in <code>R11</code>,
+loads configured code selectors and entry <code>RIP</code>, and masks selected flags. It
+does <strong>not</strong> switch <code>RSP</code>; a kernel entry stub must move to a trusted stack
+without exposing unsafe intermediate state. <code>SYSENTER</code> has different configured
+stack semantics. Register arguments and error conventions belong to the
+operating-system syscall ABI, not to x86 itself.</p><p>Call gates remain architectural but current kernels generally use syscall
+instructions and interrupt gates because those paths fit flat address spaces
+and software-defined entry frames. Paging, SMEP, SMAP, protection keys, and
+other controls complement descriptor checks.</p><h2 id=ia-32-hardware-tasks>IA-32 Hardware Tasks
+<a href=#ia-32-hardware-tasks class=heading-anchor><span>#</span></a></h2><p>The 80286 and IA-32 protected-mode architecture defines a hardware <strong>task</strong> as
+state represented by a TSS and TSS descriptor. An IA-32 TSS stores <code>EIP</code>,
+<code>EFLAGS</code>, general-purpose registers, segment selectors, <code>CR3</code>, an LDT selector,
+stack pointers for privilege levels 0 through 2, and an I/O-permission bitmap
+offset.</p><p>A hardware task switch can be initiated by:</p><ul><li>A far <code>CALL</code> or <code>JMP</code> to a TSS descriptor.</li><li>A far transfer through a task gate.</li><li>An interrupt or exception whose IDT entry is a task gate.</li><li><code>IRET</code> when <code>EFLAGS.NT</code> indicates a nested task.</li></ul><p>The processor validates the destination, saves selected outgoing state in the
+current TSS, loads the destination TSS, marks descriptor busy state as required,
+loads <code>TR</code> and other task state, and sets the task-switched flag in <code>CR0</code>.
+Exact busy-bit, link, and exception behavior depends on the initiating
+mechanism.</p><p>A nested task switch initiated by <code>CALL</code>, a task gate, or an interrupt task gate
+can write the old TSS selector into the destination TSS backlink and set the
+nested-task (<code>NT</code>) flag. <code>IRET</code> with <code>NT=1</code> follows the backlink to resume the
+previous task. A backlink is architectural control state rather than a
+scheduler-maintained process list; malformed or inconsistent task state can
+produce task-segment exceptions.</p><p>Current operating systems switch scheduled threads in software because hardware
+task switching has fixed state layout and side effects, while a kernel must also
+manage scheduler metadata, address-space policy, per-CPU state, floating-point
+and vector state, debug state, and implementation-specific mitigations. A
+software switch can save exactly the state required by the kernel&rsquo;s context and
+ABI. IA-32 kernels still use a TSS for privilege-stack and I/O-bitmap functions
+without using hardware task switching for scheduling.</p><h2 id=long-mode-tss-usage>Long-Mode TSS Usage
+<a href=#long-mode-tss-usage class=heading-anchor><span>#</span></a></h2><p>64-bit mode does not support hardware task switching, but every logical
+processor still needs a valid 64-bit TSS for normal kernel operation. The TSS
+contains:</p><ul><li><code>RSP0</code>, <code>RSP1</code>, and <code>RSP2</code>, used when an interrupt or exception enters the
+corresponding more-privileged CPL without selecting IST.</li><li>Seven interrupt-stack-table pointers, <code>IST1</code> through <code>IST7</code>.</li><li>An I/O-permission-bitmap offset.</li></ul><p>An IDT gate&rsquo;s three-bit IST field selects one of the seven IST pointers. IST is
+useful when the current stack may be unusable or when a handler requires a
+separate stack, such as a double-fault path. IST hardware loads a new stack
+pointer; it does not provide a complete software nesting policy. Entry code must
+still prevent uncontrolled reuse or overflow of a finite emergency stack.</p><p>The I/O-permission bitmap can allow or deny <code>IN</code> and <code>OUT</code> by port for
+less-privileged code, subject to <code>IOPL</code> and mode rules. Its location and bounds
+are derived from the TSS descriptor limit, so the descriptor, offset, bitmap,
+and terminating byte must be constructed consistently.</p><p>The TSS descriptor remains a sixteen-byte system descriptor in the GDT. <code>LTR</code>
+loads it into <code>TR</code>, sets or observes the defined busy type, and caches its base
+and limit. Each logical processor normally has its own TSS because privilege
+entry needs a processor-local trusted stack. Loading <code>TR</code> is initialization for
+entry handling, not a scheduler context switch.</p><h2 id=long-mode-considerations>Long-Mode Considerations
+<a href=#long-mode-considerations class=heading-anchor><span>#</span></a></h2><p>Long mode retains the standard CPL 0/CPL 3 kernel-user division, code
+descriptors, IDT gates, the GDT, <code>TR</code>, and a TSS. It removes most segment-base
+and limit effects from ordinary 64-bit addressing and omits hardware task
+switches. Page-table user/supervisor, writable, and execute-disable permissions
+therefore form the primary address-space boundary.</p><p>Descriptor state still cannot be omitted. A 64-bit code segment must have a
+valid descriptor, interrupt gates contain a code selector, privilege entry uses
+TSS stack state, and compatibility mode applies additional legacy descriptor
+semantics. Boot and kernel code should follow the processor vendor&rsquo;s current
+system-programming manual because reserved fields and mode-transition ordering
+are architectural requirements.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html>Intel 64 and IA-32 Architectures Software Developer Manuals</a>, especially Volume 3A</li><li><a href="https://www.amd.com/en/search/documentation/hub.html#sortCriteria=%40amd_release_date%20descending&amp;f-amd_archive_status=Active&amp;f-amd_document_type=Programmer%20Reference">AMD64 Architecture Programmer&rsquo;s Manual</a>, especially Volume 2</li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/x86-protected-mode/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

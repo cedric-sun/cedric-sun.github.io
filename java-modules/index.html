@@ -1,0 +1,57 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java Modules</title></head><body><main><article><div class=article-header><h1>Java Modules</h1><div class=aux>Last update: 2026-02-19 04:54:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/jpms/>Jpms</a>
+|
+<a href=/tags/modules/>Modules</a></div></div><div class=article-content><p>The Java Platform Module System (JPMS) makes dependencies and package
+encapsulation explicit. A named module contains a descriptor,
+<code>module-info.java</code>, at its source root. Compiling it produces
+<code>module-info.class</code> in an exploded module directory or modular JAR.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>module com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>app</span> {
+</span></span><span style=display:flex><span>    requires com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>codec</span>;
+</span></span><span style=display:flex><span>    uses com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>codec</span>.<span style=color:#a6e22e>Decoder</span>;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>module com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>codec</span> {
+</span></span><span style=display:flex><span>    exports com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>codec</span>.<span style=color:#a6e22e>api</span>;
+</span></span><span style=display:flex><span>    exports com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>codec</span>.<span style=color:#a6e22e>internal</span> to com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>app</span>;
+</span></span><span style=display:flex><span>    opens com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>codec</span>.<span style=color:#a6e22e>model</span> to com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>json</span>;
+</span></span><span style=display:flex><span>    provides com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>codec</span>.<span style=color:#a6e22e>Decoder</span> with com.<span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>codec</span>.<span style=color:#a6e22e>JsonDecoder</span>;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><h2 id=compilation-packaging-and-launch>Compilation, Packaging, and Launch
+<a href=#compilation-packaging-and-launch class=heading-anchor><span>#</span></a></h2><p>A conventional multi-module source tree has one directory per module below the
+module source path. Compile with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>javac --module-source-path src -d out -m com.example.app,com.example.codec
+</span></span><span style=display:flex><span>jar --create --file app.jar --main-class com.example.app.Main -C out/com.example.app .
+</span></span><span style=display:flex><span>java --module-path libs:app.jar --module com.example.app</span></span></code></pre></div></div></div><p><code>jar --main-class</code> records an executable main class, but it is optional because
+<code>java -m module/name.Main</code> can name one at launch. <code>jlink</code> creates a runtime
+image from a transitive closure of modules; it accepts modular JARs and JMODs
+on its module path, while a JMOD is not a runtime artifact.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>jlink --module-path <span style=color:#e6db74>&#34;</span>$JAVA_HOME<span style=color:#e6db74>/jmods:libs&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>      --add-modules com.example.app --output image
+</span></span><span style=display:flex><span>image/bin/java -m com.example.app</span></span></code></pre></div></div></div><h2 id=readability-and-encapsulation>Readability and Encapsulation
+<a href=#readability-and-encapsulation class=heading-anchor><span>#</span></a></h2><p><code>requires</code> makes a module readable. <code>requires transitive</code> re-exports that
+readability to dependents; <code>requires static</code> is mandatory at compile time but
+optional at run time. <code>exports</code> grants compile-time and ordinary runtime access
+to public types in a package, either to all reading modules or with <code>to</code> to a
+named list. <code>opens</code> grants deep reflection without granting ordinary type
+access; an <code>open module</code> opens all its packages. Prefer qualified <code>opens</code> for
+framework integration.</p><p><code>uses</code> and <code>provides ... with ...</code> declare services in module descriptors.
+<code>ServiceLoader</code> uses those declarations during module resolution. A package is
+not a unit of access independent of its module, so public alone never bypasses
+an unexported package.</p><h2 id=resolution-and-migration>Resolution and Migration
+<a href=#resolution-and-migration class=heading-anchor><span>#</span></a></h2><p>For each phase, the module path plus system and upgrade modules form the set of
+observable modules. Resolution starts from root modules and follows <code>requires</code>
+edges; duplicate module names fail rather than allowing classpath ordering to
+choose one. Named modules cannot contain split packages: the same package in
+two resolved named modules is an error. This rule makes package ownership and
+encapsulation deterministic.</p><p>Classpath code belongs to an unnamed module. It reads exported packages of
+resolved named modules, and its packages are exported and opened, but a named
+module cannot declare <code>requires</code> on the unnamed module. A non-modular JAR on
+the module path becomes an automatic module: it has a derived or manifest name,
+reads all resolved modules, and exports and opens all packages. Automatic
+modules help staged migration, but they do not provide meaningful
+encapsulation; replace them with explicit descriptors before relying on module
+boundaries.</p><p>Reflection across a named-module boundary requires ordinary accessibility plus
+an open package for deep access. <code>--add-exports</code> and <code>--add-opens</code> are migration
+or deployment overrides, not a substitute for a descriptor owned by the module.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-7.html#jls-7.7>JLS §7.7, Module Declarations</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/module/package-summary.html>Java SE Module System Specification</a></li><li><a href=https://openjdk.org/jeps/261>JEP 261, Module System</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-modules/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,75 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>zlib Streaming API</title></head><body><main><article><div class=article-header><h1>zlib Streaming API</h1><div class=aux>Last update: 2024-04-03 14:47:29 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/compression/>Compression</a>
+|
+<a href=/tags/zlib/>Zlib</a>
+|
+<a href=/tags/deflate/>Deflate</a></div></div><div class=article-content><p>zlib is a C library that implements DEFLATE and its common wrappers. Its
+streaming API uses <code>z_stream</code>, so an application can process input and output
+in bounded buffers instead of assuming that one call consumes or produces a
+whole message.</p><h2 id=stream-state-and-initialization>Stream State and Initialization
+<a href=#stream-state-and-initialization class=heading-anchor><span>#</span></a></h2><p>The application supplies <code>next_in</code>/<code>avail_in</code> and <code>next_out</code>/<code>avail_out</code>.
+After a call, zlib advances the pointers and decreases the available counts;
+<code>total_in</code> and <code>total_out</code> provide cumulative counters. The application must
+consume produced bytes and refill buffers before the next call, while leaving
+the other state fields to zlib.</p><p><code>deflateInit()</code> produces a zlib-wrapped stream. <code>deflateInit2()</code> selects raw
+DEFLATE with a negative <code>windowBits</code>, or gzip with <code>windowBits + 16</code>.
+Initialize allocator fields before initialization and call <code>deflateEnd()</code> on
+every successfully initialized stream, including error paths. A compressor can
+preload a shared history with <code>deflateSetDictionary()</code>. The zlib wrapper carries
+an Adler-32 dictionary identifier and lets <code>inflate()</code> return <code>Z_NEED_DICT</code>;
+raw DEFLATE requires the enclosing protocol to identify the dictionary. The
+gzip wrapper does not define preset-dictionary signaling.</p><h2 id=correct-deflate-loops>Correct Deflate Loops
+<a href=#correct-deflate-loops class=heading-anchor><span>#</span></a></h2><p>Use <code>Z_NO_FLUSH</code> for ordinary input; frequent flushing reduces compression.
+Continue calling <code>deflate()</code> while input remains or output is pending. To finish,
+stop supplying input and call <code>deflate(..., Z_FINISH)</code> until it returns
+<code>Z_STREAM_END</code>, growing or draining the output buffer between calls. This
+bounded-input sketch assumes <code>input_len</code> fits in zlib&rsquo;s <code>uInt</code> count:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>z_stream strm <span style=color:#f92672>=</span> {<span style=color:#ae81ff>0</span>};
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>deflateInit</span>(<span style=color:#f92672>&amp;</span>strm, Z_DEFAULT_COMPRESSION) <span style=color:#f92672>!=</span> Z_OK) <span style=color:#a6e22e>fail</span>();
+</span></span><span style=display:flex><span>strm.next_in <span style=color:#f92672>=</span> input;
+</span></span><span style=display:flex><span>strm.avail_in <span style=color:#f92672>=</span> (uInt)input_len;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (;;) {
+</span></span><span style=display:flex><span>    strm.next_out <span style=color:#f92672>=</span> out;
+</span></span><span style=display:flex><span>    strm.avail_out <span style=color:#f92672>=</span> <span style=color:#66d9ef>sizeof</span> out;
+</span></span><span style=display:flex><span>    uInt input_before <span style=color:#f92672>=</span> strm.avail_in;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> flush <span style=color:#f92672>=</span> strm.avail_in <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>?</span> Z_FINISH : Z_NO_FLUSH;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> rc <span style=color:#f92672>=</span> <span style=color:#a6e22e>deflate</span>(<span style=color:#f92672>&amp;</span>strm, flush);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>size_t</span> produced <span style=color:#f92672>=</span> <span style=color:#66d9ef>sizeof</span> out <span style=color:#f92672>-</span> strm.avail_out;
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>write_bytes</span>(out, produced);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (rc <span style=color:#f92672>==</span> Z_STREAM_END) <span style=color:#66d9ef>break</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (rc <span style=color:#f92672>!=</span> Z_OK) <span style=color:#a6e22e>fail</span>(rc);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (input_before <span style=color:#f92672>==</span> strm.avail_in <span style=color:#f92672>&amp;&amp;</span> produced <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span>) <span style=color:#a6e22e>fail_no_progress</span>();
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#a6e22e>deflateEnd</span>(<span style=color:#f92672>&amp;</span>strm);</span></span></code></pre></div></div></div><p>Real code must refill <code>next_in</code> before the next <code>Z_NO_FLUSH</code> call and track
+progress across both cursors. <code>Z_BUF_ERROR</code> can mean that no progress was
+possible because a buffer was empty or full; it is not by itself evidence of
+corruption. <code>Z_SYNC_FLUSH</code> makes data available to a decoder without ending
+the stream, while <code>Z_FINISH</code> ends it.</p><p>For a network or file reader, assign each newly received chunk to
+<code>next_in</code>/<code>avail_in</code>, call until that count reaches zero or the output buffer
+fills, then drain output and continue. Do not overwrite a chunk while zlib
+still reports it in <code>avail_in</code>; the cursor is the ownership boundary.</p><h2 id=inflating-with-bounds>Inflating with Bounds
+<a href=#inflating-with-bounds class=heading-anchor><span>#</span></a></h2><p><code>inflateInit()</code> accepts a zlib wrapper. <code>inflateInit2()</code> with <code>-15</code> accepts raw
+DEFLATE, <code>15 + 16</code> accepts gzip, and <code>15 + 32</code> enables zlib-or-gzip
+autodetection. Supply output space and call <code>inflate()</code> until input is
+consumed, output is full, or zlib returns a terminal status. Handle
+<code>Z_NEED_DICT</code> by supplying the preset dictionary identified by the wrapper
+through <code>inflateSetDictionary()</code>; do not guess a dictionary from unrelated
+input.</p><p>On <code>Z_STREAM_END</code>, <code>avail_in</code> can be nonzero: those bytes follow the completed
+stream and must not be silently discarded. For concatenated gzip members,
+record the remaining input, reset or reinitialize the inflater, and process
+each member while validating each member trailer. A single successful first
+member does not prove that trailing bytes are valid gzip data. Raw DEFLATE has
+no wrapper checksum; zlib validates Adler-32, and gzip validates CRC-32 and
+<code>ISIZE</code>.</p><p>Decompression can expand dramatically. Enforce output, allocation, ratio or
+work, and deadline limits before accepting untrusted data. Reject
+<code>Z_DATA_ERROR</code>, truncated input, invalid distances, and output-limit
+violations. Do not treat bytes produced before an error as complete or
+authenticated application data.</p><h2 id=cleanup-and-higher-level-apis>Cleanup and Higher-Level APIs
+<a href=#cleanup-and-higher-level-apis class=heading-anchor><span>#</span></a></h2><p>Call <code>inflateEnd()</code> or <code>deflateEnd()</code> exactly once for each successful
+initialization. Those functions release internal allocations but do not flush
+pending output. <code>compress()</code> and <code>uncompress()</code> are convenient for bounded
+one-shot buffers; <code>gzopen()</code> and <code>gzread()</code> provide gzip file access. Use the
+streaming API when input size is unknown, output must be bounded, or a protocol
+needs explicit flush boundaries.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://zlib.net/manual.html>zlib 1.3.1 Manual</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1950>RFC 1950: zlib Format</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1951>RFC 1951: DEFLATE</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1952>RFC 1952: gzip File Format</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/zlib/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

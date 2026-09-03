@@ -1,0 +1,732 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Apache Flink and Kafka Integration</title></head><body><main><article><div class=article-header><h1>Apache Flink and Kafka Integration</h1><div class=aux>Last update: 2026-07-16 15:45:24 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/apache-flink/>Apache-Flink</a>
+|
+<a href=/tags/apache-kafka/>Apache-Kafka</a>
+|
+<a href=/tags/stream-processing/>Stream-Processing</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/data-engineering/>Data-Engineering</a></div></div><div class=article-content><p><a href=https://flink.apache.org/>Apache Flink</a> is a distributed processing engine
+for stateful computations over bounded and unbounded data streams. It can
+consume events as they arrive, maintain application state, use event time,
+recover from failures, and continuously publish results.</p><p><a href=https://kafka.apache.org/>Apache Kafka</a> is a distributed event-streaming
+platform. Producers append records to partitioned topics, Kafka retains those
+records, and consumers read them at their own pace. Kafka is commonly the
+durable transport layer in a streaming architecture, while Flink performs the
+computation:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>applications -&gt; Kafka topics -&gt; Flink job -&gt; Kafka topics / databases / APIs</span></span></code></pre></div></div></div><p>The two systems solve different problems. Kafka stores and transports event
+logs. Flink transforms those logs into results by filtering, enriching,
+aggregating, joining, and detecting patterns. Their integration is especially
+useful when a computation must preserve state and remain correct after a
+process, machine, or network failure.</p><h2 id=glossary>Glossary
+<a href=#glossary class=heading-anchor><span>#</span></a></h2><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Term</th><th>Meaning and Important Distinction</th></tr></thead><tbody><tr><td><strong>Job</strong></td><td>A complete Flink application submitted for execution. A job contains a graph of operators; A single Java <code>main()</code> call may establish multiple Job.</td></tr><tr><td>Flink App</td><td>A user&rsquo;s <code>main()</code> method. Each call to  execute()  or  executeAsync()  submits a separate Flink job from the transformations currently registered in the <code> StreamExecutionEnvironment</code></td></tr><tr><td><strong>Operator</strong></td><td>A logical processing step, such as a source, <code>map</code>, <code>keyBy</code>, window, or sink. An operator can run as multiple parallel subtasks.</td></tr><tr><td><strong>Task / subtask</strong></td><td>One parallel instance of an operator or chained group of operators. The operator is the logical operation; its subtasks perform the distributed work.</td></tr><tr><td><strong>Parallelism</strong></td><td>The number of subtasks executing an operator. It controls concurrency, whereas a task slot controls where task pipelines can run.</td></tr><tr><td><strong>Task slot</strong></td><td>A TaskManager resource-sharing unit. A slot is not a CPU core and does not necessarily contain only one operator subtask.</td></tr><tr><td><strong>JobManager</strong></td><td>The control plane that coordinates scheduling, checkpoints, recovery, and job lifecycle. It does not normally process application records.</td></tr><tr><td><strong>TaskManager</strong></td><td>A worker process that provides task slots and executes subtasks. One Flink cluster usually has multiple TaskManagers.</td></tr><tr><td><strong>Source / sink</strong></td><td>A source reads records into Flink; a sink writes results out. In this article, Kafka can serve as either or both.</td></tr><tr><td><strong>Bounded / unbounded stream</strong></td><td>A bounded stream has a finite end; an unbounded stream continues receiving records. This distinction is independent of whether the source is stored in Kafka.</td></tr><tr><td><strong>Key / <code>keyBy</code></strong></td><td>A key is an application-level value such as <code>customerId</code>. <code>keyBy</code> repartitions a stream so that every record with the same key reaches the same downstream subtask. A Flink key is distinct from, although it may derive from, a Kafka record key.</td></tr><tr><td><strong>Keyed state</strong></td><td>State scoped to one logical key and redistributed by Flink during rescaling. It differs from operator state, which belongs to an operator subtask rather than an individual key.</td></tr><tr><td><strong>Event time / processing time</strong></td><td>Event time comes from when an event occurred; processing time comes from the worker&rsquo;s clock when Flink handles it. Event time gives repeatable historical results but requires watermarks.</td></tr><tr><td><strong>Watermark</strong></td><td>Flink&rsquo;s estimate that event time has progressed to a given timestamp. It is not an event timestamp or a guarantee that no earlier event will arrive.</td></tr><tr><td><strong>Window</strong></td><td>A rule that groups records, often by event-time range, for aggregation. A window defines computation boundaries; it is unrelated to checkpoint intervals.</td></tr><tr><td><strong>Checkpoint</strong></td><td>An automatically managed consistency snapshot used for failure recovery. It includes source positions and state, rather than being only a Kafka offset commit.</td></tr><tr><td><strong>Savepoint</strong></td><td>A user-managed state snapshot for planned upgrades, migrations, or rescaling. Savepoints and checkpoints use related mechanisms but have different operational lifecycles.</td></tr><tr><td><strong>Backpressure</strong></td><td>A signal that downstream operators cannot keep up, causing upstream processing to slow. It is flow control, not an error by itself.</td></tr><tr><td><strong>At-least-once / exactly-once</strong></td><td>Recovery guarantees describing how state and supported sinks behave across failures. Flink&rsquo;s exactly-once state consistency does not automatically make arbitrary HTTP calls or database writes exactly-once.</td></tr></tbody></table></div></div><h2 id=stream-types>Stream Types
+<a href=#stream-types class=heading-anchor><span>#</span></a></h2><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Job type</th><th>Example</th><th>Natural completion</th></tr></thead><tbody><tr><td>Unbounded streaming</td><td>Continuously consume new Kafka events</td><td>No</td></tr><tr><td>Bounded streaming/replay</td><td>Kafka offsets 1,000–50,000</td><td>Yes</td></tr><tr><td>Batch</td><td>Process files already present in HDFS</td><td>Yes</td></tr></tbody></table></div></div><p>Stream type will affect Job code primarily through source configuration.
+Downstream DataStream code can often remain identical.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#75715e>// Unbounded: continuously discovers and consumes Kafka records</span>
+</span></span><span style=display:flex><span>KafkaSource<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span> liveSource <span style=color:#f92672>=</span> KafkaSource.<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span>builder()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setTopics</span>(<span style=color:#e6db74>&#34;events&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setStartingOffsets</span>(OffsetsInitializer.<span style=color:#a6e22e>committedOffsets</span>())
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// Bounded: finishes at specified partition offsets</span>
+</span></span><span style=display:flex><span>KafkaSource<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span> replaySource <span style=color:#f92672>=</span> KafkaSource.<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span>builder()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setTopics</span>(<span style=color:#e6db74>&#34;events&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setStartingOffsets</span>(OffsetsInitializer.<span style=color:#a6e22e>offsets</span>(startOffsets))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setBounded</span>(OffsetsInitializer.<span style=color:#a6e22e>offsets</span>(endOffsets))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>Both can feed the same pipeline:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>env.<span style=color:#a6e22e>fromSource</span>(source, watermarks, <span style=color:#e6db74>&#34;events&#34;</span>)
+</span></span><span style=display:flex><span>   .<span style=color:#a6e22e>keyBy</span>(Event::customerId)
+</span></span><span style=display:flex><span>   .<span style=color:#a6e22e>process</span>(<span style=color:#66d9ef>new</span> CustomerProcessor())
+</span></span><span style=display:flex><span>   .<span style=color:#a6e22e>sinkTo</span>(sink);</span></span></code></pre></div></div></div><p>Boundedness also affects what code makes sense:</p><p>• Unbounded streams need windows or another emission policy for operations such as counts and aggregates.
+• A global “sort everything” cannot finish on an unbounded stream.
+• Bounded jobs can produce final results after end-of-input.
+• Continuous file monitoring makes a normally bounded file source unbounded.</p><p>You can additionally select runtime behavior:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>env.<span style=color:#a6e22e>setRuntimeMode</span>(RuntimeExecutionMode.<span style=color:#a6e22e>STREAMING</span>);
+</span></span><span style=display:flex><span>env.<span style=color:#a6e22e>setRuntimeMode</span>(RuntimeExecutionMode.<span style=color:#a6e22e>BATCH</span>);
+</span></span><span style=display:flex><span>env.<span style=color:#a6e22e>setRuntimeMode</span>(RuntimeExecutionMode.<span style=color:#a6e22e>AUTOMATIC</span>);</span></span></code></pre></div></div></div><p>Source boundedness determines whether the job can terminate; runtime mode determines how Flink schedules and exchanges its data.</p><h2 id=why-use-flink-with-kafka>Why Use Flink with Kafka?
+<a href=#why-use-flink-with-kafka class=heading-anchor><span>#</span></a></h2><ul><li>Flink works fine without kafka. Unbounded stream frequently means file/files on HFDS.</li><li>Kafka works fine without Flink. We got good old custom deployment of Kafka consumers.</li></ul><p>A basic Kafka consumer can read and transform records, but a real streaming application often needs more:</p><ul><li>keyed state that may be larger than one machine&rsquo;s memory;</li><li>event-time windows for late or out-of-order events;</li><li>consistent recovery across input offsets, operator state, and output;</li><li>rescaling without manually redistributing state;</li><li>joins between streams or between streams and reference data;</li><li>asynchronous checkpoints without stopping normal processing;</li><li>SQL over continuously arriving records; and</li><li>operational metrics, savepoints, and controlled upgrades.</li></ul><p>Flink supplies these capabilities as part of one execution model. Kafka
+provides replayable input and durable output, allowing a failed Flink job to
+resume from a consistent point rather than starting over or guessing which
+records were processed.</p><p>Flink is not automatically better than a custom Kafka consumer. A plain
+consumer is often simpler when each record is independent and processing is
+only:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>consume -&gt; perform one stateless operation -&gt; publish or store</span></span></code></pre></div></div></div><p>The custom service must otherwise implement or integrate state persistence,
+offset coordination, backpressure, retries, event-time handling, rescaling,
+and recovery. Flink becomes valuable when several of those concerns are part
+of the computation. The trade-off is the operational cost of running or using
+a Flink cluster instead of deploying an ordinary service.</p><h3 id=best-fit-mental-model-and-use-cases>Best-Fit Mental Model and Use Cases
+<a href=#best-fit-mental-model-and-use-cases class=heading-anchor><span>#</span></a></h3><p>Think of a Flink job as a distributed, continuously evaluated database query
+over event streams:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>unbounded input -&gt; transformations and durable state -&gt; continuous output</span></span></code></pre></div></div></div><p>Kafka retains and transports the event history. Flink continuously computes
+derived state and results from that history. This model is a good fit for:</p><ul><li><strong>fraud detection</strong>: detect a burst of card transactions across distant
+locations within a rolling time interval;</li><li><strong>real-time analytics</strong>: continuously update sales, active-user, and
+conversion metrics;</li><li><strong>streaming ETL</strong>: validate orders, enrich them with customer or product
+data, and publish analytics-ready records;</li><li><strong>recommendations</strong>: update a shopper&rsquo;s interests from searches, clicks,
+and purchases;</li><li><strong>monitoring</strong>: correlate service events and alert when a rolling failure
+rate crosses a threshold;</li><li><strong>deduplication</strong>: remember event identifiers so retried payments or
+notifications are not processed twice;</li><li><strong>sessionization</strong>: group web activity until a period of inactivity closes
+the session;</li><li><strong>stream joins</strong>: associate an advertisement click with a later purchase,
+including late or out-of-order events;</li><li><strong>logistics</strong>: combine GPS updates and route data to update estimated arrival
+times; and</li><li><strong>IoT processing</strong>: aggregate sensor readings and detect abnormal patterns.</li></ul><h2 id=flink-without-kafka-and-its-streaming-first-design>Flink Without Kafka and Its Streaming-First Design
+<a href=#flink-without-kafka-and-its-streaming-first-design class=heading-anchor><span>#</span></a></h2><p>Flink does not require Kafka. Kafka is one possible source and sink among
+systems such as Pulsar, Kinesis, database change-data-capture feeds, files,
+Iceberg tables, and application-specific connectors:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>database CDC -&gt; Flink -&gt; Iceberg
+</span></span><span style=display:flex><span>Kinesis      -&gt; Flink -&gt; database
+</span></span><span style=display:flex><span>HDFS files   -&gt; Flink -&gt; HDFS files
+</span></span><span style=display:flex><span>IoT events   -&gt; Flink -&gt; alerts</span></span></code></pre></div></div></div><p>Without Kafka, Flink still overlaps substantially with Apache Spark,
+particularly for bounded SQL and ETL workloads. Their main difference is
+their center of gravity rather than an absolute capability boundary:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Flink</th><th>Spark</th></tr></thead><tbody><tr><td>Native pipelined processing of continuous streams</td><td>Primarily batch and micro-batch processing</td></tr><tr><td>Long-lived operators with managed state and timers</td><td>Strong batch, SQL, data-lake, and machine-learning ecosystem</td></tr><tr><td>Low-latency event-time and stateful processing</td><td>High-throughput analytical transformations</td></tr><tr><td>Streaming-first runtime that also processes bounded data</td><td>Batch-first runtime that also supports streaming</td></tr></tbody></table></div></div><p>Finite file transformations and data-lake analytics are often a natural Spark
+workload. Flink remains distinct without Kafka when the application needs
+continuous state, fine-grained time semantics, low latency, or long-lived
+event-driven behavior.</p><h3 id=streaming-capabilities-and-how-flink-implements-them>Streaming Capabilities and How Flink Implements Them
+<a href=#streaming-capabilities-and-how-flink-implements-them class=heading-anchor><span>#</span></a></h3><p>Flink makes state, time, recovery, and flow control runtime concerns rather
+than requiring every source consumer to implement them independently:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Capability</th><th>Flink mechanism</th></tr></thead><tbody><tr><td>Continuous managed state</td><td><code>keyBy</code> plus <code>ValueState</code>, <code>ListState</code>, <code>MapState</code>, reducing state, or aggregating state; state backends store it and checkpoints make it recoverable</td></tr><tr><td>Timers</td><td><code>KeyedProcessFunction</code> registers event-time or processing-time callbacks through <code>TimerService</code>; timers are scoped by key and included in checkpoints</td></tr><tr><td>Late and out-of-order events</td><td>Event timestamps, watermarks, watermark idleness, allowed lateness, window updates, and late-event side outputs</td></tr><tr><td>Windows and sessions</td><td>Tumbling, sliding, session, global, and custom windows use triggers to decide when to evaluate or emit</td></tr><tr><td>Stateful joins</td><td>Interval, window, temporal, and process-function joins retain unmatched records in managed state until they match or expire</td></tr><tr><td>Fault recovery</td><td>Checkpoint barriers coordinate source positions, operator state, timers, and supported sink transactions</td></tr><tr><td>Backpressure</td><td>Full downstream buffers propagate pressure upstream, slowing operators and sources instead of silently dropping records</td></tr><tr><td>Rescaling</td><td>Key groups redistribute keyed state when operator parallelism changes; savepoints support controlled migrations</td></tr><tr><td>Asynchronous I/O</td><td><code>AsyncDataStream</code> manages concurrent external calls with ordered or unordered output, capacity limits, timeouts, and explicit retry behavior</td></tr><tr><td>Pattern detection</td><td>Flink CEP evaluates stateful event sequences such as repeated login failures followed by a transfer</td></tr><tr><td>Dynamic rules</td><td>Broadcast state distributes changing rules or reference data to every parallel processing instance</td></tr><tr><td>Exceptional routing</td><td>Side outputs separate late, invalid, retryable, or alert records from the main result stream</td></tr></tbody></table></div></div><p>Managed state is logically attached to an operator and, for keyed state, to
+the current application key. Runtime state may reside on the JVM heap or in an
+embedded state backend, while checkpoints copy a consistent snapshot to
+durable storage. On recovery or rescaling, Flink restores and redistributes
+that state rather than requiring the application to rebuild it manually.</p><p>Event-time timers fire when the watermark passes their timestamp, not merely
+when wall-clock time advances. A window can retain its result for an allowed
+lateness interval and update it when a delayed event arrives; records later
+than that policy can be routed to a side output. Processing-time timers instead
+follow the TaskManager&rsquo;s clock and are useful when wall-clock behavior is the
+actual requirement.</p><h2 id=core-flink-concepts>Core Flink Concepts
+<a href=#core-flink-concepts class=heading-anchor><span>#</span></a></h2><p>Before connecting the systems, it helps to understand Flink&rsquo;s model.</p><h3 id=jobs-and-operators>Jobs and Operators
+<a href=#jobs-and-operators class=heading-anchor><span>#</span></a></h3><p>A Flink application defines a graph of operators:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>source -&gt; transform -&gt; partition -&gt; window / process -&gt; sink</span></span></code></pre></div></div></div><p>Flink turns this graph into a distributed job. Each operator can have multiple
+parallel subtasks. Records flow continuously through the graph rather than
+waiting for an entire input data set to finish.</p><p>In DataStream code, an <strong>operator</strong> is a logical processing step and a
+<strong>transformation</strong> is the API operation that adds that step to the job graph.
+The terms are often used interchangeably. Flink may chain compatible operators
+into one runtime task for efficiency, so operators do not necessarily map
+one-to-one to threads, processes, or network exchanges.</p><h4 id=source-and-sink-operators>Source and Sink Operators
+<a href=#source-and-sink-operators class=heading-anchor><span>#</span></a></h4><p>A source introduces records into the job. It also defines serialization,
+partition discovery, boundedness, and the positions from which recovery
+continues.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Source API or Implementation</th><th>Purpose</th></tr></thead><tbody><tr><td><code>env.fromSource(...)</code></td><td>Add a modern Source API implementation.</td></tr><tr><td><code>KafkaSource</code></td><td>Consume one or more Kafka topics.</td></tr><tr><td><code>FileSource</code></td><td>Read bounded files or continuously monitor directories.</td></tr><tr><td><code>DataGeneratorSource</code></td><td>Generate records for tests or controlled workloads.</td></tr><tr><td><code>env.fromData(...)</code></td><td>Create a small bounded stream from local values.</td></tr><tr><td><code>env.fromCollection(...)</code></td><td>Create a bounded stream from a Java collection.</td></tr></tbody></table></div></div><p>Production connectors should normally use <code>fromSource</code>. Collection and
+in-memory sources are mainly useful for examples and tests.</p><p>A sink sends results out of Flink.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Sink API or Implementation</th><th>Purpose</th></tr></thead><tbody><tr><td><code>sinkTo(...)</code></td><td>Attach a modern Sink API implementation.</td></tr><tr><td><code>KafkaSink</code></td><td>Publish records to Kafka with configurable delivery guarantees.</td></tr><tr><td><code>FileSink</code></td><td>Write bounded or streaming output to files.</td></tr><tr><td><code>DiscardingSink</code></td><td>Intentionally discard output, mainly for tests and benchmarks.</td></tr></tbody></table></div></div><p>Sources and sinks form the job&rsquo;s external boundaries. A sink&rsquo;s delivery
+guarantee depends on both the connector and checkpoint configuration. Writing
+to an external system inside <code>map</code>, <code>process</code>, or another transformation
+bypasses the sink protocol and is not automatically coordinated with
+checkpoints.</p><h4 id=basic-transformation-operators>Basic Transformation Operators
+<a href=#basic-transformation-operators class=heading-anchor><span>#</span></a></h4><p>Basic transformations handle records independently and usually require no
+managed state:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>API</th><th>Purpose</th></tr></thead><tbody><tr><td><code>map</code></td><td>Turn each input record into exactly one output record.</td></tr><tr><td><code>flatMap</code></td><td>Emit zero, one, or many output records for each input.</td></tr><tr><td><code>filter</code></td><td>Retain only records that satisfy a predicate.</td></tr><tr><td><code>returns</code></td><td>Provide explicit output type information when Java type erasure prevents Flink from inferring it.</td></tr></tbody></table></div></div><p>Use <code>map</code> for parsing or enrichment already available in memory, <code>flatMap</code> for
+tokenization or validation that may emit multiple results, and <code>filter</code> for
+discarding unwanted records. <code>returns</code> describes a transformation&rsquo;s type; it
+does not process records itself.</p><h4 id=partitioning-operators>Partitioning Operators
+<a href=#partitioning-operators class=heading-anchor><span>#</span></a></h4><p>Partitioning determines which downstream subtask receives each record. It may
+introduce a network exchange:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>API</th><th>Purpose</th></tr></thead><tbody><tr><td><code>keyBy</code></td><td>Partition by a logical application key.</td></tr><tr><td><code>rebalance</code></td><td>Distribute records round-robin across downstream subtasks.</td></tr><tr><td><code>rescale</code></td><td>Distribute records round-robin to a subset of downstream subtasks, using local connections where possible.</td></tr><tr><td><code>shuffle</code></td><td>Choose a downstream subtask randomly.</td></tr><tr><td><code>broadcast</code></td><td>Send every record to every downstream subtask.</td></tr><tr><td><code>global</code></td><td>Send all records to one downstream subtask.</td></tr><tr><td><code>partitionCustom</code></td><td>Apply an application-defined partitioner.</td></tr></tbody></table></div></div><p><code>keyBy</code> is the most important partitioning operation because it creates a
+<code>KeyedStream</code>, enabling keyed state, timers, keyed windows, and keyed
+aggregations. It is not the same as Kafka partitioning: Kafka assigns records
+to source partitions before Flink reads them, while <code>keyBy</code> repartitions
+records inside the Flink job.</p><h4 id=aggregation-operators>Aggregation Operators
+<a href=#aggregation-operators class=heading-anchor><span>#</span></a></h4><p>Aggregations combine multiple records into a continuously updated result.
+Common APIs are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>API</th><th>Purpose</th></tr></thead><tbody><tr><td><code>reduce</code></td><td>Combine two records of the same type into one record.</td></tr><tr><td><code>aggregate</code></td><td>Use separate accumulator, input, and output types.</td></tr><tr><td><code>sum</code>, <code>min</code>, and <code>max</code></td><td>Aggregate a field on a keyed stream.</td></tr><tr><td><code>minBy</code> and <code>maxBy</code></td><td>Return the full record containing the minimum or maximum field.</td></tr></tbody></table></div></div><p>Unwindowed aggregations on a <code>KeyedStream</code> update indefinitely and therefore
+retain one aggregate per key. Windowed <code>reduce</code> and <code>aggregate</code> limit the
+aggregation to each window. Prefer <code>aggregate</code> when the accumulator should be
+different from both the input and result, such as maintaining a sum and count
+to produce an average.</p><h4 id=window-operators>Window Operators
+<a href=#window-operators class=heading-anchor><span>#</span></a></h4><p>Windows group an unbounded stream into finite buckets for computation.
+Frequently used window assigners are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Window Assigner</th><th>Purpose</th></tr></thead><tbody><tr><td><code>TumblingEventTimeWindows</code></td><td>Create fixed-size, non-overlapping event-time windows.</td></tr><tr><td><code>SlidingEventTimeWindows</code></td><td>Create fixed-size, overlapping event-time windows.</td></tr><tr><td><code>EventTimeSessionWindows</code></td><td>Create variable-size windows separated by inactivity.</td></tr><tr><td><code>TumblingProcessingTimeWindows</code></td><td>Create tumbling windows based on processing time.</td></tr><tr><td><code>GlobalWindows</code></td><td>Create one logical window that requires a custom trigger to emit.</td></tr></tbody></table></div></div><p>After <code>keyBy</code>, use <code>window(...)</code>; without a key, use <code>windowAll(...)</code>.
+Frequently used window computations are <code>reduce</code>, <code>aggregate</code>, and <code>process</code>.
+Incremental <code>reduce</code> or <code>aggregate</code> is generally more efficient than
+<code>process</code>, which may need access to all records in a window. They can be
+combined so that Flink incrementally aggregates records and a
+<code>ProcessWindowFunction</code> adds window metadata to the final result.</p><h4 id=process-operators>Process Operators
+<a href=#process-operators class=heading-anchor><span>#</span></a></h4><p>Process functions are Flink&rsquo;s low-level escape hatch for logic that needs
+managed state, timers, timestamps, watermarks, or side outputs:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>API</th><th>Purpose</th></tr></thead><tbody><tr><td><code>ProcessFunction</code></td><td>Process an ordinary <code>DataStream</code>.</td></tr><tr><td><code>KeyedProcessFunction</code></td><td>Use keyed state and event-time or processing-time timers.</td></tr><tr><td><code>CoProcessFunction</code></td><td>Process two connected streams.</td></tr><tr><td><code>KeyedCoProcessFunction</code></td><td>Process two keyed, connected streams with keyed state and timers.</td></tr><tr><td><code>ProcessWindowFunction</code></td><td>Inspect window metadata and the records or aggregate associated with a window.</td></tr></tbody></table></div></div><p>The commonly used API call is <code>process(...)</code>. Side outputs are declared with
+an <code>OutputTag</code> and emitted through the function context, which is useful for
+late events, invalid records, or separately routed alerts. Use a simpler
+transformation when state and timers are unnecessary.</p><h4 id=multi-stream-and-join-operators>Multi-Stream and Join Operators
+<a href=#multi-stream-and-join-operators class=heading-anchor><span>#</span></a></h4><p>These operators combine related streams:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>API</th><th>Purpose</th></tr></thead><tbody><tr><td><code>union</code></td><td>Merge streams of the same type without correlating their records.</td></tr><tr><td><code>connect</code></td><td>Combine two streams while preserving their distinct types.</td></tr><tr><td><code>coMap</code> and <code>coFlatMap</code></td><td>Transform the two sides of a connected stream.</td></tr><tr><td><code>intervalJoin</code></td><td>Join two keyed streams when timestamps fall within a relative interval.</td></tr><tr><td><code>join</code></td><td>Perform a windowed inner join.</td></tr><tr><td><code>coGroup</code></td><td>Perform a windowed grouped operation with access to unmatched records.</td></tr><tr><td><code>BroadcastConnectedStream</code></td><td>Connect a normal stream to small broadcast state, commonly for dynamic rules or reference data.</td></tr></tbody></table></div></div><p><code>union</code> interleaves records but does not join them. <code>connect</code> allows shared
+logic or state across two inputs but also does not correlate records
+automatically. Use <code>intervalJoin</code>, a windowed <code>join</code>, or a
+<code>KeyedCoProcessFunction</code> when records must be matched by key and time.</p><h4 id=asynchronous-io-operators>Asynchronous I/O Operators
+<a href=#asynchronous-io-operators class=heading-anchor><span>#</span></a></h4><p>Asynchronous I/O lets many external requests be in flight without blocking a
+task thread:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>API</th><th>Purpose</th></tr></thead><tbody><tr><td><code>AsyncDataStream.unorderedWait</code></td><td>Emit completed requests as soon as they finish.</td></tr><tr><td><code>AsyncDataStream.orderedWait</code></td><td>Preserve input order, potentially increasing latency and buffering.</td></tr></tbody></table></div></div><p>Both use an <code>AsyncFunction</code> or <code>RichAsyncFunction</code> plus a timeout and capacity.
+They are commonly used for remote lookups that cannot be represented as a
+stream or broadcast state. The external client must actually be asynchronous;
+wrapping a blocking call does not make it nonblocking. Define timeout, retry,
+ordering, and replay behavior explicitly.</p><h3 id=datastream-and-its-specialized-types><code>DataStream</code> and Its Specialized Types
+<a href=#datastream-and-its-specialized-types class=heading-anchor><span>#</span></a></h3><p><code>org.apache.flink.streaming.api.datastream.DataStream&lt;T></code> is the base Java
+abstraction for a stream whose records have type <code>T</code>. It is a handle to a
+logical transformation in the job graph, not an in-memory collection of all
+records. Calling methods such as <code>map</code>, <code>keyBy</code>, or <code>sinkTo</code> adds
+transformations to that graph and returns another API object.</p><p>Flink returns specialized <code>DataStream</code> subtypes when the next valid operations
+depend on how the stream was produced or partitioned:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Type</th><th>Relationship to <code>DataStream</code></th><th>How It Is Obtained</th><th>What It Adds</th></tr></thead><tbody><tr><td><code>DataStream&lt;T></code></td><td>Base class</td><td>General stream references and many partitioning operations</td><td>Common transformations, partitioning, joins, collection, and sink attachment.</td></tr><tr><td><code>SingleOutputStreamOperator&lt;T></code></td><td>Direct subclass</td><td>Most one-output transformations, including <code>map</code>, <code>filter</code>, and <code>process</code></td><td>Operator configuration such as <code>name</code>, <code>uid</code>, <code>setParallelism</code>, chaining, slot-sharing groups, and explicit return types.</td></tr><tr><td><code>DataStreamSource&lt;T></code></td><td>Indirect subclass through <code>SingleOutputStreamOperator&lt;T></code></td><td>Source methods such as <code>env.fromSource(...)</code></td><td>Represents the job&rsquo;s source transformation and supports operator configuration inherited from <code>SingleOutputStreamOperator</code>.</td></tr><tr><td><code>KeyedStream&lt;T, K></code></td><td>Direct subclass</td><td><code>stream.keyBy(...)</code></td><td>Retains key type and selector information and enables keyed aggregations, keyed windows, keyed process functions, keyed state, and timers.</td></tr><tr><td><code>SideOutputDataStream&lt;T></code></td><td>Direct subclass</td><td><code>operator.getSideOutput(outputTag)</code></td><td>Represents records emitted to one typed side output. It behaves like a normal stream for downstream transformations.</td></tr><tr><td><code>CachedDataStream&lt;T></code></td><td>Direct subclass with an evolving API</td><td><code>stream.cache()</code></td><td>Reuses a cached intermediate result in later jobs using the same execution environment. Caching currently applies to bounded streams in batch execution.</td></tr></tbody></table></div></div><p>The hierarchy can be summarized as:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>DataStream&lt;T&gt;
+</span></span><span style=display:flex><span>├── SingleOutputStreamOperator&lt;T&gt;
+</span></span><span style=display:flex><span>│   └── DataStreamSource&lt;T&gt;
+</span></span><span style=display:flex><span>├── KeyedStream&lt;T, K&gt;
+</span></span><span style=display:flex><span>├── SideOutputDataStream&lt;T&gt;
+</span></span><span style=display:flex><span>└── CachedDataStream&lt;T&gt;</span></span></code></pre></div></div></div><p>The declared Java type determines which fluent methods are visible. For
+example:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>SingleOutputStreamOperator<span style=color:#f92672>&lt;</span>Purchase<span style=color:#f92672>&gt;</span> purchases <span style=color:#f92672>=</span> raw
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(OrderPipeline::parsePurchase)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;parse-purchase&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>KeyedStream<span style=color:#f92672>&lt;</span>Purchase, String<span style=color:#f92672>&gt;</span> byCustomer <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>        purchases.<span style=color:#a6e22e>keyBy</span>(Purchase::customerId);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>SingleOutputStreamOperator<span style=color:#f92672>&lt;</span>Purchase<span style=color:#f92672>&gt;</span> totals <span style=color:#f92672>=</span> byCustomer
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>reduce</span>(OrderPipeline::addAmounts)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>uid</span>(<span style=color:#e6db74>&#34;customer-totals&#34;</span>);</span></span></code></pre></div></div></div><p><code>name</code> and <code>uid</code> are visible on <code>SingleOutputStreamOperator</code>, while keyed
+<code>reduce</code> is visible on <code>KeyedStream</code>. Assigning the result of <code>keyBy</code> to a
+plain <code>DataStream&lt;Purchase></code> variable hides <code>KeyedStream</code>-specific methods at
+compile time. Keep the specialized type when those methods are needed rather
+than casting it later.</p><p>Several important fluent API types are related to <code>DataStream</code> but are <strong>not</strong>
+subclasses of it:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Type</th><th>Created By</th><th>Purpose</th></tr></thead><tbody><tr><td><code>WindowedStream&lt;T, K, W></code></td><td><code>keyedStream.window(...)</code></td><td>Configures and evaluates windows independently for each key.</td></tr><tr><td><code>AllWindowedStream&lt;T, W></code></td><td><code>stream.windowAll(...)</code></td><td>Configures a non-keyed window over the entire stream.</td></tr><tr><td><code>ConnectedStreams&lt;IN1, IN2></code></td><td><code>first.connect(second)</code></td><td>Coordinates two inputs while preserving their different record types.</td></tr><tr><td><code>BroadcastStream&lt;T></code></td><td><code>stream.broadcast(stateDescriptor)</code></td><td>Represents the broadcast side of a broadcast-state pattern.</td></tr><tr><td><code>BroadcastConnectedStream&lt;IN1, IN2></code></td><td><code>stream.connect(broadcastStream)</code></td><td>Processes a normal stream together with replicated broadcast state.</td></tr><tr><td><code>JoinedStreams</code> and <code>CoGroupedStreams</code></td><td><code>join(...)</code> and <code>coGroup(...)</code></td><td>Builder types that collect key and window configuration before producing a result stream.</td></tr><tr><td><code>DataStreamSink&lt;T></code></td><td><code>stream.sinkTo(...)</code></td><td>Configures a terminal sink transformation; it is not another stream on which normal transformations continue.</td></tr></tbody></table></div></div><p>These wrapper and builder types make invalid operation sequences harder to
+express. A <code>WindowedStream</code>, for example, exposes window computations instead
+of every general <code>DataStream</code> operation, and <code>DataStreamSink</code> marks the end of
+that output branch.</p><h3 id=runtime-components>Runtime Components
+<a href=#runtime-components class=heading-anchor><span>#</span></a></h3><p>Flink separates job coordination from execution:</p><ul><li>The <strong>Dispatcher</strong> accepts submitted jobs and starts a JobMaster for each
+one.</li><li>A <strong>JobMaster</strong> coordinates one job: it builds the execution graph, requests
+slots, schedules subtasks, and coordinates checkpoints and recovery.</li><li>The <strong>Flink ResourceManager</strong> obtains and tracks worker resources from the
+underlying platform.</li><li>A <strong>TaskManager</strong> is a Flink worker process. It executes operator subtasks
+and exchanges records with other TaskManagers.</li><li>A <strong>task slot</strong> is a TaskManager&rsquo;s unit of execution capacity. One
+TaskManager normally has multiple slots.</li></ul><p><code>JobManager</code> is commonly used as an umbrella name for Flink&rsquo;s control-plane
+process. Depending on deployment mode, that process can contain the
+Dispatcher, Flink ResourceManager, REST endpoint, and one or more JobMasters.
+A Kubernetes TaskManager pod or YARN TaskManager container is the platform
+resource envelope; the TaskManager is the Flink worker process inside it.</p><h3 id=bounded-and-unbounded-streams>Bounded and Unbounded Streams
+<a href=#bounded-and-unbounded-streams class=heading-anchor><span>#</span></a></h3><p>An unbounded stream has no predefined end. A Kafka topic used for live events
+is normally unbounded, so the Flink job keeps running and processes new
+records.</p><p>A bounded stream has a finite end. Flink can also read a fixed range of Kafka
+offsets and process it as a batch. The same APIs can therefore support both
+continuous pipelines and finite reprocessing jobs.</p><h3 id=keyed-state>Keyed State
+<a href=#keyed-state class=heading-anchor><span>#</span></a></h3><p><code>keyBy</code> partitions records by a logical key, such as <code>customerId</code>. All records
+for the same key are sent to the same downstream subtask:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>events
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>keyBy</span>(Purchase::customerId)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>process</span>(<span style=color:#66d9ef>new</span> CustomerPurchaseFunction());</span></span></code></pre></div></div></div><p>The process function can maintain state independently for each customer.
+Flink redistributes that state when the job is restored with different
+parallelism.</p><h3 id=event-time-and-watermarks>Event Time and Watermarks
+<a href=#event-time-and-watermarks class=heading-anchor><span>#</span></a></h3><p>Processing time is the time at which Flink handles a record. Event time is the
+time at which the event occurred, usually carried in the record itself.</p><p>Event time produces more stable results when Kafka records are delayed or
+arrive out of order. Watermarks tell Flink how far event time is believed to
+have progressed. A bounded out-of-orderness strategy allows some delay:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>WatermarkStrategy<span style=color:#f92672>&lt;</span>Purchase<span style=color:#f92672>&gt;</span> watermarks <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>        WatermarkStrategy
+</span></span><span style=display:flex><span>            .<span style=color:#f92672>&lt;</span>Purchase<span style=color:#f92672>&gt;</span>forBoundedOutOfOrderness(Duration.<span style=color:#a6e22e>ofSeconds</span>(10))
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>withTimestampAssigner</span>(
+</span></span><span style=display:flex><span>                (purchase, previousTimestamp) <span style=color:#f92672>-&gt;</span> purchase.<span style=color:#a6e22e>occurredAt</span>()
+</span></span><span style=display:flex><span>            );</span></span></code></pre></div></div></div><p>When a watermark passes the end of a window, Flink can emit that window&rsquo;s
+result. Events that arrive after the watermark may require an allowed-lateness
+policy or side output.</p><h3 id=checkpoints-and-savepoints>Checkpoints and Savepoints
+<a href=#checkpoints-and-savepoints class=heading-anchor><span>#</span></a></h3><p>A checkpoint is a consistent snapshot of:</p><ul><li>Kafka source positions;</li><li>operator and keyed state;</li><li>timers; and</li><li>supported sink transaction state.</li></ul><p>If a job fails, Flink restores the latest completed checkpoint and resumes
+from its recorded Kafka offsets.</p><p>A savepoint is a user-triggered snapshot intended for operational actions such
+as an upgrade, migration, or planned rescaling. Checkpoints and savepoints use
+similar state mechanisms but have different lifecycles and purposes.</p><h2 id=deployment-and-component-lifecycles>Deployment and Component Lifecycles
+<a href=#deployment-and-component-lifecycles class=heading-anchor><span>#</span></a></h2><p>Flink does not depend on YARN. It can run on Kubernetes, YARN, a standalone
+cluster, local JVM processes, or a managed Flink service. The resource manager
+starts Flink processes; Flink itself schedules operators, manages state, and
+coordinates checkpoints.</p><p>No Flink process is inherently permanent. A streaming job may run
+indefinitely, but its JobManager, TaskManagers, and subtask execution attempts
+remain replaceable. The useful distinction is between a logical job, whose
+state can survive recovery, and the process incarnations currently executing
+it.</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Flink cluster
+</span></span><span style=display:flex><span>|
+</span></span><span style=display:flex><span>+-- control-plane process
+</span></span><span style=display:flex><span>|   +-- Dispatcher                 cluster lifetime
+</span></span><span style=display:flex><span>|   +-- Flink ResourceManager      cluster lifetime
+</span></span><span style=display:flex><span>|   +-- REST endpoint / blob store cluster lifetime
+</span></span><span style=display:flex><span>|   `-- JobMaster                  job lifetime
+</span></span><span style=display:flex><span>|       +-- scheduler              job lifetime
+</span></span><span style=display:flex><span>|       +-- checkpoint coordinator job lifetime
+</span></span><span style=display:flex><span>|       `-- operator coordinators  job lifetime
+</span></span><span style=display:flex><span>|
+</span></span><span style=display:flex><span>`-- TaskManagers                   dynamically allocated worker lifetime
+</span></span><span style=display:flex><span>    `-- task slots                 TaskManager lifetime
+</span></span><span style=display:flex><span>        `-- operator subtasks      execution-attempt lifetime</span></span></code></pre></div></div></div><p>The deployment mode determines the enclosing cluster lifetime:</p><ul><li>In <strong>session mode</strong>, one long-lived cluster accepts multiple jobs. The
+Dispatcher and Flink ResourceManager live until the session is stopped;
+each job gets a JobMaster for only its own lifetime. TaskManagers can be
+acquired and released as demand changes.</li><li>In <strong>application mode</strong>, the cluster is scoped to one application, which may
+submit one or more jobs. The user <code>main</code> method runs in the cluster, and the
+cluster normally terminates when the application finishes.</li><li>In legacy <strong>per-job mode</strong>, one cluster is created for one submitted job and
+ends with it. Modern Flink deployments generally prefer application mode.</li></ul><p>┌─────────────┬────────────────────────────────────────────────────────────────────────┐
+│ Mode │ JobManager lifetime │
+├─────────────┼────────────────────────────────────────────────────────────────────────┤
+│ Session │ Cluster lifetime; survives jobs finishing or being canceled │
+├─────────────┼────────────────────────────────────────────────────────────────────────┤
+│ Application │ Application lifetime; usually ends when all application jobs terminate │
+├─────────────┼────────────────────────────────────────────────────────────────────────┤
+│ Per-job (LEGACY DON&rsquo;T USE) │ Single job lifetime │
+└─────────────┴────────────────────────────────────────────────────────────────────────┘</p><p>If an operator subtask fails, Flink creates a new execution attempt and
+restores state from a completed checkpoint. If a TaskManager is lost, Flink
+obtains replacement capacity and reschedules its tasks. Durable checkpoint
+storage is therefore independent of ephemeral worker storage.</p><h3 id=flink-client-and-command-line-interface>Flink Client and Command-Line Interface
+<a href=#flink-client-and-command-line-interface class=heading-anchor><span>#</span></a></h3><p>The Flink client is the submission and control side of a deployment. It reads
+the Flink configuration, loads the application JAR, builds or submits the job,
+uploads required artifacts, and communicates with the cluster&rsquo;s REST endpoint.
+It can also list, stop, cancel, and take state snapshots of running jobs. Once
+a detached submission succeeds, the client is not part of the record-processing
+path: the JobManager coordinates the job and TaskManagers process its records.</p><ul><li>In session mode, the client invokes the application&rsquo;s <code>main</code> method
+locally to construct the JobGraph locally, and submit the compiled graph representation it to an existing cluster.<ul><li><code>main</code> is never invoked again throughout the cluster, but operator logics (i.e. lambdas) runs on each <code>TaskManager</code>.</li></ul></li><li>In application mode, the client submit user&rsquo;s job jar to HDFS&rsquo;s staging dir, request an YARN AM to run the JobManager.<ul><li><code>main</code> runs in the JobManager process.</li></ul></li></ul><p>The general command form is:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink &lt;action&gt; <span style=color:#f92672>[</span>Flink options<span style=color:#f92672>]</span> &lt;application.jar&gt; <span style=color:#f92672>[</span>application arguments<span style=color:#f92672>]</span></span></span></code></pre></div></div></div><p>Options before the JAR configure Flink. Arguments after the JAR are passed to
+the application&rsquo;s <code>main</code> method. The exact options depend on the installed
+Flink version, so the local client is the authoritative reference:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink --help
+</span></span><span style=display:flex><span>./bin/flink run --help
+</span></span><span style=display:flex><span>./bin/flink stop --help
+</span></span><span style=display:flex><span>./bin/flink savepoint --help</span></span></code></pre></div></div></div><h4 id=submit-a-job>Submit a Job
+<a href=#submit-a-job class=heading-anchor><span>#</span></a></h4><p>This example submits a Java job to an existing cluster:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --target remote <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --jobmanager jobmanager.example.com:8081 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --detached <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --parallelism <span style=color:#ae81ff>8</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --class com.example.OrderPipeline <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --input-topic orders <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --output-topic customer-totals</span></span></code></pre></div></div></div><p>Frequently used <code>run</code> options are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Option</th><th>Purpose</th></tr></thead><tbody><tr><td><code>-c</code>, <code>--class</code></td><td>Select the application entry-point class.</td></tr><tr><td><code>-p</code>, <code>--parallelism</code></td><td>Set the job&rsquo;s default parallelism.</td></tr><tr><td><code>-d</code>, <code>--detached</code></td><td>Return after submission instead of waiting for completion.</td></tr><tr><td><code>-t</code>, <code>--target</code></td><td>Select the deployment target.</td></tr><tr><td><code>-m</code>, <code>--jobmanager</code></td><td>Set the JobManager REST address, normally as <code>host:port</code>.</td></tr><tr><td><code>-Dkey=value</code></td><td>Override a Flink configuration property for this invocation.</td></tr><tr><td><code>-s</code>, <code>--fromSavepoint</code></td><td>Restore the new job from a savepoint.</td></tr><tr><td><code>-n</code>, <code>--allowNonRestoredState</code></td><td>Ignore saved state that no longer maps to an operator.</td></tr><tr><td><code>-cm</code>, <code>--claimMode</code></td><td>Select ownership behavior for restored savepoint files.</td></tr><tr><td><code>-C</code>, <code>--classpath</code></td><td>Add a URL to the user-code classpath.</td></tr><tr><td><code>--shutdownOnAttachedExit</code></td><td>Cancel the job if its attached client exits.</td></tr></tbody></table></div></div><p>Without <code>--detached</code>, the client remains attached and waits for the job. With
+<code>--detached</code>, it prints the new JobID and exits after successful submission.
+The cluster owns the running job, so terminating a detached client does not
+terminate a job in a session cluster.</p><p><code>-D</code> can set any applicable configuration key. For example:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dpipeline.max-parallelism<span style=color:#f92672>=</span><span style=color:#ae81ff>128</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dexecution.checkpointing.interval<span style=color:#f92672>=</span>30s <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --detached <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar</span></span></code></pre></div></div></div><p>When submitting to an existing session cluster, only execution-level
+configuration can be changed; cluster process settings were fixed when that
+cluster started.</p><h4 id=select-a-deployment-target>Select a Deployment Target
+<a href=#select-a-deployment-target class=heading-anchor><span>#</span></a></h4><p>The target tells the client whether to contact an existing cluster or create
+an application-scoped cluster:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Target</th><th>Behavior</th></tr></thead><tbody><tr><td><code>local</code></td><td>Run against a local Flink MiniCluster.</td></tr><tr><td><code>remote</code></td><td>Submit to an existing standalone/session cluster.</td></tr><tr><td><code>yarn-session</code></td><td>Submit to an existing Flink session on YARN.</td></tr><tr><td><code>yarn-application</code></td><td>Create a YARN cluster in application mode.</td></tr><tr><td><code>kubernetes-session</code></td><td>Submit to an existing Kubernetes session cluster.</td></tr><tr><td><code>kubernetes-application</code></td><td>Create a Kubernetes cluster in application mode.</td></tr></tbody></table></div></div><p>Examples for the main targets are:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Local MiniCluster</span>
+</span></span><span style=display:flex><span>./bin/flink run --target local order-pipeline.jar
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Existing standalone cluster</span>
+</span></span><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --target remote <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --jobmanager localhost:8081 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Existing YARN session</span>
+</span></span><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --target yarn-session <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dyarn.application.id<span style=color:#f92672>=</span>application_123_001 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># New YARN application cluster</span>
+</span></span><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --target yarn-application <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dyarn.application.name<span style=color:#f92672>=</span>order-pipeline <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Existing Kubernetes session</span>
+</span></span><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --target kubernetes-session <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dkubernetes.cluster-id<span style=color:#f92672>=</span>flink-session <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># New Kubernetes application cluster</span>
+</span></span><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --target kubernetes-application <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dkubernetes.cluster-id<span style=color:#f92672>=</span>order-pipeline <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dkubernetes.container.image.ref<span style=color:#f92672>=</span>example/order-pipeline:1.0 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  local:///opt/flink/usrlib/order-pipeline.jar</span></span></code></pre></div></div></div><p>For Kubernetes application mode, <code>local:///</code> identifies a JAR already present
+inside the container image. Flink can also use its configured artifact
+management support or a JAR stored in a supported remote filesystem. YARN and
+Kubernetes require their own platform-specific configuration and credentials
+in addition to these CLI arguments.</p><h4 id=inspect-and-control-jobs>Inspect and Control Jobs
+<a href=#inspect-and-control-jobs class=heading-anchor><span>#</span></a></h4><p><code>info</code> builds the application plan without submitting the job:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink info <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --class com.example.OrderPipeline <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --parallelism <span style=color:#ae81ff>8</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar</span></span></code></pre></div></div></div><p>Use <code>list</code> to inspect jobs known to the selected cluster:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink list
+</span></span><span style=display:flex><span>./bin/flink list --running
+</span></span><span style=display:flex><span>./bin/flink list --all
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Select a particular remote cluster.</span>
+</span></span><span style=display:flex><span>./bin/flink list <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --target remote <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --jobmanager jobmanager.example.com:8081</span></span></code></pre></div></div></div><p>The JobID printed by <code>run</code> and <code>list</code> identifies the job in lifecycle
+commands. A savepoint can be triggered explicitly:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink savepoint <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  &lt;JOB_ID&gt; <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  s3://flink-state/savepoints
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Return after Flink accepts the savepoint request.</span>
+</span></span><span style=display:flex><span>./bin/flink savepoint <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  &lt;JOB_ID&gt; <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  s3://flink-state/savepoints <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -detached</span></span></code></pre></div></div></div><p>If <code>execution.checkpointing.savepoint-dir</code> is configured, the target directory
+can be omitted. A savepoint can also be disposed through Flink so that both
+its data and metadata are cleaned up:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink savepoint <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --dispose s3://flink-state/savepoints/savepoint-abcd</span></span></code></pre></div></div></div><p>Recent Flink clients can manually trigger a checkpoint, including a full
+checkpoint when the configured backend normally creates incremental ones:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink checkpoint &lt;JOB_ID&gt;
+</span></span><span style=display:flex><span>./bin/flink checkpoint &lt;JOB_ID&gt; --full</span></span></code></pre></div></div></div><p>Restore a replacement job from a savepoint with <code>--fromSavepoint</code>:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --detached <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --fromSavepoint s3://flink-state/savepoints/savepoint-abcd <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar</span></span></code></pre></div></div></div><p>By default, every state entry in the savepoint must map to an operator in the
+new job. <code>--allowNonRestoredState</code> permits unmatched state to be discarded,
+which may be necessary after deliberately removing an operator:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink run <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --fromSavepoint s3://flink-state/savepoints/savepoint-abcd <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --allowNonRestoredState <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  order-pipeline.jar</span></span></code></pre></div></div></div><p>Use <code>stop</code> for a controlled streaming-job shutdown that creates a final
+savepoint:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink stop <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --savepointPath s3://flink-state/savepoints <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  &lt;JOB_ID&gt;</span></span></code></pre></div></div></div><p>Adding <code>--drain</code> emits a final maximum watermark before the last snapshot so
+that event-time timers and windows can finish:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink stop <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --drain <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --savepointPath s3://flink-state/savepoints <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  &lt;JOB_ID&gt;</span></span></code></pre></div></div></div><p>Draining is appropriate when permanently terminating the pipeline. Avoid it
+when the job will be resumed later, because firing all event-time timers before
+the snapshot can change the semantics of the restored pipeline.</p><p>Use <code>cancel</code> when the job must be terminated immediately without a final
+savepoint:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/flink cancel &lt;JOB_ID&gt;</span></span></code></pre></div></div></div><p>Cluster-selection options also apply to lifecycle commands. For example, a
+YARN application can be selected with <code>-Dyarn.application.id</code>, and a
+Kubernetes cluster with <code>-Dkubernetes.cluster-id</code>. This is necessary when the
+client cannot discover the intended cluster from its local configuration.</p><h3 id=how-flink-maps-onto-yarn>How Flink Maps onto YARN
+<a href=#how-flink-maps-onto-yarn class=heading-anchor><span>#</span></a></h3><p>For a YARN deployment, the component mapping is:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>YARN component</th><th>Flink role</th></tr></thead><tbody><tr><td>ResourceManager</td><td>Allocates containers to the Flink application</td></tr><tr><td>ApplicationMaster container</td><td>Hosts Flink&rsquo;s control-plane process</td></tr><tr><td>NodeManager</td><td>Launches and monitors Flink containers</td></tr><tr><td>Worker container</td><td>Usually runs one TaskManager</td></tr><tr><td>Container CPU and memory</td><td>Become TaskManager resources and task-slot capacity</td></tr></tbody></table></div></div><p>The startup and scheduling sequence is:</p><ol><li>The Flink client stages artifacts and submits a YARN application.</li><li>YARN&rsquo;s ResourceManager selects a NodeManager to launch the
+ApplicationMaster container.</li><li>The AM starts the Dispatcher, Flink ResourceManager, REST services, and,
+when a job is submitted, its JobMaster.</li><li>The JobMaster determines the slots required by the execution graph.</li><li>The Flink ResourceManager translates those needs into YARN container
+requests through the normal ApplicationMaster protocol.</li><li>YARN NodeManagers launch TaskManager processes in the allocated containers.</li><li>TaskManagers register, offer task slots, and receive operator subtasks from
+the JobMaster.</li></ol><p>YARN understands applications, queues, nodes, containers, CPU, memory, and
+process health. It does not understand Flink operators, Kafka partitions,
+task slots, watermarks, or checkpoints. Flink schedules that work inside the
+resources YARN supplies.</p><p>Failure handling follows the same boundary:</p><ul><li>A task failure is handled by the JobMaster and Flink&rsquo;s restart strategy.</li><li>A TaskManager or NodeManager loss causes affected tasks to be restored onto
+replacement capacity.</li><li>An AM failure ends that control-plane process incarnation. YARN can start a
+new application attempt; full job recovery also requires Flink HA metadata
+and externally stored checkpoints.</li><li>YARN ResourceManager failover is handled by YARN HA, after which the Flink
+AM re-registers through the normal YARN protocol.</li></ul><p>This resembles Spark on YARN, but Flink exposes an additional control-plane
+layer. A Spark executor is roughly comparable to a TaskManager, while a Spark
+driver is closest to a per-job JobMaster. The Dispatcher and Flink
+ResourceManager manage job admission and worker resources around those
+JobMasters.</p><h2 id=add-the-kafka-connector>Add the Kafka Connector
+<a href=#add-the-kafka-connector class=heading-anchor><span>#</span></a></h2><p>Flink&rsquo;s Kafka connector is distributed separately from the core runtime. A
+Maven project needs the connector in addition to the Flink APIs:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;properties&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;flink.version&gt;</span>YOUR_FLINK_VERSION<span style=color:#f92672>&lt;/flink.version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;kafka.connector.version&gt;</span>COMPATIBLE_CONNECTOR_VERSION<span style=color:#f92672>&lt;/kafka.connector.version&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/properties&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.flink<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>flink-streaming-java<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;version&gt;</span>${flink.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;scope&gt;</span>provided<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.flink<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>flink-clients<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;version&gt;</span>${flink.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;scope&gt;</span>provided<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.flink<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>flink-connector-kafka<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;version&gt;</span>${kafka.connector.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p>Use versions listed as compatible in the
+<a href=https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/>Flink Kafka connector documentation</a>.
+Connector releases may have a version lifecycle independent of the Flink
+runtime. Do not assume that two artifacts are compatible merely because their
+version strings look similar.</p><p>When submitting to a cluster, package the connector with the application or
+install it according to the cluster&rsquo;s dependency-management convention. Core
+Flink dependencies are normally supplied by the cluster and marked
+<code>provided</code>; connector packaging depends on how that cluster is managed.</p><h2 id=consume-a-kafka-topic>Consume a Kafka Topic
+<a href=#consume-a-kafka-topic class=heading-anchor><span>#</span></a></h2><p>The modern DataStream connector uses <code>KafkaSource</code>. This example reads UTF-8
+strings from an <code>orders</code> topic:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.time.Duration;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.api.common.eventtime.WatermarkStrategy;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.api.common.serialization.SimpleStringSchema;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.connector.kafka.source.KafkaSource;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.streaming.api.CheckpointingMode;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.streaming.api.datastream.DataStream;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderPipeline</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        StreamExecutionEnvironment env <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>                StreamExecutionEnvironment.<span style=color:#a6e22e>getExecutionEnvironment</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        env.<span style=color:#a6e22e>enableCheckpointing</span>(30_000, CheckpointingMode.<span style=color:#a6e22e>EXACTLY_ONCE</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        KafkaSource<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> source <span style=color:#f92672>=</span> KafkaSource.<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span>builder()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setBootstrapServers</span>(<span style=color:#e6db74>&#34;kafka:9092&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setTopics</span>(<span style=color:#e6db74>&#34;orders&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setGroupId</span>(<span style=color:#e6db74>&#34;order-pipeline&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setStartingOffsets</span>(OffsetsInitializer.<span style=color:#a6e22e>committedOffsets</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setValueOnlyDeserializer</span>(<span style=color:#66d9ef>new</span> SimpleStringSchema())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        DataStream<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> orders <span style=color:#f92672>=</span> env.<span style=color:#a6e22e>fromSource</span>(
+</span></span><span style=display:flex><span>                source,
+</span></span><span style=display:flex><span>                WatermarkStrategy.<span style=color:#a6e22e>noWatermarks</span>(),
+</span></span><span style=display:flex><span>                <span style=color:#e6db74>&#34;orders-source&#34;</span>
+</span></span><span style=display:flex><span>        );
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        orders
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>filter</span>(order <span style=color:#f92672>-&gt;</span> <span style=color:#f92672>!</span>order.<span style=color:#a6e22e>isBlank</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;discard-empty-orders&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>print</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        env.<span style=color:#a6e22e>execute</span>(<span style=color:#e6db74>&#34;order-pipeline&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The important source settings are:</p><ul><li><strong>bootstrap servers</strong>: the initial Kafka brokers used for discovery;</li><li><strong>topics or topic pattern</strong>: the input partitions Flink should discover;</li><li><strong>group ID</strong>: the Kafka consumer group identity;</li><li><strong>starting offsets</strong>: where a job without restored Flink state begins; and</li><li><strong>deserializer</strong>: how Kafka records become application objects.</li></ul><p><code>OffsetsInitializer.committedOffsets()</code> requires committed offsets for the
+partitions. Its overload can specify a reset strategy for partitions without a
+committed position. Other initializers can start from the earliest offsets,
+latest offsets, a timestamp, or explicit offsets:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>.<span style=color:#a6e22e>setStartingOffsets</span>(OffsetsInitializer.<span style=color:#a6e22e>earliest</span>())</span></span></code></pre></div></div></div><p>The starting-offset policy matters only when no usable Flink state is being
+restored. After recovery from a checkpoint or savepoint, the positions stored
+in that Flink snapshot take precedence.</p><h3 id=deserialize-keys-headers-and-metadata>Deserialize Keys, Headers, and Metadata
+<a href=#deserialize-keys-headers-and-metadata class=heading-anchor><span>#</span></a></h3><p><code>SimpleStringSchema</code> receives only the record value. Applications that need
+Kafka keys, headers, timestamps, partition numbers, or offsets should implement
+<code>KafkaRecordDeserializationSchema&lt;T></code> instead:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>KafkaSource<span style=color:#f92672>&lt;</span>OrderEvent<span style=color:#f92672>&gt;</span> source <span style=color:#f92672>=</span> KafkaSource.<span style=color:#f92672>&lt;</span>OrderEvent<span style=color:#f92672>&gt;</span>builder()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setBootstrapServers</span>(<span style=color:#e6db74>&#34;kafka:9092&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setTopics</span>(<span style=color:#e6db74>&#34;orders&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setGroupId</span>(<span style=color:#e6db74>&#34;order-pipeline&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setStartingOffsets</span>(OffsetsInitializer.<span style=color:#a6e22e>earliest</span>())
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setDeserializer</span>(<span style=color:#66d9ef>new</span> OrderEventDeserializationSchema())
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>Keep deserialization deterministic. Invalid records should follow an explicit
+policy, such as failing the job or being sent to a dead-letter stream with the
+original topic, partition, offset, and error. Silently dropping malformed
+business events makes recovery and auditing difficult.</p><h3 id=discover-new-partitions>Discover New Partitions
+<a href=#discover-new-partitions class=heading-anchor><span>#</span></a></h3><p>Kafka topics can gain partitions while a job is running. The connector can
+periodically discover them:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>.<span style=color:#a6e22e>setProperty</span>(<span style=color:#e6db74>&#34;partition.discovery.interval.ms&#34;</span>, <span style=color:#e6db74>&#34;60000&#34;</span>)</span></span></code></pre></div></div></div><p>New partitions need a defined starting-offset policy. Increasing a topic&rsquo;s
+partition count also changes key-to-partition assignment for producers, which
+can affect ordering assumptions outside Flink.</p><h2 id=process-events-with-event-time>Process Events with Event Time
+<a href=#process-events-with-event-time class=heading-anchor><span>#</span></a></h2><p>Suppose each Kafka value is parsed into this record:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>record</span> <span style=color:#a6e22e>Purchase</span>(
+</span></span><span style=display:flex><span>        String customerId,
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>long</span> amountInCents,
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>long</span> occurredAt
+</span></span><span style=display:flex><span>) {
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Flink can compute one-minute totals per customer:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.time.Duration;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.api.common.eventtime.WatermarkStrategy;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.api.common.functions.ReduceFunction;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.streaming.api.datastream.DataStream;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.streaming.api.windowing.time.Time;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>WatermarkStrategy<span style=color:#f92672>&lt;</span>Purchase<span style=color:#f92672>&gt;</span> watermarks <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>        WatermarkStrategy
+</span></span><span style=display:flex><span>            .<span style=color:#f92672>&lt;</span>Purchase<span style=color:#f92672>&gt;</span>forBoundedOutOfOrderness(Duration.<span style=color:#a6e22e>ofSeconds</span>(10))
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>withTimestampAssigner</span>(
+</span></span><span style=display:flex><span>                (purchase, previousTimestamp) <span style=color:#f92672>-&gt;</span> purchase.<span style=color:#a6e22e>occurredAt</span>()
+</span></span><span style=display:flex><span>            )
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>withIdleness</span>(Duration.<span style=color:#a6e22e>ofMinutes</span>(1));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>DataStream<span style=color:#f92672>&lt;</span>Purchase<span style=color:#f92672>&gt;</span> purchases <span style=color:#f92672>=</span> rawOrders
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(OrderPipeline::parsePurchase)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>assignTimestampsAndWatermarks</span>(watermarks);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>DataStream<span style=color:#f92672>&lt;</span>Purchase<span style=color:#f92672>&gt;</span> minuteTotals <span style=color:#f92672>=</span> purchases
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>keyBy</span>(Purchase::customerId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>window</span>(TumblingEventTimeWindows.<span style=color:#a6e22e>of</span>(Time.<span style=color:#a6e22e>minutes</span>(1)))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>reduce</span>((left, right) <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> Purchase(
+</span></span><span style=display:flex><span>                left.<span style=color:#a6e22e>customerId</span>(),
+</span></span><span style=display:flex><span>                left.<span style=color:#a6e22e>amountInCents</span>() <span style=color:#f92672>+</span> right.<span style=color:#a6e22e>amountInCents</span>(),
+</span></span><span style=display:flex><span>                Math.<span style=color:#a6e22e>max</span>(left.<span style=color:#a6e22e>occurredAt</span>(), right.<span style=color:#a6e22e>occurredAt</span>())
+</span></span><span style=display:flex><span>        ));</span></span></code></pre></div></div></div><p><code>withIdleness</code> prevents an idle Kafka partition from holding back the combined
+watermark indefinitely. Choose its duration from observed traffic patterns,
+not arbitrarily: a value that is too short can make a temporarily quiet
+partition appear complete too early.</p><p>Kafka preserves order within one partition, not across a topic. Flink&rsquo;s event
+time model handles cross-partition interleaving, but the application must still
+define how much lateness is acceptable and what to do with very late events.</p><h2 id=publish-results-to-kafka>Publish Results to Kafka
+<a href=#publish-results-to-kafka class=heading-anchor><span>#</span></a></h2><p><code>KafkaSink</code> writes a DataStream to Kafka:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.api.common.serialization.SimpleStringSchema;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.connector.base.DeliveryGuarantee;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.flink.connector.kafka.sink.KafkaSink;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>KafkaSink<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> sink <span style=color:#f92672>=</span> KafkaSink.<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span>builder()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setBootstrapServers</span>(<span style=color:#e6db74>&#34;kafka:9092&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setRecordSerializer</span>(
+</span></span><span style=display:flex><span>            KafkaRecordSerializationSchema.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setTopic</span>(<span style=color:#e6db74>&#34;order-totals&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setValueSerializationSchema</span>(<span style=color:#66d9ef>new</span> SimpleStringSchema())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>()
+</span></span><span style=display:flex><span>        )
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setDeliveryGuarantee</span>(DeliveryGuarantee.<span style=color:#a6e22e>AT_LEAST_ONCE</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>results.<span style=color:#a6e22e>sinkTo</span>(sink).<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;order-totals-sink&#34;</span>);</span></span></code></pre></div></div></div><p>Use <code>KafkaRecordSerializationSchema&lt;T></code> directly when the output topic, key,
+headers, or timestamp depends on the record.</p><p>The sink supports three delivery guarantees:</p><ul><li><code>NONE</code>: does not wait for Kafka acknowledgements as part of checkpointing;</li><li><code>AT_LEAST_ONCE</code>: ensures acknowledged records are not lost, but recovery may
+produce duplicates; and</li><li><code>EXACTLY_ONCE</code>: uses Kafka transactions coordinated with Flink checkpoints.</li></ul><p>Exactly-once output requires checkpointing:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>KafkaSink<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> sink <span style=color:#f92672>=</span> KafkaSink.<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span>builder()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setBootstrapServers</span>(<span style=color:#e6db74>&#34;kafka:9092&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setRecordSerializer</span>(
+</span></span><span style=display:flex><span>            KafkaRecordSerializationSchema.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setTopic</span>(<span style=color:#e6db74>&#34;order-totals&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>setValueSerializationSchema</span>(<span style=color:#66d9ef>new</span> SimpleStringSchema())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>()
+</span></span><span style=display:flex><span>        )
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setDeliveryGuarantee</span>(DeliveryGuarantee.<span style=color:#a6e22e>EXACTLY_ONCE</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setTransactionalIdPrefix</span>(<span style=color:#e6db74>&#34;order-pipeline-&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>Every concurrently running job needs a unique transactional ID prefix.
+Reusing a prefix can cause one producer to fence another. Kafka consumers that
+must not observe uncommitted transactional output should use
+<code>isolation.level=read_committed</code>.</p><p>Exactly-once is an end-to-end property, not merely a sink option. It requires:</p><ul><li>replayable input;</li><li>deterministic or correctly checkpointed processing;</li><li>successful Flink checkpoints;</li><li>a transactional or idempotent destination; and</li><li>consumers that observe committed results appropriately.</li></ul><p>An external side effect inside a <code>map</code> or <code>process</code> function, such as sending
+an HTTP request, is not automatically rolled back when Flink restores a
+checkpoint. Use an idempotency key, a transactional integration, or a design
+that publishes an intent to Kafka for a separate system to execute.</p><h2 id=how-offsets-and-checkpoints-work-together>How Offsets and Checkpoints Work Together
+<a href=#how-offsets-and-checkpoints-work-together class=heading-anchor><span>#</span></a></h2><p>Kafka consumer groups usually track progress through committed offsets. Flink
+also stores source positions in its checkpoints. These mechanisms are related
+but serve different roles:</p><ol><li>The source reads records from assigned Kafka partitions.</li><li>A Flink checkpoint barrier moves through the job.</li><li>Operators snapshot their state consistently with the source positions.</li><li>The checkpoint completes after all required snapshots and sink actions
+succeed.</li><li>On failure, Flink restores operator state and Kafka positions from that
+completed checkpoint.</li></ol><p>Kafka committed offsets are useful for visibility and for an initial start
+policy, but they are not a replacement for Flink checkpoint state. Deleting
+Flink state and restarting from consumer-group offsets can lose the exact
+relationship between source progress and operator state.</p><p>Checkpoint storage must be durable and accessible to the cluster. A local
+filesystem path on an ephemeral worker is not sufficient for production.
+Retain checkpoints or take savepoints according to the recovery and deployment
+strategy.</p><h2 id=use-kafka-with-flink-sql>Use Kafka with Flink SQL
+<a href=#use-kafka-with-flink-sql class=heading-anchor><span>#</span></a></h2><p>Flink&rsquo;s Table API and SQL connector expose a Kafka topic as a dynamic table.
+The following table reads JSON order events:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>TABLE</span> orders (
+</span></span><span style=display:flex><span>  order_id STRING,
+</span></span><span style=display:flex><span>  customer_id STRING,
+</span></span><span style=display:flex><span>  amount DECIMAL(<span style=color:#ae81ff>12</span>, <span style=color:#ae81ff>2</span>),
+</span></span><span style=display:flex><span>  occurred_at <span style=color:#66d9ef>TIMESTAMP</span>(<span style=color:#ae81ff>3</span>),
+</span></span><span style=display:flex><span>  WATERMARK <span style=color:#66d9ef>FOR</span> occurred_at <span style=color:#66d9ef>AS</span> occurred_at <span style=color:#f92672>-</span> INTERVAL <span style=color:#e6db74>&#39;10&#39;</span> <span style=color:#66d9ef>SECOND</span>
+</span></span><span style=display:flex><span>) <span style=color:#66d9ef>WITH</span> (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;connector&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;kafka&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;topic&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;orders&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;properties.bootstrap.servers&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;kafka:9092&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;properties.group.id&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;order-sql&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;scan.startup.mode&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;group-offsets&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;format&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;json&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;json.fail-on-missing-field&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;false&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;json.ignore-parse-errors&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;false&#39;</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>A second Kafka table can receive aggregates:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>TABLE</span> customer_totals (
+</span></span><span style=display:flex><span>  customer_id STRING,
+</span></span><span style=display:flex><span>  window_start <span style=color:#66d9ef>TIMESTAMP</span>(<span style=color:#ae81ff>3</span>),
+</span></span><span style=display:flex><span>  window_end <span style=color:#66d9ef>TIMESTAMP</span>(<span style=color:#ae81ff>3</span>),
+</span></span><span style=display:flex><span>  total_amount DECIMAL(<span style=color:#ae81ff>18</span>, <span style=color:#ae81ff>2</span>),
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>PRIMARY</span> <span style=color:#66d9ef>KEY</span> (customer_id, window_start) <span style=color:#66d9ef>NOT</span> ENFORCED
+</span></span><span style=display:flex><span>) <span style=color:#66d9ef>WITH</span> (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;connector&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;upsert-kafka&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;topic&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;customer-totals&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;properties.bootstrap.servers&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;kafka:9092&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;key.format&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;json&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;value.format&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;json&#39;</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>The query groups events into event-time windows:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>INSERT</span> <span style=color:#66d9ef>INTO</span> customer_totals
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span>
+</span></span><span style=display:flex><span>  customer_id,
+</span></span><span style=display:flex><span>  window_start,
+</span></span><span style=display:flex><span>  window_end,
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>SUM</span>(amount)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> <span style=color:#66d9ef>TABLE</span>(
+</span></span><span style=display:flex><span>  TUMBLE(<span style=color:#66d9ef>TABLE</span> orders, <span style=color:#66d9ef>DESCRIPTOR</span>(occurred_at), INTERVAL <span style=color:#e6db74>&#39;1&#39;</span> <span style=color:#66d9ef>MINUTE</span>)
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> customer_id, window_start, window_end;</span></span></code></pre></div></div></div><p>Use the regular <code>kafka</code> connector for append-only records. Use
+<code>upsert-kafka</code> when the table produces updates or deletes identified by a
+primary key. An ordinary Kafka topic does not magically become an upsert table:
+the key format, value format, changelog semantics, and downstream consumer must
+agree.</p><p>SQL connector artifacts must also be available to the Flink cluster. The exact
+installation mechanism differs between a SQL client, an application JAR, and
+a managed Flink service.</p><h2 id=partitioning-and-parallelism>Partitioning and Parallelism
+<a href=#partitioning-and-parallelism class=heading-anchor><span>#</span></a></h2><p>Kafka partitions determine the maximum number of source subtasks that can read
+one topic concurrently. With 12 partitions and source parallelism 20, at least
+eight source subtasks have no partition to read. With source parallelism 4,
+each subtask reads multiple partitions.</p><p>TaskManager count is independent of Kafka partition count. The relevant limit
+is Kafka <strong>source parallelism</strong>, not worker-process count. For example, all of
+the following can provide 12 source slots for a 12-partition topic:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>3 TaskManagers x 4 slots
+</span></span><span style=display:flex><span>6 TaskManagers x 2 slots
+</span></span><span style=display:flex><span>12 TaskManagers x 1 slot</span></span></code></pre></div></div></div><p>A job may also have more TaskManagers or downstream parallelism than source
+partitions because parsing, asynchronous API calls, keyed processing, or sinks
+can require more capacity than reading Kafka. Increasing source parallelism
+beyond the discovered partition count leaves some source subtasks idle, but
+does not impose a corresponding upper bound on the rest of the job.</p><p>That does not mean every operator should have the same parallelism. After
+<code>keyBy</code>, Flink repartitions records according to the logical key and can run
+downstream operators at a different parallelism.</p><p>Choose partition counts and parallelism using:</p><ul><li>peak input and output throughput;</li><li>record size and serialization cost;</li><li>skew in Kafka keys and Flink keys;</li><li>state size per key;</li><li>checkpoint duration;</li><li>broker and network capacity; and</li><li>the desired rescaling range.</li></ul><p>More partitions create more potential concurrency, but also more files,
+connections, metadata, and checkpoint work. They do not fix a hot key: all
+records for one Flink key still go to one keyed subtask unless the application
+changes its aggregation strategy.</p><h2 id=schema-management>Schema Management
+<a href=#schema-management class=heading-anchor><span>#</span></a></h2><p>JSON is convenient for examples but does not by itself provide strong schema
+compatibility. Production pipelines commonly use Avro, Protobuf, or JSON
+Schema with a schema registry.</p><p>Plan for schema evolution:</p><ul><li>assign stable field names and meanings;</li><li>distinguish required fields from optional fields;</li><li>use compatible defaults when adding fields;</li><li>avoid reusing a field for a new meaning;</li><li>preserve unknown fields when consumers may need them; and</li><li>test old records against new application versions.</li></ul><p>Kafka retention makes schema compatibility especially important. A restored
+or reprocessing job may read events produced months earlier.</p><p>Deserialization failures should carry enough context to diagnose the source
+record. If the organization permits dead-letter topics, include the original
+topic, partition, offset, key, schema identifier, and a safe error description.
+Avoid copying sensitive payloads into unrestricted logs.</p><h2 id=security-configuration>Security Configuration
+<a href=#security-configuration class=heading-anchor><span>#</span></a></h2><p>The connector accepts Kafka client properties for TLS and SASL. A deployment
+might supply properties such as:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>.<span style=color:#a6e22e>setProperty</span>(<span style=color:#e6db74>&#34;security.protocol&#34;</span>, <span style=color:#e6db74>&#34;SASL_SSL&#34;</span>)
+</span></span><span style=display:flex><span>.<span style=color:#a6e22e>setProperty</span>(<span style=color:#e6db74>&#34;sasl.mechanism&#34;</span>, <span style=color:#e6db74>&#34;SCRAM-SHA-512&#34;</span>)
+</span></span><span style=display:flex><span>.<span style=color:#a6e22e>setProperty</span>(
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;sasl.jaas.config&#34;</span>,
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>getenv</span>(<span style=color:#e6db74>&#34;KAFKA_SASL_JAAS_CONFIG&#34;</span>)
+</span></span><span style=display:flex><span>)</span></span></code></pre></div></div></div><p>Do not hard-code passwords or JAAS credentials in source code. Inject them
+from the platform&rsquo;s secret mechanism and restrict access to job configuration
+and logs.</p><p>Apply least privilege to Kafka ACLs. A source job normally needs topic
+description and read access plus permission for its consumer group. A sink
+needs write access and, for exactly-once delivery, the permissions required for
+transactional producers.</p><p>Use encrypted broker connections, validate broker certificates, and avoid
+disabling hostname verification as a shortcut.</p><h2 id=operating-the-pipeline>Operating the Pipeline
+<a href=#operating-the-pipeline class=heading-anchor><span>#</span></a></h2><p>A healthy Kafka-Flink pipeline needs visibility into both systems.</p><p>Monitor at least:</p><ul><li>input and output records and bytes;</li><li>Kafka consumer lag per partition;</li><li>busy, idle, and backpressured time for Flink subtasks;</li><li>checkpoint duration, size, failures, and alignment time;</li><li>restart counts and failure causes;</li><li>watermark progression and idle partitions;</li><li>late or invalid record counts;</li><li>state size and growth;</li><li>Kafka produce latency and errors; and</li><li>transaction timeouts for exactly-once sinks.</li></ul><p>Consumer lag alone is not enough. A job can have low lag while producing
+incorrect results, repeatedly failing checkpoints, or accumulating state
+without bounds. Conversely, a deliberate bounded replay can have high lag
+while operating correctly.</p><p>Set stable operator UIDs for stateful production jobs:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>DataStream<span style=color:#f92672>&lt;</span>OrderTotal<span style=color:#f92672>&gt;</span> totals <span style=color:#f92672>=</span> purchases
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>keyBy</span>(Purchase::customerId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>process</span>(<span style=color:#66d9ef>new</span> CustomerTotalFunction())
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>uid</span>(<span style=color:#e6db74>&#34;customer-total&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;customer-total&#34;</span>);</span></span></code></pre></div></div></div><p>Flink uses operator identity to map saved state during upgrades. Explicit UIDs
+reduce the risk that a harmless code-graph change prevents state restoration.
+Do not change or reuse them casually.</p><p>Test recovery before production. A useful test kills a task while records are
+flowing, waits for restoration, and verifies the final output for duplicates,
+loss, and ordering assumptions. Also test a savepoint upgrade, rescaling, Kafka
+broker interruption, malformed records, and a slow destination.</p><h2 id=common-pitfalls>Common Pitfalls
+<a href=#common-pitfalls class=heading-anchor><span>#</span></a></h2><h3 id=assuming-kafka-ordering-is-global>Assuming Kafka Ordering Is Global
+<a href=#assuming-kafka-ordering-is-global class=heading-anchor><span>#</span></a></h3><p>Kafka orders records only within a partition. If all events for one entity must
+remain ordered, producers should use a stable key so those events reach the
+same partition. A later Flink <code>keyBy</code> can regroup events but cannot recreate a
+global order that never existed.</p><h3 id=confusing-processing-guarantees>Confusing Processing Guarantees
+<a href=#confusing-processing-guarantees class=heading-anchor><span>#</span></a></h3><p><code>EXACTLY_ONCE</code> checkpoint mode does not make arbitrary external calls
+exactly-once. Trace every side effect through failure and replay behavior.</p><h3 id=starting-from-the-wrong-offsets>Starting from the Wrong Offsets
+<a href=#starting-from-the-wrong-offsets class=heading-anchor><span>#</span></a></h3><p><code>earliest</code>, <code>latest</code>, committed offsets, timestamps, and restored state have
+different meanings. Make restart and full-replay procedures explicit before an
+incident occurs.</p><h3 id=ignoring-watermark-idleness>Ignoring Watermark Idleness
+<a href=#ignoring-watermark-idleness class=heading-anchor><span>#</span></a></h3><p>One quiet Kafka partition can stop a downstream event-time watermark. Configure
+idleness when partitions may legitimately receive no records.</p><h3 id=using-an-unbounded-key-or-state-model>Using an Unbounded Key or State Model
+<a href=#using-an-unbounded-key-or-state-model class=heading-anchor><span>#</span></a></h3><p>A key such as a request ID can create millions of tiny state entries. State
+needs a cleanup mechanism: windows, timers, state time-to-live, or another
+business rule with understood correctness implications.</p><h3 id=treating-a-dead-letter-topic-as-a-fix>Treating a Dead-Letter Topic as a Fix
+<a href=#treating-a-dead-letter-topic-as-a-fix class=heading-anchor><span>#</span></a></h3><p>A dead-letter topic preserves problematic records; it does not resolve them.
+Define ownership, alerting, retention, replay, and privacy controls around it.</p><h2 id=a-practical-design-checklist>A Practical Design Checklist
+<a href=#a-practical-design-checklist class=heading-anchor><span>#</span></a></h2><p>Before deploying a Flink job connected to Kafka, answer:</p><ol><li>Which Kafka key preserves the required ordering?</li><li>Where does a new deployment start when no Flink state exists?</li><li>Which event timestamp drives the computation?</li><li>How late may events arrive, and what happens after that limit?</li><li>What state does each key retain, and how is it cleaned up?</li><li>Which delivery guarantee is required at every output?</li><li>Are all external side effects replay-safe?</li><li>Where are checkpoints stored, and how long are they retained?</li><li>How will the job be upgraded, rolled back, and rescaled?</li><li>How are schemas evolved and malformed records handled?</li><li>Which metrics and alerts reveal lag, backpressure, and checkpoint failure?</li><li>Have failure and recovery been tested with realistic traffic?</li></ol><p>Kafka gives Flink a durable, replayable event log. Flink adds distributed state,
+event-time processing, recovery, and rich transformations. Used together, they
+form a strong foundation for streaming applications, but correctness depends
+on deliberate choices about offsets, checkpoints, transactions, schemas,
+partitioning, and every side effect beyond the pipeline.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/apache-flink-kafka/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

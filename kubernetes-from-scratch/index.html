@@ -1,0 +1,38 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Kubernetes from Scratch</title></head><body><main><article><div class=article-header><h1>Kubernetes from Scratch</h1><div class=aux>Last update: 2022-05-30 07:31:00 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/etcd/>Etcd</a>
+|
+<a href=/tags/kubernetes/>Kubernetes</a>
+|
+<a href=/tags/linux/>Linux</a></div></div><div class=article-content><p>Building Kubernetes from source is suitable for studying or testing a patched
+component. A production cluster also requires a supported upgrade path,
+certificate rotation, backup recovery, networking, storage, monitoring, and
+incident procedures.</p><h2 id=object-model-and-api-paths>Object Model and API Paths
+<a href=#object-model-and-api-paths class=heading-anchor><span>#</span></a></h2><p>Kubernetes models cluster operations as CRUD on resources. Each object has a
+UID, a type, a unique name within that type, labels for indexed selection, and
+annotations for non-identifying metadata.</p><p>Resources are grouped into API groups:</p><ul><li>the core group is exposed under <code>/api/v1</code>;</li><li>named groups are exposed under <code>/apis/&lt;group>/&lt;version></code>.</li></ul><p>Discovery endpoints such as <code>GET /api</code>, <code>GET /apis</code>, and <code>/openapi/v3</code>
+describe which resources the cluster supports. A resource list entry exposes
+the canonical name, <code>kind</code>, namespace scope, verbs, and short names such as
+<code>pvc</code>.</p><p>The common verbs map to HTTP methods:</p><ul><li><code>get</code>, <code>list</code>, and <code>watch</code> use <code>GET</code>;</li><li><code>create</code> uses <code>POST</code>;</li><li><code>update</code> uses <code>PUT</code>;</li><li><code>patch</code> uses <code>PATCH</code>;</li><li><code>delete</code> and <code>deletecollection</code> use <code>DELETE</code>.</li></ul><p>This object model is why a <code>Service</code> is a stable endpoint backed by many Pods,
+while a Pod itself remains ephemeral and gets a new network identity when
+recreated.</p><h2 id=build-and-record-binaries>Build and Record Binaries
+<a href=#build-and-record-binaries class=heading-anchor><span>#</span></a></h2><p>Build from a tagged Kubernetes source revision with the documented Go
+toolchain. Record the source commit, toolchain version, build flags, and
+checksums for every binary. Build selected commands with <code>make WHAT=...</code> or
+use the release build process; do not download arbitrary binaries into a
+control-plane host.</p><h2 id=establish-the-control-plane>Establish the Control Plane
+<a href=#establish-the-control-plane class=heading-anchor><span>#</span></a></h2><p>An odd-sized etcd quorum stores API state. Protect peer and client traffic with
+TLS, test snapshot restoration, and restrict direct client access. Start the
+control plane in dependency order:</p><ol><li>Establish etcd, certificates, service-account signing keys, and network
+reachability.</li><li>Start <code>kube-apiserver</code> with its serving certificate, etcd client
+credentials, service CIDR, admission configuration, and audit policy.</li><li>Start <code>kube-controller-manager</code> and <code>kube-scheduler</code> with individual
+identities.</li><li>Configure an administrative kubeconfig for initial bootstrap only.</li><li>Install a CNI implementation, then join kubelets.</li></ol><p>The kubelet requires a node identity, API endpoint, CRI-compatible runtime,
+CNI configuration, and matching Pod CIDR assumptions. Service routing is
+implemented by kube-proxy or an alternative data plane.</p><p>The control plane components have distinct jobs:</p><ul><li><code>etcd</code> stores cluster state;</li><li><code>kube-apiserver</code> is the front door for all authenticated requests;</li><li><code>kube-controller-manager</code> reconciles desired state into actual state;</li><li><code>kube-scheduler</code> picks a node for pending Pods;</li><li><code>kubelet</code> keeps one node aligned with the API server;</li><li><code>kube-proxy</code> implements Service routing on each node.</li></ul><h2 id=secure-api-requests>Secure API Requests
+<a href=#secure-api-requests class=heading-anchor><span>#</span></a></h2><p>The API server accepts HTTPS requests. A request path is:</p><ol><li>authentication, which associates the request with a username, UID, groups,
+and optional extra attributes through client certificates, service-account
+tokens, or OIDC;</li><li>authorization, which evaluates the identity, verb, resource, namespace,
+and name;</li><li>admission, which validates or mutates the request;</li><li>persistence to etcd when the request changes cluster state.</li></ol><p>Enable <code>Node</code> and <code>RBAC</code> authorization unless a deliberate alternative is
+designed. Disable anonymous access, avoid static token files, separate
+component identities, and keep private keys outside source control. Verify
+<code>/readyz</code>, DNS, Service routing, resource enforcement, node loss, certificate
+renewal, and etcd restoration before considering the cluster operational.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/kubernetes-from-scratch/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

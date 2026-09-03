@@ -1,0 +1,65 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Modern Android Development</title></head><body><main><article><div class=article-header><h1>Modern Android Development</h1><div class=aux>Last update: 2026-02-10 13:57:26 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/android/>Android</a>
+|
+<a href=/tags/kotlin/>Kotlin</a>
+|
+<a href=/tags/jetpack/>Jetpack</a>
+|
+<a href=/tags/jetpack-compose/>Jetpack Compose</a></div></div><div class=article-content><p>Modern Android applications commonly use Kotlin, AndroidX, Jetpack libraries, and
+Jetpack Compose. Platform APIs remain in <code>android.*</code>; AndroidX supplies
+version-compatible and higher-level APIs in <code>androidx.*</code>. An application package has
+multiple system-managed entry points rather than a conventional process-wide
+<code>main()</code> method.</p><h2 id=application-isolation>Application Isolation
+<a href=#application-isolation class=heading-anchor><span>#</span></a></h2><p>Android assigns an installed package a Linux UID and gives its private files
+UID-based ownership. An application process runs its own Android Runtime instance,
+and cross-package component calls use Binder IPC. Runtime permissions, SELinux, and
+framework service checks supplement the UID boundary.</p><p>Shared UIDs were once available to equally signed packages but are deprecated for
+new applications because they weaken package isolation. Applications share data
+through explicit interfaces, such as a permission-protected content provider,
+document picker, URI grant, or Binder service, rather than through private paths.</p><h2 id=components-and-the-manifest>Components and the Manifest
+<a href=#components-and-the-manifest class=heading-anchor><span>#</span></a></h2><p>Android has four component types:</p><ul><li>An <strong>activity</strong> hosts a focused user interface.</li><li>A <strong>service</strong> performs work without an activity UI. Long-running user-visible work
+requires a foreground-service notification and is subject to platform limits.</li><li>A <strong>broadcast receiver</strong> performs a short response to a broadcast and should
+delegate lengthy work to an appropriate scheduler.</li><li>A <strong>content provider</strong> exposes structured data through a <code>ContentResolver</code> API.</li></ul><p>The manifest declares application components, permissions, package visibility where
+needed, minimum SDK level, features, and application metadata. A component with an
+intent filter is externally addressable only if its <code>android:exported</code> setting and
+the applicable permissions permit it. Keep non-public components unexported.</p><h2 id=intents-and-component-activation>Intents and Component Activation
+<a href=#intents-and-component-activation class=heading-anchor><span>#</span></a></h2><p>An explicit intent identifies a particular component. An implicit intent describes
+an action, data, categories, and optional extras; the system resolves it against
+exported intent filters. Use explicit intents for internal operations and services,
+because an implicit service intent can resolve to an unintended component.</p><p>Activities launch through <code>startActivity</code> or the Activity Result APIs. Services use
+<code>startService</code>, <code>startForegroundService</code>, or <code>bindService</code> according to their
+execution model. Content providers receive operations through <code>ContentResolver</code>.
+Background work that does not need immediate execution belongs in WorkManager or,
+where appropriate, JobScheduler rather than a long-lived background service.</p><p>Treat all incoming intents, extras, and URIs as untrusted input. Verify callers
+where the API permits it, validate values, require permissions for sensitive
+components, and grant URI permissions only as narrowly and briefly as required.</p><h2 id=activity-lifecycle-and-state>Activity Lifecycle and State
+<a href=#activity-lifecycle-and-state class=heading-anchor><span>#</span></a></h2><p>The system creates an activity with <code>onCreate</code>, makes it visible through <code>onStart</code>,
+and makes it interactive through <code>onResume</code>. <code>onPause</code> indicates that the activity
+has lost foreground focus; it must return quickly. <code>onStop</code> follows when the
+activity is no longer visible and is the appropriate place to release resources
+needed only while visible.</p><p>An activity object can be destroyed because <code>finish</code> was requested or because the
+system reclaims its process. <code>onSaveInstanceState</code> stores small, reconstructible UI
+state for the latter case. The framework saves supported view-hierarchy state, but
+application state belongs in a <code>ViewModel</code>, saved-state handle, database, or other
+durable store according to its size and lifetime. Do not use a lifecycle callback to
+perform an unbounded network transaction or database migration.</p><h2 id=resources>Resources
+<a href=#resources class=heading-anchor><span>#</span></a></h2><p>The Android resource system compiles <code>res/</code> entries into generated identifiers such
+as <code>R.string.app_name</code>. Place each resource in a typed top-level directory, such as
+<code>layout</code>, <code>drawable</code>, <code>mipmap</code>, <code>values</code>, <code>xml</code>, <code>font</code>, <code>menu</code>, <code>raw</code>, <code>anim</code>, or
+<code>animator</code>. Assets placed in <code>assets/</code> are not compiled into <code>R</code> and are opened
+through <code>AssetManager</code>.</p><p>Resource qualifiers select the most appropriate alternative for configuration,
+locale, screen size, density, orientation, and night mode. Qualifiers must use the
+documented order and may not repeat a qualifier type. Keep a default resource for
+every resource the application references, because a device configuration might not
+match a specialized alternative.</p><h2 id=kotlin-jetpack-and-compose>Kotlin, Jetpack, and Compose
+<a href=#kotlin-jetpack-and-compose class=heading-anchor><span>#</span></a></h2><p>Kotlin supplies null safety, extension functions, lambdas, sealed types, and
+coroutines. AndroidX and Jetpack provide lifecycle-aware components, Navigation,
+Room, WorkManager, and compatibility APIs. <code>lifecycleScope</code> and <code>viewModelScope</code>
+tie coroutines to their owners, but cancellation does not remove the need to make
+work idempotent and to handle failures.</p><p>Jetpack Compose expresses UI as composable functions. An activity enters Compose
+with <code>setContent</code>; observable state collected into the composition causes the
+affected UI to recompose. <code>LazyColumn</code> provides efficient item-based layouts, and
+modifiers express layout, interaction, and decoration.</p><p>Keep screen state in a <code>ViewModel</code>, make composables primarily functions of state,
+and use effect APIs for work whose lifetime depends on composition. Views and
+Compose can interoperate during a staged migration, so a rewrite is not required to
+adopt Compose.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/modern-android-development/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,357 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Apache Kafka</title></head><body><main><article><div class=article-header><h1>Apache Kafka</h1><div class=aux>Last update: 2026-07-19 19:31:59 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/apache-kafka/>Apache-Kafka</a>
+|
+<a href=/tags/event-streaming/>Event-Streaming</a>
+|
+<a href=/tags/kafka/>Kafka</a></div></div><div class=article-content><p>Apache Kafka is a distributed append-log system for durable event streams.
+Producers append records to topic partitions, brokers replicate and retain those
+records, and consumers read them by offset. Kafka is therefore useful when several
+independent applications need to observe the same ordered history without coupling
+their availability or processing rate.</p><h2 id=cluster-roles-and-metadata>Cluster Roles and Metadata
+<a href=#cluster-roles-and-metadata class=heading-anchor><span>#</span></a></h2><p>A Kafka cluster contains two server roles:</p><ul><li><strong>Brokers</strong> store partition replicas and serve produce and fetch requests.</li><li><strong>KRaft controllers</strong> maintain cluster metadata, broker membership, topic
+configuration, replica placement, and partition leadership.</li></ul><p>A process can perform one or both roles in a development cluster. Production
+clusters separate controller and broker roles because data-plane load should not
+interfere with metadata quorum decisions. ZooKeeper belongs to Kafka&rsquo;s legacy
+metadata architecture and is absent from Kafka 4.x.</p><p>Clients receive a list of bootstrap addresses rather than a complete routing table.
+A metadata request identifies the broker that currently leads each partition, after
+which produce and fetch requests go directly to the relevant leaders. Every
+advertised broker address must therefore be resolvable and reachable from the
+client&rsquo;s network; publishing container-only hostnames to an external client is a
+common deployment error.</p><p>Kafka uses a versioned binary protocol over TCP. The
+<code>org.apache.kafka:kafka-clients</code> artifact provides Java producer, consumer, and
+administration APIs. Other language clients implement the same protocol.</p><h2 id=topics-partitions-and-records>Topics, Partitions, and Records
+<a href=#topics-partitions-and-records class=heading-anchor><span>#</span></a></h2><p>A topic is divided into ordered partitions. Each record can contain:</p><ol><li>a key;</li><li>a value;</li><li>a timestamp; and</li><li>zero or more headers.</li></ol><p>Keys and values are byte arrays at the protocol boundary. Serializers convert
+application objects into those bytes, and deserializers perform the inverse
+operation.</p><p>A broker assigns monotonically increasing offsets to records appended to one
+partition. An offset identifies a position within that partition; it is not a
+globally ordered event ID. Kafka guarantees ordering within one partition, not
+across a topic.</p><p>When a producer does not specify a partition, the partitioner uses the record key
+and current topic metadata. Equal non-null keys are consequently routed to the same
+partition while the partition count remains unchanged. This property supports
+per-entity ordering for keys such as an account ID or device ID. Increasing the
+partition count can change the key-to-partition mapping, so partition expansion
+requires an explicit ordering and migration analysis.</p><p>Each partition is stored as segment files under a broker log directory. Segment
+files contain binary record batches and have offset and timestamp indexes; they are
+not line-oriented text logs.</p><h2 id=retention-and-compaction>Retention and Compaction
+<a href=#retention-and-compaction class=heading-anchor><span>#</span></a></h2><p>Consumption never deletes a record. Brokers remove records according to the topic&rsquo;s
+cleanup policy:</p><ul><li><code>cleanup.policy=delete</code> removes old segments after the configured time or size
+boundary.</li><li><code>cleanup.policy=compact</code> retains the latest value for each key.</li><li><code>cleanup.policy=compact,delete</code> applies both policies.</li></ul><p>Compaction preserves offsets and does not produce a dense sequence. A consumer can
+therefore encounter gaps between offsets. A keyed record with a null value is a
+<strong>tombstone</strong>; after <code>delete.retention.ms</code>, compaction can remove both the tombstone
+and the older value for that key.</p><p>Configure a compacted state topic with the administration tool:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>bin/kafka-topics.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --create --topic customer-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --partitions <span style=color:#ae81ff>12</span> --replication-factor <span style=color:#ae81ff>3</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --config cleanup.policy<span style=color:#f92672>=</span>compact <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --config min.cleanable.dirty.ratio<span style=color:#f92672>=</span>0.5</span></span></code></pre></div></div></div><p>Compaction is asynchronous. Applications must not assume that an obsolete value
+disappears immediately after a replacement or tombstone is appended.</p><h2 id=replication-and-durability>Replication and Durability
+<a href=#replication-and-durability class=heading-anchor><span>#</span></a></h2><p>A partition has one leader and one or more replicas. Producers and consumers
+ordinarily communicate with the leader. Followers fetch the leader&rsquo;s log, and the
+controller elects a replacement when leadership changes.</p><p>Several independent settings determine acknowledged-write durability:</p><ul><li><code>replication.factor</code> determines how many brokers store the partition.</li><li><code>acks=all</code> makes the producer wait for the leader to satisfy the in-sync replica
+requirement.</li><li><code>min.insync.replicas</code> rejects an <code>acks=all</code> write when too few replicas remain
+in sync.</li><li>unclean leader election permits a stale replica to become leader and can
+therefore lose acknowledged records.</li></ul><p>For example, replication factor 3 with <code>min.insync.replicas=2</code> tolerates one replica
+being unavailable while preserving the two-copy acknowledgement rule. It does not
+tolerate two unavailable replicas for writes. Availability and durability are
+coupled by this choice.</p><p>Replica placement must cross host, rack, or availability-zone failure domains.
+Three replicas on one physical host do not provide host-failure tolerance.</p><h2 id=creating-and-inspecting-topics>Creating and Inspecting Topics
+<a href=#creating-and-inspecting-topics class=heading-anchor><span>#</span></a></h2><p>Topic count and partition count are operational capacity decisions, so create
+important topics explicitly instead of relying on broker-side automatic creation:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>bin/kafka-topics.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --create --topic orders <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --partitions <span style=color:#ae81ff>12</span> --replication-factor <span style=color:#ae81ff>3</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --config min.insync.replicas<span style=color:#f92672>=</span><span style=color:#ae81ff>2</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --config retention.ms<span style=color:#f92672>=</span><span style=color:#ae81ff>604800000</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>bin/kafka-topics.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --describe --topic orders
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>bin/kafka-configs.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --entity-type topics --entity-name orders --describe</span></span></code></pre></div></div></div><p>The Java Admin API provides the same control plane:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.admin.Admin;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.admin.AdminClientConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.admin.NewTopic;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties config <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(AdminClientConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (Admin admin <span style=color:#f92672>=</span> Admin.<span style=color:#a6e22e>create</span>(config)) {
+</span></span><span style=display:flex><span>    NewTopic orders <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> NewTopic(<span style=color:#e6db74>&#34;orders&#34;</span>, 12, (<span style=color:#66d9ef>short</span>) 3)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>configs</span>(Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;min.insync.replicas&#34;</span>, <span style=color:#e6db74>&#34;2&#34;</span>,
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;retention.ms&#34;</span>, <span style=color:#e6db74>&#34;604800000&#34;</span>
+</span></span><span style=display:flex><span>        ));
+</span></span><span style=display:flex><span>    admin.<span style=color:#a6e22e>createTopics</span>(List.<span style=color:#a6e22e>of</span>(orders)).<span style=color:#a6e22e>all</span>().<span style=color:#a6e22e>get</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>createTopics</code> is asynchronous; waiting on the returned future surfaces authorization,
+validation, and timeout failures.</p><h2 id=java-client-dependency>Java Client Dependency
+<a href=#java-client-dependency class=heading-anchor><span>#</span></a></h2><p>Producer, consumer, and Admin clients are in one artifact:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.kafka<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>kafka-clients<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>${kafka.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>Select a client version from Kafka&rsquo;s compatibility documentation. Protocol
+negotiation permits many mixed client and broker versions, but new APIs and record
+formats still have minimum broker requirements.</p><h2 id=producing-records>Producing Records
+<a href=#producing-records class=heading-anchor><span>#</span></a></h2><p><code>KafkaProducer</code> is thread-safe. It accumulates records into per-partition batches,
+compresses each batch, and sends requests asynchronously. A long-lived producer
+therefore performs better than constructing one producer per record.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.nio.charset.StandardCharsets;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.KafkaProducer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.ProducerConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.ProducerRecord;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.StringSerializer;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties config <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>KEY_SERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringSerializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>VALUE_SERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringSerializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>ACKS_CONFIG</span>, <span style=color:#e6db74>&#34;all&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>ENABLE_IDEMPOTENCE_CONFIG</span>, <span style=color:#66d9ef>true</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>COMPRESSION_TYPE_CONFIG</span>, <span style=color:#e6db74>&#34;zstd&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>LINGER_MS_CONFIG</span>, 5);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (KafkaProducer<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> producer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> KafkaProducer<span style=color:#f92672>&lt;&gt;</span>(config)) {
+</span></span><span style=display:flex><span>    ProducerRecord<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> record <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> ProducerRecord<span style=color:#f92672>&lt;&gt;</span>(<span style=color:#e6db74>&#34;orders&#34;</span>, <span style=color:#e6db74>&#34;customer-42&#34;</span>, <span style=color:#e6db74>&#34;{\&#34;orderId\&#34;:123}&#34;</span>);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>record</span><span style=color:#960050;background-color:#1e0010>.</span><span style=color:#a6e22e>headers</span>().<span style=color:#a6e22e>add</span>(<span style=color:#e6db74>&#34;schema-version&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;1&#34;</span>.<span style=color:#a6e22e>getBytes</span>(StandardCharsets.<span style=color:#a6e22e>UTF_8</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    producer.<span style=color:#a6e22e>send</span>(record, (metadata, error) <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (error <span style=color:#f92672>!=</span> <span style=color:#66d9ef>null</span>) {
+</span></span><span style=display:flex><span>            System.<span style=color:#a6e22e>err</span>.<span style=color:#a6e22e>println</span>(<span style=color:#e6db74>&#34;Produce failed: &#34;</span> <span style=color:#f92672>+</span> error);
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span>;
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>printf</span>(<span style=color:#e6db74>&#34;%s-%d@%d%n&#34;</span>,
+</span></span><span style=display:flex><span>            metadata.<span style=color:#a6e22e>topic</span>(), metadata.<span style=color:#a6e22e>partition</span>(), metadata.<span style=color:#a6e22e>offset</span>());
+</span></span><span style=display:flex><span>    });
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Closing the producer flushes outstanding sends. Applications should propagate or
+record callback failures; accepting a record into the client&rsquo;s buffer does not mean
+the broker acknowledged it.</p><p>Important throughput and latency controls include:</p><ul><li><code>batch.size</code>: maximum bytes accumulated for one partition batch;</li><li><code>linger.ms</code>: time available for a partially filled batch;</li><li><code>compression.type</code>: compression applied to whole batches;</li><li><code>buffer.memory</code>: producer memory available to unsent records;</li><li><code>delivery.timeout.ms</code>: upper bound for completing a send; and</li><li><code>max.request.size</code>: maximum request size accepted by the client.</li></ul><p>Larger batches improve compression and request efficiency but consume memory and can
+add latency. Broker and topic message-size limits must also accept the resulting
+batch.</p><h3 id=idempotence-and-retries>Idempotence and Retries
+<a href=#idempotence-and-retries class=heading-anchor><span>#</span></a></h3><p>Network failure can leave a producer uncertain whether a broker appended a request.
+Blind retries can then create duplicates. Idempotent production attaches a producer
+identity and sequence numbers so the broker can reject duplicate retries within the
+producer session.</p><p>Idempotence does not deduplicate two independent business requests, records sent by
+different producer instances, or records resent after application-level replay.
+Stable business IDs and downstream idempotency remain necessary.</p><h2 id=consuming-records>Consuming Records
+<a href=#consuming-records class=heading-anchor><span>#</span></a></h2><p><code>KafkaConsumer</code> is not thread-safe. One application thread should own each consumer,
+call <code>poll</code>, process assignment callbacks, and commit offsets. Parallel processing
+requires careful coordination between completed work and offset commits.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.time.Duration;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.ConsumerConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.ConsumerRecord;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.ConsumerRecords;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.KafkaConsumer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.StringDeserializer;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties config <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>GROUP_ID_CONFIG</span>, <span style=color:#e6db74>&#34;order-indexer&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>KEY_DESERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringDeserializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>VALUE_DESERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringDeserializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>ENABLE_AUTO_COMMIT_CONFIG</span>, <span style=color:#66d9ef>false</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>AUTO_OFFSET_RESET_CONFIG</span>, <span style=color:#e6db74>&#34;earliest&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (KafkaConsumer<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> consumer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> KafkaConsumer<span style=color:#f92672>&lt;&gt;</span>(config)) {
+</span></span><span style=display:flex><span>    consumer.<span style=color:#a6e22e>subscribe</span>(List.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;orders&#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>while</span> (<span style=color:#f92672>!</span>Thread.<span style=color:#a6e22e>currentThread</span>().<span style=color:#a6e22e>isInterrupted</span>()) {
+</span></span><span style=display:flex><span>        ConsumerRecords<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> records <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>            consumer.<span style=color:#a6e22e>poll</span>(Duration.<span style=color:#a6e22e>ofSeconds</span>(1));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>for</span> (ConsumerRecord<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> record : records) {
+</span></span><span style=display:flex><span>            indexOrder(record.<span style=color:#a6e22e>key</span>(), record.<span style=color:#a6e22e>value</span>());
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// Commits the next offsets after the complete batch succeeds.</span>
+</span></span><span style=display:flex><span>        consumer.<span style=color:#a6e22e>commitSync</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The example provides at-least-once processing: a failure after <code>indexOrder</code> but
+before <code>commitSync</code> causes replay. <code>indexOrder</code> must consequently be idempotent, or
+the destination must deduplicate by a stable event ID.</p><p><code>auto.offset.reset</code> applies only when the group has no valid committed offset. It
+does not force an established group to reread a topic. Use <code>seek</code>, a new group ID,
+or the consumer-groups reset operation for deliberate replay.</p><h2 id=consumer-groups-and-rebalancing>Consumer Groups and Rebalancing
+<a href=#consumer-groups-and-rebalancing class=heading-anchor><span>#</span></a></h2><p>Consumers with the same <code>group.id</code> form a group. Each partition is assigned to at
+most one active consumer in that group:</p><ul><li>fewer consumers than partitions means some consumers own several partitions;</li><li>equal counts permit one partition per consumer; and</li><li>more consumers than partitions leaves excess consumers idle.</li></ul><p>Separate groups receive independent copies of the topic history. A fraud detector
+and a search indexer should therefore use different group IDs.</p><p>Membership or subscription changes update assignments. Cooperative assignors reduce
+partition movement, while static membership can avoid unnecessary reassignment
+during short restarts. Applications must still stop work for revoked partitions and
+commit only completed offsets.</p><p>Inspect assignments and lag with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>bin/kafka-consumer-groups.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --describe --group order-indexer</span></span></code></pre></div></div></div><p>Lag is <code>log-end-offset - committed-offset</code>. It measures uncommitted distance, not
+processing latency. A low-volume partition can have small lag while its oldest
+unprocessed record is old, so monitor both record lag and time-based service
+objectives.</p><p><code>max.poll.interval.ms</code> limits the time between calls to <code>poll</code>. Processing a large
+batch synchronously can exceed this interval and remove the consumer from the group.
+Bound the batch with <code>max.poll.records</code>, increase the interval for legitimate slow
+work, or move work to executors while pausing partitions and committing only
+contiguous completed offsets.</p><h2 id=delivery-semantics>Delivery Semantics
+<a href=#delivery-semantics class=heading-anchor><span>#</span></a></h2><p>Kafka applications can implement three outcomes:</p><ul><li><strong>At most once:</strong> advance or commit before processing, accepting loss after a
+failure.</li><li><strong>At least once:</strong> process before committing, accepting replay and duplicates.</li><li><strong>Exactly-once Kafka processing:</strong> atomically commit produced records and consumed
+offsets with Kafka transactions.</li></ul><p>Kafka transactions do not make database writes, emails, or HTTP calls atomic.
+External effects require idempotency keys, an outbox/inbox design, deduplication, or
+another coordination protocol.</p><h3 id=transactional-consume-transform-produce>Transactional Consume-Transform-Produce
+<a href=#transactional-consume-transform-produce class=heading-anchor><span>#</span></a></h3><p>Each live producer instance needs a stable, unique <code>transactional.id</code>. Reusing one
+ID concurrently fences the older producer, which prevents two instances from
+committing as the same transaction owner.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.time.Duration;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.HashMap;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.ConsumerConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.KafkaConsumer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.OffsetAndMetadata;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.KafkaProducer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.ProducerConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.ProducerRecord;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.KafkaException;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.TopicPartition;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.errors.ProducerFencedException;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.StringDeserializer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.StringSerializer;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties consumerConfig <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>GROUP_ID_CONFIG</span>, <span style=color:#e6db74>&#34;order-normalizer&#34;</span>);
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>ENABLE_AUTO_COMMIT_CONFIG</span>, <span style=color:#66d9ef>false</span>);
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>ISOLATION_LEVEL_CONFIG</span>, <span style=color:#e6db74>&#34;read_committed&#34;</span>);
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>KEY_DESERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringDeserializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>VALUE_DESERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringDeserializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties producerConfig <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>producerConfig.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>producerConfig.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>TRANSACTIONAL_ID_CONFIG</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;order-normalizer-instance-1&#34;</span>);
+</span></span><span style=display:flex><span>producerConfig.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>KEY_SERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringSerializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>producerConfig.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>VALUE_SERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringSerializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (KafkaConsumer<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> consumer <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>         <span style=color:#66d9ef>new</span> KafkaConsumer<span style=color:#f92672>&lt;&gt;</span>(consumerConfig);
+</span></span><span style=display:flex><span>     KafkaProducer<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> producer <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>         <span style=color:#66d9ef>new</span> KafkaProducer<span style=color:#f92672>&lt;&gt;</span>(producerConfig)) {
+</span></span><span style=display:flex><span>    consumer.<span style=color:#a6e22e>subscribe</span>(List.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;orders&#34;</span>));
+</span></span><span style=display:flex><span>    producer.<span style=color:#a6e22e>initTransactions</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>while</span> (<span style=color:#66d9ef>true</span>) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> records <span style=color:#f92672>=</span> consumer.<span style=color:#a6e22e>poll</span>(Duration.<span style=color:#a6e22e>ofSeconds</span>(1));
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (records.<span style=color:#a6e22e>isEmpty</span>()) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>continue</span>;
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>            producer.<span style=color:#a6e22e>beginTransaction</span>();
+</span></span><span style=display:flex><span>            Map<span style=color:#f92672>&lt;</span>TopicPartition, OffsetAndMetadata<span style=color:#f92672>&gt;</span> offsets <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> HashMap<span style=color:#f92672>&lt;&gt;</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> record : records) {
+</span></span><span style=display:flex><span>                producer.<span style=color:#a6e22e>send</span>(<span style=color:#66d9ef>new</span> ProducerRecord<span style=color:#f92672>&lt;&gt;</span>(
+</span></span><span style=display:flex><span>                    <span style=color:#e6db74>&#34;normalized-orders&#34;</span>, record.<span style=color:#a6e22e>key</span>(),
+</span></span><span style=display:flex><span>                    normalize(record.<span style=color:#a6e22e>value</span>())));
+</span></span><span style=display:flex><span>                offsets.<span style=color:#a6e22e>put</span>(
+</span></span><span style=display:flex><span>                    <span style=color:#66d9ef>new</span> TopicPartition(record.<span style=color:#a6e22e>topic</span>(), record.<span style=color:#a6e22e>partition</span>()),
+</span></span><span style=display:flex><span>                    <span style=color:#66d9ef>new</span> OffsetAndMetadata(record.<span style=color:#a6e22e>offset</span>() <span style=color:#f92672>+</span> 1)
+</span></span><span style=display:flex><span>                );
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>            producer.<span style=color:#a6e22e>sendOffsetsToTransaction</span>(
+</span></span><span style=display:flex><span>                offsets, consumer.<span style=color:#a6e22e>groupMetadata</span>());
+</span></span><span style=display:flex><span>            producer.<span style=color:#a6e22e>commitTransaction</span>();
+</span></span><span style=display:flex><span>        } <span style=color:#66d9ef>catch</span> (ProducerFencedException fatal) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> fatal;
+</span></span><span style=display:flex><span>        } <span style=color:#66d9ef>catch</span> (KafkaException retryableBatchFailure) {
+</span></span><span style=display:flex><span>            producer.<span style=color:#a6e22e>abortTransaction</span>();
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Consumers that must hide aborted records use <code>isolation.level=read_committed</code>.
+Transactions increase coordination and latency, so use them when atomic Kafka
+read-process-write behavior is required rather than as a default substitute for
+idempotent processing.</p><h2 id=kafka-streams>Kafka Streams
+<a href=#kafka-streams class=heading-anchor><span>#</span></a></h2><p>Kafka Streams is an embeddable Java library, not a separate cluster service. Each
+application instance joins a consumer group, partitions work into tasks, and stores
+local state backed by changelog topics.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.Serdes;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.streams.KafkaStreams;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.streams.StreamsBuilder;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.streams.StreamsConfig;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties config <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>APPLICATION_ID_CONFIG</span>, <span style=color:#e6db74>&#34;paid-order-counts&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>DEFAULT_KEY_SERDE_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    Serdes.<span style=color:#a6e22e>String</span>().<span style=color:#a6e22e>getClass</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>DEFAULT_VALUE_SERDE_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    Serdes.<span style=color:#a6e22e>String</span>().<span style=color:#a6e22e>getClass</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>PROCESSING_GUARANTEE_CONFIG</span>, <span style=color:#e6db74>&#34;exactly_once_v2&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>StreamsBuilder builder <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StreamsBuilder();
+</span></span><span style=display:flex><span>builder.<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span>stream(<span style=color:#e6db74>&#34;orders&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>filter</span>((customerId, json) <span style=color:#f92672>-&gt;</span> json.<span style=color:#a6e22e>contains</span>(<span style=color:#e6db74>&#34;\&#34;status\&#34;:\&#34;PAID\&#34;&#34;</span>))
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>groupByKey</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>count</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>toStream</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>to</span>(<span style=color:#e6db74>&#34;paid-orders-per-customer&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>KafkaStreams streams <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> KafkaStreams(builder.<span style=color:#a6e22e>build</span>(), config);
+</span></span><span style=display:flex><span>Runtime.<span style=color:#a6e22e>getRuntime</span>().<span style=color:#a6e22e>addShutdownHook</span>(<span style=color:#66d9ef>new</span> Thread(streams::close));
+</span></span><span style=display:flex><span>streams.<span style=color:#a6e22e>start</span>();</span></span></code></pre></div></div></div><p>Changing <code>application.id</code> creates a new processing identity with different consumer
+groups, internal topics, and state directories. Treat it as persistent application
+state rather than a display name.</p><h2 id=kafka-connect-and-replication>Kafka Connect and Replication
+<a href=#kafka-connect-and-replication class=heading-anchor><span>#</span></a></h2><p>Kafka Connect runs reusable source and sink connectors. Source connectors import
+records from external systems; sink connectors export Kafka records. Distributed
+workers store connector configuration, offsets, and status in Kafka topics and
+rebalance connector tasks across workers.</p><p>Connect simplifies standard integration but does not remove the need to define:</p><ul><li>record keys and partitioning;</li><li>schema compatibility;</li><li>delete and tombstone semantics;</li><li>retry and dead-letter behavior;</li><li>destination idempotency; and</li><li>credentials and network boundaries.</li></ul><p>MirrorMaker 2 uses Connect to replicate topics between Kafka clusters. Replication
+is asynchronous and does not turn two clusters into one synchronous consensus
+system. Disaster-recovery procedures must account for replication lag, consumer
+offset translation, topic configuration, and failback.</p><h2 id=schemas-and-evolution>Schemas and Evolution
+<a href=#schemas-and-evolution class=heading-anchor><span>#</span></a></h2><p>Kafka stores bytes and does not enforce an application schema. Avro, Protobuf, JSON
+Schema, or another encoding can define record structure. A schema registry can
+associate schema IDs with payloads and reject incompatible changes.</p><p>Compatibility rules should reflect how data is replayed:</p><ul><li>new consumers may encounter old records retained for months;</li><li>old consumers may remain deployed while producers change;</li><li>compacted topics can preserve old values indefinitely; and</li><li>restoration from an archive can reintroduce older schemas.</li></ul><p>Adding an optional field with a defined default is easier to evolve than changing a
+field&rsquo;s meaning or reusing its name. Event names and field semantics form a
+long-lived contract even when the serialization format permits a mechanical change.</p><h2 id=security>Security
+<a href=#security class=heading-anchor><span>#</span></a></h2><p>Kafka separates transport security, authentication, and authorization:</p><ul><li>TLS encrypts traffic and authenticates brokers to clients.</li><li>mTLS or SASL mechanisms authenticate clients.</li><li>ACLs authorize operations on topics, groups, transactional IDs, and cluster
+resources.</li></ul><p>A TLS client configuration can be supplied through properties:</p><div class=jose-wrapper><div class=jose-tools><span>properties</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-properties data-lang=properties><span style=display:flex><span><span style=color:#a6e22e>security.protocol</span><span style=color:#f92672>=</span><span style=color:#e6db74>SSL</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.truststore.location</span><span style=color:#f92672>=</span><span style=color:#e6db74>/run/secrets/kafka.truststore.p12</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.truststore.password</span><span style=color:#f92672>=</span><span style=color:#e6db74>${TRUSTSTORE_PASSWORD}</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.keystore.location</span><span style=color:#f92672>=</span><span style=color:#e6db74>/run/secrets/client.keystore.p12</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.keystore.password</span><span style=color:#f92672>=</span><span style=color:#e6db74>${KEYSTORE_PASSWORD}</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.key.password</span><span style=color:#f92672>=</span><span style=color:#e6db74>${KEY_PASSWORD}</span></span></span></code></pre></div></div></div><p>Do not place real passwords in committed property files. Inject them through the
+deployment platform&rsquo;s secret mechanism and restrict filesystem access.</p><h2 id=partition-and-capacity-planning>Partition and Capacity Planning
+<a href=#partition-and-capacity-planning class=heading-anchor><span>#</span></a></h2><p>Partition count bounds consumer-group parallelism, but more partitions are not free.
+Each partition adds metadata, open files, replica fetch work, elections, and recovery
+traffic. Estimate a starting count from:</p><ol><li>peak ingress and egress throughput;</li><li>maximum useful consumer concurrency;</li><li>per-broker network and disk throughput;</li><li>key skew;</li><li>replication and recovery objectives; and</li><li>expected growth before repartitioning is acceptable.</li></ol><p>Retention capacity is approximately:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ingress bytes/second × retention seconds × replication factor</span></span></code></pre></div></div></div><p>Add headroom for segment granularity, indexes, compaction, temporary imbalance,
+reassignment, and broker recovery. A cluster that serves steady-state traffic but
+cannot rebuild a failed broker within its recovery objective is underprovisioned.</p><h2 id=operations-and-failure-diagnosis>Operations and Failure Diagnosis
+<a href=#operations-and-failure-diagnosis class=heading-anchor><span>#</span></a></h2><p>Monitor at least:</p><ul><li>offline and under-replicated partitions;</li><li>controller and broker availability;</li><li>produce and fetch latency and error rates;</li><li>request-handler and network-thread saturation;</li><li>disk use and disk latency;</li><li>replica fetch lag;</li><li>consumer offset lag and record age;</li><li>transaction and authentication failures; and</li><li>partition imbalance and reassignment progress.</li></ul><p>Useful diagnosis commands include:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># Observe records without joining an application consumer group.</span>
+</span></span><span style=display:flex><span>bin/kafka-console-consumer.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --topic orders --from-beginning <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --property print.key<span style=color:#f92672>=</span>true --property print.offset<span style=color:#f92672>=</span>true
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Inspect one group&#39;s committed offsets and lag.</span>
+</span></span><span style=display:flex><span>bin/kafka-consumer-groups.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --group order-indexer --describe
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Read broker API compatibility information.</span>
+</span></span><span style=display:flex><span>bin/kafka-broker-api-versions.sh --bootstrap-server broker:9092</span></span></code></pre></div></div></div><p>An unavailable leader, insufficient in-sync replicas, unreachable advertised
+listener, authorization failure, and overloaded broker can all appear to an
+application as a send timeout. Correlate client exceptions with broker metrics,
+partition state, and controller events before changing retry limits.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://kafka.apache.org/documentation/>Apache Kafka Documentation</a></li><li><a href=https://kafka.apache.org/protocol>Kafka Protocol</a></li><li><a href=https://kafka.apache.org/documentation/#api>Kafka Java API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/apache-kafka/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

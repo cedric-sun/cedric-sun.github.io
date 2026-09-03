@@ -1,0 +1,477 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>AgentScope</title></head><body><main><article><div class=article-header><h1>AgentScope</h1><div class=aux>Last update: 2023-05-05 11:54:52 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ai/>Ai</a>
+|
+<a href=/tags/agents/>Agents</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spring-boot/>Spring-Boot</a>
+|
+<a href=/tags/llm/>Llm</a></div></div><div class=article-content><p><a href=https://github.com/agentscope-ai/agentscope>AgentScope</a> is an open-source
+framework for building and operating applications in which a large language
+model can reason, call tools, retain state, and collaborate with users or other
+agents. It was initiated by Alibaba and is available as separate Python and
+Java projects.</p><p>An ordinary model call has a short, application-controlled path:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>application -&gt; prompt -&gt; model -&gt; response</span></span></code></pre></div></div></div><p>An agent adds an execution loop:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>user goal
+</span></span><span style=display:flex><span>   |
+</span></span><span style=display:flex><span>   v
+</span></span><span style=display:flex><span>model reasons -&gt; chooses a tool -&gt; application executes it
+</span></span><span style=display:flex><span>      ^                                  |
+</span></span><span style=display:flex><span>      +----------- tool result &lt;---------+
+</span></span><span style=display:flex><span>   |
+</span></span><span style=display:flex><span>   v
+</span></span><span style=display:flex><span>final answer, interruption, or next action</span></span></code></pre></div></div></div><p>The model still does not execute Java or Python functions by itself. It emits a
+structured request, and AgentScope validates and dispatches that request
+through its tool system. The framework also manages the messages, event stream,
+permissions, session state, and repeated model calls around that loop.</p><p>This article describes AgentScope 2.0 and focuses on
+<a href=https://github.com/agentscope-ai/agentscope-java>AgentScope Java</a> 2.0.0.
+AgentScope evolves quickly, and examples for its earlier 1.x APIs may not work
+unchanged.</p><h2 id=python-and-java-are-separate-implementations>Python and Java Are Separate Implementations
+<a href=#python-and-java-are-separate-implementations class=heading-anchor><span>#</span></a></h2><p>The name AgentScope refers to an ecosystem rather than one library that runs
+unchanged in every language.</p><p>The <a href=https://docs.agentscope.io/>Python project</a> requires Python 3.11 or later.
+It provides an asynchronous agent framework, event system, tool and resource
+permissions, middleware, workspaces, sandbox integrations, multi-session
+services, and multi-agent teams.</p><p><a href=https://java.agentscope.io/>AgentScope Java</a> is a native JVM implementation
+requiring JDK 17 or later. It uses Project Reactor for its nonblocking execution
+API and provides Java-native models, tools, messages, events, state stores,
+middleware, permissions, workspaces, sandboxes, and distributed deployment
+components.</p><p>The two implementations share design ideas, but they do not share in-process
+objects or source-compatible APIs. A Java application has two sensible
+integration choices:</p><ol><li>Embed AgentScope Java directly in the JVM.</li><li>Run a Python AgentScope application as a service and call it over a
+versioned network API or an agent protocol such as A2A.</li></ol><p>Do not start a Python interpreter for every request or try to serialize a live
+Python agent into Java. Process boundaries require an explicit service
+contract, authentication, timeout behavior, and session ownership.</p><h2 id=core-concepts>Core Concepts
+<a href=#core-concepts class=heading-anchor><span>#</span></a></h2><h3 id=messages-and-content>Messages and Content
+<a href=#messages-and-content class=heading-anchor><span>#</span></a></h3><p>Messages carry input and output through an agent. AgentScope Java represents
+user input with <code>UserMessage</code> and supports typed content blocks for text,
+images, files, audio, video, tool calls, and tool results.</p><p>Role validation is important. A model response, a user instruction, and a tool
+result have different trust levels and should not be flattened into one
+unstructured prompt.</p><h3 id=models>Models
+<a href=#models class=heading-anchor><span>#</span></a></h3><p>The model layer provides a common chat-model contract with provider-specific
+extensions. AgentScope Java 2.0 includes modules for providers such as:</p><ul><li>Alibaba DashScope and Qwen;</li><li>OpenAI and OpenAI-compatible endpoints;</li><li>Anthropic Claude;</li><li>Google Gemini;</li><li>Ollama; and</li><li>other providers exposed through supported extensions.</li></ul><p>The abstraction makes models replaceable at the Java API boundary, but models
+are not behaviorally identical. Tool-calling quality, structured output,
+multimodal support, context limits, reasoning controls, and streaming semantics
+still depend on the selected model.</p><h3 id=tools-and-toolkits>Tools and Toolkits
+<a href=#tools-and-toolkits class=heading-anchor><span>#</span></a></h3><p>A tool is a capability the model may request. AgentScope generates a JSON
+schema from the tool definition, sends that schema to the model, parses the
+model&rsquo;s tool request, and invokes the Java implementation.</p><p>A <code>Toolkit</code> groups the tools available to an agent. Restricting a toolkit is
+one of the most important security controls: if an agent cannot see a tool, it
+cannot ask the framework to call it.</p><p>Tool descriptions are operational instructions for the model. They should say
+what an operation does, what its arguments mean, and whether it has external or
+irreversible effects. Vague descriptions lead to incorrect calls.</p><h3 id=the-react-loop>The ReAct Loop
+<a href=#the-react-loop class=heading-anchor><span>#</span></a></h3><p><code>ReActAgent</code> is AgentScope Java&rsquo;s basic reasoning-and-acting agent. During one
+run it repeatedly:</p><ol><li>builds model context from the system prompt, messages, and available tools;</li><li>calls the model;</li><li>emits typed events;</li><li>executes requested tools when permitted;</li><li>adds tool results to the context; and</li><li>continues until it produces a final result or reaches a stopping condition.</li></ol><p>Use <code>ReActAgent</code> when the application needs a focused conversational or
+tool-calling loop and controls most surrounding infrastructure itself.</p><h3 id=harnessagent>HarnessAgent
+<a href=#harnessagent class=heading-anchor><span>#</span></a></h3><p><code>HarnessAgent</code> builds on the same reasoning core for long-running, open-ended
+work. Its harness can add:</p><ul><li>a workspace and file-system abstraction;</li><li>context compaction;</li><li>layered memory;</li><li>reusable skills;</li><li>planning;</li><li>subagents;</li><li>sandboxed execution; and</li><li>persistent state and recovery.</li></ul><p>A customer-support assistant that calls three business services may need only
+<code>ReActAgent</code>. A coding agent that explores a repository for an hour, edits
+files, delegates review, and survives a restart benefits from <code>HarnessAgent</code>.
+More autonomy also creates more risk, so the larger harness should not be the
+default merely because it offers more features.</p><h3 id=events>Events
+<a href=#events class=heading-anchor><span>#</span></a></h3><p>Agent execution produces a typed event stream. Events cover text deltas, model
+calls, tool calls, results, confirmation requests, errors, and the final
+result. A web UI can therefore display progress without scraping log text.</p><p>The event stream is also the right place to connect observability and audit
+logic. A production application usually records tool name, duration, outcome,
+model usage, session, and authenticated subject while redacting message and
+tool content that may contain secrets.</p><h3 id=runtime-context-and-state>Runtime Context and State
+<a href=#runtime-context-and-state class=heading-anchor><span>#</span></a></h3><p><code>RuntimeContext</code> identifies one invocation. It can carry <code>userId</code>, <code>sessionId</code>,
+and typed application objects. A Java tool can receive such an object without
+exposing it in the JSON schema sent to the model.</p><p>This distinction prevents a serious authorization mistake. The model may
+supply an <code>orderId</code>, but it must not supply the trusted <code>tenantId</code> or user
+identity used to authorize that order. The application obtains identity from
+Spring Security and injects it through <code>RuntimeContext</code>.</p><p>Conversation history and other recoverable state belong in an
+<code>AgentStateStore</code>. Local JSON storage is useful for development. A
+multi-replica deployment needs shared storage, such as a supported Redis or
+relational database implementation, so another replica can resume the same
+session.</p><h2 id=a-minimal-python-agent>A Minimal Python Agent
+<a href=#a-minimal-python-agent class=heading-anchor><span>#</span></a></h2><p>Install the Python framework with:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>pip install agentscope</span></span></code></pre></div></div></div><p>AgentScope Python 2.0 uses asynchronous APIs. A minimal agent looks like this:</p><div class=jose-wrapper><div class=jose-tools><span>python</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> asyncio
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> os
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> agentscope.agent <span style=color:#f92672>import</span> Agent
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> agentscope.credential <span style=color:#f92672>import</span> DashScopeCredential
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> agentscope.message <span style=color:#f92672>import</span> UserMsg
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> agentscope.model <span style=color:#f92672>import</span> DashScopeChatModel
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>async</span> <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>main</span>() <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>None</span>:
+</span></span><span style=display:flex><span>    agent <span style=color:#f92672>=</span> Agent(
+</span></span><span style=display:flex><span>        name<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>        system_prompt<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;You are a concise technical assistant.&#34;</span>,
+</span></span><span style=display:flex><span>        model<span style=color:#f92672>=</span>DashScopeChatModel(
+</span></span><span style=display:flex><span>            credential<span style=color:#f92672>=</span>DashScopeCredential(
+</span></span><span style=display:flex><span>                api_key<span style=color:#f92672>=</span>os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#34;DASHSCOPE_API_KEY&#34;</span>],
+</span></span><span style=display:flex><span>            ),
+</span></span><span style=display:flex><span>            model<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;qwen3.6-plus&#34;</span>,
+</span></span><span style=display:flex><span>        ),
+</span></span><span style=display:flex><span>    )
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>for</span> event <span style=color:#f92672>in</span> agent<span style=color:#f92672>.</span>reply_stream(
+</span></span><span style=display:flex><span>        UserMsg(<span style=color:#e6db74>&#34;alice&#34;</span>, <span style=color:#e6db74>&#34;Explain optimistic locking.&#34;</span>),
+</span></span><span style=display:flex><span>    ):
+</span></span><span style=display:flex><span>        print(event)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>asyncio<span style=color:#f92672>.</span>run(main())</span></span></code></pre></div></div></div><p>Real applications normally select events by type, register a deliberately
+limited toolkit, persist session state, and configure permissions before
+exposing the agent to users.</p><h2 id=starting-with-agentscope-java>Starting with AgentScope Java
+<a href=#starting-with-agentscope-java class=heading-anchor><span>#</span></a></h2><h3 id=add-dependencies>Add Dependencies
+<a href=#add-dependencies class=heading-anchor><span>#</span></a></h3><p>AgentScope Java 2.0 requires JDK 17 or later. A basic <code>ReActAgent</code> needs the core
+module and one model-provider extension:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>io.agentscope<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>agentscope-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>2.0.0<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>io.agentscope<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>agentscope-core<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>io.agentscope<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>agentscope-extensions-model-dashscope<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p>Use <code>agentscope-harness</code> instead of, or in addition to, the core dependency
+when the application needs <code>HarnessAgent</code> and its workspace-oriented
+capabilities. Other model extensions include
+<code>agentscope-extensions-model-openai</code>,
+<code>agentscope-extensions-model-anthropic</code>,
+<code>agentscope-extensions-model-gemini</code>, and
+<code>agentscope-extensions-model-ollama</code>.</p><h3 id=create-an-agent>Create an Agent
+<a href=#create-an-agent class=heading-anchor><span>#</span></a></h3><p>The following program uses DashScope. It reads the API key from an environment
+variable rather than source code:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.ReActAgent;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.message.Msg;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.message.UserMessage;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>FirstAgent</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> model <span style=color:#f92672>=</span> DashScopeChatModel.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>apiKey</span>(System.<span style=color:#a6e22e>getenv</span>(<span style=color:#e6db74>&#34;DASHSCOPE_API_KEY&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>modelName</span>(<span style=color:#e6db74>&#34;qwen-plus&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>stream</span>(<span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> agent <span style=color:#f92672>=</span> ReActAgent.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;technical-assistant&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>sysPrompt</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        You are a technical assistant.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Distinguish facts from assumptions.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Ask before performing a destructive operation.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>model</span>(model)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        Msg result <span style=color:#f92672>=</span> agent.<span style=color:#a6e22e>call</span>(
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>new</span> UserMessage(<span style=color:#e6db74>&#34;Explain write skew in two paragraphs.&#34;</span>)
+</span></span><span style=display:flex><span>        ).<span style=color:#a6e22e>block</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(result.<span style=color:#a6e22e>getTextContent</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>AgentScope exposes Reactor types. Calling <code>block()</code> is acceptable in a command
+line program at the outer boundary. A reactive server should return the
+<code>Mono</code> or <code>Flux</code> instead of blocking a request thread.</p><h2 id=adding-java-tools>Adding Java Tools
+<a href=#adding-java-tools class=heading-anchor><span>#</span></a></h2><p>Suppose an application already has an <code>OrderService</code>. The agent adapter should
+delegate to that service rather than duplicate business logic or call the
+application&rsquo;s own REST endpoint:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.tool.Tool;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.tool.ToolParam;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderTools</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderService orders;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>OrderTools</span>(OrderService orders) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>orders</span> <span style=color:#f92672>=</span> orders;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Tool</span>(
+</span></span><span style=display:flex><span>            name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;get_order&#34;</span>,
+</span></span><span style=display:flex><span>            description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Get the current state of an order visible to the caller&#34;</span>,
+</span></span><span style=display:flex><span>            readOnly <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderView <span style=color:#a6e22e>getOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(
+</span></span><span style=display:flex><span>                    name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;order_id&#34;</span>,
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Numeric order ID&#34;</span>)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>long</span> orderId,
+</span></span><span style=display:flex><span>            RequestIdentity identity) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>get</span>(identity.<span style=color:#a6e22e>tenantId</span>(), identity.<span style=color:#a6e22e>userId</span>(), orderId);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Tool</span>(
+</span></span><span style=display:flex><span>            name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;cancel_order&#34;</span>,
+</span></span><span style=display:flex><span>            description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                    Cancel an order that has not shipped. This changes business
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                    state and must be approved by the user before execution.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                    &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderView <span style=color:#a6e22e>cancelOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(
+</span></span><span style=display:flex><span>                    name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;order_id&#34;</span>,
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Numeric order ID&#34;</span>)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>long</span> orderId,
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(
+</span></span><span style=display:flex><span>                    name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;reason&#34;</span>,
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Business reason for cancellation&#34;</span>)
+</span></span><span style=display:flex><span>            String reason,
+</span></span><span style=display:flex><span>            RequestIdentity identity) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>cancel</span>(
+</span></span><span style=display:flex><span>                identity.<span style=color:#a6e22e>tenantId</span>(),
+</span></span><span style=display:flex><span>                identity.<span style=color:#a6e22e>userId</span>(),
+</span></span><span style=display:flex><span>                orderId,
+</span></span><span style=display:flex><span>                reason);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>orderId</code> and <code>reason</code> are annotated with <code>@ToolParam</code>, so the model sees them
+in the tool schema. <code>RequestIdentity</code> is not annotated. AgentScope injects it
+from the per-call <code>RuntimeContext</code>, so the model cannot impersonate another
+tenant by inventing that argument.</p><p>Register the tool object in a toolkit:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Toolkit toolkit <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Toolkit();
+</span></span><span style=display:flex><span>toolkit.<span style=color:#a6e22e>registerTool</span>(<span style=color:#66d9ef>new</span> OrderTools(orderService));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ReActAgent agent <span style=color:#f92672>=</span> ReActAgent.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;order-assistant&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>sysPrompt</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                Help users inspect their orders.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                Never cancel an order without explicit approval.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>model</span>(model)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>toolkit</span>(toolkit)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>Java annotations make simple synchronous tools convenient. For more control
+over permission checks, asynchronous execution, or structured metadata,
+AgentScope Java also provides lower-level tool abstractions.</p><h2 id=integrating-agentscope-java-with-spring-boot>Integrating AgentScope Java with Spring Boot
+<a href=#integrating-agentscope-java-with-spring-boot class=heading-anchor><span>#</span></a></h2><p>AgentScope Java is framework-agnostic, so a Spring Boot application integrates
+it as ordinary Java objects. The recommended boundary is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>REST or WebSocket controller
+</span></span><span style=display:flex><span>        |
+</span></span><span style=display:flex><span>        v
+</span></span><span style=display:flex><span>AgentScope agent factory
+</span></span><span style=display:flex><span>        |
+</span></span><span style=display:flex><span>        +----&gt; model provider
+</span></span><span style=display:flex><span>        +----&gt; application tools ----&gt; existing Spring services
+</span></span><span style=display:flex><span>        +----&gt; shared state store</span></span></code></pre></div></div></div><p>The following example exposes an SSE chat endpoint. It deliberately creates a
+new <code>ReActAgent</code> for each invocation. A <code>ReActAgent</code> instance is not safe for
+concurrent calls, while the model and state store can be shared. The toolkit is
+copied during agent construction.</p><h3 id=configure-shared-components>Configure Shared Components
+<a href=#configure-shared-components class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.ReActAgent;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.state.AgentStateStore;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.state.JsonFileAgentStateStore;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.tool.Toolkit;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.nio.file.Path;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.context.properties.ConfigurationProperties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.context.properties.EnableConfigurationProperties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.context.annotation.Bean;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.context.annotation.Configuration;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@ConfigurationProperties</span>(prefix <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;app.agent&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>AgentProperties</span>(String apiKey, String model) {
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Configuration</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@EnableConfigurationProperties</span>(AgentProperties.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>AgentConfiguration</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>    DashScopeChatModel <span style=color:#a6e22e>agentModel</span>(AgentProperties properties) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> DashScopeChatModel.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>apiKey</span>(properties.<span style=color:#a6e22e>apiKey</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>modelName</span>(properties.<span style=color:#a6e22e>model</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>stream</span>(<span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>    AgentStateStore <span style=color:#a6e22e>agentStateStore</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> JsonFileAgentStateStore(
+</span></span><span style=display:flex><span>                Path.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;.agentscope&#34;</span>, <span style=color:#e6db74>&#34;sessions&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>    Toolkit <span style=color:#a6e22e>orderToolkit</span>(OrderService orders) {
+</span></span><span style=display:flex><span>        Toolkit toolkit <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Toolkit();
+</span></span><span style=display:flex><span>        toolkit.<span style=color:#a6e22e>registerTool</span>(<span style=color:#66d9ef>new</span> OrderTools(orders));
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> toolkit;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>    OrderAgentFactory <span style=color:#a6e22e>orderAgentFactory</span>(
+</span></span><span style=display:flex><span>            DashScopeChatModel model,
+</span></span><span style=display:flex><span>            AgentStateStore stateStore,
+</span></span><span style=display:flex><span>            Toolkit orderToolkit) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> OrderAgentFactory(model, stateStore, orderToolkit);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Configure nonsecret values normally and supply the API key through a secret
+manager or environment variable:</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>app</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>agent</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>model</span>: <span style=color:#ae81ff>qwen-plus</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>api-key</span>: <span style=color:#ae81ff>${DASHSCOPE_API_KEY}</span></span></span></code></pre></div></div></div><p>Do not expose model credentials to the browser.</p><p>The factory creates an isolated agent run while reusing safe infrastructure:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>record</span> <span style=color:#a6e22e>OrderAgentFactory</span>(
+</span></span><span style=display:flex><span>        DashScopeChatModel model,
+</span></span><span style=display:flex><span>        AgentStateStore stateStore,
+</span></span><span style=display:flex><span>        Toolkit toolkit) {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReActAgent <span style=color:#a6e22e>create</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> ReActAgent.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;order-assistant&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>sysPrompt</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Help the authenticated user inspect orders.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Use tools for current order data.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Never claim that a mutation succeeded unless its tool
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        returned a successful result.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>model</span>(model)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>stateStore</span>(stateStore)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>toolkit</span>(toolkit)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>For local development, <code>JsonFileAgentStateStore</code> is sufficient. Replace it
+with a supported shared state store before running multiple application
+replicas. A local directory inside a container is not durable session storage.</p><h3 id=expose-an-sse-endpoint>Expose an SSE Endpoint
+<a href=#expose-an-sse-endpoint class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.agent.RuntimeContext;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.event.TextBlockDeltaEvent;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.message.UserMessage;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.security.Principal;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.http.MediaType;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.PostMapping;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RequestBody;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RequestMapping;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RestController;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> reactor.core.publisher.Flux;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>ChatRequest</span>(String sessionId, String message) {
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>RequestIdentity</span>(String tenantId, String userId) {
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RestController</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RequestMapping</span>(<span style=color:#e6db74>&#34;/api/assistant&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>AgentController</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderAgentFactory agents;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> TenantResolver tenants;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    AgentController(OrderAgentFactory agents, TenantResolver tenants) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>agents</span> <span style=color:#f92672>=</span> agents;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>tenants</span> <span style=color:#f92672>=</span> tenants;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@PostMapping</span>(
+</span></span><span style=display:flex><span>            path <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;/messages&#34;</span>,
+</span></span><span style=display:flex><span>            produces <span style=color:#f92672>=</span> MediaType.<span style=color:#a6e22e>TEXT_EVENT_STREAM_VALUE</span>)
+</span></span><span style=display:flex><span>    Flux<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>chat</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@RequestBody</span> ChatRequest request,
+</span></span><span style=display:flex><span>            Principal principal) {
+</span></span><span style=display:flex><span>        String userId <span style=color:#f92672>=</span> principal.<span style=color:#a6e22e>getName</span>();
+</span></span><span style=display:flex><span>        String tenantId <span style=color:#f92672>=</span> tenants.<span style=color:#a6e22e>currentTenant</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        RuntimeContext context <span style=color:#f92672>=</span> RuntimeContext.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>userId</span>(userId)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>sessionId</span>(request.<span style=color:#a6e22e>sessionId</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>put</span>(
+</span></span><span style=display:flex><span>                        RequestIdentity.<span style=color:#a6e22e>class</span>,
+</span></span><span style=display:flex><span>                        <span style=color:#66d9ef>new</span> RequestIdentity(tenantId, userId))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> agents.<span style=color:#a6e22e>create</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>streamEvents</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#66d9ef>new</span> UserMessage(request.<span style=color:#a6e22e>message</span>()),
+</span></span><span style=display:flex><span>                        context)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>filter</span>(TextBlockDeltaEvent.<span style=color:#a6e22e>class</span>::isInstance)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>cast</span>(TextBlockDeltaEvent.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>map</span>(TextBlockDeltaEvent::getDelta);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The application must verify that the submitted session belongs to the
+authenticated user. In many systems the server should issue an opaque session
+ID and store its ownership rather than accept arbitrary client-generated IDs.
+Using the same <code>sessionId</code> for two users risks conversation disclosure even
+when <code>RuntimeContext.userId</code> differs, depending on how the selected store is
+partitioned.</p><p>Streaming only text deltas is convenient for a simple UI, but a richer API
+should preserve event types. The browser may need to distinguish model text,
+tool progress, approval requests, recoverable errors, and final completion.
+AG-UI or an application-specific event envelope is more expressive than a
+plain stream of strings.</p><h3 id=handle-blocking-tools>Handle Blocking Tools
+<a href=#handle-blocking-tools class=heading-anchor><span>#</span></a></h3><p>The agent API is reactive, but an annotated tool may call a blocking database
+driver or legacy HTTP client. Reactive types do not make that operation
+nonblocking. Either:</p><ul><li>use nonblocking dependencies and asynchronous tool APIs;</li><li>schedule blocking work on a bounded worker pool; or</li><li>use a conventional request model with explicitly bounded concurrency.</li></ul><p>Never run unbounded blocking work on Reactor&rsquo;s event-loop threads. Also set
+timeouts independently for model calls, tool calls, and the overall agent run.
+An agent can make several model and tool calls, so its total latency is larger
+than one model request.</p><h2 id=permissions-and-human-approval>Permissions and Human Approval
+<a href=#permissions-and-human-approval class=heading-anchor><span>#</span></a></h2><p>Prompt instructions such as “ask before deleting” are useful but are not
+enforcement. A model can misunderstand them, retrieved content can attempt
+prompt injection, and future prompt edits can weaken them.</p><p>AgentScope Java&rsquo;s permission engine can classify tool calls as:</p><ul><li><strong>allow</strong>: execute without interruption;</li><li><strong>ask</strong>: pause and request a user decision; or</li><li><strong>deny</strong>: reject the operation.</li></ul><p>When a call requires approval, the agent emits or returns confirmation state.
+The application displays the exact operation and arguments, records the user&rsquo;s
+decision, and resumes the run with that decision. In a headless environment,
+operations requiring approval should default to denial rather than silently
+becoming allowed.</p><p>Permission rules complement normal application authorization:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>permission rule:
+</span></span><span style=display:flex><span>  Is this category of tool allowed in this agent flow?
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>OrderService authorization:
+</span></span><span style=display:flex><span>  May this authenticated user cancel this specific order?</span></span></code></pre></div></div></div><p>Both checks are required. A permission rule cannot replace tenant checks,
+ownership checks, transaction invariants, or database constraints.</p><h2 id=memory-workspaces-and-sandboxes>Memory, Workspaces, and Sandboxes
+<a href=#memory-workspaces-and-sandboxes class=heading-anchor><span>#</span></a></h2><p>These concepts solve different problems:</p><p><strong>Conversation state</strong> preserves the messages and agent state needed to
+continue a session.</p><p><strong>Long-term memory</strong> stores selected facts or summaries across conversations.
+It should have retention, correction, deletion, and tenant-isolation policies.
+Saving every model utterance forever is not a memory strategy.</p><p><strong>Workspace</strong> gives a harness a persistent area for plans, artifacts, skills,
+and large tool results. Treat workspace files as untrusted input when their
+contents can be influenced by users or tools.</p><p><strong>Sandbox</strong> isolates code and command execution. A local subprocess is not a
+strong security boundary merely because it has a different process ID.
+Production execution of model-generated commands should use an appropriately
+hardened container, Kubernetes, or supported remote sandbox with resource and
+network restrictions.</p><h2 id=multi-agent-systems>Multi-Agent Systems
+<a href=#multi-agent-systems class=heading-anchor><span>#</span></a></h2><p>AgentScope supports agent teams and subagents, but multiple agents are not
+automatically better than one. They add model calls, state transitions,
+failure modes, and coordination cost.</p><p>Use a subagent when the work has a genuine boundary, such as:</p><ul><li>a different tool and permission set;</li><li>a specialized context or system prompt;</li><li>independent parallel research;</li><li>a separately recoverable long-running task; or</li><li>a trust boundary requiring isolation.</li></ul><p>Use ordinary Java methods or workflow code for deterministic sequencing.
+Having one model ask another model to add two numbers is slower and less
+reliable than calling a function.</p><p>For communication between independently deployed agents, use a service
+contract. <a href=/a2a-protocol/>A2A</a> is intended for agent-to-agent discovery,
+messages, tasks, and artifacts. <a href=/mcp/>MCP</a> connects an agent to tools and
+resources; it is not the same as delegating a goal to an autonomous remote
+agent.</p><h2 id=integrating-with-a-python-agentscope-service>Integrating with a Python AgentScope Service
+<a href=#integrating-with-a-python-agentscope-service class=heading-anchor><span>#</span></a></h2><p>An organization may already operate an agent written with AgentScope Python.
+A Java service should treat it as a remote system:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Spring Boot service
+</span></span><span style=display:flex><span>    -&gt; authenticated HTTP, A2A, or messaging contract
+</span></span><span style=display:flex><span>    -&gt; Python AgentScope service
+</span></span><span style=display:flex><span>    -&gt; model and tools</span></span></code></pre></div></div></div><p>Define:</p><ul><li>request, event, and artifact schemas;</li><li>the protocol and version;</li><li>authentication and tenant propagation;</li><li>who creates and owns session IDs;</li><li>idempotency behavior;</li><li>streaming and reconnection behavior;</li><li>cancellation and timeout semantics; and</li><li>error mapping.</li></ul><p>Generate a Java HTTP client from an OpenAPI contract when the Python service
+offers a conventional REST API. Use A2A when the remote component is an
+independent agent with long-running tasks and multi-turn negotiation. Keep the
+Java service unaware of Python implementation classes.</p><p>The embedded Java and remote Python approaches can coexist. For example, a
+Spring Boot order agent can use local Java tools for low-latency business
+operations and delegate a specialized document-analysis task to a Python agent
+over A2A.</p><h2 id=agentscope-java-and-spring-ai>AgentScope Java and Spring AI
+<a href=#agentscope-java-and-spring-ai class=heading-anchor><span>#</span></a></h2><p><a href=/spring-ai/>Spring AI</a> and AgentScope Java overlap, but their centers of
+gravity differ.</p><p>Spring AI is Spring-native infrastructure for portable model APIs,
+<code>ChatClient</code>, Advisors, retrieval augmented generation, vector stores,
+structured output, tools, observability, and MCP. It is a natural choice when
+an application primarily needs model features inside an existing Spring
+architecture.</p><p>AgentScope Java focuses on the agent execution runtime: repeated reasoning and
+acting, typed lifecycle events, permissions, interruptions, harness
+workspaces, subagents, resumable sessions, and distributed agent operation.</p><p>Choose based on the application&rsquo;s dominant problem:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Requirement</th><th>Likely Starting Point</th></tr></thead><tbody><tr><td>Add chat, RAG, or tool calling to a Spring service</td><td>Spring AI</td></tr><tr><td>Run long-lived, interruptible, tool-using agents</td><td>AgentScope Java</td></tr><tr><td>Publish tools to multiple AI hosts</td><td>MCP server</td></tr><tr><td>Collaborate with an independently deployed agent</td><td>A2A</td></tr></tbody></table></div></div><p>The libraries&rsquo; model, message, and tool interfaces are not interchangeable.
+Avoid writing an adapter merely to mix frameworks in one reasoning loop.
+Integration is cleaner at a stable boundary: shared Spring business services,
+MCP tools, A2A, or an application API.</p><h2 id=production-checklist>Production Checklist
+<a href=#production-checklist class=heading-anchor><span>#</span></a></h2><p>Before exposing an AgentScope application to real users:</p><ol><li>Authenticate every entry point and derive identity from trusted context.</li><li>Partition sessions, state, memory, workspaces, and caches by tenant and
+user.</li><li>Give each agent only the tools required for its role.</li><li>Enforce authorization inside business services, not only in prompts.</li><li>Require explicit approval for financial, destructive, or external actions.</li><li>Sandbox model-generated code and restrict its file-system and network
+access.</li><li>Bound model turns, tool calls, tokens, execution time, result size, and
+concurrency.</li><li>Make state-changing tools idempotent where retries are possible.</li><li>Store resumable state in shared storage before scaling to multiple replicas.</li><li>Trace model and tool events while redacting secrets and personal data.</li><li>Evaluate complete trajectories, not only the final prose answer.</li><li>Test cancellation, model failure, tool timeout, restart, and duplicate
+delivery paths.</li></ol><p>An agent framework supplies execution machinery. It does not decide which
+actions are safe, which data a user may access, or whether a model&rsquo;s answer is
+correct. Those remain application and operational responsibilities.</p><h2 id=further-reading>Further Reading
+<a href=#further-reading class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.agentscope.io/>AgentScope Python documentation</a></li><li><a href=https://github.com/agentscope-ai/agentscope>AgentScope Python repository</a></li><li><a href=https://java.agentscope.io/>AgentScope Java documentation</a></li><li><a href=https://github.com/agentscope-ai/agentscope-java>AgentScope Java repository</a></li><li><a href=/spring-ai/>Spring AI</a></li><li><a href=/mcp/>Model Context Protocol</a></li><li><a href=/a2a-protocol/>Agent2Agent Protocol</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/agentscope/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

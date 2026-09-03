@@ -1,0 +1,79 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Git Internals and History Editing</title></head><body><main><article><div class=article-header><h1>Git Internals and History Editing</h1><div class=aux>Last update: 2024-03-07 13:17:55 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/git/>Git</a>
+|
+<a href=/tags/version-control/>Version-Control</a></div></div><div class=article-content><p>Git stores immutable objects and moves small references between them. Daily
+work should use porcelain commands, while the storage model explains why
+rewrites create new history and why recovery remains possible for a period.</p><h2 id=inspect-the-repository-database>Inspect the Repository Database
+<a href=#inspect-the-repository-database class=heading-anchor><span>#</span></a></h2><p>The <code>.git</code> directory contains repository-local state:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Path</th><th>Purpose</th></tr></thead><tbody><tr><td><code>HEAD</code></td><td>Symbolic name of the checked-out branch, or a detached object ID</td></tr><tr><td><code>config</code></td><td>Repository configuration</td></tr><tr><td><code>index</code></td><td>Proposed snapshot for the next commit</td></tr><tr><td><code>objects/</code></td><td>Loose objects and packfiles</td></tr><tr><td><code>refs/</code> and <code>packed-refs</code></td><td>Branch, tag, and remote-tracking names</td></tr><tr><td><code>logs/</code></td><td>Local reflogs for references</td></tr><tr><td><code>hooks/</code></td><td>Client-side hook samples and installed hooks</td></tr><tr><td><code>modules/</code></td><td>Git directories for initialized submodules</td></tr></tbody></table></div></div><p>A worktree holds checked-out files. The index records a candidate tree. A
+commit points to a tree together with parent IDs and metadata. A branch is a
+movable reference to a commit; it is not a mutable container of commits.</p><p>Inspect names and object types without decoding files manually:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git rev-parse --git-dir
+</span></span><span style=display:flex><span>git show-ref --head
+</span></span><span style=display:flex><span>git cat-file -t HEAD
+</span></span><span style=display:flex><span>git cat-file -p HEAD
+</span></span><span style=display:flex><span>git count-objects -vH</span></span></code></pre></div></div></div><h2 id=model-objects-and-content-addressing>Model Objects and Content Addressing
+<a href=#model-objects-and-content-addressing class=heading-anchor><span>#</span></a></h2><p>Git identifies an object by hashing a canonical byte sequence:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>&lt;type&gt;&lt;space&gt;&lt;decimal-size&gt;&lt;NUL&gt;&lt;content&gt;</span></span></code></pre></div></div></div><p>SHA-1 repositories use a 160-bit object ID. New repositories can use
+SHA-256. The object ID identifies content and structure; it does not encode a
+time or a sequence number.</p><p>Git has four core object types:</p><ol><li>A <strong>blob</strong> stores file bytes without a filename.</li><li>A <strong>tree</strong> maps path names and modes to blobs and subtrees.</li><li>A <strong>commit</strong> names a root tree, zero or more parents, author and committer
+identities and times, and a message.</li><li>An <strong>annotated tag</strong> stores tag metadata and points to another object.</li></ol><p>A tree entry mode of <code>100644</code> is a normal non-executable file, <code>100755</code> is an
+executable file, <code>120000</code> is a symbolic link, and <code>160000</code> is a submodule
+gitlink. A gitlink points at a commit in another repository rather than
+embedding that repository&rsquo;s files.</p><p>Create and inspect objects in a disposable repository:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>printf <span style=color:#e6db74>&#39;hello\n&#39;</span> | git hash-object -w --stdin
+</span></span><span style=display:flex><span>git cat-file -p &lt;object-id&gt;
+</span></span><span style=display:flex><span>git ls-tree HEAD
+</span></span><span style=display:flex><span>git ls-tree -r HEAD</span></span></code></pre></div></div></div><p>Loose objects live under <code>.git/objects/aa/bb...</code>, where <code>aa</code> is the first byte
+of the hexadecimal ID. Git zlib-compresses their canonical representation.
+<code>git cat-file</code> is safer than manually adding compression headers or using
+ad-hoc decompression pipelines.</p><h2 id=understand-packs-deltas-and-reachability>Understand Packs, Deltas, and Reachability
+<a href=#understand-packs-deltas-and-reachability class=heading-anchor><span>#</span></a></h2><p>Many loose objects cost filesystem metadata operations. <code>git gc</code> can collect
+reachable objects into packfiles in <code>.git/objects/pack/</code>. A <code>.pack</code> file holds
+object representations, an <code>.idx</code> file maps object IDs to pack offsets, and a
+<code>.rev</code> file can speed operations that need pack order.</p><p>Packfiles may delta-compress objects against other objects. Deltas are a
+storage optimization, not Git&rsquo;s history model: every commit still names a
+complete root tree, and Git can reconstruct any referenced blob through its
+object graph. A commit does not store only the textual diff from its parent.</p><p>Reachability starts at references such as branches, tags, remote-tracking
+branches, and reflogs. Garbage collection retains reachable objects and can
+prune unreachable objects after configured expiration. <code>git fsck</code> reports
+connectivity and can locate unreachable objects:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git fsck --full --no-reflogs --unreachable
+</span></span><span style=display:flex><span>git cat-file -p &lt;unreachable-object-id&gt;</span></span></code></pre></div></div></div><h2 id=read-references-and-the-index>Read References and the Index
+<a href=#read-references-and-the-index class=heading-anchor><span>#</span></a></h2><p><code>HEAD</code> commonly contains <code>ref: refs/heads/main</code>. A detached checkout contains
+an object ID directly. Loose branch names are files under <code>refs/heads/</code>, while
+many references can be consolidated in <code>packed-refs</code>.</p><p>The index is not a list of changed files. It stores the path, mode, object ID,
+and stat cache for the next tree. During a merge conflict, the index can carry
+multiple stages for one path:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Stage</th><th>Meaning</th></tr></thead><tbody><tr><td>1</td><td>Merge base</td></tr><tr><td>2</td><td>Current branch version</td></tr><tr><td>3</td><td>Other branch version</td></tr></tbody></table></div></div><p>Inspect index entries with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git ls-files --stage
+</span></span><span style=display:flex><span>git diff --cached</span></span></code></pre></div></div></div><p>Resolving a conflict and running <code>git add</code> replaces stages 1–3 with one
+stage-0 entry.</p><h2 id=explain-why-rewriting-changes-ids>Explain Why Rewriting Changes IDs
+<a href=#explain-why-rewriting-changes-ids class=heading-anchor><span>#</span></a></h2><p>A commit includes its parent object IDs. Changing its message, tree, author,
+committer, timestamp, or parent produces a different commit ID. Every
+descendant must be recreated because its recorded parent changes.</p><p>Rewrite local, unpublished work freely when it improves history. Coordinate
+before rewriting a shared branch. A forced update can discard a collaborator&rsquo;s
+new remote commit; use <code>--force-with-lease</code> when a force push is necessary:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git push --force-with-lease origin feature/topic</span></span></code></pre></div></div></div><h2 id=amend-the-latest-commit>Amend the Latest Commit
+<a href=#amend-the-latest-commit class=heading-anchor><span>#</span></a></h2><p><code>git commit --amend</code> creates a replacement for <code>HEAD</code> and moves the current
+branch:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git add README.md
+</span></span><span style=display:flex><span>git commit --amend --no-edit</span></span></code></pre></div></div></div><p>Run <code>git commit --amend</code> without <code>--no-edit</code> to replace the message. The
+original commit remains recoverable through the reflog until expiry and
+pruning.</p><h2 id=edit-older-commits-interactively>Edit Older Commits Interactively
+<a href=#edit-older-commits-interactively class=heading-anchor><span>#</span></a></h2><p>Interactive rebase rewrites the commits after the selected endpoint:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git rebase -i HEAD~3</span></span></code></pre></div></div></div><p>The command presents the last three commits. Its todo commands include:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Command</th><th>Effect</th></tr></thead><tbody><tr><td><code>pick</code></td><td>Keep a commit</td></tr><tr><td><code>reword</code></td><td>Replace its message</td></tr><tr><td><code>edit</code></td><td>Stop after applying it</td></tr><tr><td><code>squash</code></td><td>Combine it with the preceding commit and edit the message</td></tr><tr><td><code>fixup</code></td><td>Combine it and discard its message</td></tr><tr><td><code>drop</code></td><td>Omit it</td></tr></tbody></table></div></div><p>To change an older commit&rsquo;s contents, mark it <code>edit</code>, amend when the rebase
+stops, and continue:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git add path/to/file
+</span></span><span style=display:flex><span>git commit --amend --no-edit
+</span></span><span style=display:flex><span>git rebase --continue</span></span></code></pre></div></div></div><p>Resolve conflicts, stage the resolved paths, and continue. <code>git rebase --abort</code>
+returns the branch to its pre-rebase state. <code>git rebase --edit-todo</code> changes
+remaining instructions while a rebase is paused.</p><h2 id=recover-with-reflogs>Recover with Reflogs
+<a href=#recover-with-reflogs class=heading-anchor><span>#</span></a></h2><p>Every local reference movement can have a reflog entry. Create an explicit
+backup name before a risky rewrite:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git branch backup/before-rewrite</span></span></code></pre></div></div></div><p>Then locate and name an earlier state:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git reflog show --date<span style=color:#f92672>=</span>iso HEAD
+</span></span><span style=display:flex><span>git switch -c recovered-work HEAD@<span style=color:#f92672>{</span>1<span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>Reflogs are local implementation history, not a distributed backup. Publish
+important work, preserve remote backups, and avoid running destructive cleanup
+before recovery is complete.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/git-internals-and-history-editing/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

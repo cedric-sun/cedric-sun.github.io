@@ -1,0 +1,80 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Using Thymeleaf without Spring MVC</title></head><body><main><article><div class=article-header><h1>Using Thymeleaf without Spring MVC</h1><div class=aux>Last update: 2026-05-10 10:03:32 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spring-boot/>Spring-Boot</a>
+|
+<a href=/tags/thymeleaf/>Thymeleaf</a></div></div><div class=article-content><p>Thymeleaf can render HTML in a batch job, command-line program, mail service, or
+report pipeline without Spring MVC. A standalone application configures a
+template resolver and <code>TemplateEngine</code>, supplies a context, and writes the
+rendered output to its destination.</p><h2 id=choose-the-integration-level>Choose the Integration Level
+<a href=#choose-the-integration-level class=heading-anchor><span>#</span></a></h2><p>A non-Spring program needs the core Thymeleaf artifact:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.thymeleaf<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>thymeleaf<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>3.1.3.RELEASE<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>A Spring application can use <code>thymeleaf-spring6</code> and <code>SpringTemplateEngine</code> for
+Spring EL, <code>MessageSource</code>, conversion, and Spring-aware link behavior. Spring
+Boot dependency management should choose the matching Thymeleaf version.
+<code>spring-boot-starter-thymeleaf</code> is convenient when those integrations are
+needed, but it is not required to run the core engine and does not require MVC.</p><h2 id=configure-the-resolver-and-engine>Configure the Resolver and Engine
+<a href=#configure-the-resolver-and-engine class=heading-anchor><span>#</span></a></h2><p>Select a resolver that matches template ownership. A
+<code>ClassLoaderTemplateResolver</code> works for immutable templates packaged in a JAR;
+a <code>FileTemplateResolver</code> works for operator-managed files:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>var</span> resolver <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ClassLoaderTemplateResolver();
+</span></span><span style=display:flex><span>resolver.<span style=color:#a6e22e>setPrefix</span>(<span style=color:#e6db74>&#34;reports/&#34;</span>);
+</span></span><span style=display:flex><span>resolver.<span style=color:#a6e22e>setSuffix</span>(<span style=color:#e6db74>&#34;.html&#34;</span>);
+</span></span><span style=display:flex><span>resolver.<span style=color:#a6e22e>setTemplateMode</span>(TemplateMode.<span style=color:#a6e22e>HTML</span>);
+</span></span><span style=display:flex><span>resolver.<span style=color:#a6e22e>setCharacterEncoding</span>(StandardCharsets.<span style=color:#a6e22e>UTF_8</span>.<span style=color:#a6e22e>name</span>());
+</span></span><span style=display:flex><span>resolver.<span style=color:#a6e22e>setCacheable</span>(<span style=color:#66d9ef>true</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> engine <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> TemplateEngine();
+</span></span><span style=display:flex><span>engine.<span style=color:#a6e22e>setTemplateResolver</span>(resolver);</span></span></code></pre></div></div></div><p>Configure an engine once and then share it. Thymeleaf documents a fully
+configured <code>TemplateEngine</code> as thread-safe, while changing configuration after
+processing begins is unsupported. Enable caching for stable production
+templates. Disable it, or configure bounded cache validity, only when files
+must be re-read during development or operation.</p><p>Character encoding on the resolver controls how template bytes are decoded.
+The encoding used by the output <code>Writer</code> independently controls generated file
+bytes; set both explicitly.</p><h2 id=render-heterogeneous-report-data>Render Heterogeneous Report Data
+<a href=#render-heterogeneous-report-data class=heading-anchor><span>#</span></a></h2><p>Expose domain-shaped values instead of constructing HTML in Java:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>WarningRow</span>(String orderId, String message) {}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>DailyReport</span>(List<span style=color:#f92672>&lt;</span>OrderSummary<span style=color:#f92672>&gt;</span> orders, List<span style=color:#f92672>&lt;</span>WarningRow<span style=color:#f92672>&gt;</span> warnings) {}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> context <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Context(Locale.<span style=color:#a6e22e>ENGLISH</span>);
+</span></span><span style=display:flex><span>context.<span style=color:#a6e22e>setVariable</span>(<span style=color:#e6db74>&#34;report&#34;</span>, report);
+</span></span><span style=display:flex><span>context.<span style=color:#a6e22e>setVariable</span>(<span style=color:#e6db74>&#34;generatedAt&#34;</span>, generatedAt);
+</span></span><span style=display:flex><span>engine.<span style=color:#a6e22e>process</span>(<span style=color:#e6db74>&#34;daily-report&#34;</span>, context, writer);</span></span></code></pre></div></div></div><p>A template can render independent sections with different row types:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>section</span>&gt;
+</span></span><span style=display:flex><span>  &lt;<span style=color:#f92672>h2</span>&gt;Warnings&lt;/<span style=color:#f92672>h2</span>&gt;
+</span></span><span style=display:flex><span>  &lt;<span style=color:#f92672>table</span>&gt;
+</span></span><span style=display:flex><span>    &lt;<span style=color:#f92672>tr</span> <span style=color:#a6e22e>th:each</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;warning : ${report.warnings}&#34;</span>&gt;
+</span></span><span style=display:flex><span>      &lt;<span style=color:#f92672>td</span> <span style=color:#a6e22e>th:text</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;${warning.orderId}&#34;</span>&gt;order&lt;/<span style=color:#f92672>td</span>&gt;
+</span></span><span style=display:flex><span>      &lt;<span style=color:#f92672>td</span> <span style=color:#a6e22e>th:text</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;${warning.message}&#34;</span>&gt;message&lt;/<span style=color:#f92672>td</span>&gt;
+</span></span><span style=display:flex><span>    &lt;/<span style=color:#f92672>tr</span>&gt;
+</span></span><span style=display:flex><span>  &lt;/<span style=color:#f92672>table</span>&gt;
+</span></span><span style=display:flex><span>&lt;/<span style=color:#f92672>section</span>&gt;</span></span></code></pre></div></div></div><p><code>th:text</code> escapes text for the output mode. <code>th:utext</code> emits unescaped markup
+and must not receive untrusted content. HTML template mode parses and writes
+HTML-aware markup; choose XML, text, JavaScript, or CSS modes only when the
+target format requires their different rules.</p><h2 id=fragments-and-testability>Fragments and Testability
+<a href=#fragments-and-testability class=heading-anchor><span>#</span></a></h2><p>Declare reusable markup with <code>th:fragment</code> and compose it through <code>th:insert</code> or
+<code>th:replace</code>. Fragment parameters keep shared tables and headers independent of
+global variable names. Multiple resolvers can be ordered and restricted by
+resolvable patterns, preventing a broad filesystem resolver from shadowing
+packaged templates unintentionally.</p><p>Keep rendering as a pure service that accepts a report model and a <code>Writer</code>.
+Tests can use <code>StringWriter</code>, parse the result with an HTML parser, and assert
+structure and escaping. Resolver tests should also verify missing templates and
+non-ASCII content.</p><h2 id=manage-output-resources>Manage Output Resources
+<a href=#manage-output-resources class=heading-anchor><span>#</span></a></h2><p>Write with an explicit charset and close the writer:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Path temporary <span style=color:#f92672>=</span> Files.<span style=color:#a6e22e>createTempFile</span>(outputDirectory, <span style=color:#e6db74>&#34;daily-&#34;</span>, <span style=color:#e6db74>&#34;.html&#34;</span>);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (Writer writer <span style=color:#f92672>=</span> Files.<span style=color:#a6e22e>newBufferedWriter</span>(
+</span></span><span style=display:flex><span>        temporary, StandardCharsets.<span style=color:#a6e22e>UTF_8</span>,
+</span></span><span style=display:flex><span>        StandardOpenOption.<span style=color:#a6e22e>TRUNCATE_EXISTING</span>)) {
+</span></span><span style=display:flex><span>    engine.<span style=color:#a6e22e>process</span>(<span style=color:#e6db74>&#34;daily-report&#34;</span>, context, writer);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>Files.<span style=color:#a6e22e>move</span>(temporary, destination,
+</span></span><span style=display:flex><span>    StandardCopyOption.<span style=color:#a6e22e>ATOMIC_MOVE</span>,
+</span></span><span style=display:flex><span>    StandardCopyOption.<span style=color:#a6e22e>REPLACE_EXISTING</span>);</span></span></code></pre></div></div></div><p>Create temporary files in the destination filesystem when an atomic move is
+required. Clean up the temporary path after rendering or upload failure, and do
+not publish the destination until processing succeeds. For object storage,
+render to a bounded buffer or stream through an upload API whose retry and
+partial-failure behavior is explicit.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.thymeleaf.org/doc/tutorials/3.1/usingthymeleaf.html>Using Thymeleaf 3.1</a></li><li><a href=https://www.thymeleaf.org/apidocs/thymeleaf/3.1.3.RELEASE/org/thymeleaf/TemplateEngine.html><code>TemplateEngine</code> API</a></li><li><a href=https://www.thymeleaf.org/doc/tutorials/3.1/thymeleafspring.html>Thymeleaf and Spring</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/thymeleaf-without-mvc/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

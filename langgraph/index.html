@@ -1,0 +1,440 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>LangGraph4j</title></head><body><main><article><div class=article-header><h1>LangGraph4j</h1><div class=aux>Last update: 2026-04-22 22:26:49 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ai/>Ai</a>
+|
+<a href=/tags/agents/>Agents</a>
+|
+<a href=/tags/langgraph4j/>Langgraph4j</a>
+|
+<a href=/tags/workflows/>Workflows</a>
+|
+<a href=/tags/java/>Java</a></div></div><div class=article-content><p><a href=https://github.com/langgraph4j/langgraph4j>LangGraph4j</a> is a Java library
+for building stateful, graph-based AI applications. A graph consists of nodes
+that perform work, edges that select the next node, and shared state that
+changes as the graph runs. It is inspired by LangGraph and integrates with
+<a href=https://docs.langchain4j.dev/>LangChain4j</a> and
+<a href=/spring-ai/>Spring AI</a>, but a graph node can also be ordinary Java code.</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>                    +------------+
+</span></span><span style=display:flex><span>                    | call model |
+</span></span><span style=display:flex><span>                    +------+-----+
+</span></span><span style=display:flex><span>                           |
+</span></span><span style=display:flex><span>                    tool requested?
+</span></span><span style=display:flex><span>                     /           \
+</span></span><span style=display:flex><span>                   yes            no
+</span></span><span style=display:flex><span>                   /               \
+</span></span><span style=display:flex><span>          +-------v-------+      +--v--+
+</span></span><span style=display:flex><span>          | execute tool  |      | END |
+</span></span><span style=display:flex><span>          +-------+-------+      +-----+
+</span></span><span style=display:flex><span>                  |
+</span></span><span style=display:flex><span>                  +----------&gt; call model</span></span></code></pre></div></div></div><p>Cycles are intentional. They let an application reason, act, inspect a result,
+and reason again. LangGraph4j makes that control flow and its state explicit;
+it also provides reducers, conditional routing, checkpoints, breakpoints,
+streaming, graph visualization, and subgraphs.</p><p>This tutorial uses LangGraph4j 1.8.24 and Java 17. It focuses on the core
+module so that its examples do not depend on a particular model provider or
+web framework.</p><h2 id=what-langgraph4j-solves>What LangGraph4j Solves
+<a href=#what-langgraph4j-solves class=heading-anchor><span>#</span></a></h2><p>A small AI feature can be a single request:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>request -&gt; prompt -&gt; model -&gt; response</span></span></code></pre></div></div></div><p>An agentic application may need to:</p><ol><li>classify a request;</li><li>retrieve private documents;</li><li>ask a model to select a tool;</li><li>validate and execute that tool;</li><li>retry a recoverable failure;</li><li>pause before a risky action;</li><li>retain progress across requests;</li><li>resume the same run; and</li><li>report progress while it works.</li></ol><p>Loops, conditionals, queues, and database tables can implement this without a
+graph library. The difficult part is making the execution understandable,
+interruptible, recoverable, and safe when a model&rsquo;s decisions are
+non-deterministic.</p><p>LangGraph4j supplies an execution model; it does not choose the workflow,
+prompt, tools, authorization rules, or business policy. Those remain
+application responsibilities.</p><h2 id=graphs-are-not-limited-to-dags>Graphs Are Not Limited to DAGs
+<a href=#graphs-are-not-limited-to-dags class=heading-anchor><span>#</span></a></h2><p>A directed acyclic graph, or DAG, suits a one-way pipeline:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>load -&gt; transform -&gt; validate -&gt; publish</span></span></code></pre></div></div></div><p>An agent loop is usually cyclic:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>model -&gt; tool -&gt; model -&gt; tool -&gt; model -&gt; answer</span></span></code></pre></div></div></div><p>LangGraph4j supports both forms. A graph can branch, loop, run independent
+branches in parallel, join results, invoke a subgraph, pause at a configured
+node, and finish. Routing may be deterministic Java code or the validated
+result of a model decision.</p><p>The runtime follows a Pregel-like superstep model. Nodes activated in one step
+may run concurrently, then their updates are merged before later work runs.
+That makes the merge rules for shared state important.</p><h2 id=core-concepts>Core Concepts
+<a href=#core-concepts class=heading-anchor><span>#</span></a></h2><h3 id=state>State
+<a href=#state class=heading-anchor><span>#</span></a></h3><p><code>AgentState</code> is the shared data carried through a graph run. It wraps a
+<code>Map&lt;String, Object></code> and is normally extended with typed accessors:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.AgentState;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>SupportState</span> <span style=color:#66d9ef>extends</span> AgentState {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String REQUEST <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;request&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String DOCUMENTS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;documents&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String PROPOSED_ACTION <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;proposed_action&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String APPROVED <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;approved&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String ATTEMPTS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;attempts&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String ANSWER <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;answer&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    SupportState(Map<span style=color:#f92672>&lt;</span>String, Object<span style=color:#f92672>&gt;</span> data) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>super</span>(data);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>request</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> value(REQUEST).<span style=color:#a6e22e>map</span>(Object::toString).<span style=color:#a6e22e>orElse</span>(<span style=color:#e6db74>&#34;&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>documents</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#f92672>&lt;</span>List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;&gt;</span>value(DOCUMENTS).<span style=color:#a6e22e>orElse</span>(List.<span style=color:#a6e22e>of</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>boolean</span> <span style=color:#a6e22e>approved</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#f92672>&lt;</span>Boolean<span style=color:#f92672>&gt;</span>value(APPROVED).<span style=color:#a6e22e>orElse</span>(<span style=color:#66d9ef>false</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Nodes return updates rather than replacing a complete state object:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Map<span style=color:#f92672>&lt;</span>String, Object<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>incrementAttempt</span>(SupportState state) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> attempts <span style=color:#f92672>=</span> state.<span style=color:#f92672>&lt;</span>Integer<span style=color:#f92672>&gt;</span>value(SupportState.<span style=color:#a6e22e>ATTEMPTS</span>).<span style=color:#a6e22e>orElse</span>(0);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> Map.<span style=color:#a6e22e>of</span>(SupportState.<span style=color:#a6e22e>ATTEMPTS</span>, attempts <span style=color:#f92672>+</span> 1);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>State is application data, not just chat history. Keeping decisions,
+identifiers, artifacts, and status in named fields is easier to validate than
+recovering them from prose messages.</p><p>Do not place open connections, executors, request objects, or secrets in
+checkpointed state. A checkpoint must be serializable and may be inspected by
+operators or persisted outside the process.</p><h3 id=channels-and-reducers>Channels and Reducers
+<a href=#channels-and-reducers class=heading-anchor><span>#</span></a></h3><p>A state schema maps a key to a <code>Channel&lt;?></code>. A channel defines the key&rsquo;s
+default value and how an update is merged. With a base channel, a new value
+replaces the old one. <code>Channels.appender</code> accumulates values in a list.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.ArrayList;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.Channel;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.Channels;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> Map<span style=color:#f92672>&lt;</span>String, Channel<span style=color:#f92672>&lt;?&gt;&gt;</span> SCHEMA <span style=color:#f92672>=</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;status&#34;</span>, Channels.<span style=color:#a6e22e>base</span>(() <span style=color:#f92672>-&gt;</span> <span style=color:#e6db74>&#34;new&#34;</span>),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;audit&#34;</span>, Channels.<span style=color:#a6e22e>appender</span>(ArrayList::<span style=color:#66d9ef>new</span>));</span></span></code></pre></div></div></div><p>If a node returns <code>Map.of("audit", "classified")</code> and a later node returns
+<code>Map.of("audit", "retrieved")</code>, the appender channel retains both entries.
+The standard appender disallows duplicates; use
+<code>Channels.appenderWithDuplicate</code> when repeated values are meaningful.</p><p>Reducers are essential when parallel branches write the same key. They should
+be deterministic and free of side effects because checkpoint recovery and
+replay may apply the same state transitions again.</p><p>For chat messages, use the message-channel facilities supplied by the
+appropriate LangChain4j or Spring AI integration rather than treating message
+editing as blind list concatenation.</p><h3 id=nodes>Nodes
+<a href=#nodes class=heading-anchor><span>#</span></a></h3><p>A node receives the current state and returns a map of updates. It can call a
+model, query a <a href=/vector-stores/>vector store</a>, invoke a tool, validate data,
+emit an audit entry, or call a subgraph.</p><p><code>NodeAction&lt;S></code> is synchronous. <code>AsyncNodeAction&lt;S></code> returns a
+<code>CompletableFuture</code>, which is useful for non-blocking model, database, and HTTP
+clients. The <code>node_async</code> adapter turns a synchronous action into an
+asynchronous node action.</p><p>Keep nodes small. A node that classifies, retrieves, invokes several tools,
+writes a row, and generates an answer hides the workflow inside one method and
+makes checkpoints and failures hard to interpret.</p><h3 id=edges>Edges
+<a href=#edges class=heading-anchor><span>#</span></a></h3><p>An ordinary edge always selects the same destination:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>graph.<span style=color:#a6e22e>addEdge</span>(<span style=color:#e6db74>&#34;retrieve&#34;</span>, <span style=color:#e6db74>&#34;generate&#34;</span>);</span></span></code></pre></div></div></div><p>A conditional edge evaluates state and returns a routing label. The graph maps
+that label to a declared destination:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>graph.<span style=color:#a6e22e>addConditionalEdges</span>(
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;review&#34;</span>,
+</span></span><span style=display:flex><span>        edge_async(state <span style=color:#f92672>-&gt;</span> state.<span style=color:#a6e22e>approved</span>() <span style=color:#f92672>?</span> <span style=color:#e6db74>&#34;publish&#34;</span> : <span style=color:#e6db74>&#34;reject&#34;</span>),
+</span></span><span style=display:flex><span>        Map.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;publish&#34;</span>, <span style=color:#e6db74>&#34;publish&#34;</span>, <span style=color:#e6db74>&#34;reject&#34;</span>, <span style=color:#e6db74>&#34;reject&#34;</span>));</span></span></code></pre></div></div></div><p>The mapping is an allowlist. Do not use a model-generated string as an
+unrestricted destination or function name. Validate model output, then map a
+small set of accepted decisions to graph nodes.</p><p><code>StateGraph.START</code> and <code>StateGraph.END</code> mark graph entry and termination. Call
+<code>compile()</code> after defining nodes and edges. Compilation validates the structure
+and produces a runnable <code>CompiledGraph</code>.</p><h2 id=installing-langgraph4j>Installing LangGraph4j
+<a href=#installing-langgraph4j class=heading-anchor><span>#</span></a></h2><p>LangGraph4j 1.8.x requires Java 17 or later. Import its BOM to keep core and
+optional module versions aligned:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;properties&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;langgraph4j.version&gt;</span>1.8.24<span style=color:#f92672>&lt;/langgraph4j.version&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/properties&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.bsc.langgraph4j<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>langgraph4j-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>${langgraph4j.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.bsc.langgraph4j<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>langgraph4j-core<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p>Add an integration module only when the application needs it. LangGraph4j can
+orchestrate a node that uses a provider SDK directly, LangChain4j, Spring AI,
+a database client, or ordinary application code.</p><h2 id=a-complete-java-graph>A Complete Java Graph
+<a href=#a-complete-java-graph class=heading-anchor><span>#</span></a></h2><p>The following deterministic graph drafts a release announcement, reviews it,
+and either publishes or rejects it. Its simple drafting logic keeps the graph
+mechanics visible; production code can replace the draft node with a model
+call.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.ArrayList;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.GraphStateException;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.StateGraph;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.action.NodeAction;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.AgentState;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.Channel;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.Channels;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.StateGraph.END;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.StateGraph.START;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReleaseState</span> <span style=color:#66d9ef>extends</span> AgentState {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String RELEASE_ID <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;release_id&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String NOTES <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;notes&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String DRAFT <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;draft&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String APPROVED <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;approved&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String STATUS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;status&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String AUDIT <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;audit&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> Map<span style=color:#f92672>&lt;</span>String, Channel<span style=color:#f92672>&lt;?&gt;&gt;</span> SCHEMA <span style=color:#f92672>=</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            STATUS, Channels.<span style=color:#a6e22e>base</span>(() <span style=color:#f92672>-&gt;</span> <span style=color:#e6db74>&#34;new&#34;</span>),
+</span></span><span style=display:flex><span>            AUDIT, Channels.<span style=color:#a6e22e>appender</span>(ArrayList::<span style=color:#66d9ef>new</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReleaseState(Map<span style=color:#f92672>&lt;</span>String, Object<span style=color:#f92672>&gt;</span> data) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>super</span>(data);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>releaseId</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> value(RELEASE_ID).<span style=color:#a6e22e>map</span>(Object::toString).<span style=color:#a6e22e>orElseThrow</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>notes</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> value(NOTES).<span style=color:#a6e22e>map</span>(Object::toString).<span style=color:#a6e22e>orElse</span>(<span style=color:#e6db74>&#34;&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>draft</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> value(DRAFT).<span style=color:#a6e22e>map</span>(Object::toString).<span style=color:#a6e22e>orElseThrow</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>boolean</span> <span style=color:#a6e22e>approved</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#f92672>&lt;</span>Boolean<span style=color:#f92672>&gt;</span>value(APPROVED).<span style=color:#a6e22e>orElse</span>(<span style=color:#66d9ef>false</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>audit</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#f92672>&lt;</span>List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;&gt;</span>value(AUDIT).<span style=color:#a6e22e>orElse</span>(List.<span style=color:#a6e22e>of</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReleaseGraph</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> NodeAction<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> DRAFT <span style=color:#f92672>=</span> state <span style=color:#f92672>-&gt;</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>DRAFT</span>,
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;Release %s%n%n%s&#34;</span>.<span style=color:#a6e22e>formatted</span>(state.<span style=color:#a6e22e>releaseId</span>(), state.<span style=color:#a6e22e>notes</span>()),
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>STATUS</span>, <span style=color:#e6db74>&#34;awaiting_review&#34;</span>,
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>AUDIT</span>, <span style=color:#e6db74>&#34;drafted&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> NodeAction<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> REVIEW <span style=color:#f92672>=</span> state <span style=color:#f92672>-&gt;</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>AUDIT</span>, <span style=color:#e6db74>&#34;reviewed&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> NodeAction<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> PUBLISH <span style=color:#f92672>=</span> state <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// Call a publication API here with releaseId() as an idempotency key.</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>STATUS</span>, <span style=color:#e6db74>&#34;published&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>AUDIT</span>, <span style=color:#e6db74>&#34;published&#34;</span>);
+</span></span><span style=display:flex><span>    };
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> NodeAction<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> REJECT <span style=color:#f92672>=</span> state <span style=color:#f92672>-&gt;</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>STATUS</span>, <span style=color:#e6db74>&#34;rejected&#34;</span>,
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>AUDIT</span>, <span style=color:#e6db74>&#34;rejected&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> StateGraph<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>definition</span>() <span style=color:#66d9ef>throws</span> GraphStateException {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> StateGraph<span style=color:#f92672>&lt;&gt;</span>(
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>SCHEMA</span>,
+</span></span><span style=display:flex><span>                ReleaseState::<span style=color:#66d9ef>new</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;draft&#34;</span>, node_async(DRAFT))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;review&#34;</span>, node_async(REVIEW))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;publish&#34;</span>, node_async(PUBLISH))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;reject&#34;</span>, node_async(REJECT))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addEdge</span>(START, <span style=color:#e6db74>&#34;draft&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addEdge</span>(<span style=color:#e6db74>&#34;draft&#34;</span>, <span style=color:#e6db74>&#34;review&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addConditionalEdges</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;review&#34;</span>,
+</span></span><span style=display:flex><span>                        edge_async(state <span style=color:#f92672>-&gt;</span>
+</span></span><span style=display:flex><span>                                state.<span style=color:#a6e22e>approved</span>() <span style=color:#f92672>?</span> <span style=color:#e6db74>&#34;publish&#34;</span> : <span style=color:#e6db74>&#34;reject&#34;</span>),
+</span></span><span style=display:flex><span>                        Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>                                <span style=color:#e6db74>&#34;publish&#34;</span>, <span style=color:#e6db74>&#34;publish&#34;</span>,
+</span></span><span style=display:flex><span>                                <span style=color:#e6db74>&#34;reject&#34;</span>, <span style=color:#e6db74>&#34;reject&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addEdge</span>(<span style=color:#e6db74>&#34;publish&#34;</span>, END)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addEdge</span>(<span style=color:#e6db74>&#34;reject&#34;</span>, END);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) <span style=color:#66d9ef>throws</span> GraphStateException {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> graph <span style=color:#f92672>=</span> definition().<span style=color:#a6e22e>compile</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> input <span style=color:#f92672>=</span> Map.<span style=color:#f92672>&lt;</span>String, Object<span style=color:#f92672>&gt;</span>of(
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>RELEASE_ID</span>, <span style=color:#e6db74>&#34;2026.08&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>NOTES</span>, <span style=color:#e6db74>&#34;Adds resumable exports and audit reports.&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>APPROVED</span>, <span style=color:#66d9ef>true</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> output : graph.<span style=color:#a6e22e>stream</span>(input)) {
+</span></span><span style=display:flex><span>            System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(output);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The graph starts at <code>draft</code>, moves to <code>review</code>, and then evaluates the
+conditional edge. A real review flow should not accept <code>approved</code> directly
+from an untrusted browser request. It must bind an authenticated approver to a
+specific proposed action and validate that decision on the server.</p><p>The <code>PUBLISH</code> node is deliberately separate from the model-facing work. It
+must treat <code>release_id</code> as an idempotency key, validate the final payload, and
+perform authorization before it creates an external side effect.</p><h2 id=conditional-routing-and-bounded-loops>Conditional Routing and Bounded Loops
+<a href=#conditional-routing-and-bounded-loops class=heading-anchor><span>#</span></a></h2><p>Conditional edges make a retry or tool loop explicit:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>call model -&gt; tool needed? -- yes --&gt; execute tool --+
+</span></span><span style=display:flex><span>      |                                              |
+</span></span><span style=display:flex><span>      no                                             |
+</span></span><span style=display:flex><span>      v                                              |
+</span></span><span style=display:flex><span>     answer &lt;----------------------------------------+</span></span></code></pre></div></div></div><p>The route action should return one of a small number of labels. For a retry
+loop, store an attempt counter in state and route to a failure node once the
+limit is reached. <code>CompileConfig.builder().recursionLimit(...)</code> also sets a
+positive upper bound on graph iterations; its default is 25.</p><p>Do not rely on a model to stop an expensive or dangerous loop. Track model
+calls, tool calls, elapsed time, token use, and retries in application state
+or observability data. Every cycle needs a success route, a bounded retry
+route, and a failure route.</p><h2 id=checkpoints-breakpoints-and-resumption>Checkpoints, Breakpoints, and Resumption
+<a href=#checkpoints-breakpoints-and-resumption class=heading-anchor><span>#</span></a></h2><p>A checkpoint saver stores snapshots under a <code>RunnableConfig</code> thread ID. This
+allows an application to inspect state, stop at a configured node, and continue
+the same thread later.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.CompileConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.RunnableConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.checkpoint.MemorySaver;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> compiled <span style=color:#f92672>=</span> ReleaseGraph.<span style=color:#a6e22e>definition</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>compile</span>(CompileConfig.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>checkpointSaver</span>(<span style=color:#66d9ef>new</span> MemorySaver())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>interruptBefore</span>(<span style=color:#e6db74>&#34;publish&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> thread <span style=color:#f92672>=</span> RunnableConfig.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>threadId</span>(<span style=color:#e6db74>&#34;release-2026.08&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> output : compiled.<span style=color:#a6e22e>stream</span>(
+</span></span><span style=display:flex><span>        Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>RELEASE_ID</span>, <span style=color:#e6db74>&#34;2026.08&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>NOTES</span>, <span style=color:#e6db74>&#34;Adds resumable exports and audit reports.&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>APPROVED</span>, <span style=color:#66d9ef>true</span>),
+</span></span><span style=display:flex><span>        thread)) {
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(output);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>With <code>interruptBefore("publish")</code>, execution stops before the named node.
+<code>MemorySaver</code> is useful for local development only: it loses all state when
+the process ends. LangGraph4j also provides saver modules for databases and
+stores such as PostgreSQL, SQLite, MySQL, Redis, DynamoDB, CockroachDB,
+Hazelcast, and Oracle Database. Select a backend based on the application&rsquo;s
+availability, retention, transaction, and operational requirements.</p><p>To edit a paused thread, persist an authenticated approval decision and update
+the checkpointed state. <code>updateState</code> returns a configuration that identifies
+the updated checkpoint; supplying the node that made the decision lets the
+runtime calculate the next route:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>RunnableConfig resumed <span style=color:#f92672>=</span> compiled.<span style=color:#a6e22e>updateState</span>(
+</span></span><span style=display:flex><span>        thread,
+</span></span><span style=display:flex><span>        Map.<span style=color:#a6e22e>of</span>(ReleaseState.<span style=color:#a6e22e>APPROVED</span>, <span style=color:#66d9ef>true</span>),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;review&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> output : compiled.<span style=color:#a6e22e>stream</span>(<span style=color:#66d9ef>null</span>, resumed)) {
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(output);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Passing <code>null</code> to this <code>stream</code> overload resumes the saved graph input. In a
+service, store the thread ID server-side with its tenant and owner. Never load
+an arbitrary client-provided thread ID without verifying access to it.</p><p>An interruption is a node-level breakpoint, not an authorization system. The
+approval screen must show the concrete, validated action and its arguments.
+“Continue?” is not meaningful consent if the action deploys a service,
+deletes data, or changes money.</p><h3 id=durable-does-not-mean-exactly-once>Durable Does Not Mean Exactly Once
+<a href=#durable-does-not-mean-exactly-once class=heading-anchor><span>#</span></a></h3><p>Checkpoints can resume computation, but a checkpoint and an external side
+effect are not automatically one transaction:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>1. publish node calls an external API
+</span></span><span style=display:flex><span>2. process fails before the following checkpoint
+</span></span><span style=display:flex><span>3. the node runs again during recovery</span></span></code></pre></div></div></div><p>Without an idempotency key or authoritative transaction record, the effect may
+occur twice. Make nodes that send email, change infrastructure, or mutate a
+business system idempotent. Treat model calls as repeatable but
+non-deterministic: replay can cost money and return different output.</p><h2 id=streaming-and-state-inspection>Streaming and State Inspection
+<a href=#streaming-and-state-inspection class=heading-anchor><span>#</span></a></h2><p><code>CompiledGraph.stream</code> yields a sequence of <code>NodeOutput</code> values as the graph
+runs. The complete example prints each value; a web application can translate
+safe progress events into Server-Sent Events or a WebSocket message.</p><p>By default, graph streaming uses <code>CompiledGraph.StreamMode.VALUES</code>.
+<code>streamSnapshots</code> or a <code>RunnableConfig</code> with <code>StreamMode.SNAPSHOTS</code> provides
+checkpoint-oriented state snapshots when a saver is configured.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.CompiledGraph;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.RunnableConfig;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> config <span style=color:#f92672>=</span> RunnableConfig.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>threadId</span>(<span style=color:#e6db74>&#34;release-2026.08&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>streamMode</span>(CompiledGraph.<span style=color:#a6e22e>StreamMode</span>.<span style=color:#a6e22e>SNAPSHOTS</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> output : compiled.<span style=color:#a6e22e>streamSnapshots</span>(
+</span></span><span style=display:flex><span>        Map.<span style=color:#a6e22e>of</span>(ReleaseState.<span style=color:#a6e22e>APPROVED</span>, <span style=color:#66d9ef>true</span>),
+</span></span><span style=display:flex><span>        config)) {
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(output);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Do not serialize every state field to a browser. State may contain retrieved
+documents, tool arguments, internal identifiers, or data that a node added by
+mistake. Define an explicit event DTO with only the fields a particular
+recipient may see.</p><p><code>CompiledGraph.getState</code>, <code>stateOf</code>, <code>lastStateOf</code>, and <code>getStateHistory</code>
+inspect saved state for a thread. Treat these interfaces as privileged
+operational tools and apply the same tenant isolation, retention, deletion,
+and encryption rules used for other application data.</p><h2 id=parallel-nodes-and-merge-rules>Parallel Nodes and Merge Rules
+<a href=#parallel-nodes-and-merge-rules class=heading-anchor><span>#</span></a></h2><p>Multiple outgoing edges can activate independent work in the same superstep:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>                   +-&gt; search internal docs -+
+</span></span><span style=display:flex><span>question -&gt; route  +-&gt; search issue tracker --+-&gt; combine -&gt; answer
+</span></span><span style=display:flex><span>                   +-&gt; search source code ----+</span></span></code></pre></div></div></div><p>Parallelism is useful only when branches are independent. Their writes must be
+mergeable: a channel can append candidates, a custom base-channel reducer can
+merge namespaced maps, and a single owner can write a final answer.</p><p>Parallel model requests cost more and can exhaust provider limits. Bound
+concurrency with an application executor, propagate cancellation, and decide
+what should happen when one branch fails while another succeeds. A parallel
+node cannot itself have incompatible multiple downstream routes, so design a
+join node that makes the next deterministic decision.</p><h2 id=subgraphs-and-multi-agent-workflows>Subgraphs and Multi-Agent Workflows
+<a href=#subgraphs-and-multi-agent-workflows class=heading-anchor><span>#</span></a></h2><p>A <code>StateGraph</code> or <code>CompiledGraph</code> can be added as a node of another graph.
+Subgraphs are useful for a reusable research flow, a specialized tool loop, a
+team-owned module, or a separately testable workflow.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>StateGraph<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> child <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StateGraph<span style=color:#f92672>&lt;&gt;</span>(
+</span></span><span style=display:flex><span>        ReleaseState.<span style=color:#a6e22e>SCHEMA</span>,
+</span></span><span style=display:flex><span>        ReleaseState::<span style=color:#66d9ef>new</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>StateGraph<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> parent <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StateGraph<span style=color:#f92672>&lt;&gt;</span>(
+</span></span><span style=display:flex><span>        ReleaseState.<span style=color:#a6e22e>SCHEMA</span>,
+</span></span><span style=display:flex><span>        ReleaseState::<span style=color:#66d9ef>new</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;prepare_release&#34;</span>, child);</span></span></code></pre></div></div></div><p>The parent and this form of child graph share the same state type. Define
+clear state ownership and narrow interfaces before composing graphs. Do not
+create a separate model-mediated agent for an ordinary deterministic function;
+doing so adds latency, cost, and non-determinism without improving control
+flow.</p><p>An in-process subgraph is not an independent remote agent.
+<a href=/a2a-protocol/>A2A</a> addresses communication across an agent-service
+boundary. <a href=/mcp/>MCP</a> exposes tools and resources to agents. LangGraph4j
+orchestrates the Java workflow that may use either protocol.</p><h2 id=langgraph4j-langchain4j-and-spring-ai>LangGraph4j, LangChain4j, and Spring AI
+<a href=#langgraph4j-langchain4j-and-spring-ai class=heading-anchor><span>#</span></a></h2><p>These components occupy different layers:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Component</th><th>Primary Role</th></tr></thead><tbody><tr><td>LangGraph4j</td><td>Java state graphs, routing, checkpoints, breakpoints, and execution</td></tr><tr><td>LangChain4j</td><td>Java model, message, tool, retrieval, and agent abstractions</td></tr><tr><td>Spring AI</td><td>Spring model clients, tools, RAG, vector stores, MCP, and observability</td></tr><tr><td>LangGraph4j Studio</td><td>Graph visualization, execution, and debugging UI</td></tr></tbody></table></div></div><p>LangGraph4j is an independent project inspired by LangGraph; it is not a
+drop-in implementation of another runtime and does not share checkpoint or
+deployment compatibility guarantees.</p><p>Use LangChain4j or Spring AI inside graph nodes when their provider adapters,
+message abstractions, tools, or retrieval support fit the application. Use
+ordinary Java clients when that is simpler. A graph runtime is useful when the
+application needs explicit cycles, stateful routing, durable checkpoints, or
+controlled pauses; basic chat and retrieval do not require one.</p><h2 id=deployment-and-operations>Deployment and Operations
+<a href=#deployment-and-operations class=heading-anchor><span>#</span></a></h2><p>LangGraph4j is a library embedded in the Java service that the team builds and
+operates. The team owns:</p><ul><li>checkpoint storage, migrations, retention, and deletion;</li><li>queueing, concurrency limits, cancellation, and timeouts;</li><li>authentication and thread authorization;</li><li>retry policy and idempotency;</li><li>streaming endpoints and reconnection behavior;</li><li>observability, alerts, and cost controls;</li><li>model and tool credentials; and</li><li>safe shutdown and recovery.</li></ul><p>LangGraph4j includes graph-representation support for Mermaid and PlantUML and
+an embeddable Studio project for visual inspection. These are useful during
+development, but they do not replace production metrics, traces, audit logs,
+or authorization checks.</p><p>When registering a compiled graph as a Spring singleton, keep its nodes and
+dependencies stateless and thread-safe. Per-run data belongs in graph input
+and checkpoint storage, not mutable fields on the singleton.</p><h2 id=design-guidelines>Design Guidelines
+<a href=#design-guidelines class=heading-anchor><span>#</span></a></h2><h3 id=keep-deterministic-decisions-in-java>Keep Deterministic Decisions in Java
+<a href=#keep-deterministic-decisions-in-java class=heading-anchor><span>#</span></a></h3><p>Use a model for semantic classification and generation. Use normal Java code
+for authorization, arithmetic, quotas, schema validation, and invariant
+enforcement.</p><h3 id=make-state-explicit>Make State Explicit
+<a href=#make-state-explicit class=heading-anchor><span>#</span></a></h3><p>Store important decisions in named fields rather than parsing old messages.
+Document which node owns each field and how concurrent updates merge.</p><h3 id=bound-every-cycle>Bound Every Cycle
+<a href=#bound-every-cycle class=heading-anchor><span>#</span></a></h3><p>Track attempts, model calls, elapsed time, tokens, and tool invocations. Give
+each loop a termination condition and an error route.</p><h3 id=make-side-effects-idempotent>Make Side Effects Idempotent
+<a href=#make-side-effects-idempotent class=heading-anchor><span>#</span></a></h3><p>Retries and recovery are normal. Use stable operation IDs and authoritative
+records for externally visible effects.</p><h3 id=separate-proposal-from-execution>Separate Proposal From Execution
+<a href=#separate-proposal-from-execution class=heading-anchor><span>#</span></a></h3><p>Let a model propose an action. Validate it, authorize it, and obtain any
+required approval before a separate node performs the action.</p><h3 id=persist-only-governable-data>Persist Only Governable Data
+<a href=#persist-only-governable-data class=heading-anchor><span>#</span></a></h3><p>Apply retention, encryption, deletion, and tenant isolation to checkpoints.
+Graph state may contain prompts, personal data, retrieved documents, and tool
+results.</p><h3 id=evaluate-trajectories>Evaluate Trajectories
+<a href=#evaluate-trajectories class=heading-anchor><span>#</span></a></h3><p>A final answer can look correct even when a graph used the wrong tool,
+retrieved forbidden data, retried excessively, or ignored a required review.
+Evaluate routes, state transitions, tool arguments, evidence, cost, and
+latency in addition to final output.</p><h3 id=version-graphs-and-state>Version Graphs and State
+<a href=#version-graphs-and-state class=heading-anchor><span>#</span></a></h3><p>Threads can survive a deployment. A later release may rename nodes or change
+the state schema while saved checkpoints still refer to an earlier graph.
+Define migration and compatibility policy before changing a production graph.</p><h2 id=when-not-to-use-langgraph4j>When Not to Use LangGraph4j
+<a href=#when-not-to-use-langgraph4j class=heading-anchor><span>#</span></a></h2><p>Do not add a graph runtime when:</p><ul><li>one model call is sufficient;</li><li>a short deterministic pipeline is already clear;</li><li>ordinary Spring AI or LangChain4j code meets the need;</li><li>a conventional workflow engine already owns the durable business process;</li><li>no state must survive between requests; or</li><li>the team cannot operate and evaluate an additional stateful system.</li></ul><p>For a financial or fulfillment process, a conventional workflow engine can
+remain the authoritative system while a graph performs bounded AI analysis:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>durable business workflow
+</span></span><span style=display:flex><span>  -&gt; starts an AI analysis graph
+</span></span><span style=display:flex><span>  -&gt; receives a proposed decision
+</span></span><span style=display:flex><span>  -&gt; applies deterministic policy and approval
+</span></span><span style=display:flex><span>  -&gt; performs the authoritative transaction</span></span></code></pre></div></div></div><p>Choose the smallest abstraction that expresses the required control flow. A
+graph is valuable when the workflow genuinely branches, loops, pauses, and
+resumes; otherwise, it can become a verbose flowchart around code that was
+already clear.</p><h2 id=further-reading>Further Reading
+<a href=#further-reading class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://langgraph4j.github.io/langgraph4j/>LangGraph4j Documentation</a></li><li><a href=https://github.com/langgraph4j/langgraph4j>LangGraph4j Repository</a></li><li><a href=https://central.sonatype.com/artifact/org.bsc.langgraph4j/langgraph4j-core>LangGraph4j Releases on Maven Central</a></li><li><a href=https://github.com/langgraph4j/langgraph4j/tree/main/langgraph4j-postgres-saver>LangGraph4j Checkpoint Saver Modules</a></li><li><a href=https://docs.langchain4j.dev/>LangChain4j Documentation</a></li><li><a href=/spring-ai/>Spring AI</a></li><li><a href=/agentscope/>AgentScope</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/langgraph/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

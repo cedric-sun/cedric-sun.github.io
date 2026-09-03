@@ -1,0 +1,53 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Servlets and Tomcat</title></head><body><main><article><div class=article-header><h1>Servlets and Tomcat</h1><div class=aux>Last update: 2025-07-31 23:33:22 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/servlet/>Servlet</a>
+|
+<a href=/tags/tomcat/>Tomcat</a></div></div><div class=article-content><p>The Jakarta Servlet API defines a server-side request and response model. Apache
+Tomcat implements that API and supplies the Catalina servlet container, HTTP and
+AJP connectors, session management, deployment, and operational tooling.
+Tomcat 11 implements Jakarta Servlet 6.1 and requires Java 17; older applications
+that import <code>javax.servlet.*</code> need migration to the <code>jakarta.servlet.*</code> namespace
+or an older compatible container.</p><h2 id=web-application-layout>Web Application Layout
+<a href=#web-application-layout class=heading-anchor><span>#</span></a></h2><p>A deployable web application can be an expanded directory or a WAR archive:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>orders.war
+</span></span><span style=display:flex><span>|-- index.html
+</span></span><span style=display:flex><span>`-- WEB-INF
+</span></span><span style=display:flex><span>    |-- web.xml
+</span></span><span style=display:flex><span>    |-- classes/com/example/OrdersServlet.class
+</span></span><span style=display:flex><span>    `-- lib/orders-domain.jar</span></span></code></pre></div></div></div><p>Resources below <code>WEB-INF/</code> are not directly addressable by clients.
+<code>WEB-INF/classes/</code> contains application classes and resources, while
+<code>WEB-INF/lib/</code> contains dependency JARs. <code>WEB-INF/web.xml</code> is the deployment
+descriptor. Servlet 3.0 and later also support annotation-based registration and
+programmatic registration through <code>ServletContainerInitializer</code>, so <code>web.xml</code>
+can be absent unless deployment requires descriptor metadata or ordering.</p><h2 id=mapping-and-request-dispatch>Mapping and Request Dispatch
+<a href=#mapping-and-request-dispatch class=heading-anchor><span>#</span></a></h2><p>A servlet mapping selects a servlet from a URL pattern. Exact mappings win over
+the longest path mapping, followed by extension mappings and the default <code>/</code>
+mapping. A filter can wrap requests and responses before or after the target,
+and listeners observe context, session, and request lifecycle events.</p><p>Dispatches have distinct <code>DispatcherType</code> values:</p><ul><li><code>REQUEST</code> represents the original container dispatch.</li><li><code>FORWARD</code> transfers processing without a client round trip.</li><li><code>INCLUDE</code> inserts another resource&rsquo;s output.</li><li><code>ERROR</code> invokes configured error handling.</li><li><code>ASYNC</code> continues an asynchronous request.</li></ul><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>request.<span style=color:#a6e22e>getRequestDispatcher</span>(<span style=color:#e6db74>&#34;/WEB-INF/views/order.jsp&#34;</span>)
+</span></span><span style=display:flex><span>       .<span style=color:#a6e22e>forward</span>(request, response);</span></span></code></pre></div></div></div><p>A redirect instead sends a 3xx response, after which the client starts a new
+request. During a normal dispatch, the connector parses the request, Catalina
+selects the virtual host and web context, the filter chain runs, and one servlet
+instance handles the call. Containers call a servlet concurrently; mutable
+instance fields therefore require synchronization or, preferably, elimination.</p><p>Sessions are identified by a cookie or URL rewriting. Session attributes may be
+accessed by concurrent requests and must not be treated as thread-confined.
+Async processing releases the request thread, but the application must complete
+the <code>AsyncContext</code> and preserve any required security or logging context.</p><h2 id=tomcats-container-model>Tomcat&rsquo;s Container Model
+<a href=#tomcats-container-model class=heading-anchor><span>#</span></a></h2><p><code>org.apache.catalina.startup.Bootstrap</code> starts a standalone installation.
+<code>catalina.home</code> points to the shared Tomcat binaries, while <code>catalina.base</code>
+points to an instance&rsquo;s configuration, logs, temporary files, work directory,
+and deployed applications. Multiple instances can thus share one installation.</p><p>Catalina composes these elements:</p><ol><li>A <code>Server</code> owns the Tomcat instance.</li><li>A <code>Service</code> associates one or more <code>Connector</code>s with one <code>Engine</code>.</li><li>An <code>Engine</code> routes requests to a <code>Host</code>.</li><li>A <code>Host</code> contains one or more web application <code>Context</code>s.</li><li>A <code>Wrapper</code> represents an individual servlet.</li></ol><p>Connectors own protocol processing and worker threads. Blocking servlet work
+occupies those threads, so connector limits, downstream timeouts, and application
+executor limits must form one capacity plan.</p><h2 id=class-loaders-and-shutdown>Class Loaders and Shutdown
+<a href=#class-loaders-and-shutdown class=heading-anchor><span>#</span></a></h2><p>Tomcat separates bootstrap, system, common, and per-web-application class
+loaders. A web application sees its own <code>WEB-INF/classes</code> and <code>WEB-INF/lib</code> but
+not another application&rsquo;s classes. Tomcat&rsquo;s web loader uses local-first lookup
+for application classes, with mandatory delegation for Java, Jakarta Servlet,
+and container implementation APIs. Duplicate API JARs in <code>WEB-INF/lib</code> do not
+override container APIs and can cause linkage failures.</p><p>For graceful shutdown, stop accepting new traffic, allow in-flight work to
+finish within a deadline, and then stop the <code>Server</code>. Servlet context listeners
+and managed resources receive shutdown callbacks, but application-created
+executors and threads still need explicit termination. Session persistence
+depends on the configured manager and must not be assumed across a restart.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://jakarta.ee/specifications/servlet/6.1/>Jakarta Servlet 6.1 specification</a></li><li><a href=https://tomcat.apache.org/tomcat-11.0-doc/architecture/overview.html>Tomcat 11 architecture</a></li><li><a href=https://tomcat.apache.org/tomcat-11.0-doc/class-loader-howto.html>Tomcat class-loader documentation</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/servlets-and-tomcat/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

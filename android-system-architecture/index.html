@@ -1,0 +1,50 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Android System Architecture</title></head><body><main><article><div class=article-header><h1>Android System Architecture</h1><div class=aux>Last update: 2022-01-06 03:13:05 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/android/>Android</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/system-architecture/>System Architecture</a></div></div><div class=article-content><p>Android uses the Linux kernel for scheduling, process isolation, device drivers,
+networking, and filesystems, but supplies its own native library, runtime, framework,
+and application model. Bionic is Android&rsquo;s C library. ART executes DEX bytecode, and
+Binder provides the principal cross-process RPC mechanism.</p><h2 id=runtime-and-process-creation>Runtime and Process Creation
+<a href=#runtime-and-process-creation class=heading-anchor><span>#</span></a></h2><p>Build tools compile Java or Kotlin sources to class files and then transform them
+into DEX code. An APK or app bundle delivery split packages DEX, resources, native
+libraries, signing metadata, and a manifest. ART compiles and interprets DEX as
+appropriate for the device and profile state; an APK is not simply an executable
+JAR.</p><p><code>init</code> is Android&rsquo;s PID 1 process. It mounts early filesystems, applies policy,
+starts native services, and launches Zygote. Zygote preloads common runtime classes
+and resources, then forks application processes on system request. The fork model
+shares pages until either process writes them, reducing application startup cost.</p><h2 id=application-isolation-and-binder>Application Isolation and Binder
+<a href=#application-isolation-and-binder class=heading-anchor><span>#</span></a></h2><p>Package installation normally assigns a distinct Linux UID. File ownership and
+kernel credentials isolate app-private files, while SELinux applies mandatory
+access-control policy to processes, files, services, and Binder calls. Permissions
+are checked by framework and service boundaries in addition to kernel controls.</p><p>An app component launched in another package runs in the target package&rsquo;s process.
+Binder transfers a transaction to that process and carries caller identity for
+permission checks. Binder object references are capabilities with lifecycle and
+permission semantics; an exported component or service must validate all
+caller-controlled arguments.</p><h2 id=system-partitions-and-updates>System Partitions and Updates
+<a href=#system-partitions-and-updates class=heading-anchor><span>#</span></a></h2><p>Modern devices divide the operating-system image into logical, generally
+read-only partitions:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Mount</th><th>Purpose</th></tr></thead><tbody><tr><td><code>/system</code></td><td>Core framework, runtime, and platform applications</td></tr><tr><td><code>/system_ext</code></td><td>System extensions with a platform-specific lifecycle</td></tr><tr><td><code>/product</code></td><td>Product and OEM customization</td></tr><tr><td><code>/vendor</code></td><td>Hardware-vendor libraries, HALs, and configuration</td></tr><tr><td><code>/odm</code></td><td>Device-specific vendor overlays and configuration</td></tr><tr><td><code>/vendor_dlkm</code>, <code>/system_dlkm</code></td><td>Dynamically loadable kernel modules</td></tr><tr><td><code>/data</code></td><td>Writable per-device and per-user application data</td></tr><tr><td><code>/metadata</code></td><td>Metadata required by encryption and boot services</td></tr></tbody></table></div></div><p>Dynamic partitions place logical partitions in a physical <code>super</code> partition.
+Device-mapper names such as <code>dm-5</code> represent those logical block devices. A
+read-only image that reports near-full capacity is normally an immutable filesystem
+image, not a signal that user data storage is exhausted.</p><p>Verified Boot establishes a chain of trust for boot and verified partitions. A/B
+updates write an inactive slot and select it after verification, allowing rollback
+when the new slot fails to boot.</p><h2 id=apex-and-native-interfaces>APEX and Native Interfaces
+<a href=#apex-and-native-interfaces class=heading-anchor><span>#</span></a></h2><p>APEX packages deliver selected low-level platform modules, including ART and
+Conscrypt. Android verifies and mounts APEX images below <code>/apex</code> early in boot;
+stable paths expose the active version. The vendor interface and hardware
+abstraction layers separate framework releases from vendor implementations, subject
+to the compatibility rules for a given Android release.</p><h2 id=writable-storage-and-mount-namespaces>Writable Storage and Mount Namespaces
+<a href=#writable-storage-and-mount-namespaces class=heading-anchor><span>#</span></a></h2><p><code>/data</code> is the principal writable partition. File-based encryption distinguishes
+device-encrypted storage, available before user unlock, from credential-encrypted
+storage, available after it. Per-user paths include <code>/data/user/0</code> and
+<code>/data/user_de/0</code>.</p><p>Emulated shared storage is exposed through paths such as <code>/storage/emulated/0</code> and
+is backed by private storage under <code>/data/media</code>. FUSE and mount namespaces provide
+each application and user an appropriate view and enforce scoped-storage access
+rules. <code>/storage/self/primary</code> resolves to the process&rsquo;s primary shared-storage
+view; code should use platform storage APIs rather than hard-code an implementation
+path.</p><p>Pseudo-filesystems such as <code>proc</code>, <code>sysfs</code>, <code>binderfs</code>, <code>selinuxfs</code>, <code>cgroupfs</code>, and
+<code>tracefs</code> expose kernel interfaces rather than persistent files. A <code>mount</code> listing
+is device-, release-, and process-namespace-specific, so it is diagnostic evidence
+rather than a portable filesystem contract.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/android-system-architecture/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

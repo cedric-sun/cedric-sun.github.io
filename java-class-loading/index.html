@@ -1,0 +1,45 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java Class Loading</title></head><body><main><article><div class=article-header><h1>Java Class Loading</h1><div class=aux>Last update: 2023-02-25 22:30:58 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/classloading/>Classloading</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/jvm/>Jvm</a></div></div><div class=article-content><p>Class loading converts a binary representation into a <code>Class</code> object. Linking
+and initialization are separate steps, thus loading a type does not imply that
+its static initializer has run.</p><h2 id=loaders-and-type-identity>Loaders and Type Identity
+<a href=#loaders-and-type-identity class=heading-anchor><span>#</span></a></h2><p>The JDK supplies bootstrap, platform, and application loaders. The bootstrap
+loader defines core platform classes and is represented by <code>null</code> in selected
+APIs; the platform loader defines platform modules; the application loader
+loads application classes from the class path or module path. Custom loaders commonly use parent-first delegation:</p><ol><li>reuse an already loaded definition;</li><li>ask the parent to load the binary name; then</li><li>find bytes and call <code>defineClass</code>.</li></ol><p>Parent-first delegation protects platform type identity. It is a convention,
+not an absolute rule: plugin systems sometimes use child-first loading with
+strict package exclusions. A runtime type is identified by both its binary name
+and its defining loader. Thus two loaders can define different
+<code>com.example.Plugin</code> types, and instances cannot be cast between them.</p><h2 id=loading-linking-and-initialization>Loading, Linking, and Initialization
+<a href=#loading-linking-and-initialization class=heading-anchor><span>#</span></a></h2><p>The JVM specification separates the lifecycle as follows:</p><ol><li><strong>Loading</strong> obtains bytes, creates the <code>Class</code> object, and associates a
+defining loader.</li><li><strong>Linking</strong> includes verification, preparation, and optional resolution.
+Verification checks structural and type-safety constraints. Preparation
+allocates static fields and assigns their default values. Resolution turns
+symbolic references into runtime references; an implementation may defer it.</li><li><strong>Initialization</strong> executes the synthesized <code>&lt;clinit></code> method, which
+contains static field initializers and static blocks in source order.</li></ol><p>Compile-time constants are assigned by preparation, so reading a constant
+variable can avoid initialization of its declaring class. Do not infer a
+portable resolution schedule from an implementation&rsquo;s logging output.</p><h2 id=exact-initialization-triggers>Exact Initialization Triggers
+<a href=#exact-initialization-triggers class=heading-anchor><span>#</span></a></h2><p>JLS §12.4.1 requires initialization immediately before the first active use of
+a class: creating an instance, invoking a static method, assigning a static
+field, or reading a static field that is not a constant variable. It also
+includes a <code>static</code> assertion whose execution requires the class, selected
+reflective operations, and specified method-handle behavior. <code>Class.forName</code>
+initializes by default; use the three-argument overload with <code>false</code> to load
+without requesting initialization.</p><p>Before class <code>C</code> initializes, its superclass initializes, followed where
+applicable by superinterfaces that declare default methods in the order defined
+by the JLS. Initializing a class does not initialize arbitrary interfaces it
+implements. Reading <code>Child.value</code> initializes the class that actually declares
+<code>value</code>, not necessarily <code>Child</code>.</p><h2 id=failure-and-concurrency>Failure and Concurrency
+<a href=#failure-and-concurrency class=heading-anchor><span>#</span></a></h2><p>The JVM serializes initialization for each class or interface. Other threads
+wait while one thread runs <code>&lt;clinit></code>; recursive requests by that same thread
+are permitted. If initialization completes abruptly, the VM records the type
+as erroneous, reports an initialization failure to the triggering use, and
+later active uses fail with <code>NoClassDefFoundError</code>. Restarting the process or
+using an independent loader is required to obtain another initialization
+attempt.</p><p>Static initializers should establish simple, failure-free invariants. Network
+calls, lock acquisition, and configuration parsing can deadlock or permanently
+poison a type after one transient failure.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-12.html#jls-12.4>JLS §12.4, Initialization of Classes and Interfaces</a></li><li><a href=https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-5.html>JVMS §5, Loading, Linking, and Initializing</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ClassLoader.html>JDK <code>ClassLoader</code> API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-class-loading/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

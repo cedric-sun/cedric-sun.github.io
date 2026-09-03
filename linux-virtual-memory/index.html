@@ -1,0 +1,102 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Virtual Memory</title></head><body><main><article><div class=article-header><h1>Linux Virtual Memory</h1><div class=aux>Last update: 2023-07-08 11:32:23 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/kernel/>Kernel</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/memory/>Memory</a></div></div><div class=article-content><p>Linux virtual memory gives each process a protected virtual address space while
+letting the kernel share files, overcommit address space, reclaim physical pages,
+and place memory on NUMA nodes. The discussion assumes a memory-management unit
+(MMU); Linux has a separate <code>nommu</code> implementation for systems without one.</p><h2 id=translation-and-tlbs>Translation and TLBs
+<a href=#translation-and-tlbs class=heading-anchor><span>#</span></a></h2><p>Every load, store, and instruction fetch uses a virtual address. Hardware page
+tables translate the address to a physical page frame plus an offset. Linux
+models the hierarchy with five levels:</p><ol><li><code>PGD</code> — page global directory</li><li><code>P4D</code> — page fourth-level directory</li><li><code>PUD</code> — page upper directory</li><li><code>PMD</code> — page middle directory</li><li><code>PTE</code> — page-table entry</li></ol><p>An architecture with fewer hardware levels folds unused Linux levels into an
+adjacent level. The CPU caches translations in a translation lookaside buffer
+(TLB), because walking several page tables per access would be expensive.
+Changing a mapping requires invalidating stale translations on every CPU that
+can execute the affected address space.</p><p>Base-page size is architecture and kernel-configuration dependent. A mapping at
+a higher page-table level can cover a larger page, reducing page-table memory
+and TLB pressure. Linux supplies two separate huge-page mechanisms:</p><ul><li><strong>HugeTLB</strong> reserves or manages explicit huge pages, commonly through
+<code>hugetlbfs</code> or <code>MAP_HUGETLB</code>; capacity and allocation failure are part of its
+operational contract.</li><li><strong>Transparent Huge Pages (THP)</strong> promotes eligible mappings according to
+kernel policy, without a distinct application mapping ABI. Promotion and
+compaction can introduce latency, so workloads should measure rather than
+assume a benefit.</li></ul><h2 id=address-spaces-and-mappings>Address Spaces and Mappings
+<a href=#address-spaces-and-mappings class=heading-anchor><span>#</span></a></h2><p>Each userspace address space is described by an <code>mm_struct</code>. Kernel threads
+normally have no independent userspace <code>mm</code>; architecture-specific execution
+uses an active address-space context when needed. The kernel represents a
+contiguous virtual-memory region as a <code>vm_area_struct</code> (VMA). A VMA records its
+half-open address range, permissions, flags, backing object, and fault
+operations. Modern kernels index VMAs with a maple tree.</p><p>An <code>execve(2)</code> creates mappings for executable and shared-library segments.
+Other common VMAs include the stack, heap, anonymous <code>mmap(2)</code> mappings,
+file-backed mappings, shared memory, and the vDSO. <code>mmap(2)</code> reserves a virtual
+range and its access policy; it need not allocate or read all physical pages at
+mapping time.</p><p><code>mprotect(2)</code> changes VMA permissions, and <code>munmap(2)</code> removes mappings.
+Permission checks require both a suitable VMA and a suitable page-table entry.
+Guard pages, non-executable mappings, and address-space layout randomization are
+therefore enforcement mechanisms, not merely bookkeeping.</p><h2 id=faults-demand-paging-and-copy-on-write>Faults, Demand Paging, and Copy-on-Write
+<a href=#faults-demand-paging-and-copy-on-write class=heading-anchor><span>#</span></a></h2><p>A page fault transfers control to the kernel because translation is absent or
+the attempted access violates the current entry&rsquo;s permissions. The fault
+handler finds the VMA and decides whether the access is legal:</p><ul><li>A <strong>minor fault</strong> is resolved without storage I/O, for example by mapping a
+resident page-cache page or installing a newly allocated zero-filled page.</li><li>A <strong>major fault</strong> requires storage I/O before execution can continue.</li><li>An invalid address or disallowed access normally generates <code>SIGSEGV</code>; some
+object-specific failures, such as an inaccessible file-backed page, generate
+<code>SIGBUS</code>.</li></ul><p>Anonymous memory can initially map a shared read-only zero page. A write faults
+and obtains a private physical page. After <code>fork(2)</code>, parent and child commonly
+share pages through read-only mappings. The first writer takes a
+copy-on-write fault, receives a private page, and leaves the other mapping
+unchanged. Copy-on-write makes <code>fork()</code> inexpensive for an <code>exec()</code>-bound child
+but can make writes after a large fork expensive.</p><p>File-backed mappings and <code>read(2)</code> use the page cache. Clean cache pages are
+reclaimable because the kernel can reread the file. Dirty shared mappings must
+be written back before their frames can be reused. A private file mapping uses
+copy-on-write for writes, so its modified pages are anonymous rather than
+changes to the backing file.</p><h2 id=physical-allocation-and-numa>Physical Allocation and NUMA
+<a href=#physical-allocation-and-numa class=heading-anchor><span>#</span></a></h2><p>Linux describes physical frames with page descriptors and partitions memory by
+NUMA node and zone. Zones encode hardware constraints: for example, DMA-capable
+memory or memory not permanently mapped by the kernel on applicable 32-bit
+systems. NUMA nodes own zones, free lists, statistics, and reclaim state because
+access latency depends on the requesting CPU and memory bank.</p><p>The buddy allocator supplies physically contiguous page blocks. Order zero is
+one base page; order <em>n</em> is <code>2^n</code> contiguous pages. SLAB-family allocators,
+commonly SLUB, obtain pages from the buddy allocator and divide them into caches
+of fixed-size kernel objects.</p><p><code>kmalloc()</code> returns physically contiguous kernel memory for sizes supported by
+the allocator. <code>vmalloc()</code> constructs a virtually contiguous kernel range from
+noncontiguous physical pages, so it has different allocation cost and device-DMA
+properties. Driver and DMA APIs should be selected by the device&rsquo;s addressing
+requirements rather than substituting one for the other.</p><h2 id=reclaim-writeback-swap-and-oom>Reclaim, Writeback, Swap, and OOM
+<a href=#reclaim-writeback-swap-and-oom class=heading-anchor><span>#</span></a></h2><p>Physical memory pressure causes reclaim. The kernel can:</p><ul><li>drop clean page-cache pages;</li><li>write back dirty file pages and then drop them;</li><li>swap eligible anonymous pages when swap is available; and</li><li>invoke shrinkers for reclaimable caches such as filesystem metadata.</li></ul><p>Each zone has watermarks. Crossing the low watermark wakes <code>kswapd</code> for
+background reclaim. An allocation under more severe pressure can enter direct
+reclaim and block until enough pages are available. Reclaim policy and
+multi-generational LRU availability are kernel-configuration and release
+dependent; inspect the target kernel rather than assuming an LRU implementation.</p><p>Pinned pages, many kernel allocations, unreclaimable device buffers, and pages
+protected by policy reduce reclaimable capacity. Fragmentation can also prevent
+a higher-order allocation despite ample free memory. Compaction migrates movable
+pages to form a contiguous free block; <code>kcompactd</code> can run it in the background,
+and an allocating task can compact synchronously. THP and DMA are common
+consumers of such blocks.</p><p>When reclaim and compaction cannot satisfy an allocation, the kernel applies an
+out-of-memory policy. OOM handling may be global, scoped to a memory cgroup, or
+constrained by the failing allocation context. An OOM kill is a recovery path,
+not evidence that the selected process is the original source of memory growth.
+Investigate cgroup limits, memory pressure, allocation patterns, and pinned
+memory before changing <code>oom_score_adj</code>.</p><h2 id=observing-memory-behavior>Observing Memory Behavior
+<a href=#observing-memory-behavior class=heading-anchor><span>#</span></a></h2><p>Use several interfaces together because each reports a different layer:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>cat /proc/meminfo
+</span></span><span style=display:flex><span>cat /proc/vmstat
+</span></span><span style=display:flex><span>cat /proc/pressure/memory
+</span></span><span style=display:flex><span>cat /proc/$$/maps
+</span></span><span style=display:flex><span>cat /proc/$$/smaps_rollup
+</span></span><span style=display:flex><span>cat /proc/$$/numa_maps
+</span></span><span style=display:flex><span>vmstat <span style=color:#ae81ff>1</span></span></span></code></pre></div></div></div><p><code>/proc/PID/maps</code> lists VMAs. <code>smaps</code> adds per-VMA RSS, proportional-set-size,
+anonymous, file, swap, and page-size accounting; <code>smaps_rollup</code> aggregates that
+information. <code>numa_maps</code> shows locality and policy. Access to
+<code>/proc/PID/pagemap</code> is restricted because physical-mapping information can
+weaken security boundaries.</p><p>For fault rates, process accounting exposes <code>ru_minflt</code> and <code>ru_majflt</code> through
+<code>getrusage(2)</code>, while <code>/proc/PID/stat</code> includes per-process minor and major
+fault counters. <code>/proc/vmstat</code> provides system-wide <code>pgfault</code> and <code>pgmajfault</code>
+counters. Interpret deltas over an interval with latency and I/O metrics:
+major-fault counts identify fault paths that needed I/O, but do not independently
+prove the storage device caused an application&rsquo;s latency.</p><p>Pressure stall information (PSI) in <code>/proc/pressure/memory</code> reports the time
+tasks were stalled because of memory pressure. Pair PSI with <code>vmstat</code>, cgroup
+<code>memory.events</code>, and application latency to distinguish harmless cache turnover
+from sustained reclaim or cgroup-limit pressure.</p><p>Kernel behavior and tunables evolve. The primary references are the Linux
+<a href=https://docs.kernel.org/mm/index.html>memory-management index</a>, its
+<a href=https://docs.kernel.org/admin-guide/mm/concepts.html>concepts overview</a>, and
+the target release&rsquo;s source under
+<a href=https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/mm><code>mm/</code></a>.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-virtual-memory/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

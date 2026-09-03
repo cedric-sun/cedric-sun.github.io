@@ -1,0 +1,94 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>x86 Instruction Families</title></head><body><main><article><div class=article-header><h1>x86 Instruction Families</h1><div class=aux>Last update: 2022-02-24 03:27:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/x86/>X86</a>
+|
+<a href=/tags/x86-64/>X86-64</a>
+|
+<a href=/tags/assembly/>Assembly</a></div></div><div class=article-content><p>x86 groups a large, irregular instruction set behind common data movement,
+arithmetic, bit manipulation, control-flow, and string-processing patterns.
+Operand size, address size, execution mode, prefixes, and ISA extensions can
+change an instruction&rsquo;s encoding or availability. Intel&rsquo;s and AMD&rsquo;s architecture
+manuals remain authoritative; successful assembly only proves that a tool can
+encode the source.</p><h2 id=data-movement-and-address-generation>Data Movement and Address Generation
+<a href=#data-movement-and-address-generation class=heading-anchor><span>#</span></a></h2><p><code>MOV</code> copies an immediate or register value to a register or memory, or copies
+memory to a register. An ordinary <code>MOV</code> has at most one explicit memory operand.
+<code>MOVZX</code> zero-extends a narrower integer, while <code>MOVSX</code> and <code>MOVSXD</code> sign-extend.
+A 32-bit general-purpose-register destination in 64-bit mode implicitly clears
+the upper 32 bits.</p><p><code>CMOVcc</code> conditionally copies a register or memory source according to status
+flags without changing control flow. A memory-source conditional move can still
+perform the source read before selecting the result, so it must not be used to
+guard an invalid address. <code>SETcc</code> writes a byte result from the same condition
+families.</p><p><code>XCHG</code> exchanges two operands. Its memory form has locked semantics even without
+an explicit <code>LOCK</code> prefix, making it atomic with respect to other processors for
+the addressed memory. Atomicity does not make a compound algorithm correct;
+ordering, cache-line placement, and retry behavior still matter.</p><p><code>LEA</code> calculates an effective address and writes the arithmetic result without
+accessing memory:</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>lea</span> <span style=color:#66d9ef>rax</span>, [<span style=color:#66d9ef>rdi</span> <span style=color:#960050;background-color:#1e0010>+</span> <span style=color:#66d9ef>rdi</span>*<span style=color:#ae81ff>4</span>]    <span style=color:#960050;background-color:#1e0010>;</span> <span style=color:#66d9ef>rax</span> <span style=color:#960050;background-color:#1e0010>=</span> <span style=color:#66d9ef>rdi</span> * <span style=color:#ae81ff>5</span></span></span></code></pre></div></div></div><p>Compilers use <code>LEA</code> for pointer calculation and selected additions or constant
+multiplications. Segment bases and paging are not applied because no memory
+operand is dereferenced.</p><h2 id=stack-operations>Stack Operations
+<a href=#stack-operations class=heading-anchor><span>#</span></a></h2><p><code>PUSH</code> decrements the stack pointer and stores a value; <code>POP</code> loads a value and
+increments it. Exact operand-size behavior depends on mode. The platform ABI,
+not the instruction, determines alignment, red zones, shadow space, saved
+registers, and which memory is valid stack storage.</p><p><code>CALL</code> stores a return address and transfers control, while a near <code>RET</code> loads
+the return address from the stack. A mismatched stack pointer or corrupted
+return address therefore changes control flow. Far calls, far returns, call
+gates, and <code>IRET</code> additionally process segment or privilege state and should not
+be treated as ordinary function-call instructions.</p><h2 id=integer-arithmetic-comparison-and-flags>Integer Arithmetic, Comparison, and Flags
+<a href=#integer-arithmetic-comparison-and-flags class=heading-anchor><span>#</span></a></h2><p><code>ADD</code>, <code>ADC</code>, <code>SUB</code>, and <code>SBB</code> implement ordinary and multi-precision
+arithmetic. <code>ADC</code> consumes carry flag <code>CF</code>, and <code>SBB</code> consumes it as a borrow, so
+low-to-high limb sequences propagate carry or borrow. <code>INC</code> and <code>DEC</code> update
+several arithmetic flags but preserve <code>CF</code>.</p><p><code>CMP</code> performs a subtraction only to set flags. <code>TEST</code> performs a bitwise AND
+only to set flags. Conditional branches, moves, and byte-setting instructions
+then interpret those flags:</p><ul><li>Equality uses <code>ZF</code>.</li><li>Unsigned ordering uses <code>CF</code> and <code>ZF</code>.</li><li>Signed ordering combines <code>SF</code>, <code>OF</code>, and <code>ZF</code>.</li></ul><p><code>CF</code> records unsigned carry or borrow, while <code>OF</code> records signed overflow. The
+same bit pattern therefore requires a signed or unsigned condition matching the
+program&rsquo;s data interpretation.</p><p>Single-operand <code>MUL</code> and <code>IMUL</code> multiply an accumulator by an explicit operand
+and produce a double-width result in implicit high and low registers. Two- and
+three-operand <code>IMUL</code> forms write a truncated result to an explicit destination.
+<code>DIV</code> and <code>IDIV</code> divide a double-width implicit dividend. They raise divide error
+for a zero divisor or a quotient that cannot fit the destination; software must
+prepare the high half correctly before division.</p><h2 id=logical-bit-test-shift-and-rotate-operations>Logical, Bit-Test, Shift, and Rotate Operations
+<a href=#logical-bit-test-shift-and-rotate-operations class=heading-anchor><span>#</span></a></h2><p><code>AND</code>, <code>OR</code>, <code>XOR</code>, and <code>NOT</code> operate bitwise. Clearing a register with
+<code>xor eax, eax</code> is a common dependency-breaking idiom on current out-of-order
+processors, but its architectural result is simply zero.</p><p><code>BT</code> copies a selected bit to <code>CF</code>; <code>BTS</code>, <code>BTR</code>, and <code>BTC</code> also set, reset, or
+complement the bit. A memory bit index can address beyond the encoded memory
+operand, which makes bounds reasoning important. An explicit <code>LOCK</code> prefix can
+make supported read-modify-write memory forms atomic.</p><p><code>BSF</code> and <code>BSR</code> locate the least- or most-significant set bit. Their destination
+is undefined for a zero source. <code>TZCNT</code> and <code>LZCNT</code> provide defined zero-input
+results when the relevant extension is present, but their encodings can execute
+as <code>BSF</code> or <code>BSR</code> on processors without that extension. Feature detection is
+therefore required.</p><p><code>SHL</code> and <code>SAL</code> are equivalent left shifts. <code>SHR</code> shifts in zero bits, while
+<code>SAR</code> replicates the sign bit. <code>ROL</code> and <code>ROR</code> rotate within the operand; <code>RCL</code>
+and <code>RCR</code> rotate through <code>CF</code>. Shift counts are masked according to operand size,
+and flag results for large or zero counts require consulting the instruction
+definition.</p><h2 id=direct-and-indirect-control-flow>Direct and Indirect Control Flow
+<a href=#direct-and-indirect-control-flow class=heading-anchor><span>#</span></a></h2><p>Near <code>JMP</code>, <code>CALL</code>, and conditional <code>Jcc</code> instructions can use relative
+displacements measured from the end of the instruction. Indirect <code>JMP</code> and
+<code>CALL</code> read the destination from a register or memory. <code>RET</code> obtains its
+destination from the stack. Indirect targets interact with control-flow
+integrity, return prediction, and speculation mitigations, so equivalent-looking
+forms can have different security or performance properties.</p><p>Short conditional branches encode an 8-bit signed displacement. Near forms use
+a wider displacement in 32- and 64-bit modes. x86 has no general instruction
+that conditionally calls or returns; code composes those operations with a
+conditional branch.</p><p>Exceptions, software interrupts, and external interrupts transfer through the
+interrupt descriptor table. <code>INT</code>, <code>IRET</code>, and gate-based transfers have
+privilege semantics beyond ordinary branches. <code>SYSCALL</code>/<code>SYSRET</code> and
+<code>SYSENTER</code>/<code>SYSEXIT</code> use model-specific configuration and an operating-system
+ABI.</p><h2 id=string-instructions-and-repeat-prefixes>String Instructions and Repeat Prefixes
+<a href=#string-instructions-and-repeat-prefixes class=heading-anchor><span>#</span></a></h2><p><code>MOVS</code>, <code>CMPS</code>, <code>SCAS</code>, <code>LODS</code>, and <code>STOS</code> use implicit source, destination,
+accumulator, and count registers. Byte, word, doubleword, and selected quadword
+forms make element size explicit. The direction flag (<code>DF</code>) chooses whether
+index registers increment or decrement.</p><p><code>REP</code> repeats an operation while the count is nonzero. <code>REPE</code>/<code>REPZ</code> and
+<code>REPNE</code>/<code>REPNZ</code> additionally use <code>ZF</code> with comparison or scan instructions.
+Current processors can optimize large <code>REP MOVSB</code> and <code>REP STOSB</code> operations,
+but feature and size-dependent library dispatch remains an implementation
+decision.</p><p>Forward <code>rep movsb</code> is unsafe when the destination starts inside and above the
+source range because early stores overwrite bytes that have not been read.
+Backward copying can handle that overlap:</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>std</span>             <span style=color:#75715e>; decrement indexes
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>rep</span> <span style=color:#a6e22e>movsb</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>cld</span>             <span style=color:#960050;background-color:#1e0010>;</span> <span style=color:#66d9ef>restore</span> <span style=color:#66d9ef>the</span> <span style=color:#66d9ef>ABI-required</span> <span style=color:#66d9ef>direction</span></span></span></code></pre></div></div></div><p>The caller must initialize pointers to the final elements for a backward copy.
+Most x86 ABIs require <code>DF=0</code> on function entry and return, so code that executes
+<code>STD</code> must restore it even on failure paths. Production <code>memmove</code>
+implementations also choose direction and optimized sequences according to
+overlap, size, and processor features.</p><p>Privileged operations such as <code>CLI</code>, <code>STI</code>, <code>LGDT</code>, <code>LIDT</code>, control-register
+access, port I/O, and <code>HLT</code> are constrained by current mode and privilege.
+Assembler acceptance does not grant execution permission.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/x86-instructions/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

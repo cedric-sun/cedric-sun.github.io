@@ -1,0 +1,287 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Testing Spring Boot REST APIs</title></head><body><main><article><div class=article-header><h1>Testing Spring Boot REST APIs</h1><div class=aux>Last update: 2026-08-17 10:18:23 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/junit/>Junit</a>
+|
+<a href=/tags/mockito/>Mockito</a>
+|
+<a href=/tags/spring-boot/>Spring-Boot</a>
+|
+<a href=/tags/testing/>Testing</a></div></div><div class=article-content><p>Testing a Spring Boot REST API requires several scopes because a direct Java
+call, a simulated MVC request, and a request through a live server exercise
+different failure boundaries. A useful test suite places most behavior checks
+below the Spring context, then adds narrower web slices and a smaller number
+of full-application tests.</p><p>The dependency examples target Spring Boot 3.x because its test starter uses
+JUnit 5. Spring Boot 4 manages JUnit 6; Jupiter concepts remain, but package
+names for several Boot test annotations changed.</p><h2 id=testing-without-a-test-framework>Testing without a Test Framework
+<a href=#testing-without-a-test-framework class=heading-anchor><span>#</span></a></h2><p>A REST API can be checked without JUnit, Spring Test, or Mockito. Start the
+application, send a request with the JDK HTTP client, and throw an error when
+the response violates the contract:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>package</span> com.example;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.URI;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpClient;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpRequest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpResponse;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ManualApiCheck</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> request <span style=color:#f92672>=</span> HttpRequest.<span style=color:#a6e22e>newBuilder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>uri</span>(URI.<span style=color:#a6e22e>create</span>(<span style=color:#e6db74>&#34;http://localhost:8080/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>header</span>(<span style=color:#e6db74>&#34;Accept&#34;</span>, <span style=color:#e6db74>&#34;application/json&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>GET</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> response <span style=color:#f92672>=</span> HttpClient.<span style=color:#a6e22e>newHttpClient</span>().<span style=color:#a6e22e>send</span>(
+</span></span><span style=display:flex><span>                request, HttpResponse.<span style=color:#a6e22e>BodyHandlers</span>.<span style=color:#a6e22e>ofString</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (response.<span style=color:#a6e22e>statusCode</span>() <span style=color:#f92672>!=</span> 200) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> AssertionError(<span style=color:#e6db74>&#34;status: &#34;</span> <span style=color:#f92672>+</span> response.<span style=color:#a6e22e>statusCode</span>());
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>response.<span style=color:#a6e22e>body</span>().<span style=color:#a6e22e>equals</span>(<span style=color:#e6db74>&#34;{\&#34;message\&#34;:\&#34;Hello, Ada\&#34;}&#34;</span>)) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> AssertionError(<span style=color:#e6db74>&#34;body: &#34;</span> <span style=color:#f92672>+</span> response.<span style=color:#a6e22e>body</span>());
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Java&rsquo;s <code>assert</code> statement could replace the explicit checks, but assertions
+are disabled unless the JVM starts with <code>-ea</code>. Explicit <code>AssertionError</code>
+therefore gives a reliable process exit code.</p><p>A custom executable remains useful for smoke checks against an already
+deployed service. Replacing a test framework entirely would also require
+implementing test discovery, fixture lifecycle, isolation, result reporting,
+parallel execution, and build integration. Manual <code>curl</code> or browser checks
+provide exploration rather than a repeatable regression suite.</p><h2 id=choosing-a-test-scope>Choosing a Test Scope
+<a href=#choosing-a-test-scope class=heading-anchor><span>#</span></a></h2><p>Spring&rsquo;s testing documentation distinguishes unit tests from integration tests
+and provides several web-test scopes. No single annotation is the recommended
+answer for every endpoint. Select the smallest scope that contains the
+behavior under examination:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Scope</th><th>Mechanism</th><th>Behavior Exercised</th></tr></thead><tbody><tr><td>Plain unit</td><td>JUnit and ordinary constructors</td><td>Controller or service Java logic without Spring</td></tr><tr><td>MVC slice</td><td><code>@WebMvcTest</code> and <code>MockMvc</code></td><td>Routing, binding, validation, serialization, filters, and controller advice</td></tr><tr><td>Full context with mock web layer</td><td><code>@SpringBootTest</code> and <code>@AutoConfigureMockMvc</code></td><td>Application wiring plus simulated Servlet requests</td></tr><tr><td>Full live server</td><td><code>@SpringBootTest(webEnvironment = RANDOM_PORT)</code></td><td>Embedded server, filters, serialization, networking, and complete application wiring</td></tr><tr><td>Deployed-system test</td><td>External HTTP client</td><td>Packaged service and its deployed dependencies</td></tr></tbody></table></div></div><p>Spring recommends unit tests where the Spring container is not required.
+<code>MockMvc</code> then provides full Spring MVC request handling without a running
+server. Keep some live-server tests because a simulated request does not cover
+the Servlet container&rsquo;s network, dispatch, and error-page behavior.</p><p>Tests that use a database or broker need a separate dependency decision:</p><ul><li>Replace the boundary with a fake or mock when testing application decisions.</li><li>Use an isolated real service when database queries, mappings, transactions,
+broker behavior, or wire compatibility form part of the requirement.</li><li>Never point an automated test at production infrastructure.</li></ul><h2 id=spring-boot-test-dependencies>Spring Boot Test Dependencies
+<a href=#spring-boot-test-dependencies class=heading-anchor><span>#</span></a></h2><p>An application that already inherits from the Spring Boot 3 parent or imports
+its BOM needs one test dependency:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.boot<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>spring-boot-starter-test<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>The starter includes Spring Boot Test, Spring Test, JUnit Jupiter, Mockito,
+AssertJ, Hamcrest, JSONassert, JsonPath, and Awaitility. Let Spring Boot manage
+their versions because the dependency set is tested as one release train.</p><p>The examples use the following application boundary:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>interface</span> <span style=color:#a6e22e>GreetingService</span> {
+</span></span><span style=display:flex><span>    Greeting <span style=color:#a6e22e>greet</span>(String name);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>record</span> <span style=color:#a6e22e>Greeting</span>(String message) {}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RestController</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RequestMapping</span>(<span style=color:#e6db74>&#34;/greetings&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingController</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> GreetingService service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>GreetingController</span>(GreetingService service) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>service</span> <span style=color:#f92672>=</span> service;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@GetMapping</span>(<span style=color:#e6db74>&#34;/{name}&#34;</span>)
+</span></span><span style=display:flex><span>    Greeting <span style=color:#a6e22e>get</span>(<span style=color:#a6e22e>@PathVariable</span> String name) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> service.<span style=color:#a6e22e>greet</span>(name);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><h2 id=plain-junit-5-tests>Plain JUnit 5 Tests
+<a href=#plain-junit-5-tests class=heading-anchor><span>#</span></a></h2><p>Spring components remain ordinary Java objects. Constructing a controller
+directly avoids context startup when the test concerns branching, returned
+values, or service delegation:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingControllerTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>returnsTheServiceResult</span>() {
+</span></span><span style=display:flex><span>        GreetingService service <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>                name <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Hello, &#34;</span> <span style=color:#f92672>+</span> name);
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> controller <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> GreetingController(service);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>),
+</span></span><span style=display:flex><span>                controller.<span style=color:#a6e22e>get</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The test does not validate <code>@GetMapping</code>, path-variable conversion, JSON
+serialization, validation, filters, or exception handlers because direct
+method invocation bypasses Spring MVC.</p><h2 id=mvc-slice-tests-with-junit-5>MVC Slice Tests with JUnit 5
+<a href=#mvc-slice-tests-with-junit-5 class=heading-anchor><span>#</span></a></h2><p><code>@WebMvcTest</code> loads MVC infrastructure and selected web components instead of
+the complete application. Supply a deterministic implementation for the
+controller dependency to keep Mockito out of the test:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.beans.factory.annotation.Autowired;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.context.TestConfiguration;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.context.annotation.Bean;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.context.annotation.Import;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.test.web.servlet.MockMvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@WebMvcTest</span>(GreetingController.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Import</span>(GreetingControllerWebTest.<span style=color:#a6e22e>Dependencies</span>.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingControllerWebTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Autowired</span>
+</span></span><span style=display:flex><span>    MockMvc mvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>rendersAJsonGreeting</span>() <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        mvc.<span style=color:#a6e22e>perform</span>(get(<span style=color:#e6db74>&#34;/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(status().<span style=color:#a6e22e>isOk</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(content().<span style=color:#a6e22e>contentTypeCompatibleWith</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;application/json&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(jsonPath(<span style=color:#e6db74>&#34;$.message&#34;</span>).<span style=color:#a6e22e>value</span>(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@TestConfiguration</span>(proxyBeanMethods <span style=color:#f92672>=</span> <span style=color:#66d9ef>false</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Dependencies</span> {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>        GreetingService <span style=color:#a6e22e>greetingService</span>() {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span> name <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Hello, &#34;</span> <span style=color:#f92672>+</span> name);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Add security configuration, controller advice, converters, or filters to the
+slice when their behavior belongs to the endpoint contract. A slice that
+excludes a production component under test can pass while the assembled
+application fails, so full-context coverage remains necessary.</p><h2 id=full-context-tests>Full-Context Tests
+<a href=#full-context-tests class=heading-anchor><span>#</span></a></h2><p>The default <code>@SpringBootTest</code> web environment is <code>MOCK</code>. Add
+<code>@AutoConfigureMockMvc</code> to execute requests through the complete application
+context without opening a network port:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@SpringBootTest</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@AutoConfigureMockMvc</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingApplicationTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Autowired</span>
+</span></span><span style=display:flex><span>    MockMvc mvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>servesAGreeting</span>() <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        mvc.<span style=color:#a6e22e>perform</span>(get(<span style=color:#e6db74>&#34;/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(status().<span style=color:#a6e22e>isOk</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(jsonPath(<span style=color:#e6db74>&#34;$.message&#34;</span>).<span style=color:#a6e22e>value</span>(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Use a random-port environment when the embedded server or real HTTP behavior
+forms part of the test:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.URI;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpClient;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpRequest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpResponse;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.context.SpringBootTest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.web.server.LocalServerPort;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@SpringBootTest</span>(webEnvironment <span style=color:#f92672>=</span> SpringBootTest.<span style=color:#a6e22e>WebEnvironment</span>.<span style=color:#a6e22e>RANDOM_PORT</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingHttpTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@LocalServerPort</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> port;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>servesAGreetingOverHttp</span>() <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> request <span style=color:#f92672>=</span> HttpRequest.<span style=color:#a6e22e>newBuilder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>uri</span>(URI.<span style=color:#a6e22e>create</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;http://localhost:&#34;</span> <span style=color:#f92672>+</span> port <span style=color:#f92672>+</span> <span style=color:#e6db74>&#34;/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>GET</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> response <span style=color:#f92672>=</span> HttpClient.<span style=color:#a6e22e>newHttpClient</span>().<span style=color:#a6e22e>send</span>(
+</span></span><span style=display:flex><span>                request, HttpResponse.<span style=color:#a6e22e>BodyHandlers</span>.<span style=color:#a6e22e>ofString</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(200, response.<span style=color:#a6e22e>statusCode</span>());
+</span></span><span style=display:flex><span>        assertEquals(
+</span></span><span style=display:flex><span>                <span style=color:#e6db74>&#34;{\&#34;message\&#34;:\&#34;Hello, Ada\&#34;}&#34;</span>,
+</span></span><span style=display:flex><span>                response.<span style=color:#a6e22e>body</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Random ports prevent fixed-port conflicts during concurrent builds. Client and
+server code run on separate threads, so a transaction started on the test
+thread does not automatically roll back data committed by a live-server
+request. Reset state explicitly or isolate the backing service.</p><p>Boot 3 also provides <code>TestRestTemplate</code>, while Spring&rsquo;s reactive stack provides
+<code>WebTestClient</code>. Spring Framework 7 adds <code>RestTestClient</code> for a common
+synchronous assertion API across MockMvc and live-server tests. Choose a client
+supported by the Spring version in the application rather than copying an
+unversioned example.</p><h2 id=junit-5-and-mockito-without-a-spring-context>JUnit 5 and Mockito without a Spring Context
+<a href=#junit-5-and-mockito-without-a-spring-context class=heading-anchor><span>#</span></a></h2><p>Use <code>MockitoExtension</code> when Spring wiring is not under test:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.verify;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.when;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.extension.ExtendWith;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.InjectMocks;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.Mock;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.junit.jupiter.MockitoExtension;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@ExtendWith</span>(MockitoExtension.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingControllerMockitoTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Mock</span>
+</span></span><span style=display:flex><span>    GreetingService service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@InjectMocks</span>
+</span></span><span style=display:flex><span>    GreetingController controller;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>delegatesToTheService</span>() {
+</span></span><span style=display:flex><span>        when(service.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>thenReturn</span>(<span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>),
+</span></span><span style=display:flex><span>                controller.<span style=color:#a6e22e>get</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>));
+</span></span><span style=display:flex><span>        verify(service).<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The test loads no Spring context. <code>@InjectMocks</code> calls the controller
+constructor, while <code>@Mock</code> creates an ordinary Mockito object.</p><h2 id=mockito-in-a-spring-test-context>Mockito in a Spring Test Context
+<a href=#mockito-in-a-spring-test-context class=heading-anchor><span>#</span></a></h2><p>An ordinary <code>@Mock</code> field does not replace a bean in Spring&rsquo;s
+<code>ApplicationContext</code>. Use <code>@MockitoBean</code> when a slice or full-context test
+needs a bean override:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.verify;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.when;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.beans.factory.annotation.Autowired;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.test.context.bean.override.mockito.MockitoBean;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.test.web.servlet.MockMvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@WebMvcTest</span>(GreetingController.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingControllerMockitoWebTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Autowired</span>
+</span></span><span style=display:flex><span>    MockMvc mvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@MockitoBean</span>
+</span></span><span style=display:flex><span>    GreetingService service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>rendersTheMockedServiceResult</span>() <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        when(service.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>thenReturn</span>(<span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        mvc.<span style=color:#a6e22e>perform</span>(get(<span style=color:#e6db74>&#34;/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(status().<span style=color:#a6e22e>isOk</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(jsonPath(<span style=color:#e6db74>&#34;$.message&#34;</span>).<span style=color:#a6e22e>value</span>(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        verify(service).<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring Framework&rsquo;s TestContext support creates the mock and replaces the
+matching bean before refreshing the context. Spring Boot test annotations
+already register <code>SpringExtension</code>, so adding <code>MockitoExtension</code> does not help
+with context bean replacement.</p><p><code>@MockitoSpyBean</code> wraps an existing context bean when selected real behavior
+must remain. Spring Boot&rsquo;s older <code>@MockBean</code> and <code>@SpyBean</code> annotations were
+deprecated in Boot 3.4 in favor of Spring Framework&rsquo;s <code>@MockitoBean</code> and
+<code>@MockitoSpyBean</code>. Projects on Boot 3.3 or earlier must use the older
+annotations.</p><p>Apply bean overrides to architectural boundaries such as remote clients,
+message publishers, clocks, or repositories. Replacing many internal beans in
+a full-context test removes the wiring that <code>@SpringBootTest</code> was selected to
+exercise; a plain unit test or MVC slice then expresses the scope more
+accurately.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/testing.html>Spring Framework Testing</a></li><li><a href=https://docs.spring.io/spring-framework/reference/testing/mockmvc.html>Spring MVC Test Framework</a></li><li><a href=https://docs.spring.io/spring-boot/reference/testing/index.html>Spring Boot Testing</a></li><li><a href=https://docs.spring.io/spring-framework/reference/testing/annotations/integration-spring/annotation-mockitobean.html><code>@MockitoBean</code> and <code>@MockitoSpyBean</code></a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/testing-spring-boot-rest-apis/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

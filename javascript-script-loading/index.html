@@ -1,0 +1,87 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>JavaScript Script Loading</title></head><body><main><article><div class=article-header><h1>JavaScript Script Loading</h1><div class=aux>Last update: 2025-09-19 20:13:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/javascript/>Javascript</a>
+|
+<a href=/tags/html/>Html</a></div></div><div class=article-content><p>The HTML parser, script fetcher, and JavaScript engine can work concurrently,
+but execution constraints differ by script type and attributes. Choose a mode
+from the dependency graph and readiness contract rather than adding <code>async</code> or
+<code>defer</code> only as a performance hint.</p><h2 id=understand-parser-blocking-classic-scripts>Understand Parser-Blocking Classic Scripts
+<a href=#understand-parser-blocking-classic-scripts class=heading-anchor><span>#</span></a></h2><p>A classic external script without <code>async</code> or <code>defer</code> blocks the parser at its
+element. The browser fetches and executes the script before parsing subsequent
+markup:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/library.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;
+</span></span><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/application.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;</span></span></code></pre></div></div></div><p>The second script can read globals created by the first because document order
+is execution order. An inline classic script also runs immediately at its
+parser position, so it can access only the DOM parsed up to that point.</p><p>Parser blocking can be intentional when a script must call <code>document.write</code> or
+establish state before later markup is interpreted. Application code should
+avoid those dependencies because network latency then delays both DOM
+construction and first rendering.</p><h2 id=defer-ordered-classic-scripts>Defer Ordered Classic Scripts
+<a href=#defer-ordered-classic-scripts class=heading-anchor><span>#</span></a></h2><p><code>defer</code> applies to external classic scripts. Fetching proceeds in parallel with
+HTML parsing, then deferred scripts execute in document order after parsing and
+before <code>DOMContentLoaded</code>:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>defer</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/library.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;
+</span></span><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>defer</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/application.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;</span></span></code></pre></div></div></div><p>The second script keeps its dependency on the first without blocking the
+parser. The <code>defer</code> attribute has no effect on an inline classic script; use a
+module or an explicit readiness callback instead.</p><p>A deferred script can still delay <code>DOMContentLoaded</code> through slow fetching or
+synchronous execution. Stylesheets needed by the script can also postpone its
+execution because script code may depend on computed style.</p><h2 id=load-independent-scripts-asynchronously>Load Independent Scripts Asynchronously
+<a href=#load-independent-scripts-asynchronously class=heading-anchor><span>#</span></a></h2><p>An external classic script with <code>async</code> executes as soon as it is ready. Fetch
+does not block parsing, but execution pauses the parser if the response arrives
+while parsing is still in progress:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>async</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;https://analytics.example/sdk.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;</span></span></code></pre></div></div></div><p>Two async scripts have no execution-order guarantee. They must not depend on
+one another, on a complete DOM, or on running before <code>DOMContentLoaded</code>.
+<code>DOMContentLoaded</code> does not wait for them, while the window <code>load</code> event waits
+for scripts that are part of the document&rsquo;s outstanding load work.</p><p>Use an explicit callback or promise supplied by the integration when later
+code depends on async initialization. Observing that a global exists on one
+network does not establish a valid ordering contract.</p><h2 id=load-es-modules-as-dependency-graphs>Load ES Modules as Dependency Graphs
+<a href=#load-es-modules-as-dependency-graphs class=heading-anchor><span>#</span></a></h2><p><code>type="module"</code> changes both loading and execution:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>type</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;module&#34;</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/main.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;</span></span></code></pre></div></div></div><p>Module scripts are deferred by default, including inline modules. Static
+<code>import</code> declarations form a graph whose dependencies are fetched before a
+module evaluates. Modules use strict mode, have their own top-level scope, and
+are evaluated once for each resolved module identity rather than once per
+<code>&lt;script></code> element.</p><p>Module fetches use CORS. A cross-origin module and every cross-origin dependency
+must return an appropriate <code>Access-Control-Allow-Origin</code> response, and a
+JavaScript-compatible media type is required. Classic-script behavior is not a
+fallback for a failed module fetch.</p><p>Adding <code>async</code> to a module script lets its graph evaluate as soon as it is
+ready, removing normal document-order behavior:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>type</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;module&#34;</span> <span style=color:#a6e22e>async</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/independent-widget.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;</span></span></code></pre></div></div></div><p>Top-level <code>await</code> suspends evaluation of modules that depend on the awaiting
+module. Do not treat DOM readiness as proof that application initialization
+has completed; export or publish an initialization promise when consumers must
+wait for asynchronous module work.</p><h2 id=insert-scripts-dynamically>Insert Scripts Dynamically
+<a href=#insert-scripts-dynamically class=heading-anchor><span>#</span></a></h2><p>A script element created by JavaScript is force-async by default:</p><div class=jose-wrapper><div class=jose-tools><span>js</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-js data-lang=js><span style=display:flex><span><span style=color:#66d9ef>function</span> <span style=color:#a6e22e>loadScript</span>(<span style=color:#a6e22e>src</span>) {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> Promise((<span style=color:#a6e22e>resolve</span>, <span style=color:#a6e22e>reject</span>) =&gt; {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>const</span> <span style=color:#a6e22e>script</span> <span style=color:#f92672>=</span> document.<span style=color:#a6e22e>createElement</span>(<span style=color:#e6db74>&#34;script&#34;</span>);
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>script</span>.<span style=color:#a6e22e>src</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>src</span>;
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>script</span>.<span style=color:#a6e22e>addEventListener</span>(<span style=color:#e6db74>&#34;load&#34;</span>, <span style=color:#a6e22e>resolve</span>, { <span style=color:#a6e22e>once</span><span style=color:#f92672>:</span> <span style=color:#66d9ef>true</span> });
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>script</span>.<span style=color:#a6e22e>addEventListener</span>(<span style=color:#e6db74>&#34;error&#34;</span>, <span style=color:#a6e22e>reject</span>, { <span style=color:#a6e22e>once</span><span style=color:#f92672>:</span> <span style=color:#66d9ef>true</span> });
+</span></span><span style=display:flex><span>    document.<span style=color:#a6e22e>head</span>.<span style=color:#a6e22e>append</span>(<span style=color:#a6e22e>script</span>);
+</span></span><span style=display:flex><span>  });
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The returned promise defines a usable completion boundary:</p><div class=jose-wrapper><div class=jose-tools><span>js</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-js data-lang=js><span style=display:flex><span><span style=color:#66d9ef>await</span> <span style=color:#a6e22e>loadScript</span>(<span style=color:#e6db74>&#34;/library.js&#34;</span>);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>await</span> <span style=color:#a6e22e>loadScript</span>(<span style=color:#e6db74>&#34;/application.js&#34;</span>);</span></span></code></pre></div></div></div><p>A loader can set <code>script.async = false</code> before insertion to place dynamically
+inserted classic scripts in an ordered queue. Explicit promise sequencing is
+clearer when failures need to stop dependent loads. Dynamic <code>import()</code> is the
+corresponding module mechanism and resolves only after the requested module
+graph evaluates.</p><p>Dynamically adding a script after <code>DOMContentLoaded</code> does not fire that event
+again. Adding load-delaying work before the window <code>load</code> event can postpone
+<code>load</code>; adding it afterward cannot replay the event.</p><h2 id=select-the-correct-readiness-event>Select the Correct Readiness Event
+<a href=#select-the-correct-readiness-event class=heading-anchor><span>#</span></a></h2><p><code>DOMContentLoaded</code> means that parsing is complete and parser-deferred scripts
+have run. It does not mean that images, async scripts, dynamically started
+application work, or every custom element is ready:</p><div class=jose-wrapper><div class=jose-tools><span>js</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-js data-lang=js><span style=display:flex><span><span style=color:#66d9ef>function</span> <span style=color:#a6e22e>start</span>() {
+</span></span><span style=display:flex><span>  <span style=color:#75715e>// The parsed DOM is available here.
+</span></span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> (document.<span style=color:#a6e22e>readyState</span> <span style=color:#f92672>===</span> <span style=color:#e6db74>&#34;loading&#34;</span>) {
+</span></span><span style=display:flex><span>  document.<span style=color:#a6e22e>addEventListener</span>(<span style=color:#e6db74>&#34;DOMContentLoaded&#34;</span>, <span style=color:#a6e22e>start</span>, { <span style=color:#a6e22e>once</span><span style=color:#f92672>:</span> <span style=color:#66d9ef>true</span> });
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>start</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The <code>readyState</code> branch matters for modules and dynamically loaded code that
+may begin after the event. Use <code>load</code> only when layout or behavior requires
+load-complete resources such as images or frames. Prefer resource-specific
+promises such as <code>image.decode()</code>, <code>document.fonts.ready</code>, or a module&rsquo;s own
+initialization promise when only one dependency matters.</p><p>Parser-blocking scripts provide immediate ordering, <code>defer</code> provides ordered
+post-parse execution, <code>async</code> provides independent opportunistic execution,
+and modules provide a CORS-checked dependency graph. Matching the mechanism to
+the dependency contract removes timing assumptions that disappear under a
+different cache or network.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/javascript-script-loading/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,345 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Process Model</title></head><body><main><article><div class=article-header><h1>Linux Process Model</h1><div class=aux>Last update: 2023-10-20 02:49:27 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/kernel/>Kernel</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/processes/>Processes</a></div></div><div class=article-content><p>The kernel represents every schedulable flow of execution with <code>struct task_struct</code>,
+declared in the kernel source&rsquo;s <code>include/linux/sched.h</code>. Distribution headers in
+<code>/usr/include/linux</code> are exported userspace ABI headers, not a copy of every kernel
+internal definition.</p><h2 id=tasks-threads-and-ids>Tasks, Threads, and IDs
+<a href=#tasks-threads-and-ids class=heading-anchor><span>#</span></a></h2><p>A <code>pid_t</code> is an integer type; its width is architecture and ABI dependent. A
+<code>struct pid</code> represents an identity across PID namespaces and associates numeric PIDs
+with their namespaces. A task&rsquo;s <code>pid</code> identifies that individual task in its active
+namespace. Its <code>tgid</code> is the thread-group ID: for the leader it equals <code>pid</code>, and
+<code>getpid(2)</code> returns the thread-group ID.</p><p>Linux uses the same task representation for processes and threads. <code>clone(2)</code> selects
+which resources are shared; threads share a thread group, address space, and other
+resources as requested, while <code>fork(2)</code> creates a child with separate process state
+before a possible <code>execve(2)</code>.</p><h2 id=parentage>Parentage
+<a href=#parentage class=heading-anchor><span>#</span></a></h2><p><code>parent</code> is the task that receives parent-oriented events such as <code>SIGCHLD</code>; it can
+change when a child is reparented. <code>real_parent</code> initially identifies the creator and
+normally remains that creator, although kernel facilities can change it in special
+cases. The <code>children</code> and <code>sibling</code> lists express the current parent-child tree.
+Sessions and process groups form additional job-control relationships independent of
+the thread-group relationship.</p><h2 id=migrated-reference-material>Migrated Reference Material
+<a href=#migrated-reference-material class=heading-anchor><span>#</span></a></h2><p>Task is the only unit of execution flow scheduling in Linux.
+This article explains the mysteries around Linux tasks by directly checking the Linux source.</p><p>A task is represented by a <code>struct task_struct</code> instance. In the Linux source tree, this structure is defined by <code>include/linux/sched.h</code>:</p><p><em>(Don&rsquo;t get confused with <code>/usr/include/linux/sched.h</code> on your distro, which are userspace APIs generated at kernel&rsquo;s build time.
+Structures internal to the kernel, including <code>struct task_struct</code>, won&rsquo;t be there.)</em></p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>// include/linux/sched.h
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> task_struct {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// ...
+</span></span></span></code></pre></div></div></div><p><code>task_struct</code> is a large structure. Its fields will be summarized below.</p><h3 id=types>Types
+<a href=#types class=heading-anchor><span>#</span></a></h3><p>Before looking at the definition of <code>task_struct</code>, some basics need to be set up.</p><p>A <code>pid_t</code> is a platform <code>int</code>. On x86_64 that&rsquo;s 32 bit:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>// include/linux/types.h
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>typedef</span> __kernel_pid_t		<span style=color:#66d9ef>pid_t</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// include/uapi/asm-generic/posix_types.h
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>typedef</span> <span style=color:#66d9ef>int</span>		__kernel_pid_t;</span></span></code></pre></div></div></div><p>A <code>struct pid</code> instance identifies an individual task, a process group, or a session.
+The latter 2 are sets of tasks and exist for a reason, see <a href=/linux-process-model/#process-group>Process Group & Session</a></p><p>The same task, process group, or session, can have different numeric ID in different pid namespaces.
+Thus a <code>struct pid</code> instance can have multiple <code>upid</code>.</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>// include/linux/pid.h
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * What is struct pid?
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * A struct pid is the kernel&#39;s internal notion of a process identifier.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * It refers to individual tasks, process groups, and sessions.  While
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * there are processes attached to it the struct pid lives in a hash
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * table, so it and then the processes that it refers to can be found
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * quickly from the numeric pid value.  The attached processes may be
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * quickly accessed by following pointers from struct pid.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * Storing pid_t values in the kernel and referring to them later has a
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * problem.  The process originally with that pid may have exited and the
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * pid allocator wrapped, and another process could have come along
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * and been assigned that pid.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * Referring to user space processes by holding a reference to struct
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * task_struct has a problem.  When the user space process exits
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * the now useless task_struct is still kept.  A task_struct plus a
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * stack consumes around 10K of low kernel memory.  More precisely
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * this is THREAD_SIZE + sizeof(struct task_struct).  By comparison
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * a struct pid is about 64 bytes.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * Holding a reference to struct pid solves both of these problems.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * It is small so holding a reference does not consume a lot of
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * resources, and since a new struct pid is allocated when the numeric pid
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * value is reused (when pids wrap around) we don&#39;t mistakenly refer to new
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * processes.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> */</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * struct upid is used to get the id of the struct pid, as it is
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * seen in particular namespace. Later the struct pid is found with
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * find_pid_ns() using the int nr and struct pid_namespace *ns.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> */</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> upid {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> nr;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> pid_namespace <span style=color:#f92672>*</span>ns;
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> pid
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>refcount_t</span> count;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>int</span> level;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>spinlock_t</span> lock;
+</span></span><span style=display:flex><span>	<span style=color:#75715e>/* lists of tasks that use this pid */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> hlist_head tasks[PIDTYPE_MAX];
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> hlist_head inodes;
+</span></span><span style=display:flex><span>	<span style=color:#75715e>/* wait queue for pidfd notifications */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>wait_queue_head_t</span> wait_pidfd;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> rcu_head rcu;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> upid numbers[];
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><h3 id=the-task_struct>The <code>task_struct</code>
+<a href=#the-task_struct class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>pid_t</span>				pid;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pid_t</span>				tgid;</span></span></code></pre></div></div></div><ul><li><code>pid</code> is a number that uniquely marks this <code>task_struct</code> instance. This number is not necessarily</li><li><code>tgid</code> is a number returned by the <code>getpid(2)</code> syscall, and is numerically the same as the <code>pid</code> of the thread group leader.</li></ul><p>See <a href=/linux-process-model/#threading>Threading</a> below.</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>/* Recipient of SIGCHLD, wait4() reports: */</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> task_struct __rcu	<span style=color:#f92672>*</span>parent;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>/* Real parent process: */</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> task_struct __rcu	<span style=color:#f92672>*</span>real_parent;</span></span></code></pre></div></div></div><p>Current parent, which may change due to [reparenting](#documented behavior);
+and the original parent that clones/forks this task that never changes once the task is created.</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>* Children/sibling form the list of natural children:
+</span></span></span><span style=display:flex><span><span style=color:#75715e>*/</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> list_head		children;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> list_head		sibling;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> task_struct		<span style=color:#f92672>*</span>group_leader;</span></span></code></pre></div></div></div><p>Pointers to the youngest child, the youngest sibling, and the oldest sibling.
+See <a href=/linux-process-model/#process-group>Process Group & Session</a>.</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>#ifdef CONFIG_THREAD_INFO_IN_TASK
+</span></span></span><span style=display:flex><span>	<span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 * For reasons of header soup (see current_thread_info()), this
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 * must be the first element of task_struct.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> thread_info		thread_info;
+</span></span><span style=display:flex><span><span style=color:#75715e>#endif</span></span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>	<span style=color:#75715e>/* PID/PID hash table linkage. */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> pid			<span style=color:#f92672>*</span>thread_pid;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> hlist_node		pid_links[PIDTYPE_MAX];
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> list_head		thread_node;</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>    <span style=color:#75715e>/* CPU-specific state of this task: */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> thread_struct		<span style=color:#66d9ef>thread</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 * WARNING: on x86, &#39;thread_struct&#39; contains a variable-sized
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 * structure.  It *MUST* be at the end of &#39;task_struct&#39;.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 *
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 * Do not put anything below here!
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 */</span></span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>/* Signal handlers: */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> signal_struct		<span style=color:#f92672>*</span>signal;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> sighand_struct __rcu		<span style=color:#f92672>*</span>sighand;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>sigset_t</span>			blocked;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>sigset_t</span>			real_blocked;
+</span></span><span style=display:flex><span>	<span style=color:#75715e>/* Restored if set_restore_sigmask() was used: */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>sigset_t</span>			saved_sigmask;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> sigpending		pending;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>			sas_ss_sp;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>size_t</span>				sas_ss_size;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>int</span>			sas_ss_flags;</span></span></code></pre></div></div></div><ol><li>A task represents a thread in the process-thread terminology, and thus belongs to a process (i.e. a thread group).</li><li>A process (i.e. thread group) belongs to a <em>process group</em>,</li></ol><ul><li>A task belongs to a namespace.</li><li>A task belongs to a cgroup (control group).</li></ul><h2 id=ids>IDs
+<a href=#ids class=heading-anchor><span>#</span></a></h2><p>For the current kernel design, there are 4 numeric IDs directly associated with a <code>task_struct</code> instance: thread ID, thread group (i.e. process) ID, process group ID, and session ID; as opposed to indirect ones, e.g. parent process ID obtained as the thread group ID of <code>p->real_parent</code> pointer.</p><p>The numeric values of all 4 IDs as observed from the userspace are subject to the pid namespace (see <code>man 7 namespaces</code>) the process is currently in,
+thus simply storing numbers in <code>task_struct</code> and returing them from syscalls won&rsquo;t work.</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>//include/linux/pid_types.h
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>enum</span> pid_type {
+</span></span><span style=display:flex><span>	PIDTYPE_PID,
+</span></span><span style=display:flex><span>	PIDTYPE_TGID,
+</span></span><span style=display:flex><span>	PIDTYPE_PGID,
+</span></span><span style=display:flex><span>	PIDTYPE_SID,
+</span></span><span style=display:flex><span>	PIDTYPE_MAX,
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// kernel/pid.c
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * the helpers to get the task&#39;s different pids as they are seen
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * from various namespaces
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * task_xid_nr()     : global id, i.e. the id seen from the init namespace;
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * task_xid_vnr()    : virtual id, i.e. the id seen from the pid namespace of
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *                     current.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * task_xid_nr_ns()  : id seen from the ns specified;
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * see also pid_nr() etc in include/linux/pid.h
+</span></span></span><span style=display:flex><span><span style=color:#75715e> */</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_pid_nr</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_pid_vnr</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_pid_nr_ns</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk, <span style=color:#66d9ef>struct</span> pid_namespace <span style=color:#f92672>*</span>ns)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_tgid_nr</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_tgid_nr_ns</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk, <span style=color:#66d9ef>struct</span> pid_namespace <span style=color:#f92672>*</span>ns)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_tgid_vnr</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_pgrp_nr</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_pgrp_vnr</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_pgrp_nr_ns</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk, <span style=color:#66d9ef>struct</span> pid_namespace <span style=color:#f92672>*</span>ns)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_session_nr_ns</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk, <span style=color:#66d9ef>struct</span> pid_namespace <span style=color:#f92672>*</span>ns)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_session_vnr</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_ppid_nr</span>(<span style=color:#66d9ef>const</span> <span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>inline</span> <span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>task_ppid_nr_ns</span>(<span style=color:#66d9ef>const</span> <span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>tsk, <span style=color:#66d9ef>struct</span> pid_namespace <span style=color:#f92672>*</span>ns)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pid_t</span> <span style=color:#a6e22e>__task_pid_nr_ns</span>(<span style=color:#66d9ef>struct</span> task_struct <span style=color:#f92672>*</span>task, <span style=color:#66d9ef>enum</span> pid_type type, <span style=color:#66d9ef>struct</span> pid_namespace <span style=color:#f92672>*</span>ns);</span></span></code></pre></div></div></div><p>From the userspace&rsquo;s perspective:</p><ul><li><code>getpid(2)</code> syscall returns a number same to <code>tgid</code> if in the default namespaces</li><li><code>gettid</code> syscall returns a number same to <code>pid</code> if in the default namespaces</li></ul><p>If the task is in a new pid namespace (via <code>CLONE_NEWPID</code> clone flag), its ID in the corresponding namespace are looked up via the <code>_vnr</code> functions.</p><h2 id=process-group>Process Group, Session, and Controlling Terminal
+<a href=#process-group class=heading-anchor><span>#</span></a></h2><p>Process group and session are concepts built into the kernel&rsquo;s task model to support a feature of shell known as the <em>job control</em></p><p>In the normal operation of a shell:</p><ul><li>A process group models all processes in the same pipeline</li><li>A session models the lifecycle of a shell from a user&rsquo;s login to logout</li></ul><h3 id=models>Models
+<a href=#models class=heading-anchor><span>#</span></a></h3><p>A process group is simply a group of tasks. The choice of the word &ldquo;process&rdquo; is rather unfortunate and can&rsquo;t change now due to the inertia of history.</p><p>From the userspace&rsquo;s perspective:</p><ul><li>A process group has a leader task, known as the group leader.</li><li>A process group has an ID that is numerically the same as the <code>pid_t</code> of the leader task.</li><li>A task has a <code>pgid</code> which is the ID of its belonging process group; Any code can query the <code>pgid</code> of any task by <code>getpgid(2)</code> or reading <code>/proc/&lt;pid>/stat</code>. Any code can change the process group of a task in the same session by calling <code>setpgid(2)</code>.</li><li>A child task by default is in the same process group as its parent.</li></ul><p>Internally, the kernel doesn&rsquo;t have dedicated structure for a process group. A task remembers which group it is in by holding a pointer to the leader of its group: <code>struct task_struct *group_leader</code>, instead of holding a number <code>pgid</code>. This field is copied when a child task is fork/clone-ed, thus we say a child task by default is in the same process group as its parent, or inherits the <code>pgid</code> of its parent. Such descriptions can be indeed misleading.</p><p>A process that is not a group leader (*) may call <code>setsid(2)</code> to start a new session and become the session leader of that new session.
+It also becomes the group leader of the only process group in that new session.</p><p>(* This restriction is imposed to avoid the complexity where process group members will lose their group leader.)</p><p>When a session leader <code>open(2)</code> a device node backed by a tty driver (with character device major 4 (for real tty) or 136 to 143 (for pseudo tty)),
+this terminal (specifically, the <code>struct cdev</code> instance registered by that tty driver), is said to be the <em>controlling terminal</em> of that session (unless <code>O_NOCTTY</code> flag is used).</p><ul><li><p>When the controlling terminal of a session hang ups the modem connection, the kernel will send a <code>SIGHUP</code> signal to the session leader. (unless <code>CLOCAL</code> flag is set for that terminal, see <code>termios(3)</code>)</p><p>It&rsquo;s up to that session leader what to do with that signal, by properly setting up a signal handler.
+Almost always, session leaders are shell program. See <code>SIGNALS</code> section for bash.</p></li><li><p>When a session leader exits, the kernel will send a <code>SIGHUP</code> to all processes in the foreground process group of that session.</p><p>The kernel is aware of session and which process group is currently the foreground process group of a session.
+You can check this from the kernel&rsquo;s procfs by checking the <code>tpgid</code> field of the <code>/proc/&lt;pid>/stat</code> file.
+See <code>man 5 proc_pid_stat</code>.</p></li></ul><p>Controlling terminal is very different from the terminal associated with <code>stdin</code> (if any) of a process.</p><h2 id=reparenting-zombie-and-orphan>Reparenting, Zombie and Orphan
+<a href=#reparenting-zombie-and-orphan class=heading-anchor><span>#</span></a></h2><p>A task has a pointer to its original parent (the one that forked it) and a pointer to its current parent (the one that receives <code>SIGCHLD</code>)</p><p>There is no <code>setppid()</code> - the change of parent only happens when the parent process exit without <code>wait()</code>-ing on childern.
+Those orphan child processes change their current parent to the <code>pid 1</code> i.e. <code>init</code> or <code>systemd</code>.</p><ul><li>After a child task <code>exit</code>, if its parent is alive and has not call <code>wait()</code> on it, the child is known as a zombie. Zombie process appeared in the system is the problem of their parents. There is no specific name for such a parent afaik.</li><li>regardless a child task <code>exit</code>-ed or not, if if its parent is <code>exit</code> already (indicating no <code>wait()</code> on the child is ever called), the child is known as an orphan. Orphan processes are always re-parented to pid 1.</li></ul><h2 id=threading>Threading
+<a href=#threading class=heading-anchor><span>#</span></a></h2><p>Each flow of execution, i.e. process, is represented as a <code>task_struct</code> instance,</p><p>Back then the only id for <code>task_struct</code> instance was the <code>pid</code> field. A process can retrieve its own pid by <code>getpid(2)</code>.</p><p>The first standardization for thread API is pthread in POSIX 1996. Several attempts of pure userspace implementation was made: thread library schedules application threads on top of a single kernel process.</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>struct</span> task_struct {
+</span></span><span style=display:flex><span><span style=color:#75715e>#ifdef CONFIG_THREAD_INFO_IN_TASK
+</span></span></span><span style=display:flex><span>	<span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 * For reasons of header soup (see current_thread_info()), this
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 * must be the first element of task_struct.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> thread_info		thread_info;
+</span></span><span style=display:flex><span><span style=color:#75715e>#endif</span></span></span></code></pre></div></div></div><p>The kernel build option <code>CONFIG_THREAD_INFO_IN_TASK</code> determines whether the <code>struct thread_info</code> instance is embedded in <code>task_struct</code> or found in a hash table linked by a pointer (see <code>PID/PID hash table linkage</code> below).</p><p><code>struct thread_info</code> is a CPU-specific structure defined in <code>arch/&lt;archtecture>/</code>. For x86, it is:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>// arch/x86/include/asm/thread_info.h
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> thread_info {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>		flags;		<span style=color:#75715e>/* low level flags */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>		syscall_work;	<span style=color:#75715e>/* SYSCALL_WORK_ flags */</span>
+</span></span><span style=display:flex><span>	u32			status;		<span style=color:#75715e>/* thread synchronous flags */</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#ifdef CONFIG_SMP
+</span></span></span><span style=display:flex><span>	u32			cpu;		<span style=color:#75715e>/* current CPU */</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#endif
+</span></span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>	<span style=color:#75715e>/* PID/PID hash table linkage. */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> pid			<span style=color:#f92672>*</span>thread_pid;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> hlist_node		pid_links[PIDTYPE_MAX];
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> list_head		thread_node;</span></span></code></pre></div></div></div><h2 id=syscalls>Syscalls
+<a href=#syscalls class=heading-anchor><span>#</span></a></h2><h3 id=clone--clone3>Clone / Clone3
+<a href=#clone--clone3 class=heading-anchor><span>#</span></a></h3><p><code>clone3</code> is <code>clone</code>&rsquo;s extensible successor. There was once a syscall, <code>clone2</code>, only available on the IA64 architecture.
+It&rsquo;s now permanently removed from the mainstream kernel release.</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>#ifdef __ARCH_WANT_SYS_CLONE
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#ifdef CONFIG_CLONE_BACKWARDS
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>SYSCALL_DEFINE5</span>(clone, <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, clone_flags, <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, newsp,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>, parent_tidptr,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, tls,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>, child_tidptr)
+</span></span><span style=display:flex><span><span style=color:#75715e>#elif defined(CONFIG_CLONE_BACKWARDS2)
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>SYSCALL_DEFINE5</span>(clone, <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, newsp, <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, clone_flags,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>, parent_tidptr,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>, child_tidptr,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, tls)
+</span></span><span style=display:flex><span><span style=color:#75715e>#elif defined(CONFIG_CLONE_BACKWARDS3)
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>SYSCALL_DEFINE6</span>(clone, <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, clone_flags, <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, newsp,
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>int</span>, stack_size,
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>, parent_tidptr,
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>, child_tidptr,
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, tls)
+</span></span><span style=display:flex><span><span style=color:#75715e>#else
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>SYSCALL_DEFINE5</span>(clone, <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, clone_flags, <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, newsp,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>, parent_tidptr,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>, child_tidptr,
+</span></span><span style=display:flex><span>		 <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span>, tls)
+</span></span><span style=display:flex><span><span style=color:#75715e>#endif
+</span></span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> kernel_clone_args args <span style=color:#f92672>=</span> {
+</span></span><span style=display:flex><span>		.flags		<span style=color:#f92672>=</span> (<span style=color:#a6e22e>lower_32_bits</span>(clone_flags) <span style=color:#f92672>&amp;</span> <span style=color:#f92672>~</span>CSIGNAL),
+</span></span><span style=display:flex><span>		.pidfd		<span style=color:#f92672>=</span> parent_tidptr,
+</span></span><span style=display:flex><span>		.child_tid	<span style=color:#f92672>=</span> child_tidptr,
+</span></span><span style=display:flex><span>		.parent_tid	<span style=color:#f92672>=</span> parent_tidptr,
+</span></span><span style=display:flex><span>		.exit_signal	<span style=color:#f92672>=</span> (<span style=color:#a6e22e>lower_32_bits</span>(clone_flags) <span style=color:#f92672>&amp;</span> CSIGNAL),
+</span></span><span style=display:flex><span>		.stack		<span style=color:#f92672>=</span> newsp,
+</span></span><span style=display:flex><span>		.tls		<span style=color:#f92672>=</span> tls,
+</span></span><span style=display:flex><span>	};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span> <span style=color:#a6e22e>kernel_clone</span>(<span style=color:#f92672>&amp;</span>args);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#75715e>#endif</span></span></span></code></pre></div></div></div><hr><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>/**
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * sys_clone3 - create a new process with specific properties
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * @uargs: argument structure
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * @size:  size of @uargs
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * clone3() is the extensible successor to clone()/clone2().
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * It takes a struct as argument that is versioned by its size.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *
+</span></span></span><span style=display:flex><span><span style=color:#75715e> * Return: On success, a positive PID for the child process.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> *         On error, a negative errno number.
+</span></span></span><span style=display:flex><span><span style=color:#75715e> */</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>SYSCALL_DEFINE2</span>(clone3, <span style=color:#66d9ef>struct</span> clone_args __user <span style=color:#f92672>*</span>, uargs, <span style=color:#66d9ef>size_t</span>, size)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> err;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> kernel_clone_args kargs;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>pid_t</span> set_tid[MAX_PID_NS_LEVEL];
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	kargs.set_tid <span style=color:#f92672>=</span> set_tid;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	err <span style=color:#f92672>=</span> <span style=color:#a6e22e>copy_clone_args_from_user</span>(<span style=color:#f92672>&amp;</span>kargs, uargs, size);
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> (err)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> err;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span><span style=color:#a6e22e>clone3_args_valid</span>(<span style=color:#f92672>&amp;</span>kargs))
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#f92672>-</span>EINVAL;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span> <span style=color:#a6e22e>kernel_clone</span>(<span style=color:#f92672>&amp;</span>kargs);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><blockquote><p><strong>Info.</strong></p><p>The glibc&rsquo;s wrapper use variadic function in signature:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>// source:
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>extern</span> <span style=color:#66d9ef>int</span> <span style=color:#a6e22e>clone</span> (
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> (<span style=color:#f92672>*</span>__fn) (<span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>__arg),
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>__child_stack,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> __flags,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>__arg,
+</span></span><span style=display:flex><span>    ...
+</span></span><span style=display:flex><span>) <span style=color:#a6e22e>__attribute__</span> ((__nothrow__ , __leaf__));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// man page:
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>int</span> <span style=color:#a6e22e>clone</span>(<span style=color:#66d9ef>int</span> (<span style=color:#f92672>*</span>fn)(<span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>_Nullable), <span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>stack, <span style=color:#66d9ef>int</span> flags,
+</span></span><span style=display:flex><span>                 <span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>_Nullable arg, ...  <span style=color:#75715e>/* pid_t *_Nullable parent_tid,
+</span></span></span><span style=display:flex><span><span style=color:#75715e>                                              void *_Nullable tls,
+</span></span></span><span style=display:flex><span><span style=color:#75715e>                                              pid_t *_Nullable child_tid */</span> );</span></span></code></pre></div></div></div></blockquote><p>Both <code>clone()</code> and <code>clone3()</code> simply assembles a <code>struct kernel_clone_args</code> instance and delegates to <code>kernel_clone()</code>;
+This structure</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>struct</span> kernel_clone_args {
+</span></span><span style=display:flex><span>	u64 flags;					<span style=color:#75715e>//
+</span></span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>pidfd;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>child_tid;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> __user <span style=color:#f92672>*</span>parent_tid;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>const</span> <span style=color:#66d9ef>char</span> <span style=color:#f92672>*</span>name;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> exit_signal;
+</span></span><span style=display:flex><span>	u32 kthread:<span style=color:#ae81ff>1</span>;
+</span></span><span style=display:flex><span>	u32 io_thread:<span style=color:#ae81ff>1</span>;
+</span></span><span style=display:flex><span>	u32 user_worker:<span style=color:#ae81ff>1</span>;
+</span></span><span style=display:flex><span>	u32 no_files:<span style=color:#ae81ff>1</span>;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span> stack;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span> stack_size;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span> tls;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>pid_t</span> <span style=color:#f92672>*</span>set_tid;
+</span></span><span style=display:flex><span>	<span style=color:#75715e>/* Number of elements in *set_tid */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>size_t</span> set_tid_size;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> cgroup;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> idle;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>int</span> (<span style=color:#f92672>*</span>fn)(<span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>);
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>fn_arg;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> cgroup <span style=color:#f92672>*</span>cgrp;
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>struct</span> css_set <span style=color:#f92672>*</span>cset;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><h4 id=clone-flags><code>clone</code> Flags
+<a href=#clone-flags class=heading-anchor><span>#</span></a></h4><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>/* CLONE_PARENT re-uses the old parent */</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> (clone_flags <span style=color:#f92672>&amp;</span> (CLONE_PARENT<span style=color:#f92672>|</span>CLONE_THREAD)) {
+</span></span><span style=display:flex><span>    p<span style=color:#f92672>-&gt;</span>real_parent <span style=color:#f92672>=</span> current<span style=color:#f92672>-&gt;</span>real_parent;
+</span></span><span style=display:flex><span>    p<span style=color:#f92672>-&gt;</span>parent_exec_id <span style=color:#f92672>=</span> current<span style=color:#f92672>-&gt;</span>parent_exec_id;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (clone_flags <span style=color:#f92672>&amp;</span> CLONE_THREAD)
+</span></span><span style=display:flex><span>        p<span style=color:#f92672>-&gt;</span>exit_signal <span style=color:#f92672>=</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>else</span>
+</span></span><span style=display:flex><span>        p<span style=color:#f92672>-&gt;</span>exit_signal <span style=color:#f92672>=</span> current<span style=color:#f92672>-&gt;</span>group_leader<span style=color:#f92672>-&gt;</span>exit_signal;
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>    p<span style=color:#f92672>-&gt;</span>real_parent <span style=color:#f92672>=</span> current;
+</span></span><span style=display:flex><span>    p<span style=color:#f92672>-&gt;</span>parent_exec_id <span style=color:#f92672>=</span> current<span style=color:#f92672>-&gt;</span>self_exec_id;
+</span></span><span style=display:flex><span>    p<span style=color:#f92672>-&gt;</span>exit_signal <span style=color:#f92672>=</span> args<span style=color:#f92672>-&gt;</span>exit_signal;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><h3 id=pctrl>Pctrl
+<a href=#pctrl class=heading-anchor><span>#</span></a></h3><h3 id=unshare>Unshare
+<a href=#unshare class=heading-anchor><span>#</span></a></h3></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-process-model/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

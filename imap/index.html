@@ -1,0 +1,55 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>IMAP4rev2</title></head><body><main><article><div class=article-header><h1>IMAP4rev2</h1><div class=aux>Last update: 2021-06-05 00:21:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/email/>Email</a>
+|
+<a href=/tags/imap/>Imap</a>
+|
+<a href=/tags/protocols/>Protocols</a></div></div><div class=article-content><p>IMAP is a stateful mail-access protocol. RFC 9051 defines IMAP4rev2; it
+supersedes IMAP4rev1 in RFC 3501. Clients manage mailboxes and message state on
+the server, enabling multiple clients to view the same mailbox.</p><h2 id=connection-and-commands>Connection and Commands
+<a href=#connection-and-commands class=heading-anchor><span>#</span></a></h2><p>IMAP uses a text protocol over TCP. Port 143 begins in cleartext and can
+negotiate TLS with <code>STARTTLS</code>; port 993 uses TLS from connection establishment.
+Clients must obtain capabilities, negotiate TLS before password authentication,
+and require certificate and hostname validation.</p><p>The protocol state constrains legal commands:</p><ol><li>In <strong>not authenticated</strong> state, the client negotiates capabilities, TLS, and
+authentication.</li><li>In <strong>authenticated</strong> state, it can manage and list mailboxes.</li><li>In <strong>selected</strong> state, it has selected one mailbox and can fetch or change
+message state.</li><li><code>LOGOUT</code> enters logout state and closes the session after the server&rsquo;s
+untagged <code>BYE</code> and tagged completion response.</li></ol><p>Each client command begins with a client-chosen tag. Server responses are
+either untagged (<code>*</code>), continuation requests (<code>+</code>), or tagged completion
+responses:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>S: * OK IMAP4rev2 ready
+</span></span><span style=display:flex><span>C: A001 CAPABILITY
+</span></span><span style=display:flex><span>S: * CAPABILITY IMAP4rev2 STARTTLS SASL-IR
+</span></span><span style=display:flex><span>S: A001 OK completed
+</span></span><span style=display:flex><span>C: A002 STARTTLS
+</span></span><span style=display:flex><span>S: A002 OK begin TLS negotiation now</span></span></code></pre></div></div></div><p>After TLS, the client sends <code>CAPABILITY</code> again because capabilities may differ.
+Use SASL authentication mechanisms rather than <code>LOGIN</code> when the server and
+client support them.</p><h2 id=mailboxes-and-messages>Mailboxes and Messages
+<a href=#mailboxes-and-messages class=heading-anchor><span>#</span></a></h2><p>An authenticated connection can list, create, rename, subscribe to, and select
+mailboxes. <code>SELECT</code> opens a mailbox read-write; <code>EXAMINE</code> opens it read-only.
+Messages have sequence numbers that change as the mailbox changes and stable
+unique identifiers (UIDs) within a UIDVALIDITY epoch. Persistent clients must
+use UIDs, record UIDVALIDITY, and resynchronize when it changes.</p><p>Mailbox names are protocol strings rather than operating-system paths. Use
+<code>LIST</code> to discover hierarchy delimiters and names, preserve server-provided
+UTF-8 names, and quote or send them as literals when required. <code>INBOX</code> is
+case-insensitive; other names can be case-sensitive according to server rules.</p><p>System flags include <code>\Seen</code>, <code>\Answered</code>, <code>\Flagged</code>, <code>\Deleted</code>, and
+<code>\Draft</code>. A client marks a message deleted with <code>STORE</code>; <code>EXPUNGE</code> removes
+messages marked <code>\Deleted</code>. Avoid sequence numbers in workflows that can
+receive concurrent mailbox updates.</p><p><code>FETCH</code> retrieves message attributes or body sections. <code>SEARCH</code> returns
+matching messages. IMAP literals carry data that cannot appear safely in
+quoted strings; the server can request a continuation before the client sends
+a synchronizing literal. A literal marker such as <code>{4096}\r\n</code> declares the
+exact following octet count. Parsers must consume that length rather than scan
+literal contents for line breaks.</p><h2 id=idle-and-synchronization>Idle and Synchronization
+<a href=#idle-and-synchronization class=heading-anchor><span>#</span></a></h2><p><code>IDLE</code> lets a client receive unsolicited mailbox changes while it remains
+connected. The client must terminate IDLE with <code>DONE</code> before sending another
+command. UID-based synchronization, <code>UID FETCH</code>, and server capability
+inspection avoid treating a mailbox snapshot as permanently stable.</p><p>While a mailbox is selected, untagged <code>EXISTS</code>, <code>EXPUNGE</code>, <code>FETCH</code>, and related
+responses report changes. An expunge renumbers later sequence numbers, so a
+client must update its sequence map immediately and continue identifying durable
+state by UID. Store the last known UID, flags, UIDVALIDITY, and relevant
+modification state; extensions such as CONDSTORE and QRESYNC can reduce transfer
+when both peers advertise them, but the fallback must perform a correct
+UID-based rescan.</p><p>IMAP transports message bytes and metadata; MIME defines email body structure
+and transfer encodings. Do not confuse IMAP&rsquo;s line-oriented command encoding
+with a seven-bit packing scheme: IMAP command lines use ASCII syntax, while
+literals transport octets.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc9051>RFC 9051: IMAP4rev2</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc8314>RFC 8314: Cleartext Email Access</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/imap/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,41 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java Service Provider Interface</title></head><body><main><article><div class=article-header><h1>Java Service Provider Interface</h1><div class=aux>Last update: 2024-10-01 22:56:33 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spi/>Spi</a></div></div><div class=article-content><p>Java SPI separates a <strong>service</strong> contract from one or more <strong>providers</strong> and
+from the <strong>consumer</strong> that selects them. The consumer depends on the service
+type and uses <code>ServiceLoader</code>, so providers can be added at deployment without
+an application dependency on concrete classes.</p><h2 id=classpath-services>Classpath Services
+<a href=#classpath-services class=heading-anchor><span>#</span></a></h2><p>Before modules, a provider JAR listed implementations in
+<code>META-INF/services/&lt;fully.qualified.ServiceName></code>. The UTF-8 file has one
+provider class name per line; blank lines and <code>#</code> comments are allowed. Each
+provider must be accessible to the loader used for discovery and offer a public
+no-argument constructor.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ServiceLoader<span style=color:#f92672>&lt;</span>Codec<span style=color:#f92672>&gt;</span> codecs <span style=color:#f92672>=</span> ServiceLoader.<span style=color:#a6e22e>load</span>(Codec.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (Codec codec : codecs) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (codec.<span style=color:#a6e22e>supports</span>(mediaType)) <span style=color:#66d9ef>return</span> codec;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Discovery and provider instantiation are lazy. Iterating, streaming providers,
+or calling <code>Provider.get()</code> can load and initialize a provider, so malformed
+configuration, missing dependencies, inaccessible types, or failed
+constructors surface as <code>ServiceConfigurationError</code>. Treat provider code as
+deployment-supplied code, select an explicit class loader in containers or
+plugin systems, and fail with diagnostics at a controlled startup boundary.</p><h2 id=module-services>Module Services
+<a href=#module-services class=heading-anchor><span>#</span></a></h2><p>With JPMS, the consumer module declares <code>uses com.example.Codec</code>; a provider
+declares <code>provides com.example.Codec with com.example.JsonCodec</code>. Module
+resolution accounts for service providers as defined by the module-system
+rules. A provider class need not be exported merely for <code>ServiceLoader</code>; a
+named-module provider can have a public no-argument constructor or a public
+static provider method, subject to the service declaration constraints.
+<code>ServiceLoader.load(service, loader)</code> follows the supplied loader&rsquo;s visibility,
+whereas the module-aware overloads operate from a module layer. The loader and
+layer are part of the service boundary, not incidental details.</p><p>Classpath configuration remains supported for unnamed and automatic modules,
+which enables migration. Avoid publishing both mechanisms without testing the
+resolved provider set, because duplicates and ordering assumptions make
+selection non-portable.</p><h2 id=jdbc-as-an-evolution-example>JDBC as an Evolution Example
+<a href=#jdbc-as-an-evolution-example class=heading-anchor><span>#</span></a></h2><p>Early JDBC driver usage often called <code>Class.forName("vendor.Driver")</code> to trigger
+a driver&rsquo;s static registration with <code>DriverManager</code>. JDBC 4 introduced
+service-provider loading for <code>java.sql.Driver</code>, allowing compatible driver
+JARs to be discovered from <code>META-INF/services/java.sql.Driver</code>. Modern
+applications should still configure the intended driver and connection
+properties explicitly; automatic discovery removes a bootstrap call, not
+database authentication or version compatibility concerns.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ServiceLoader.html>JDK <code>ServiceLoader</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/specs/jar/jar.html#service-providers>JAR File Specification, Service Providers</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DriverManager.html>JDBC <code>DriverManager</code> API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-service-provider-interface/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

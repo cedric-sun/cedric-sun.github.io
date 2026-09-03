@@ -1,0 +1,61 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Disk Addressing and Partition Tables</title></head><body><main><article><div class=article-header><h1>Disk Addressing and Partition Tables</h1><div class=aux>Last update: 2024-02-16 16:23:16 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/storage/>Storage</a>
+|
+<a href=/tags/filesystem/>Filesystem</a></div></div><div class=article-content><p>Disk addresses identify sectors, while partition tables divide the resulting address
+space into regions. Filesystems occupy some of those regions but belong to a separate
+format layer. Keeping the layers distinct explains why obsolete geometry fields can
+coexist with modern logical addressing.</p><h2 id=physical-and-translated-chs-geometry>Physical and Translated CHS Geometry
+<a href=#physical-and-translated-chs-geometry class=heading-anchor><span>#</span></a></h2><p>Cylinder-head-sector (CHS) addressing models a rotating disk through three
+coordinates:</p><ul><li><strong>Cylinder</strong> selects the same radial track position across the platter surfaces.</li><li><strong>Head</strong> selects a recording surface.</li><li><strong>Sector</strong> selects a numbered record within that track.</li></ul><p>The BIOS <code>INT 13h</code> interface and the original IBM PC partition table encoded CHS,
+but their fields did not scale together. A legacy MBR entry allocates 10 bits to the
+cylinder, 8 bits to the head, and 6 bits to a one-based sector number. The maximum
+encoded geometry is therefore 1024 cylinders, 256 heads, and 63 sectors per track.
+With 512-byte sectors, those fields describe at most about 8.4 GB.</p><p>Real drives also began using zone bit recording, spare-sector remapping, and embedded
+controllers, so one fixed sectors-per-track value no longer represented the medium.
+BIOS and drive firmware responded with translated or synthetic geometries. A CHS
+tuple in an old partition entry can consequently be compatibility metadata rather
+than the location of a physical track.</p><h2 id=logical-block-addressing-and-capacity>Logical Block Addressing and Capacity
+<a href=#logical-block-addressing-and-capacity class=heading-anchor><span>#</span></a></h2><p>Logical block addressing (LBA) numbers addressable sectors from zero. The host asks
+for LBA 0, LBA 1, and so forth; the device maps each number to its internal medium.
+Capacity follows directly from the number and size of logical blocks:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>capacity in bytes = logical-block count × logical-block size</span></span></code></pre></div></div></div><p>An MBR partition entry stores a 32-bit starting LBA and a 32-bit sector count.
+At 512 bytes per sector, the count field limits one partition to just under 2 TiB.
+Drives exposing 4096-byte logical blocks move that arithmetic limit, but legacy
+firmware and software compatibility may impose other constraints. LBA removes CHS
+translation; it does not make every field that stores an LBA arbitrarily wide.</p><h2 id=mbr-bootstrap-and-partition-entries>MBR Bootstrap and Partition Entries
+<a href=#mbr-bootstrap-and-partition-entries class=heading-anchor><span>#</span></a></h2><p>The master boot record occupies the first 512-byte logical sector in the traditional
+layout. Its conventional structure is:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th style=text-align:right>Offset</th><th style=text-align:right>Size</th><th>Purpose</th></tr></thead><tbody><tr><td style=text-align:right>0</td><td style=text-align:right>446 bytes</td><td>Bootstrap code and implementation-specific data</td></tr><tr><td style=text-align:right>446</td><td style=text-align:right>64 bytes</td><td>Four 16-byte partition entries</td></tr><tr><td style=text-align:right>510</td><td style=text-align:right>2 bytes</td><td><code>0x55AA</code> signature</td></tr></tbody></table></div></div><p>Each entry contains a boot indicator, partition-type byte, starting and ending CHS
+fields, starting LBA, and sector count. A BIOS bootstrap can inspect the active
+entry and load code from the selected partition. The table itself neither defines
+the filesystem nor guarantees that a partition contains boot code.</p><h3 id=extended-partitions>Extended Partitions
+<a href=#extended-partitions class=heading-anchor><span>#</span></a></h3><p>Four entries proved restrictive, so MBR systems reserve partition-type values for an
+extended partition. The extended region contains a linked sequence of extended boot
+records (EBRs):</p><ol><li>The first EBR entry describes one logical partition relative to that EBR.</li><li>The second entry, when present, points to the next EBR relative to the base of the
+containing extended partition.</li><li>Following the links enumerates the logical partitions.</li></ol><p>An extended partition is therefore a container for metadata and logical partitions,
+not one additional filesystem volume. Broken offsets or loops in the EBR chain can
+hide later partitions even when their filesystem data remains present.</p><h3 id=volume-boot-records>Volume Boot Records
+<a href=#volume-boot-records class=heading-anchor><span>#</span></a></h3><p>A partition used for BIOS boot often begins with a volume boot record (VBR). For
+FAT, the VBR combines initial machine code with a BIOS Parameter Block describing
+the volume. NTFS and other bootable filesystems define their own first-sector
+formats. The MBR locates a partition, while the VBR and filesystem metadata
+interpret its contents; neither structure can substitute for the other.</p><h2 id=guid-partition-table>GUID Partition Table
+<a href=#guid-partition-table class=heading-anchor><span>#</span></a></h2><p>The GUID Partition Table (GPT), standardized as part of UEFI, replaces the four-entry
+array and 32-bit MBR LBAs with a self-describing layout. A common disk has:</p><ol><li>a protective MBR at LBA 0;</li><li>a primary GPT header at LBA 1;</li><li>a primary partition-entry array;</li><li>usable LBAs for partitions;</li><li>a backup partition-entry array near the end of the disk;</li><li>a backup GPT header in the final logical block.</li></ol><p>The header records its own LBA, the alternate header&rsquo;s LBA, usable-LBA bounds, the
+disk GUID, the entry-array location and shape, and CRC32 checksums for both header
+and entry array. The backup stores enough metadata to recover when one copy is
+damaged, although repair software must decide which valid copy reflects the intended
+layout.</p><p>Each partition entry carries a partition-type GUID, a unique partition GUID, first
+and last 64-bit LBAs, attributes, and a UTF-16LE name. Type GUIDs state a partition&rsquo;s
+intended role; unique GUIDs distinguish individual partitions. Neither GUID proves
+which filesystem is present.</p><p>The protective MBR normally has a <code>0xEE</code> entry covering the GPT disk as far as the
+32-bit MBR size permits. Its purpose is defensive: an MBR-only program should see
+the disk as occupied rather than offering to repartition it. Hybrid MBRs duplicate
+selected GPT partitions in legacy entries, but the two tables can diverge and are
+not the standard protective layout.</p><h2 id=keep-addressing-partitioning-and-filesystems-separate>Keep Addressing, Partitioning, and Filesystems Separate
+<a href=#keep-addressing-partitioning-and-filesystems-separate class=heading-anchor><span>#</span></a></h2><p>Storage tools operate at different layers:</p><ul><li>A device reports logical blocks and their size.</li><li>MBR or GPT metadata assigns ranges of those blocks to partitions.</li><li>A filesystem interprets blocks within one assigned range as boot records,
+allocation structures, directories, and file data.</li></ul><p>Changing a partition boundary does not resize the enclosed filesystem. Formatting a
+partition does not recreate its GPT entry. Likewise, a filesystem signature found
+at an offset can survive after its partition entry is deleted. Safe recovery and
+migration tools must validate all three layers rather than infer one from another.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://uefi.org/specifications>UEFI specifications</a></li><li><a href=https://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc>Microsoft FAT32 File System Specification</a></li><li><a href=https://man7.org/linux/man-pages/man8/fdisk.8.html>Linux <code>fdisk(8)</code> manual</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/disk-addressing-and-partition-tables/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

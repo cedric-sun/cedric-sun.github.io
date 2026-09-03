@@ -1,0 +1,132 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Git Workflows and Configuration</title></head><body><main><article><div class=article-header><h1>Git Workflows and Configuration</h1><div class=aux>Last update: 2025-11-26 10:56:03 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/git/>Git</a>
+|
+<a href=/tags/gpg/>Gpg</a>
+|
+<a href=/tags/shell/>Shell</a>
+|
+<a href=/tags/version-control/>Version-Control</a></div></div><div class=article-content><p>Git records content and history, while configuration determines how a local
+installation presents, authenticates, and transforms that content. Separating
+repository policy from per-developer convenience avoids surprising commits.</p><h2 id=inspect-and-scope-configuration>Inspect and Scope Configuration
+<a href=#inspect-and-scope-configuration class=heading-anchor><span>#</span></a></h2><p>Git reads configuration from several scopes. Later scopes override earlier
+values for a scalar key:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Scope</th><th>Typical Location</th><th>Intended Use</th></tr></thead><tbody><tr><td>System</td><td><code>/etc/gitconfig</code></td><td>Installation-wide defaults</td></tr><tr><td>Global</td><td><code>~/.gitconfig</code> or <code>~/.config/git/config</code></td><td>Developer preferences</td></tr><tr><td>Local</td><td><code>.git/config</code></td><td>One repository</td></tr><tr><td>Worktree</td><td><code>.git/config.worktree</code> when enabled</td><td>One linked worktree</td></tr><tr><td>Command</td><td><code>git -c name=value ...</code></td><td>One invocation</td></tr></tbody></table></div></div><p><code>git config --list --show-origin --show-scope</code> shows the source of every
+effective value. Query a key before changing it, because a value can be
+inherited from a system or global configuration:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git config --show-origin --get-all user.email
+</span></span><span style=display:flex><span>git config --local pull.rebase false
+</span></span><span style=display:flex><span>git -c fetch.prune<span style=color:#f92672>=</span>true fetch</span></span></code></pre></div></div></div><p>Configuration syntax resembles an INI file. Git accepts many values when a
+file is written, then validates them when a command consumes the value.
+Therefore, a successful <code>git config core.eol invalid</code> does not prove that the
+value is usable. Prefer documented enum values and inspect a change with
+<code>git config --show-origin --get core.eol</code>.</p><p>Put project policy in tracked files such as <code>.gitattributes</code> and
+<code>.gitignore</code>, not in an untracked local configuration. A clone then receives
+the policy without setup instructions.</p><h2 id=recover-from-common-repository-states>Recover from Common Repository States
+<a href=#recover-from-common-repository-states class=heading-anchor><span>#</span></a></h2><p>Git keeps unreachable objects for a retention period, so recovery often starts
+with locating an object rather than accepting data loss. Make a safety branch
+before a destructive operation:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git branch backup/before-recovery</span></span></code></pre></div></div></div><h3 id=recover-a-dropped-stash-that-contains-untracked-files>Recover a Dropped Stash That Contains Untracked Files
+<a href=#recover-a-dropped-stash-that-contains-untracked-files class=heading-anchor><span>#</span></a></h3><p><code>git stash pop</code> applies a stash and then drops its reference when the apply
+succeeds. A former stash can remain reachable only through an unreachable
+commit until pruning. Search without reflogs:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git fsck --no-reflogs --unreachable |
+</span></span><span style=display:flex><span>  awk <span style=color:#e6db74>&#39;/unreachable commit/ { print $3 }&#39;</span></span></span></code></pre></div></div></div><p>Inspect each candidate before applying it:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git stash show --patch --include-untracked &lt;object-id&gt;
+</span></span><span style=display:flex><span>git stash apply &lt;object-id&gt;</span></span></code></pre></div></div></div><p><code>git stash apply</code> accepts a stash-shaped commit object. Copy recovered files
+to a safe location or commit them before further cleanup, because
+<code>git gc</code> can prune unreachable objects after the expiry policy permits it.</p><h3 id=synchronize-deleted-remote-branches>Synchronize Deleted Remote Branches
+<a href=#synchronize-deleted-remote-branches class=heading-anchor><span>#</span></a></h3><p><code>git fetch</code> adds and advances remote-tracking references but does not remove a
+local <code>refs/remotes/origin/topic</code> merely because the remote deleted <code>topic</code>.
+Prune obsolete tracking references explicitly:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git fetch --prune origin
+</span></span><span style=display:flex><span>git remote prune origin
+</span></span><span style=display:flex><span>git config --global fetch.prune true</span></span></code></pre></div></div></div><p>Pruning never deletes a local branch. Inspect branches whose upstream was
+removed with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git branch -vv</span></span></code></pre></div></div></div><h3 id=abort-a-conflicted-git-stash-pop>Abort a Conflicted <code>git stash pop</code>
+<a href=#abort-a-conflicted-git-stash-pop class=heading-anchor><span>#</span></a></h3><p>A conflicted <code>stash pop</code> leaves conflict markers and does not drop the stash.
+<code>git merge --abort</code> does not apply because <code>stash pop</code> is not a merge
+operation with merge state. Either resolve the files and commit the result, or
+discard the partially applied worktree state:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git reset --hard HEAD
+</span></span><span style=display:flex><span>git clean -fd    <span style=color:#75715e># only after checking which untracked paths may be removed</span></span></span></code></pre></div></div></div><p>Use <code>git clean -nd</code> first. <code>reset --hard</code> does not remove untracked files,
+while <code>git clean -fd</code> can do so.</p><h3 id=retrieve-a-file-from-another-revision>Retrieve a File from Another Revision
+<a href=#retrieve-a-file-from-another-revision class=heading-anchor><span>#</span></a></h3><p>Read a historical path without changing the index:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git show &lt;revision&gt;:path/from/repository/root</span></span></code></pre></div></div></div><p>Restore a path into the worktree and index only when that is intended:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git restore --source<span style=color:#f92672>=</span>&lt;revision&gt; --staged --worktree path/from/repository/root</span></span></code></pre></div></div></div><h2 id=use-submodules-as-pinned-dependencies>Use Submodules as Pinned Dependencies
+<a href=#use-submodules-as-pinned-dependencies class=heading-anchor><span>#</span></a></h2><p>A submodule entry in a tree has mode <code>160000</code> and stores a commit ID, not a
+copy of the nested repository. <code>.gitmodules</code> records the path and suggested
+URL; the superproject&rsquo;s <code>.git/config</code> records local activation and URL
+overrides.</p><p>Add a submodule and commit both the metadata and gitlink:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git submodule add https://example.com/library.git vendor/library
+</span></span><span style=display:flex><span>git commit -m <span style=color:#e6db74>&#34;Add library submodule&#34;</span></span></span></code></pre></div></div></div><p>Clone a project and initialize the exact commits recorded by the
+superproject:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git clone --recurse-submodules https://example.com/project.git
+</span></span><span style=display:flex><span><span style=color:#75715e># Or, after a plain clone:</span>
+</span></span><span style=display:flex><span>git submodule update --init --recursive</span></span></code></pre></div></div></div><p>To advance a dependency, first check out and commit the intended revision
+inside the submodule, then commit the changed gitlink in the superproject:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git -C vendor/library fetch --tags origin
+</span></span><span style=display:flex><span>git -C vendor/library switch --detach v2.4.0
+</span></span><span style=display:flex><span>git add vendor/library
+</span></span><span style=display:flex><span>git commit -m <span style=color:#e6db74>&#34;Update library to v2.4.0&#34;</span></span></span></code></pre></div></div></div><p><code>git submodule update --remote</code> follows a configured branch and changes the
+gitlink; it does not by itself record a reproducible update. Review and commit
+the new gitlink afterward. Removing a submodule requires removing its
+<code>.gitmodules</code> entry and gitlink, then deinitializing local metadata:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git submodule deinit -f vendor/library
+</span></span><span style=display:flex><span>git rm -f vendor/library
+</span></span><span style=display:flex><span>rm -rf .git/modules/vendor/library</span></span></code></pre></div></div></div><p>Treat a submodule URL as executable supply-chain configuration. Pinning a
+commit makes a build reproducible only while the referenced object remains
+available from a trusted remote or a preserved mirror.</p><h2 id=add-repository-state-to-a-bash-prompt>Add Repository State to a Bash Prompt
+<a href=#add-repository-state-to-a-bash-prompt class=heading-anchor><span>#</span></a></h2><p>Git&rsquo;s <code>contrib/completion/git-prompt.sh</code> defines <code>__git_ps1</code>. Source the copy
+installed with Git, rather than copying a version from another installation:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#f92672>[[</span> -r /usr/share/git/completion/git-prompt.sh <span style=color:#f92672>]]</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>  . /usr/share/git/completion/git-prompt.sh
+</span></span><span style=display:flex><span>  GIT_PS1_SHOWDIRTYSTATE<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>  GIT_PS1_SHOWSTASHSTATE<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>  GIT_PS1_SHOWUNTRACKEDFILES<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>  GIT_PS1_SHOWUPSTREAM<span style=color:#f92672>=</span>auto
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  path_color<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;\[</span><span style=color:#66d9ef>$(</span>tput setaf 2<span style=color:#66d9ef>)</span><span style=color:#e6db74>\]&#34;</span>
+</span></span><span style=display:flex><span>  git_color<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;\[</span><span style=color:#66d9ef>$(</span>tput setaf 207<span style=color:#66d9ef>)</span><span style=color:#e6db74>\]&#34;</span>
+</span></span><span style=display:flex><span>  reset_color<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;\[</span><span style=color:#66d9ef>$(</span>tput sgr0<span style=color:#66d9ef>)</span><span style=color:#e6db74>\]&#34;</span>
+</span></span><span style=display:flex><span>  PS1<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#e6db74>${</span>path_color<span style=color:#e6db74>}</span><span style=color:#e6db74>[\u] \w</span><span style=color:#e6db74>${</span>git_color<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span><span style=color:#e6db74>&#39;$(__git_ps1 &#34; &lt;%s&gt;&#34;)&#39;</span><span style=color:#e6db74>&#34;</span><span style=color:#e6db74>${</span>path_color<span style=color:#e6db74>}</span><span style=color:#e6db74> \$ </span><span style=color:#e6db74>${</span>reset_color<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>  unset path_color git_color reset_color
+</span></span><span style=display:flex><span><span style=color:#66d9ef>fi</span></span></span></code></pre></div></div></div><p>Common installation paths include
+<code>/usr/share/git/completion/git-prompt.sh</code>,
+<code>/usr/local/etc/bash_completion.d/git-prompt.sh</code>, and
+<code>/opt/homebrew/etc/bash_completion.d/git-prompt.sh</code>.</p><p>The <code>\[</code> and <code>\]</code> markers tell Bash that terminal-control bytes have zero
+display width. Omitting them breaks cursor placement and wrapping. <code>*</code>, <code>+</code>,
+<code>%</code>, and <code>$</code> in the prompt describe unstaged changes, staged changes,
+untracked files, and stashed changes. Prompt-time status checks can be costly
+in a large repository or a slow filesystem, so disable state variables when
+latency matters.</p><h2 id=sign-commits-and-tags-with-openpgp>Sign Commits and Tags with OpenPGP
+<a href=#sign-commits-and-tags-with-openpgp class=heading-anchor><span>#</span></a></h2><p>An OpenPGP signature proves that a holder of a private key signed a specific
+commit or annotated tag. It neither audits code nor encrypts repository
+content. Generate or select a signing key:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>gpg --full-generate-key
+</span></span><span style=display:flex><span>gpg --list-secret-keys --keyid-format<span style=color:#f92672>=</span>long
+</span></span><span style=display:flex><span>gpg --fingerprint &lt;long-key-id&gt;</span></span></code></pre></div></div></div><p>Configure a fingerprint or long key ID, then enable signing where policy
+requires it:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git config --global user.signingkey &lt;fingerprint&gt;
+</span></span><span style=display:flex><span>git config --global gpg.format openpgp
+</span></span><span style=display:flex><span>git config --global commit.gpgsign true
+</span></span><span style=display:flex><span>git config --global tag.gpgSign true</span></span></code></pre></div></div></div><p>Test the key and inspect a signed commit:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>printf <span style=color:#e6db74>&#39;test\n&#39;</span> | gpg --clearsign
+</span></span><span style=display:flex><span>git commit --allow-empty -m <span style=color:#e6db74>&#34;Verify commit signing&#34;</span>
+</span></span><span style=display:flex><span>git show --show-signature --no-patch HEAD
+</span></span><span style=display:flex><span>git verify-commit HEAD
+</span></span><span style=display:flex><span>git verify-tag v1.0.0</span></span></code></pre></div></div></div><p>On macOS, configure an installed <code>pinentry-mac</code> in <code>~/.gnupg/gpg-agent.conf</code>
+and restart the agent with <code>gpgconf --kill gpg-agent</code>. A terminal session can
+also require <code>export GPG_TTY="$(tty)"</code>. Upload only an ASCII-armored public key
+to a hosting service. A verified-hosting badge also requires an account and
+commit email association that the hosting service recognizes.</p><h2 id=choose-a-pull-request-merge-strategy>Choose a Pull-Request Merge Strategy
+<a href=#choose-a-pull-request-merge-strategy class=heading-anchor><span>#</span></a></h2><p>Each strategy changes permanent ancestry, not merely the display of history.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Strategy</th><th>Result on <code>main</code></th><th>Use When</th><th>Local Git command equivalent</th></tr></thead><tbody><tr><td>Merge commit</td><td>Preserves feature commits and adds a two-parent commit</td><td>Branch topology and individual commits are useful</td><td><code>git merge --no-ff feature</code></td></tr><tr><td>Squash and merge</td><td>Adds one new commit containing the complete change</td><td>A pull request is one logical change or contains fixups</td><td><code>git merge --squash feature && git commit</code></td></tr><tr><td>Rebase and merge</td><td>Replays each feature commit linearly with new IDs</td><td>Each commit is meaningful and a linear history is required</td><td><code>git rebase main feature && git switch main && git merge --ff-only feature</code></td></tr><tr><td>Fast-forward (not supported by Github PR)</td><td>Moves <code>main</code> to the feature tip without a merge commit</td><td>A strictly linear history is desired; GitHub&rsquo;s PR UI does not offer this option</td><td><code>git merge --ff-only feature</code></td></tr></tbody></table></div></div><p>A merge commit preserves the original commits:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>A---B---C---------M  main
+</span></span><span style=display:flex><span>         \       /
+</span></span><span style=display:flex><span>          D---E---F  feature</span></span></code></pre></div></div></div><p>Squashing gives <code>main</code> one new commit after <code>C</code>; <code>D</code>, <code>E</code>, and <code>F</code> are not
+ancestors of that result. Delete the feature branch after a squash merge,
+because reusing it produces confusing ancestry.</p><p>Rebase and merge produces <code>D'</code>, <code>E'</code>, and <code>F'</code> after <code>C</code>. The changed parent
+of each replayed commit changes its ID and invalidates a signature on the
+original commit. Clean unmerged branches with interactive rebase before
+integration, and use <code>--force-with-lease</code> rather than <code>--force</code> when a
+reviewed branch must be updated.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/git-misc/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

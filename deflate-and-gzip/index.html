@@ -1,0 +1,44 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>DEFLATE and Gzip Formats</title></head><body><main><article><div class=article-header><h1>DEFLATE and Gzip Formats</h1><div class=aux>Last update: 2023-09-27 03:10:18 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/compression/>Compression</a>
+|
+<a href=/tags/deflate/>Deflate</a>
+|
+<a href=/tags/gzip/>Gzip</a></div></div><div class=article-content><p>DEFLATE is the bitstream format defined by RFC 1951. It combines an LZ77
+sliding window with Huffman codes. “zlib” and “gzip” often refer to files that
+contain DEFLATE, but each is a different wrapper around the raw bitstream.</p><h2 id=block-boundaries-and-btype>Block Boundaries and BTYPE
+<a href=#block-boundaries-and-btype class=heading-anchor><span>#</span></a></h2><p>A DEFLATE stream is a sequence of blocks. Each block begins at the current bit
+position with <code>BFINAL</code> (one bit) and <code>BTYPE</code> (two bits):</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>BTYPE</code></th><th>Meaning</th></tr></thead><tbody><tr><td><code>00</code></td><td>Stored bytes, without Huffman coding</td></tr><tr><td><code>01</code></td><td>Compressed with fixed Huffman codes</td></tr><tr><td><code>10</code></td><td>Compressed with dynamic Huffman codes</td></tr><tr><td><code>11</code></td><td>Reserved and invalid</td></tr></tbody></table></div></div><p><code>BFINAL</code> is one only for the last block. A compressed block ends when its
+literal/length stream emits end-of-block (EOB), symbol 256. The next block
+header follows immediately at the next bit; a compressed block is not padded
+to a byte boundary. Stored blocks are the exception: after their header, the
+decoder discards remaining bits in the current byte, reads little-endian
+<code>LEN</code> and <code>NLEN</code> (the one&rsquo;s complement of <code>LEN</code>), and copies exactly <code>LEN</code>
+bytes. <code>LEN</code> is 16 bits, so one stored block holds at most 65,535 bytes.</p><h2 id=lz77-symbols-and-huffman-codes>LZ77 Symbols and Huffman Codes
+<a href=#lz77-symbols-and-huffman-codes class=heading-anchor><span>#</span></a></h2><p>The compressed data alphabet has literal bytes 0–255, EOB 256, and
+length symbols 257–285. A length symbol selects a base length and a number of
+extra bits. A following distance symbol selects a base distance and extra bits.
+The resulting pair copies bytes from the already produced output, up to 32 KiB
+backward and up to 258 bytes long; overlap is valid.</p><p>Fixed blocks use code lengths prescribed by RFC 1951. Dynamic blocks carry
+<code>HLIT</code> (5 bits), <code>HDIST</code> (5 bits), and <code>HCLEN</code> (4 bits), then transmit a
+code-length alphabet in a specified permutation. That alphabet describes the
+literal/length and distance code lengths, including repeat codes for runs of
+zeros or repeated lengths. Canonical reconstruction turns those lengths into
+the actual codes.</p><p>DEFLATE packs data elements from the least-significant bit upward within each
+byte. Numeric extra-bit fields use least-significant-bit-first order. Huffman
+codes are assigned as canonical values but emitted with the format&rsquo;s
+bit-reversal convention. A parser must keep a bit cursor rather than reading
+every field as a byte-aligned integer.</p><h2 id=zlib-and-gzip-wrappers>zlib and gzip Wrappers
+<a href=#zlib-and-gzip-wrappers class=heading-anchor><span>#</span></a></h2><p>Raw DEFLATE has no header or trailer. The zlib wrapper (RFC 1950) starts with
+<code>CMF</code> and <code>FLG</code>, whose <code>FCHECK</code> makes the 16-bit header divisible by 31. If
+<code>FDICT</code> is set, a four-byte Adler-32 dictionary identifier follows. The stream
+ends with a big-endian Adler-32 of the uncompressed data.</p><p>The gzip wrapper (RFC 1952) is a sequence of members. Each member has the
+magic bytes <code>1f 8b</code>, compression method 8, flags, modification time, extra
+flags, and operating-system fields. Flags can add an extra field, an original
+filename, a comment, and a header CRC. The trailer stores a little-endian
+CRC-32 of the uncompressed member and <code>ISIZE</code>, its size modulo 2³². Metadata is
+not a substitute for validating the trailer.</p><p>Protocol documentation must name the representation. HTTP
+<code>Content-Encoding: gzip</code> carries the gzip format, while a ZIP entry using
+method 8 normally carries a raw DEFLATE stream. A zlib decoder cannot safely
+be selected merely because a payload is described as “compressed.”</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc1951>RFC 1951: DEFLATE</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1950>RFC 1950: zlib Format</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1952>RFC 1952: gzip Format</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/deflate-and-gzip/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

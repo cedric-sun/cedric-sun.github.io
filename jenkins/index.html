@@ -1,0 +1,77 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Jenkins</title></head><body><main><article><div class=article-header><h1>Jenkins</h1><div class=aux>Last update: 2023-09-13 18:46:33 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ci-cd/>Ci-Cd</a>
+|
+<a href=/tags/jenkins/>Jenkins</a></div></div><div class=article-content><p>Jenkins coordinates delivery work as jobs and Pipelines. Store a Pipeline in a
+versioned <code>Jenkinsfile</code> because build logic, application code, and tool versions
+must change under the same review process.</p><h2 id=controller-agents-and-workspaces>Controller, Agents, and Workspaces
+<a href=#controller-agents-and-workspaces class=heading-anchor><span>#</span></a></h2><p>The controller stores configuration and build records, evaluates scheduling
+decisions, serves the user interface, and coordinates agents. Builds should not
+run on the controller. An agent supplies one or more executors; each executor can
+occupy one Pipeline task at a time. Labels describe capabilities such as
+<code>linux</code>, <code>arm64</code>, or <code>docker</code>, and a Pipeline&rsquo;s <code>agent</code> selection constrains
+where its workspace is allocated.</p><p>A workspace is mutable checkout and build state, not an artifact repository.
+Concurrent builds can receive distinct workspace paths, and an ephemeral agent
+can disappear after a stage. Publish outputs with <code>archiveArtifacts</code>, transfer
+small files between stages with <code>stash</code> and <code>unstash</code>, or upload release
+artifacts to a dedicated repository. Do not rely on files left by a previous
+build.</p><p>Agents should have only the tools, network paths, and credentials required by
+their labels. Ephemeral agents reduce cross-build contamination, but reproducible
+builds still require pinned container images, toolchains, plugins, and dependency
+inputs.</p><h2 id=declarative-and-scripted-pipelines>Declarative and Scripted Pipelines
+<a href=#declarative-and-scripted-pipelines class=heading-anchor><span>#</span></a></h2><p>Declarative Pipeline provides a validated structure around <code>pipeline</code>, <code>agent</code>,
+<code>stages</code>, <code>steps</code>, <code>environment</code>, <code>options</code>, and <code>post</code>. Scripted Pipeline uses
+Groovy control flow inside <code>node</code> and other Pipeline steps. Declarative
+<code>script { ... }</code> can contain an imperative section, but large scripted regions
+discard declarative validation and stage semantics. Put reusable policy in a
+versioned Shared Library rather than copying Groovy between repositories.</p><div class=jose-wrapper><div class=jose-tools><span>groovy</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-groovy data-lang=groovy><span style=display:flex><span>pipeline <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>  agent <span style=color:#f92672>{</span> label <span style=color:#e6db74>&#39;linux &amp;&amp; container&#39;</span> <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  options <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>    timeout<span style=color:#f92672>(</span>time: <span style=color:#ae81ff>20</span><span style=color:#f92672>,</span> unit: <span style=color:#e6db74>&#39;MINUTES&#39;</span><span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>    disableConcurrentBuilds<span style=color:#f92672>()</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  stages <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>    stage<span style=color:#f92672>(</span><span style=color:#e6db74>&#39;Test&#39;</span><span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>      steps <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>        retry<span style=color:#f92672>(</span><span style=color:#ae81ff>2</span><span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>          sh <span style=color:#e6db74>&#39;./mvnw --batch-mode verify&#39;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>      post <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>        always <span style=color:#f92672>{</span> junit <span style=color:#e6db74>&#39;target/surefire-reports/*.xml&#39;</span> <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>    stage<span style=color:#f92672>(</span><span style=color:#e6db74>&#39;Package&#39;</span><span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>      steps <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>        sh <span style=color:#e6db74>&#39;./mvnw --batch-mode package -DskipTests&#39;</span>
+</span></span><span style=display:flex><span>        archiveArtifacts artifacts: <span style=color:#e6db74>&#39;target/*.jar&#39;</span><span style=color:#f92672>,</span> fingerprint: <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  post <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>    always <span style=color:#f92672>{</span> deleteDir<span style=color:#f92672>()</span> <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>Pipeline steps persist execution state so a durable task can survive controller
+restarts, but external commands must remain restart-safe. Use <code>timeout</code> to bound
+stalled work and <code>retry</code> only for operations known to be idempotent. Deployment
+retries can duplicate side effects. <code>parallel</code> reduces latency when branches do
+not mutate the same workspace or external resource; use separate workspaces or
+agents when isolation is required.</p><h2 id=credentials-and-least-privilege>Credentials and Least Privilege
+<a href=#credentials-and-least-privilege class=heading-anchor><span>#</span></a></h2><p>Store secrets in Jenkins credentials and bind them for the smallest possible
+scope:</p><div class=jose-wrapper><div class=jose-tools><span>groovy</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-groovy data-lang=groovy><span style=display:flex><span>withCredentials<span style=color:#f92672>([</span>file<span style=color:#f92672>(</span>credentialsId: <span style=color:#e6db74>&#39;registry-token-file&#39;</span><span style=color:#f92672>,</span>
+</span></span><span style=display:flex><span>                      variable: <span style=color:#e6db74>&#39;REGISTRY_TOKEN_FILE&#39;</span><span style=color:#f92672>)])</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>  sh <span style=color:#e6db74>&#39;registry-client --token-file &#34;$REGISTRY_TOKEN_FILE&#34;&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>Masking reduces accidental log disclosure; it cannot protect a secret from
+untrusted build code running in the same scope. Avoid Groovy interpolation of
+string secrets because the value can enter process arguments or Jenkins-generated
+scripts before masking. File credentials supply a temporary protected file, but
+untrusted code in the same build context can still read it. Restrict credential IDs by folder, isolate untrusted
+pull requests from deployment jobs, and grant agents short-lived credentials
+for one environment.</p><h2 id=operating-the-pipeline>Operating the Pipeline
+<a href=#operating-the-pipeline class=heading-anchor><span>#</span></a></h2><p>Use multibranch jobs or trusted webhooks to associate execution with an exact
+commit. Preserve test reports and immutable artifacts according to a retention
+policy. Configure <code>post</code> actions for cleanup and notifications even when a stage
+fails. Protect the controller with authentication and authorization, review
+plugin updates as controller code, back up <code>JENKINS_HOME</code>, and keep build agents
+outside the controller&rsquo;s trust boundary.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/jenkins/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

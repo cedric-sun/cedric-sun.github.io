@@ -1,0 +1,53 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>awk</title></head><body><main><article><div class=article-header><h1>awk</h1><div class=aux>Last update: 2024-05-22 06:31:54 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/awk/>Awk</a>
+|
+<a href=/tags/gnu/>Gnu</a>
+|
+<a href=/tags/linux/>Linux</a></div></div><div class=article-content><p><code>awk</code> transforms text as a stream of records. Each record is tested against
+ordered pattern-action rules, which makes the language suited to reports,
+validation, and small data transformations. POSIX <code>awk</code> is widely available;
+GNU awk (<code>gawk</code>) adds features that scripts should declare when they require
+them.</p><h2 id=records-fields-and-counters>Records, Fields, and Counters
+<a href=#records-fields-and-counters class=heading-anchor><span>#</span></a></h2><p><code>RS</code> separates input records and defaults to newline. <code>FS</code> separates fields;
+its default treats runs of spaces and tabs specially. <code>$0</code> is the whole record,
+<code>$1</code> through <code>$NF</code> are fields, and <code>NF</code> is the field count. <code>NR</code> counts records
+across all inputs, whereas <code>FNR</code> restarts for each input file.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>awk -F <span style=color:#e6db74>&#39;:&#39;</span> <span style=color:#e6db74>&#39;$3 &gt;= 1000 { print $1, $6 }&#39;</span> /etc/passwd
+</span></span><span style=display:flex><span>awk -v limit<span style=color:#f92672>=</span><span style=color:#ae81ff>10</span> <span style=color:#e6db74>&#39;NF &gt; limit { print FILENAME &#34;:&#34; FNR }&#39;</span> input</span></span></code></pre></div></div></div><p>Set output separators explicitly when generating a structured result:</p><div class=jose-wrapper><div class=jose-tools><span>awk</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-awk data-lang=awk><span style=display:flex><span>BEGIN { FS <span style=color:#f92672>=</span> OFS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;,&#34;</span> }
+</span></span><span style=display:flex><span>NF <span style=color:#f92672>&gt;=</span> <span style=color:#ae81ff>3</span> { <span style=color:#a6e22e>total</span> <span style=color:#f92672>+=</span> <span style=color:#f92672>$</span><span style=color:#ae81ff>3</span> }
+</span></span><span style=display:flex><span>END { <span style=color:#66d9ef>print</span> <span style=color:#e6db74>&#34;total&#34;</span>, <span style=color:#a6e22e>total</span> }</span></span></code></pre></div></div></div><p>GNU awk treats a multi-character <code>RS</code> as a regular expression. Portable awk
+requires a single-character record separator, so scripts handling NUL-delimited
+names should require <code>gawk</code> explicitly, for example <code>gawk -v RS='\0'</code>.</p><h2 id=write-pattern-action-programs>Write Pattern-Action Programs
+<a href=#write-pattern-action-programs class=heading-anchor><span>#</span></a></h2><p>A rule has the form <code>pattern { action }</code>. A regular expression such as
+<code>/error/</code> tests <code>$0</code>; an expression tests according to awk&rsquo;s truth rules; and
+an omitted pattern matches every record. <code>BEGIN</code> runs before input and <code>END</code>
+runs after the final record.</p><div class=jose-wrapper><div class=jose-tools><span>awk</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-awk data-lang=awk><span style=display:flex><span>BEGIN { FS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;:&#34;</span> }
+</span></span><span style=display:flex><span><span style=color:#f92672>$</span><span style=color:#ae81ff>7</span> <span style=color:#f92672>~</span> <span style=color:#e6db74>/nologin$/</span> { <span style=color:#a6e22e>next</span> }
+</span></span><span style=display:flex><span>{ <span style=color:#a6e22e>users</span>[<span style=color:#f92672>$</span><span style=color:#ae81ff>1</span>] <span style=color:#f92672>=</span> <span style=color:#f92672>$</span><span style=color:#ae81ff>6</span> }
+</span></span><span style=display:flex><span>END {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> (<span style=color:#a6e22e>name</span> <span style=color:#f92672>in</span> <span style=color:#a6e22e>users</span>)
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>print</span> <span style=color:#a6e22e>name</span>, <span style=color:#a6e22e>users</span>[<span style=color:#a6e22e>name</span>]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Associative-array keys are strings, and <code>for (key in array)</code> has no portable
+iteration order. Sort output externally or use a documented GNU awk ordering
+feature when deterministic output is required.</p><h2 id=values-and-regular-expressions>Values and Regular Expressions
+<a href=#values-and-regular-expressions class=heading-anchor><span>#</span></a></h2><p>awk values have string and numeric forms. Context selects a conversion:
+<code>total += $3</code> needs a number, while concatenation needs a string. Validate
+input before relying on conversion because a nonnumeric string converts to
+zero in numeric context.</p><p>Regular expressions use POSIX extended regular-expression syntax. <code>~</code> and
+<code>!~</code> test a value; <code>match()</code>, <code>sub()</code>, <code>gsub()</code>, and <code>split()</code> operate inside
+actions. <code>sub()</code> changes the first match and <code>gsub()</code> changes every match.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>awk <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  /^[[:space:]]*#/ || NF == 0 { next }
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  $2 ~ /^[0-9]+$/ { count[$1] += $2 }
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  END { for (key in count) print key, count[key] }
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span> metrics.txt</span></span></code></pre></div></div></div><h2 id=invoke-awk-safely>Invoke <code>awk</code> Safely
+<a href=#invoke-awk-safely class=heading-anchor><span>#</span></a></h2><p>Single-quote the program so the shell does not expand <code>$1</code>, backslashes, or
+glob characters before awk receives them. Pass shell data with <code>-v</code> rather
+than interpolating it into program source:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>awk -v prefix<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$prefix<span style=color:#e6db74>&#34;</span> <span style=color:#e6db74>&#39;$1 == prefix { print $0 }&#39;</span> input
+</span></span><span style=display:flex><span>awk -f report.awk -- --filename-starting-with-dash</span></span></code></pre></div></div></div><p>The <code>--</code> option ends awk option processing on implementations that support it;
+use it when input names can begin with <code>-</code>. Treat <code>-v</code> data as data, not awk
+source. For untrusted CSV, use a CSV-aware parser or GNU awk&rsquo;s documented
+<code>--csv</code> mode because <code>FS=","</code> does not implement CSV quoting rules.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/awk/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

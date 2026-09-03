@@ -1,0 +1,522 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>The A2A Protocol</title></head><body><main><article><div class=article-header><h1>The A2A Protocol</h1><div class=aux>Last update: 2026-03-18 19:10:43 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ai/>Ai</a>
+|
+<a href=/tags/agents/>Agents</a>
+|
+<a href=/tags/a2a/>A2a</a>
+|
+<a href=/tags/protocol/>Protocol</a>
+|
+<a href=/tags/distributed-systems/>Distributed-Systems</a></div></div><div class=article-content><blockquote><p>inventing mcp again.</p></blockquote><p>The <a href=https://a2a-protocol.org/>Agent2Agent Protocol</a>, abbreviated <strong>A2A</strong>, is
+an open protocol for communication between independent AI-agent applications.
+It lets one agent discover another agent&rsquo;s capabilities, send it work, continue
+a multi-turn interaction, track a long-running task, and receive structured
+results without knowing how the remote agent is implemented.</p><p>A2A was initiated by Google and donated to the Linux Foundation. It is
+framework-, model-, language-, and vendor-neutral. An A2A client built in Java
+can collaborate with a remote agent built in Python using a different model and
+agent framework.</p><p>The important boundary is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Agent A knows what Agent B offers and how to communicate with it.
+</span></span><span style=display:flex><span>Agent A does not need Agent B&#39;s prompt, memory, tools, model, or source code.</span></span></code></pre></div></div></div><p>This article describes the released A2A v1.0 data model. The specification is
+still evolving, so production implementations should negotiate and validate
+the protocol version declared by the remote Agent Card.</p><h2 id=the-problem-a2a-solves>The Problem A2A Solves
+<a href=#the-problem-a2a-solves class=heading-anchor><span>#</span></a></h2><p>Suppose a general assistant must arrange a business trip. It may need to
+collaborate with:</p><ul><li>a flight agent;</li><li>a hotel agent;</li><li>an employer travel-policy agent;</li><li>a ground-transport agent; and</li><li>an expense-management agent.</li></ul><p>Without a common protocol, every pair needs a custom integration:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>orchestrator -&gt; flight vendor&#39;s private API
+</span></span><span style=display:flex><span>orchestrator -&gt; hotel vendor&#39;s private API
+</span></span><span style=display:flex><span>orchestrator -&gt; policy agent&#39;s custom WebSocket
+</span></span><span style=display:flex><span>orchestrator -&gt; expense agent&#39;s message queue</span></span></code></pre></div></div></div><p>Each integration invents its own:</p><ul><li>capability description;</li><li>request and response schemas;</li><li>authentication metadata;</li><li>progress events;</li><li>cancellation behavior;</li><li>file handling;</li><li>conversation identifier;</li><li>long-running job model; and</li><li>error representation.</li></ul><p>As the number of independently developed agents grows, these point-to-point
+adapters become expensive to build and govern.</p><p>A conventional REST API solves part of this problem when the remote operation
+is deterministic and completely specified. An agent interaction is often less
+rigid:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Client: Arrange travel within company policy.
+</span></span><span style=display:flex><span>Agent: I need the employee ID and preferred departure window.
+</span></span><span style=display:flex><span>Client: Employee E-1042, after 18:00.
+</span></span><span style=display:flex><span>Agent: The only compliant flight arrives after hotel check-in. May I request
+</span></span><span style=display:flex><span>       an exception?
+</span></span><span style=display:flex><span>Client: Yes; prepare the exception request but do not purchase anything.</span></span></code></pre></div></div></div><p>The work is stateful, may require clarification or authorization, can last a
+long time, and may produce several evolving artifacts. A2A standardizes that
+interaction envelope while leaving the domain reasoning to each agent.</p><h3 id=from-an-integration-matrix-to-one-protocol>From an Integration Matrix to One Protocol
+<a href=#from-an-integration-matrix-to-one-protocol class=heading-anchor><span>#</span></a></h3><p>If every agent has a bespoke interface, connecting \(N\) agents can approach
+\(N \times (N - 1)\) directional integrations. With A2A, each implementation
+targets a shared protocol:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Agent A --\
+</span></span><span style=display:flex><span>Agent B ----&gt; A2A data model and operations
+</span></span><span style=display:flex><span>Agent C --/</span></span></code></pre></div></div></div><p>This does not eliminate domain differences. A flight-booking skill and a
+security-review skill still accept different information. It standardizes how
+their capabilities are advertised and how work, state, content, and results are
+exchanged.</p><h2 id=what-a2a-is-not>What A2A Is Not
+<a href=#what-a2a-is-not class=heading-anchor><span>#</span></a></h2><p>A2A is:</p><ul><li>a wire protocol and interaction model between agentic applications;</li><li>suitable across process, framework, team, and organization boundaries; and</li><li>designed for opaque, potentially long-running agents.</li></ul><p>A2A is not:</p><ul><li>an LLM;</li><li>an agent framework;</li><li>an orchestration algorithm;</li><li>a prompt format;</li><li>a workflow engine;</li><li>a model-routing system;</li><li>an identity provider;</li><li>a registry API standard;</li><li>a guarantee that an advertised agent is trustworthy; or</li><li>a replacement for a well-defined ordinary API.</li></ul><p>If the remote capability is simply <code>getExchangeRate(from, to)</code>, a normal API or
+tool protocol may be clearer. A2A is valuable when the remote party is an
+autonomous collaborator that can reason, negotiate, maintain task state, ask
+for more information, and return complex deliverables.</p><h2 id=a2a-and-mcp>A2A and MCP
+<a href=#a2a-and-mcp class=heading-anchor><span>#</span></a></h2><p>A2A and the Model Context Protocol solve different problems:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Protocol</th><th>Relationship</th><th>Typical Remote Capability</th></tr></thead><tbody><tr><td>MCP</td><td>Agent to tool or resource</td><td>Query a database, read a file, call an API</td></tr><tr><td>A2A</td><td>Agent to agent</td><td>Research, negotiate, plan, delegate, and deliver a result</td></tr></tbody></table></div></div><p>An agent can use both:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Travel Orchestrator
+</span></span><span style=display:flex><span>  |
+</span></span><span style=display:flex><span>  | A2A: &#34;Find compliant flight options&#34;
+</span></span><span style=display:flex><span>  v
+</span></span><span style=display:flex><span>Flight Agent
+</span></span><span style=display:flex><span>  |
+</span></span><span style=display:flex><span>  | MCP: call inventory and pricing tools
+</span></span><span style=display:flex><span>  v
+</span></span><span style=display:flex><span>Airline systems</span></span></code></pre></div></div></div><p>MCP exposes relatively bounded primitives to an agent. A2A exposes an
+independent agent as an opaque collaborator. Wrapping every agent as one large
+tool hides useful task lifecycle, clarification, artifacts, and asynchronous
+behavior; treating every simple tool as an agent adds unnecessary autonomy and
+complexity.</p><h2 id=the-three-protocol-layers>The Three Protocol Layers
+<a href=#the-three-protocol-layers class=heading-anchor><span>#</span></a></h2><p>A2A v1.0 separates three layers:</p><ol><li><strong>Canonical data model:</strong> Agent Cards, Messages, Tasks, Parts, Artifacts,
+events, security declarations, and extensions.</li><li><strong>Abstract operations:</strong> Send a message, stream a message, retrieve/list or
+cancel tasks, subscribe to task updates, manage push-notification
+configuration, and retrieve an extended Agent Card.</li><li><strong>Bindings:</strong> Concrete mappings to JSON-RPC, gRPC, HTTP+JSON, or a governed
+custom binding.</li></ol><p>The canonical Protocol Buffer definition is normative. Bindings serialize the
+same concepts differently. Clients should use a maintained SDK rather than
+assuming one JSON-RPC example describes every binding.</p><p>The official project maintains SDKs for Python, Go, Java, JavaScript, .NET, and
+Rust, plus a separate sample repository.</p><h2 id=actors>Actors
+<a href=#actors class=heading-anchor><span>#</span></a></h2><p>An interaction has three conceptual actors:</p><ul><li><strong>User:</strong> A human or automated system whose goal motivates the request.</li><li><strong>A2A client:</strong> The application or client agent that initiates the protocol
+operation on the user&rsquo;s behalf.</li><li><strong>A2A server:</strong> The remote agent that publishes an A2A interface and performs
+the work.</li></ul><p>The same application can be both a server and a client. A travel orchestrator
+serves its user&rsquo;s request while acting as a client of flight and hotel agents.</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>User
+</span></span><span style=display:flex><span>  -&gt; A2A server: Travel Orchestrator
+</span></span><span style=display:flex><span>       -&gt; A2A client: Flight Agent
+</span></span><span style=display:flex><span>       -&gt; A2A client: Hotel Agent
+</span></span><span style=display:flex><span>       -&gt; A2A client: Policy Agent</span></span></code></pre></div></div></div><p>A2A does not standardize the orchestrator&rsquo;s planning logic. It may use a fixed
+workflow, a rules engine, an LLM planner, or human decisions.</p><h2 id=agent-discovery>Agent Discovery
+<a href=#agent-discovery class=heading-anchor><span>#</span></a></h2><p>An A2A server describes itself with an <strong>Agent Card</strong>, a JSON document that
+contains:</p><ul><li>agent name, description, provider, and version;</li><li>one or more supported interfaces and A2A protocol versions;</li><li>supported protocol bindings;</li><li>default input and output media types;</li><li>optional streaming, push-notification, and extended-card capabilities;</li><li>security schemes and requirements;</li><li>skills, descriptions, tags, examples, and media types; and</li><li>optional signatures and extensions.</li></ul><p>A simplified v1.0 Agent Card is:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;name&#34;</span>: <span style=color:#e6db74>&#34;Corporate Travel Agent&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;description&#34;</span>: <span style=color:#e6db74>&#34;Plans policy-compliant business travel&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;version&#34;</span>: <span style=color:#e6db74>&#34;3.4.0&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;provider&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;organization&#34;</span>: <span style=color:#e6db74>&#34;Example Travel&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;url&#34;</span>: <span style=color:#e6db74>&#34;https://travel.example&#34;</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;supportedInterfaces&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;url&#34;</span>: <span style=color:#e6db74>&#34;https://agents.example/a2a/travel&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;protocolBinding&#34;</span>: <span style=color:#e6db74>&#34;HTTP+JSON&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;protocolVersion&#34;</span>: <span style=color:#e6db74>&#34;1.0&#34;</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;capabilities&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;streaming&#34;</span>: <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;pushNotifications&#34;</span>: <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;extendedAgentCard&#34;</span>: <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;defaultInputModes&#34;</span>: [
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;text/plain&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;application/json&#34;</span>
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;defaultOutputModes&#34;</span>: [
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;text/plain&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;application/json&#34;</span>
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;skills&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;id&#34;</span>: <span style=color:#e6db74>&#34;plan-business-trip&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;name&#34;</span>: <span style=color:#e6db74>&#34;Plan a Business Trip&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;description&#34;</span>: <span style=color:#e6db74>&#34;Finds policy-compliant flight and hotel options&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;tags&#34;</span>: [<span style=color:#e6db74>&#34;travel&#34;</span>, <span style=color:#e6db74>&#34;flight&#34;</span>, <span style=color:#e6db74>&#34;hotel&#34;</span>, <span style=color:#e6db74>&#34;corporate-policy&#34;</span>],
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;examples&#34;</span>: [
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;Plan a trip from Singapore to Helsinki for 12-16 October&#34;</span>
+</span></span><span style=display:flex><span>      ],
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;inputModes&#34;</span>: [<span style=color:#e6db74>&#34;text/plain&#34;</span>, <span style=color:#e6db74>&#34;application/json&#34;</span>],
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;outputModes&#34;</span>: [<span style=color:#e6db74>&#34;application/json&#34;</span>]
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The exact JSON field names are derived from the v1.0 canonical model. Validate
+cards through an SDK or generated schema rather than accepting arbitrary JSON.</p><h3 id=discovery-strategies>Discovery Strategies
+<a href=#discovery-strategies class=heading-anchor><span>#</span></a></h3><p>For domain-based discovery, the standard well-known URL is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>https://agent.example/.well-known/agent-card.json</span></span></code></pre></div></div></div><p>Other practical approaches are:</p><ul><li><strong>Curated registry:</strong> An enterprise catalog or marketplace returns approved
+Agent Cards based on skill, provider, geography, or trust policy.</li><li><strong>Direct configuration:</strong> A deployment manifest supplies known card URLs for
+a closed set of agents.</li><li><strong>Authenticated extended card:</strong> A public card advertises basic capability;
+an authenticated operation returns sensitive skills or interfaces available
+to that caller.</li></ul><p>A2A standardizes the card, not the API of a centralized registry.</p><p>Treat discovery as input to policy, not automatic trust. Before invoking an
+agent, a client may need to check:</p><ul><li>trusted issuer or registry;</li><li>card signature;</li><li>allowed domain and TLS identity;</li><li>protocol version;</li><li>required binding;</li><li>supported media types;</li><li>approved provider;</li><li>data residency;</li><li>security scheme;</li><li>contractual relationship; and</li><li>whether the skill is authorized for the current user.</li></ul><p>Agent Cards change less often than tasks and should use normal HTTP caching,
+including <code>Cache-Control</code>, <code>ETag</code>, and conditional requests.</p><h3 id=when-the-agent-card-is-exchanged>When the Agent Card Is Exchanged
+<a href=#when-the-agent-card-is-exchanged class=heading-anchor><span>#</span></a></h3><p>The Agent Card is control-plane metadata used during discovery, normally before
+the first A2A operation:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Client -&gt; discover or receive Agent Card
+</span></span><span style=display:flex><span>Client -&gt; validate trust, version, binding, security, and media types
+</span></span><span style=display:flex><span>Client -&gt; select an interface URL from supportedInterfaces
+</span></span><span style=display:flex><span>Client -&gt; send A2A operations to that interface</span></span></code></pre></div></div></div><p>The card is not normally attached to every Message. A client can cache it and
+refresh it according to normal HTTP caching rules or local policy.</p><p>An A2A server <strong>must make an Agent Card available</strong>, but v1.0 permits several
+discovery mechanisms: the standard well-known URI, a registry or catalog, and
+directly configured card URLs or card content. Consequently,
+<code>/.well-known/agent-card.json</code> is the conventional interoperable location, not
+the only compliant way to exchange a card.</p><p>If the public card advertises <code>extendedAgentCard</code>, an authorized client may
+later invoke Get Extended Agent Card. That authenticated card can reveal
+caller-specific skills or interfaces that should not be published during
+anonymous discovery.</p><h2 id=messages-and-parts>Messages and Parts
+<a href=#messages-and-parts class=heading-anchor><span>#</span></a></h2><p>A <strong>Message</strong> is one communication turn. It has:</p><ul><li>a caller-generated <code>messageId</code>;</li><li>a role, <code>ROLE_USER</code> or <code>ROLE_AGENT</code>;</li><li>one or more Parts;</li><li>optional <code>contextId</code> and <code>taskId</code>;</li><li>optional references to previous tasks;</li><li>optional metadata; and</li><li>declared extensions.</li></ul><p>A <strong>Part</strong> contains exactly one content representation:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Content</th><th>Use</th></tr></thead><tbody><tr><td><code>text</code></td><td>Plain textual content</td></tr><tr><td><code>data</code></td><td>Structured JSON value</td></tr><tr><td><code>url</code></td><td>Reference to external content</td></tr><tr><td><code>raw</code></td><td>Inline bytes, represented as Base64 in JSON</td></tr></tbody></table></div></div><p>A Part can also have a MIME <code>mediaType</code>, filename, and metadata:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;messageId&#34;</span>: <span style=color:#e6db74>&#34;msg-01JZ8P...&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;ROLE_USER&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;parts&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;text&#34;</span>: <span style=color:#e6db74>&#34;Review the attached contract for renewal risk.&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;mediaType&#34;</span>: <span style=color:#e6db74>&#34;text/plain&#34;</span>
+</span></span><span style=display:flex><span>    },
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;url&#34;</span>: <span style=color:#e6db74>&#34;https://files.example/contracts/42&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;filename&#34;</span>: <span style=color:#e6db74>&#34;contract.pdf&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;mediaType&#34;</span>: <span style=color:#e6db74>&#34;application/pdf&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;metadata&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;sha256&#34;</span>: <span style=color:#e6db74>&#34;...&#34;</span>
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    },
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;data&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;jurisdiction&#34;</span>: <span style=color:#e6db74>&#34;Singapore&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;riskTolerance&#34;</span>: <span style=color:#e6db74>&#34;low&#34;</span>
+</span></span><span style=display:flex><span>      },
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;mediaType&#34;</span>: <span style=color:#e6db74>&#34;application/json&#34;</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Prefer a URL for a large file rather than putting Base64 data in every protocol
+hop. The URL should be short-lived, scoped to the intended agent, integrity
+checked, and protected against confused-deputy access.</p><p>Media negotiation matters. The client declares output media types it accepts,
+and the Agent Card describes what the agent supports. A machine orchestrator
+should request structured data rather than parse prose when a skill offers
+<code>application/json</code>.</p><h2 id=direct-messages-and-stateful-tasks>Direct Messages and Stateful Tasks
+<a href=#direct-messages-and-stateful-tasks class=heading-anchor><span>#</span></a></h2><p>The Send Message operation can return either:</p><ul><li>a <strong>Message</strong> for an immediate, self-contained response; or</li><li>a <strong>Task</strong> for stateful or long-running work.</li></ul><p>For example, an agent may answer a capability question directly:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Client: Can you review contracts governed by Singapore law?
+</span></span><span style=display:flex><span>Agent: Yes.</span></span></code></pre></div></div></div><p>Reviewing a 300-page contract should create a Task that can be tracked,
+interrupted, canceled, and associated with output artifacts.</p><h3 id=the-task-model>The Task Model
+<a href=#the-task-model class=heading-anchor><span>#</span></a></h3><p>A Task has:</p><ul><li>a server-generated task ID;</li><li>a server-generated context ID;</li><li>current status and timestamp;</li><li>optional status Message;</li><li>Message history;</li><li>zero or more Artifacts; and</li><li>metadata.</li></ul><p>The lifecycle states are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>State</th><th>Meaning</th></tr></thead><tbody><tr><td><code>TASK_STATE_SUBMITTED</code></td><td>Accepted but not yet actively processed</td></tr><tr><td><code>TASK_STATE_WORKING</code></td><td>Processing</td></tr><tr><td><code>TASK_STATE_INPUT_REQUIRED</code></td><td>More user or client information is needed</td></tr><tr><td><code>TASK_STATE_AUTH_REQUIRED</code></td><td>Additional out-of-band authentication is needed</td></tr><tr><td><code>TASK_STATE_COMPLETED</code></td><td>Successful terminal result</td></tr><tr><td><code>TASK_STATE_FAILED</code></td><td>Terminal processing failure</td></tr><tr><td><code>TASK_STATE_CANCELED</code></td><td>Terminal cancellation</td></tr><tr><td><code>TASK_STATE_REJECTED</code></td><td>Agent declined the work</td></tr></tbody></table></div></div><p><code>INPUT_REQUIRED</code> and <code>AUTH_REQUIRED</code> interrupt processing but are not terminal.
+The client can send another Message associated with the Task to continue it.</p><p>Terminal Tasks are immutable. A correction or refinement creates a new Task in
+the same context and can reference the previous task:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>context C
+</span></span><span style=display:flex><span>  task T1: Generate itinerary       -&gt; completed -&gt; artifact A1
+</span></span><span style=display:flex><span>  task T2: Replace morning flight   -&gt; completed -&gt; artifact A2
+</span></span><span style=display:flex><span>            references T1</span></span></code></pre></div></div></div><p>This gives auditability: each Task remains a stable unit of input, state, and
+output.</p><h3 id=context-and-task-ids>Context and Task IDs
+<a href=#context-and-task-ids class=heading-anchor><span>#</span></a></h3><p><code>contextId</code> groups related Tasks and Messages. <code>taskId</code> identifies one unit of
+work:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>context: &#34;Plan Helsinki trip&#34;
+</span></span><span style=display:flex><span>  task: find flights
+</span></span><span style=display:flex><span>  task: reserve hotel
+</span></span><span style=display:flex><span>  task: request policy exception</span></span></code></pre></div></div></div><p>Do not confuse a context ID with authentication, authorization, or tenant
+identity. It is an opaque correlation handle assigned by the server. The server
+must still verify that the authenticated caller may access every referenced
+context, task, and artifact.</p><h2 id=artifacts>Artifacts
+<a href=#artifacts class=heading-anchor><span>#</span></a></h2><p>An <strong>Artifact</strong> is a concrete Task output, as opposed to a conversational
+status Message. Examples include:</p><ul><li>an itinerary;</li><li>a security report;</li><li>generated source code;</li><li>a PDF contract analysis;</li><li>an image;</li><li>a structured list of offers; or</li><li>a deployment manifest.</li></ul><p>An Artifact has an ID unique within its Task, name, description, Parts,
+metadata, and optional extensions:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;artifactId&#34;</span>: <span style=color:#e6db74>&#34;offers-v1&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;name&#34;</span>: <span style=color:#e6db74>&#34;flight-offers.json&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;description&#34;</span>: <span style=color:#e6db74>&#34;Policy-compliant flight options&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;parts&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;mediaType&#34;</span>: <span style=color:#e6db74>&#34;application/json&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;data&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;currency&#34;</span>: <span style=color:#e6db74>&#34;SGD&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;offers&#34;</span>: [
+</span></span><span style=display:flex><span>          {
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&#34;offerId&#34;</span>: <span style=color:#e6db74>&#34;F-812&#34;</span>,
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&#34;price&#34;</span>: <span style=color:#ae81ff>1420.30</span>,
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&#34;refundable&#34;</span>: <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>          }
+</span></span><span style=display:flex><span>        ]
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;metadata&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;expiresAt&#34;</span>: <span style=color:#e6db74>&#34;2026-07-20T10:15:00Z&#34;</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>An Artifact is not automatically durable or trustworthy. The client must
+validate its schema, media type, size, integrity, provenance, expiration, and
+business meaning.</p><h2 id=core-operations>Core Operations
+<a href=#core-operations class=heading-anchor><span>#</span></a></h2><p>The binding-neutral v1.0 operations include:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Operation</th><th>Purpose</th></tr></thead><tbody><tr><td>Send Message</td><td>Start or continue an interaction</td></tr><tr><td>Send Streaming Message</td><td>Start an interaction and receive incremental events</td></tr><tr><td>Get Task</td><td>Retrieve current Task state, history, and Artifacts</td></tr><tr><td>List Tasks</td><td>List authorized Tasks with filters and pagination</td></tr><tr><td>Cancel Task</td><td>Ask the agent to cancel ongoing work</td></tr><tr><td>Subscribe to Task</td><td>Reconnect to updates for an active Task</td></tr><tr><td>Manage Task Push Notification Config</td><td>Create, read, list, or delete webhook configuration</td></tr><tr><td>Get Extended Agent Card</td><td>Retrieve caller-specific Agent Card details</td></tr></tbody></table></div></div><h3 id=bindings-and-endpoint-mapping>Bindings and Endpoint Mapping
+<a href=#bindings-and-endpoint-mapping class=heading-anchor><span>#</span></a></h3><p>The interface URL and <code>protocolBinding</code> in the Agent Card determine how these
+abstract operations appear on the wire.</p><p>With <strong>JSON-RPC</strong>, the advertised interface URL is one HTTP endpoint for all
+operations. A URL such as <code>/a2a</code> is only an implementation choice; the A2A
+specification does not require that path. The client sends an ordinary HTTP
+request with a JSON-RPC body, and the <code>method</code> field selects the A2A operation:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#a6e22e>POST</span> /a2a <span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span>
+</span></span><span style=display:flex><span>Host<span style=color:#f92672>:</span> <span style=color:#ae81ff>agents.example</span>
+</span></span><span style=display:flex><span>Content-Type<span style=color:#f92672>:</span> <span style=color:#ae81ff>application/json</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;jsonrpc&#34;</span>: <span style=color:#e6db74>&#34;2.0&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;id&#34;</span>: <span style=color:#e6db74>&#34;request-17&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;method&#34;</span>: <span style=color:#e6db74>&#34;SendMessage&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;params&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;message&#34;</span>: {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;messageId&#34;</span>: <span style=color:#e6db74>&#34;msg-01JZ8P...&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;ROLE_USER&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;parts&#34;</span>: [{<span style=color:#f92672>&#34;text&#34;</span>: <span style=color:#e6db74>&#34;Hello&#34;</span>}]
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>JSON-RPC is a protocol convention layered over HTTP here, not a replacement
+for HTTP. HTTP supplies transport, headers, authentication, and status codes;
+JSON-RPC standardizes the body fields <code>method</code>, <code>params</code>, <code>id</code>, <code>result</code>, and
+<code>error</code>, plus request correlation, notifications, and protocol error
+semantics. Other protocols can also use JSON-RPC over transports such as
+WebSocket or standard input/output, but A2A&rsquo;s JSON-RPC binding specifically
+uses HTTP(S), with Server-Sent Events for streaming.</p><p>All JSON-RPC A2A methods go to the same advertised URL:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>A2A operation</th><th>JSON-RPC method</th></tr></thead><tbody><tr><td>Send Message</td><td><code>SendMessage</code></td></tr><tr><td>Send Streaming Message</td><td><code>SendStreamingMessage</code></td></tr><tr><td>Get Task</td><td><code>GetTask</code></td></tr><tr><td>List Tasks</td><td><code>ListTasks</code></td></tr><tr><td>Cancel Task</td><td><code>CancelTask</code></td></tr><tr><td>Subscribe to Task</td><td><code>SubscribeToTask</code></td></tr><tr><td>Create push configuration</td><td><code>CreateTaskPushNotificationConfig</code></td></tr><tr><td>Get push configuration</td><td><code>GetTaskPushNotificationConfig</code></td></tr><tr><td>List push configurations</td><td><code>ListTaskPushNotificationConfigs</code></td></tr><tr><td>Delete push configuration</td><td><code>DeleteTaskPushNotificationConfig</code></td></tr><tr><td>Get Extended Agent Card</td><td><code>GetExtendedAgentCard</code></td></tr></tbody></table></div></div><p>The <strong>HTTP+JSON</strong> binding instead uses distinct resource-oriented paths
+relative to its advertised interface base URL:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>HTTP endpoint</th><th>A2A operation</th></tr></thead><tbody><tr><td><code>POST /message:send</code></td><td>Send Message</td></tr><tr><td><code>POST /message:stream</code></td><td>Send Streaming Message using SSE</td></tr><tr><td><code>GET /tasks/{id}</code></td><td>Get Task</td></tr><tr><td><code>GET /tasks</code></td><td>List Tasks</td></tr><tr><td><code>POST /tasks/{id}:cancel</code></td><td>Cancel Task</td></tr><tr><td><code>POST /tasks/{id}:subscribe</code></td><td>Subscribe to Task using SSE</td></tr><tr><td><code>POST /tasks/{id}/pushNotificationConfigs</code></td><td>Create push configuration</td></tr><tr><td><code>GET /tasks/{id}/pushNotificationConfigs/{configId}</code></td><td>Get push configuration</td></tr><tr><td><code>GET /tasks/{id}/pushNotificationConfigs</code></td><td>List push configurations</td></tr><tr><td><code>DELETE /tasks/{id}/pushNotificationConfigs/{configId}</code></td><td>Delete push configuration</td></tr><tr><td><code>GET /extendedAgentCard</code></td><td>Get Extended Agent Card</td></tr></tbody></table></div></div><p>These paths belong to the HTTP+JSON binding; a JSON-RPC implementation does not
+expose one HTTP route per operation. The gRPC binding likewise exposes RPC
+methods rather than these REST paths.</p><h3 id=blocking-and-non-blocking-sends>Blocking and Non-Blocking Sends
+<a href=#blocking-and-non-blocking-sends class=heading-anchor><span>#</span></a></h3><p>The Send Message configuration controls whether the call waits:</p><ul><li>With <code>returnImmediately</code> false or absent, it waits until the Task reaches a
+terminal or interrupted state.</li><li>With <code>returnImmediately</code> true, it returns after Task creation; the client
+polls, subscribes, or waits for a push notification.</li></ul><p>A simplified HTTP+JSON request is:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#a6e22e>POST</span> /message:send <span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span>
+</span></span><span style=display:flex><span>Host<span style=color:#f92672>:</span> <span style=color:#ae81ff>agents.example</span>
+</span></span><span style=display:flex><span>Authorization<span style=color:#f92672>:</span> <span style=color:#ae81ff>Bearer eyJ...</span>
+</span></span><span style=display:flex><span>Content-Type<span style=color:#f92672>:</span> <span style=color:#ae81ff>application/json</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;message&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;messageId&#34;</span>: <span style=color:#e6db74>&#34;msg-01JZ8P...&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;ROLE_USER&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;parts&#34;</span>: [
+</span></span><span style=display:flex><span>      {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;text&#34;</span>: <span style=color:#e6db74>&#34;Review repository example/payments for critical vulnerabilities&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;mediaType&#34;</span>: <span style=color:#e6db74>&#34;text/plain&#34;</span>
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    ]
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;configuration&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;acceptedOutputModes&#34;</span>: [
+</span></span><span style=display:flex><span>      <span style=color:#e6db74>&#34;application/json&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#e6db74>&#34;text/markdown&#34;</span>
+</span></span><span style=display:flex><span>    ],
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;historyLength&#34;</span>: <span style=color:#ae81ff>10</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;returnImmediately&#34;</span>: <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The immediate response may contain:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;task&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;id&#34;</span>: <span style=color:#e6db74>&#34;task-sec-2048&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;contextId&#34;</span>: <span style=color:#e6db74>&#34;ctx-release-91&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;status&#34;</span>: {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;state&#34;</span>: <span style=color:#e6db74>&#34;TASK_STATE_SUBMITTED&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;timestamp&#34;</span>: <span style=color:#e6db74>&#34;2026-07-20T08:30:00Z&#34;</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>This example targets the v1.0 HTTP+JSON binding. Use an SDK for exact request
+and response wrappers.</p><h2 id=streaming-and-asynchronous-work>Streaming and Asynchronous Work
+<a href=#streaming-and-asynchronous-work class=heading-anchor><span>#</span></a></h2><p>Agent work often lasts longer than a normal request timeout. A2A offers three
+update patterns.</p><h3 id=polling>Polling
+<a href=#polling class=heading-anchor><span>#</span></a></h3><p>The client sends a non-blocking request and periodically invokes Get Task:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Send Message -&gt; Task(submitted)
+</span></span><span style=display:flex><span>Get Task     -&gt; Task(working)
+</span></span><span style=display:flex><span>Get Task     -&gt; Task(completed, artifacts=[...])</span></span></code></pre></div></div></div><p>Polling is simple and survives process restarts. Use exponential backoff,
+jitter, and server hints rather than polling every few milliseconds.</p><h3 id=streaming>Streaming
+<a href=#streaming class=heading-anchor><span>#</span></a></h3><p>If the Agent Card advertises streaming, Send Streaming Message returns a
+stream. Depending on the binding, HTTP can use Server-Sent Events and gRPC can
+use a server stream.</p><p>A Task lifecycle stream begins with the Task and then emits:</p><ul><li><code>TaskStatusUpdateEvent</code> for state changes or intermediate status Messages;</li><li><code>TaskArtifactUpdateEvent</code> for new or incrementally updated Artifacts.</li></ul><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Task(submitted)
+</span></span><span style=display:flex><span>Status(working: &#34;Scanning dependencies&#34;)
+</span></span><span style=display:flex><span>Artifact(report, append=true, chunk=1)
+</span></span><span style=display:flex><span>Status(working: &#34;Analyzing reachable call paths&#34;)
+</span></span><span style=display:flex><span>Artifact(report, append=true, chunk=2, lastChunk=true)
+</span></span><span style=display:flex><span>Status(completed)</span></span></code></pre></div></div></div><p>Artifact updates identify whether data appends to the existing Artifact and
+whether the final chunk has arrived. A client should assemble chunks by task
+and artifact IDs, enforce size limits, and tolerate reconnects without
+duplicating content.</p><p>If a stream disconnects while the Task is active, Subscribe to Task can resume
+receiving future updates. Persist the Task ID before processing streamed data so
+recovery remains possible.</p><h3 id=push-notifications>Push Notifications
+<a href=#push-notifications class=heading-anchor><span>#</span></a></h3><p>For work lasting minutes, hours, or days, a client can register an HTTPS webhook
+if the agent advertises push-notification support:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Client -&gt; Agent: start Task and register callback
+</span></span><span style=display:flex><span>Client disconnects
+</span></span><span style=display:flex><span>Agent performs work
+</span></span><span style=display:flex><span>Agent -&gt; Client webhook: Task completed
+</span></span><span style=display:flex><span>Client -&gt; Agent: Get Task</span></span></code></pre></div></div></div><p>The notification tells the client that state changed; the client normally
+fetches the authoritative Task afterward.</p><p>Webhook support introduces serious risks:</p><ul><li><strong>SSRF:</strong> A malicious caller supplies an internal or cloud-metadata URL.</li><li><strong>Spoofing:</strong> An attacker sends a fake completion event.</li><li><strong>Replay:</strong> A valid old event is processed again.</li><li><strong>Amplification:</strong> The server is induced to flood a third party.</li><li><strong>Duplicate delivery:</strong> Network retries deliver the same event more than
+once.</li></ul><p>The server should allowlist or verify callback ownership and restrict outbound
+networks. The receiver should authenticate the sender, validate issuer,
+audience, expiry, task ID, and unique event ID, reject stale events, and process
+notifications idempotently.</p><h2 id=input-and-authentication-interruptions>Input and Authentication Interruptions
+<a href=#input-and-authentication-interruptions class=heading-anchor><span>#</span></a></h2><p>Long-running work may need another user decision:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Client -&gt; Agent: &#34;Book the best compliant option&#34;
+</span></span><span style=display:flex><span>Agent -&gt; Client: Task(INPUT_REQUIRED)
+</span></span><span style=display:flex><span>                &#34;Two options have equal policy score. Prefer lower price or
+</span></span><span style=display:flex><span>                 refundable fare?&#34;
+</span></span><span style=display:flex><span>Client -&gt; Agent: Message(taskId=T1, &#34;Prefer refundable&#34;)
+</span></span><span style=display:flex><span>Agent -&gt; Client: Task(WORKING)
+</span></span><span style=display:flex><span>Agent -&gt; Client: Task(COMPLETED, artifact=booking)</span></span></code></pre></div></div></div><p><code>AUTH_REQUIRED</code> indicates that additional authorization is needed during work.
+For example, the travel agent may discover that it needs the user to authorize
+an airline account.</p><p>The client should perform the OAuth or consent flow out of band and then
+continue the Task. Do not send a password, refresh token, or reusable secret as
+ordinary Message text merely because the agent requested authentication.</p><h2 id=detailed-example-corporate-travel>Detailed Example: Corporate Travel
+<a href=#detailed-example-corporate-travel class=heading-anchor><span>#</span></a></h2><p>Consider a company assistant that coordinates independently operated agents.</p><h3 id=participants>Participants
+<a href=#participants class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Travel Orchestrator
+</span></span><span style=display:flex><span>  -&gt; Policy Agent
+</span></span><span style=display:flex><span>  -&gt; Flight Agent
+</span></span><span style=display:flex><span>  -&gt; Hotel Agent
+</span></span><span style=display:flex><span>  -&gt; Expense Agent</span></span></code></pre></div></div></div><p>Each remote system publishes an Agent Card. The orchestrator&rsquo;s approved
+registry contains the trusted cards and OAuth audience for each provider.</p><h3 id=flow>Flow
+<a href=#flow class=heading-anchor><span>#</span></a></h3><ol><li><p>The user asks:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Plan travel from Singapore to Helsinki for 12-16 October.
+</span></span><span style=display:flex><span>I need to arrive before Monday&#39;s 09:00 meeting.
+</span></span><span style=display:flex><span>Do not make purchases yet.</span></span></code></pre></div></div></div></li><li><p>The orchestrator sends employee grade, cost center, route, and dates as
+structured Parts to the Policy Agent.</p></li><li><p>The Policy Agent returns a completed Task with a policy Artifact:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;cabin&#34;</span>: <span style=color:#e6db74>&#34;economy&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;maxNightlyHotelRate&#34;</span>: <span style=color:#ae81ff>240</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;currency&#34;</span>: <span style=color:#e6db74>&#34;EUR&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;approvalRequiredAbove&#34;</span>: <span style=color:#ae81ff>1800</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div></li><li><p>The orchestrator starts Flight and Hotel Tasks in parallel within its own
+workflow. It sends only the policy fields each agent needs.</p></li><li><p>The Flight Agent streams status:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>working: searching direct routes
+</span></span><span style=display:flex><span>working: direct route violates arrival constraint
+</span></span><span style=display:flex><span>working: searching one-stop routes
+</span></span><span style=display:flex><span>completed: artifact flight-offers.json</span></span></code></pre></div></div></div></li><li><p>The Hotel Agent reaches <code>INPUT_REQUIRED</code> because there are two office
+locations. The orchestrator asks the user and continues that same Task with
+the selected office.</p></li><li><p>The orchestrator joins the two structured Artifacts, calculates complete
+itinerary options, and presents them to the user.</p></li><li><p>The user selects one option. This creates new booking Tasks in the same
+orchestration context; it does not mutate the completed search Tasks.</p></li><li><p>Because the total exceeds the policy threshold, the Expense Agent creates an
+approval Task and configures a push notification. A manager approves it
+several hours later.</p></li><li><p>The orchestrator receives the authenticated notification, retrieves the
+Task, confirms the approved amount and expiration, and only then continues
+the booking Tasks.</p></li></ol><h3 id=why-a2a-helps>Why A2A Helps
+<a href=#why-a2a-helps class=heading-anchor><span>#</span></a></h3><p>The flight and hotel providers retain their own models, tools, pricing systems,
+and planning logic. The orchestrator sees declared skills, task state, Messages,
+and Artifacts. A provider can replace its internal framework without changing
+the collaboration contract.</p><p>A2A does not solve transaction atomicity. If the flight succeeds and the hotel
+fails, the orchestrator still needs compensation logic, reservations with
+expiry, or a domain-specific transaction workflow.</p><h2 id=detailed-example-software-delivery>Detailed Example: Software Delivery
+<a href=#detailed-example-software-delivery class=heading-anchor><span>#</span></a></h2><p>A release orchestrator coordinates agents owned by different engineering
+teams:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Coding Agent -&gt; Test Agent -&gt; Security Agent -&gt; Deployment Agent</span></span></code></pre></div></div></div><h3 id=flow-1>Flow
+<a href=#flow-1 class=heading-anchor><span>#</span></a></h3><ol><li><p>The Coding Agent completes Task <code>T1</code> and emits:</p><ul><li>a Git commit reference;</li><li>a patch Artifact;</li><li>a change-summary Artifact; and</li><li>the expected test scope.</li></ul></li><li><p>The orchestrator sends separate Messages to the Test and Security Agents.
+Each Message references <code>T1</code>, but includes only a short-lived repository
+credential authorized for that repository and operation.</p></li><li><p>The Test Agent streams:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Task submitted
+</span></span><span style=display:flex><span>Compiling module payments
+</span></span><span style=display:flex><span>Running 1,842 unit tests
+</span></span><span style=display:flex><span>Running 37 integration tests
+</span></span><span style=display:flex><span>Artifact: junit-results.xml
+</span></span><span style=display:flex><span>Task completed</span></span></code></pre></div></div></div></li><li><p>The Security Agent returns <code>INPUT_REQUIRED</code>:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>The patch changes authorization behavior. Is the endpoint intended for
+</span></span><span style=display:flex><span>service identities, end users, or both?</span></span></code></pre></div></div></div></li><li><p>The orchestrator obtains the answer from the code owner and continues the
+same security Task.</p></li><li><p>The Security Agent completes with structured findings:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;decision&#34;</span>: <span style=color:#e6db74>&#34;block&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;findings&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;severity&#34;</span>: <span style=color:#e6db74>&#34;high&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;file&#34;</span>: <span style=color:#e6db74>&#34;AuthorizationService.java&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;line&#34;</span>: <span style=color:#ae81ff>118</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;summary&#34;</span>: <span style=color:#e6db74>&#34;Tenant constraint omitted&#34;</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div></li><li><p>The orchestrator does not invoke deployment. It creates refinement Task
+<code>T4</code> for the Coding Agent, references <code>T1</code> and the security Task, and requests
+a fix.</p></li><li><p>The new patch receives new test and review Tasks. Completed Tasks remain
+immutable audit records.</p></li><li><p>Only deterministic release policy, not an LLM&rsquo;s prose, decides whether all
+required checks permit deployment.</p></li></ol><h3 id=why-a2a-helps-1>Why A2A Helps
+<a href=#why-a2a-helps-1 class=heading-anchor><span>#</span></a></h3><p>Each team can build its agent with a different framework. Results remain typed
+Artifacts rather than scraped chat. Streaming exposes progress for expensive
+test suites, and interrupted Tasks support questions without discarding prior
+work.</p><p>The protocol does not make generated code safe. Branch protection,
+authorization, reproducible builds, signatures, isolated execution, and human
+approval remain necessary.</p><h2 id=detailed-example-insurance-claim>Detailed Example: Insurance Claim
+<a href=#detailed-example-insurance-claim class=heading-anchor><span>#</span></a></h2><p>A claim intake agent receives text, images, and documents from a mobile
+application:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Claim Intake Agent
+</span></span><span style=display:flex><span>  -&gt; Damage Assessment Agent
+</span></span><span style=display:flex><span>  -&gt; Coverage Agent
+</span></span><span style=display:flex><span>  -&gt; Fraud Review Agent
+</span></span><span style=display:flex><span>  -&gt; Repair Network Agent</span></span></code></pre></div></div></div><h3 id=multimodal-exchange>Multimodal Exchange
+<a href=#multimodal-exchange class=heading-anchor><span>#</span></a></h3><p>The intake Message contains:</p><ul><li>text describing the accident;</li><li>image Parts referenced by scoped URLs;</li><li>a PDF police report;</li><li>structured vehicle and policy data; and</li><li>hashes for integrity verification.</li></ul><p>The Damage Assessment Agent returns:</p><ul><li>a human-readable summary;</li><li>a structured list of damaged components;</li><li>annotated-image Artifacts; and</li><li>an uncertainty score.</li></ul><p>The Coverage Agent sees policy terms but not unnecessary accident images. The
+Fraud Agent receives redacted evidence appropriate to its role. Data
+minimization occurs in the orchestrator before each A2A call.</p><h3 id=human-in-the-loop>Human in the Loop
+<a href=#human-in-the-loop class=heading-anchor><span>#</span></a></h3><p>If assessment confidence is low, the Task enters <code>INPUT_REQUIRED</code>:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Please provide a photograph of the rear-left wheel at ground level.</span></span></code></pre></div></div></div><p>The mobile user uploads another image, and the intake agent continues the same
+Task.</p><p>If estimated loss exceeds a threshold, the workflow creates a separate human
+adjuster Task. A2A tracks collaboration, but deterministic claims policy and a
+qualified human make the legally consequential decision.</p><h3 id=why-a2a-helps-2>Why A2A Helps
+<a href=#why-a2a-helps-2 class=heading-anchor><span>#</span></a></h3><p>Parts support text, structured data, and file references in one interaction.
+Tasks survive intermittent mobile connectivity. Artifacts represent durable
+deliverables, and remote specialist agents remain opaque.</p><p>The implementation must still enforce consent, retention, regional processing,
+medical-data rules, and strict authorization for every Artifact URL.</p><h2 id=detailed-example-procurement-and-negotiation>Detailed Example: Procurement and Negotiation
+<a href=#detailed-example-procurement-and-negotiation class=heading-anchor><span>#</span></a></h2><p>A procurement agent needs quotes for 500 laptops from several supplier agents.
+This illustrates why an agent is more than a stateless price tool.</p><h3 id=flow-2>Flow
+<a href=#flow-2 class=heading-anchor><span>#</span></a></h3><ol><li><p>The client sends required specifications, delivery locations, service terms,
+and a response deadline to three approved supplier agents.</p></li><li><p>Each supplier creates a Task and may ask clarifying questions.</p></li><li><p>Suppliers return quote Artifacts with price, inventory, warranty, expiration,
+and commercial terms.</p></li><li><p>The procurement agent requests refinements in new Tasks:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Keep the same hardware and delivery date. Offer a three-year warranty and
+</span></span><span style=display:flex><span>quote the price difference.</span></span></code></pre></div></div></div></li><li><p>Each refinement references the prior Task and quote Artifact.</p></li><li><p>The client tracks quote versions because Artifact lineage and acceptance are
+client responsibilities.</p></li><li><p>A deterministic policy engine compares mandatory terms. The model may
+summarize tradeoffs but cannot waive requirements.</p></li><li><p>A human approves the selected quote.</p></li><li><p>A separate purchase Task performs the order with an idempotency key and
+narrow authorization.</p></li></ol><h3 id=why-a2a-helps-3>Why A2A Helps
+<a href=#why-a2a-helps-3 class=heading-anchor><span>#</span></a></h3><p>Negotiation is multi-turn and each supplier owns its reasoning and inventory
+tools. Tasks and Artifacts provide consistent mechanics without forcing all
+suppliers into one proprietary agent SDK.</p><p>A2A does not standardize the quote schema. The buyer and suppliers still need a
+shared domain schema or an extension for machine-comparable commercial terms.</p><h2 id=security-model>Security Model
+<a href=#security-model class=heading-anchor><span>#</span></a></h2><p>A2A reuses standard web security rather than placing credentials in protocol
+Messages.</p><p>The Agent Card declares supported security schemes and requirements. The client
+obtains credentials out of band, then sends them through transport headers:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>Authorization: Bearer eyJ...</span></span></span></code></pre></div></div></div><p>Production A2A interfaces should use HTTPS and verify server identity.
+Cross-organization deployments commonly use OAuth 2.0/OIDC, workload identity,
+mTLS, or a combination.</p><p>Authentication answers who the caller is. Every operation still requires
+authorization:</p><ul><li>May this caller invoke this skill?</li><li>May it access this task and context?</li><li>May it reference this artifact?</li><li>May it request this output modality?</li><li>May it cancel this work?</li><li>May the remote agent perform the underlying action for this end user?</li></ul><p>Opaque execution protects implementation details, not users. A malicious or
+compromised agent can still return harmful content, misuse delegated
+credentials, or claim work succeeded when it did not.</p><h3 id=delegation>Delegation
+<a href=#delegation class=heading-anchor><span>#</span></a></h3><p>When one agent acts for a user across another agent boundary, preserve:</p><ul><li>end-user identity where policy requires it;</li><li>calling workload identity;</li><li>tenant;</li><li>audience;</li><li>authorized scopes;</li><li>purpose and consent;</li><li>token expiry; and</li><li>trace context.</li></ul><p>Do not forward a broad bearer token merely because both agents can technically
+accept it. Exchange it for a short-lived, audience-bound token with only the
+remote skill&rsquo;s required scopes.</p><h3 id=untrusted-content>Untrusted Content
+<a href=#untrusted-content class=heading-anchor><span>#</span></a></h3><p>Every Message, Part, Artifact, Agent Card, and referenced file is untrusted
+input. Apply:</p><ul><li>JSON and media-type validation;</li><li>byte, history, and nesting limits;</li><li>malware scanning;</li><li>decompression limits;</li><li>URL scheme and destination restrictions;</li><li>content-security policies for rendered output;</li><li>prompt-injection defenses;</li><li>output-schema validation; and</li><li>domain authorization independent of agent text.</li></ul><p>Do not render an HTML Artifact directly in a privileged application origin.</p><h2 id=reliability-and-workflow-semantics>Reliability and Workflow Semantics
+<a href=#reliability-and-workflow-semantics class=heading-anchor><span>#</span></a></h2><p>A2A supplies task state but is not a distributed transaction coordinator.
+Clients and servers still need:</p><ul><li>durable Task storage;</li><li>idempotent business operations;</li><li>request deduplication;</li><li>bounded retries with jitter;</li><li>deadlines and expiration;</li><li>cancellation propagation;</li><li>compensation for partial success;</li><li>artifact integrity and retention;</li><li>backpressure;</li><li>concurrency limits; and</li><li>recovery after process restart.</li></ul><p>A canceled Task does not prove that an external side effect was undone. A
+flight may already have been ticketed or an email already sent. Model
+cancellation and business compensation separately.</p><p>Network failures create ambiguity:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Client sends &#34;purchase&#34;
+</span></span><span style=display:flex><span>Server performs purchase
+</span></span><span style=display:flex><span>Response is lost
+</span></span><span style=display:flex><span>Client does not know whether purchase occurred</span></span></code></pre></div></div></div><p>Use a domain idempotency key and queryable business reference for consequential
+actions. <code>messageId</code> identifies a protocol Message but should not be the sole
+business guarantee unless the implementation explicitly defines and persists
+that behavior.</p><p>Tasks and Artifacts need retention policies. A client cannot assume it can
+retrieve a completed Task forever unless the service contract says so.</p><h2 id=observability>Observability
+<a href=#observability class=heading-anchor><span>#</span></a></h2><p>Propagate W3C Trace Context headers across A2A calls. Useful span attributes and
+logs include:</p><ul><li>remote agent identity and version;</li><li>protocol and binding version;</li><li>operation;</li><li>task and context IDs;</li><li>skill;</li><li>state transition;</li><li>media types;</li><li>artifact size;</li><li>retry count;</li><li>latency; and</li><li>authenticated client application.</li></ul><p>Do not put prompt text, document content, access tokens, or personal data into
+metric labels. Logs containing Messages or Artifacts need redaction, access
+control, and retention limits.</p><p>Important metrics include:</p><ul><li>request and error rates by operation;</li><li>task queue and execution latency;</li><li>Tasks by state;</li><li>time spent waiting for input or authentication;</li><li>stream disconnect and resubscription rates;</li><li>push-notification delivery failures;</li><li>cancellation latency;</li><li>Artifact bytes; and</li><li>downstream model and tool cost.</li></ul><p>Audit consequential actions separately from diagnostic logging.</p><h2 id=extensions>Extensions
+<a href=#extensions class=heading-anchor><span>#</span></a></h2><p>Extensions add behavior or data without changing the core protocol. An Agent
+Card declares each extension by a stable URI, description, parameters, and
+whether clients must understand it.</p><p>A client must not call an agent when a required extension is unsupported.
+Optional extensions should degrade cleanly.</p><p>Use an extension when several independent implementations need interoperable
+semantics, not merely to carry one application&rsquo;s private metadata. Vendor
+extensions can recreate the same lock-in A2A is meant to reduce, so keep the
+core interaction usable where possible and document conformance precisely.</p><h2 id=implementing-an-a2a-server>Implementing an A2A Server
+<a href=#implementing-an-a2a-server class=heading-anchor><span>#</span></a></h2><p>A practical server implementation proceeds as follows:</p><ol><li>Define a narrow set of skills and their input/output media types.</li><li>Publish a minimal public Agent Card.</li><li>Choose one official binding and SDK first.</li><li>Authenticate at the HTTP or transport boundary.</li><li>Authorize skills, Tasks, contexts, and Artifacts.</li><li>Validate Messages and dereference files safely.</li><li>Decide when to return a direct Message versus create a Task.</li><li>Persist Tasks before acknowledging non-blocking work.</li><li>Emit valid state transitions and immutable terminal state.</li><li>Store or reference Artifacts with integrity and retention metadata.</li><li>Add streaming only when intermediate updates have value.</li><li>Add push notifications only with SSRF protection and authenticated
+delivery.</li><li>Propagate tracing and record audit events.</li><li>Publish compatibility and retention guarantees.</li></ol><p>The agent&rsquo;s internal implementation can use an LLM, deterministic workflow,
+human queue, tools, or other A2A agents. Do not expose chain-of-thought or
+internal credentials as status Messages.</p><h2 id=implementing-an-a2a-client>Implementing an A2A Client
+<a href=#implementing-an-a2a-client class=heading-anchor><span>#</span></a></h2><p>A robust client should:</p><ol><li>Discover the Agent Card from a trusted source.</li><li>Validate and cache it.</li><li>Select a mutually supported protocol version, binding, and media type.</li><li>Enforce local trust and data-sharing policy.</li><li>Obtain an audience-bound credential.</li><li>Generate and persist Message correlation data.</li><li>Send the smallest required context.</li><li>Persist returned Task and context IDs immediately.</li><li>Handle direct Message and Task responses.</li><li>Handle every Task state, including rejection and authentication.</li><li>Reconnect, poll, or process push notifications idempotently.</li><li>Validate Artifacts before use.</li><li>Apply deterministic policy before consequential follow-up actions.</li><li>Record trace and audit relationships across delegated Tasks.</li></ol><p>Do not let an LLM choose arbitrary Agent Card URLs and immediately send them
+credentials or private data. Discovery and invocation need an allowlist or
+trust policy.</p><h2 id=when-to-use-a2a>When to Use A2A
+<a href=#when-to-use-a2a class=heading-anchor><span>#</span></a></h2><p>Use A2A when:</p><ul><li>independently owned agents must interoperate;</li><li>the remote system is genuinely agentic rather than a single function;</li><li>capability discovery is useful;</li><li>interaction may require clarification or negotiation;</li><li>work is long-running or resumable;</li><li>rich or incremental Artifacts are required;</li><li>internal agent implementation must remain opaque; or</li><li>multiple languages and frameworks must share one contract.</li></ul><p>Prefer a normal API, event schema, workflow activity, or MCP tool when:</p><ul><li>input and output are fully deterministic;</li><li>one short request always completes the operation;</li><li>there is no meaningful conversation or task lifecycle;</li><li>both sides are one tightly coupled application;</li><li>strong static domain schemas matter more than agent flexibility; or</li><li>adding autonomous behavior creates risk without user value.</li></ul><h2 id=common-mistakes>Common Mistakes
+<a href=#common-mistakes class=heading-anchor><span>#</span></a></h2><ol><li><strong>Treating discovery as trust.</strong> An Agent Card describes claims; policy
+decides whether to trust them.</li><li><strong>Putting credentials in Messages.</strong> Use transport-level authentication and
+out-of-band authorization.</li><li><strong>Using a context ID as authorization.</strong> It is only an opaque grouping
+identifier.</li><li><strong>Sending all user context to every agent.</strong> Minimize data per delegated
+skill.</li><li><strong>Parsing prose when structured output is offered.</strong> Negotiate an
+appropriate media type.</li><li><strong>Restarting a terminal Task.</strong> Create a new Task in the same context and
+reference the prior Task.</li><li><strong>Assuming cancellation undoes side effects.</strong> Implement domain
+compensation.</li><li><strong>Trusting arbitrary push URLs.</strong> Prevent SSRF and authenticate callbacks.</li><li><strong>Assuming streaming is durable.</strong> Persist IDs and support resubscription or
+polling.</li><li><strong>Confusing A2A with orchestration.</strong> The client still owns workflow and
+failure policy.</li><li><strong>Confusing A2A with MCP.</strong> Agents collaborate through A2A; agents use
+bounded tools through MCP.</li><li><strong>Giving an orchestrating model final authority.</strong> Deterministic code must
+enforce permissions, budgets, and approval rules.</li><li><strong>Ignoring protocol negotiation.</strong> Cards can expose several bindings and
+versions.</li><li><strong>Using old pre-1.0 examples unchanged.</strong> The v1.0 canonical model changed
+field names, enums, and binding structure.</li></ol><p>A2A&rsquo;s value is not that agents can send JSON to each other; ordinary HTTP
+already does that. Its value is a shared model for discovering opaque agents,
+delegating stateful work, negotiating modalities, handling interruptions, and
+retrieving incremental or durable results. That common layer makes
+cross-framework collaboration possible while leaving business schemas,
+orchestration, trust, and safety in the applications that understand them.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/a2a-protocol/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

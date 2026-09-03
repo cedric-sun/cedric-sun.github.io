@@ -1,0 +1,167 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Querying HTML, Media, and Storage</title></head><body><main><article><div class=article-header><h1>Querying HTML, Media, and Storage</h1><div class=aux>Last update: 2022-02-11 10:29:35 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/curl/>Curl</a>
+|
+<a href=/tags/ffmpeg/>Ffmpeg</a>
+|
+<a href=/tags/html/>Html</a>
+|
+<a href=/tags/storage/>Storage</a>
+|
+<a href=/tags/xpath/>Xpath</a></div></div><div class=article-content><p>Web extraction, media processing, and storage formats all benefit from working
+with structured representations rather than treating bytes as opaque text.</p><h2 id=parse-html-before-querying-it>Parse HTML Before Querying It
+<a href=#parse-html-before-querying-it class=heading-anchor><span>#</span></a></h2><p>XPath operates on a document tree, not a raw HTML string. Parse web content
+with an HTML parser, then query the resulting DOM. Browser DOMs, HTML parsers,
+and XML parsers can repair malformed markup differently, so use the same
+parser class in tests and production.</p><p>CSS selectors are concise when the document author controls stable IDs and
+classes. XPath can query text and navigate relative to matched nodes, which
+makes it suitable for document analysis and crawlers.</p><div class=jose-wrapper><div class=jose-tools><span>xpath</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-xpath data-lang=xpath>//article//h2
+//a[@rel=&#39;next&#39;]/@href
+//table//tr[td]
+//*[contains(concat(&#39; &#39;, normalize-space(@class), &#39; &#39;), &#39; product &#39;)]
+//h2[normalize-space(.)=&#39;Specifications&#39;]/following-sibling::ul[1]/li</code></pre></div></div><p><code>//</code> searches descendants, <code>@name</code> selects an attribute, predicates filter a
+node set, and an axis such as <code>following-sibling</code> navigates from a selected
+node. The class expression matches one token rather than accidentally matching
+<code>product-card</code> for a query that requires <code>product</code>.</p><p>Avoid positional paths such as <code>//div[7]</code> unless the structure is contractual.
+Anchor on a semantic element, an accessible name, a heading, a link relation,
+or a stable data attribute. Resolve extracted relative URLs against the
+document base, respect robots policies and terms of service, rate-limit
+requests, and treat extracted content as untrusted input.</p><h2 id=evaluate-xpath-in-browser-code>Evaluate XPath in Browser Code
+<a href=#evaluate-xpath-in-browser-code class=heading-anchor><span>#</span></a></h2><p>Browsers expose XPath through <code>document.evaluate</code>. Provide an explicit context
+node and request the result form needed by the caller:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>result</span> <span style=color:#f92672>=</span> document.<span style=color:#a6e22e>evaluate</span>(
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;.//a[normalize-space(.)=&#39;Download&#39;]/@href&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>container</span>,
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>XPathResult</span>.<span style=color:#a6e22e>STRING_TYPE</span>,
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>href</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>result</span>.<span style=color:#a6e22e>stringValue</span>;</span></span></code></pre></div></div></div><p>For many nodes, use an ordered snapshot or an iterator:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>result</span> <span style=color:#f92672>=</span> document.<span style=color:#a6e22e>evaluate</span>(
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;.//tr[td]&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>table</span>,
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>XPathResult</span>.<span style=color:#a6e22e>ORDERED_NODE_SNAPSHOT_TYPE</span>,
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>let</span> <span style=color:#a6e22e>index</span> <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>index</span> <span style=color:#f92672>&lt;</span> <span style=color:#a6e22e>result</span>.<span style=color:#a6e22e>snapshotLength</span>; <span style=color:#a6e22e>index</span> <span style=color:#f92672>+=</span> <span style=color:#ae81ff>1</span>) {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>const</span> <span style=color:#a6e22e>row</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>result</span>.<span style=color:#a6e22e>snapshotItem</span>(<span style=color:#a6e22e>index</span>);
+</span></span><span style=display:flex><span>  <span style=color:#75715e>// Process row while the DOM is stable.
+</span></span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>An iterator becomes invalid after relevant DOM mutation. A locator API is
+preferable for authored, testable applications; XPath is valuable when an
+automation task cannot influence the document structure.</p><h2 id=retrieve-multiple-resources-with-curl>Retrieve Multiple Resources with Curl
+<a href=#retrieve-multiple-resources-with-curl class=heading-anchor><span>#</span></a></h2><p><code>curl</code> accepts multiple URLs in one invocation. Output templates can use
+<code>#1</code>, <code>#2</code>, and later placeholders for URL glob components:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>curl --fail --location --remote-name <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;https://example.test/images/page-[001-010].jpg&#39;</span></span></span></code></pre></div></div></div><p><code>--fail</code> makes HTTP status failures non-successful, <code>--location</code> follows HTTP
+redirects, and <code>--remote-name</code> uses the remote filename. Set an explicit
+<code>--output</code> template when a server filename is unsuitable:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>curl --fail --location <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;https://example.test/page/[0001-0217].jp2&#39;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --output <span style=color:#e6db74>&#39;page-#1.jp2&#39;</span></span></span></code></pre></div></div></div><p>Use <code>--proxy socks5h://localhost:1080</code> when a SOCKS proxy must resolve DNS
+through the proxy. The <code>h</code> matters: <code>socks5</code> resolves the target locally,
+while <code>socks5h</code> sends the hostname to the proxy.</p><p>Do not bypass a certificate-name mismatch with <code>--insecure</code>. A mismatch means
+the requested hostname is absent from the certificate&rsquo;s subject alternative
+names. Correct the URL or server configuration, then retry. <code>curl -v</code> exposes
+the TLS and HTTP exchange for diagnosis; remove authorization headers and
+cookies before sharing its output.</p><h2 id=process-media-with-ffmpeg>Process Media with FFmpeg
+<a href=#process-media-with-ffmpeg class=heading-anchor><span>#</span></a></h2><p>FFmpeg separates container formats, streams, codecs, and filters. A file can
+contain video, audio, subtitle, data, and attachment streams; a filename
+extension does not identify the codec configuration.</p><p>Inspect an input before choosing a command:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>ffprobe -hide_banner -show_format -show_streams input.mkv</span></span></code></pre></div></div></div><p>Copy compatible streams without re-encoding:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>ffmpeg -i input.mkv -map 0:v:0 -map 0:a? -c copy output.mkv</span></span></code></pre></div></div></div><p><code>-map</code> selects streams explicitly. The trailing <code>?</code> makes an optional audio
+stream non-fatal. Stream copy preserves encoded packets, so it cannot change
+resolution, frame rate, audio sampling, or codec.</p><p>Re-encode when a transformation or compatibility conversion is required:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>ffmpeg -i input.mov <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -vf <span style=color:#e6db74>&#39;scale=1920:-2:flags=lanczos,format=yuv420p&#39;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -c:v libx264 -crf <span style=color:#ae81ff>20</span> -preset medium <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -c:a aac -b:a 192k <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  output.mp4</span></span></code></pre></div></div></div><p><code>-2</code> asks the scale filter to choose an even dimension, which many
+subsampled-pixel formats require. <code>-crf</code> controls quality for constant-quality
+encoders; lower values request higher quality and larger output. Codec options
+have encoder-specific semantics, so record the command and encoder version in
+reproducible media pipelines.</p><p>Filter graphs combine audio and video operations:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>ffmpeg -i video.mp4 -i narration.wav <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -filter_complex <span style=color:#e6db74>&#39;[0:a][1:a]amix=inputs=2:duration=first[a]&#39;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -map 0:v:0 -map <span style=color:#e6db74>&#39;[a]&#39;</span> -c:v copy -c:a aac mixed.mp4</span></span></code></pre></div></div></div><p>Place input options before the <code>-i</code> they affect and output options after the
+input they affect. Preserve timestamps with intent: <code>-ss</code> before <code>-i</code> seeks
+quickly to a nearby keyframe, while <code>-ss</code> after <code>-i</code> decodes to an accurate
+position. Test seek behavior on representative inputs.</p><h2 id=address-blocks-on-magnetic-disks>Address Blocks on Magnetic Disks
+<a href=#address-blocks-on-magnetic-disks class=heading-anchor><span>#</span></a></h2><p>A sector is an addressable device unit. A filesystem block is a filesystem
+allocation or I/O unit and can span one or more sectors. Modern drives expose
+512-byte logical sectors, 4096-byte logical sectors, or 512-byte emulation on
+4 KiB physical sectors.</p><p>Cylinder-head-sector (CHS) addressing modeled a disk&rsquo;s geometry:</p><ul><li>A <strong>cylinder</strong> selected one radius across all platter surfaces.</li><li>A <strong>head</strong> selected a surface, giving a track at that radius.</li><li>A <strong>sector</strong> selected a device block on the track.</li></ul><p>The legacy BIOS CHS interface encoded up to 1024 cylinders, 255 heads, and 63
+sectors per track. At 512 bytes per sector, that limit is
+8,422,686,720 bytes (about 7.84 GiB). Drives later reported translated
+geometries, so CHS values ceased to describe physical platters. Zone-bit
+recording further ensures outer tracks contain more physical sectors than
+inner tracks.</p><p>Logical block addressing (LBA) replaces geometry with a zero-based linear
+sector number. Firmware translates an LBA into physical locations internally.
+Tools should display sectors, bytes, and alignment separately because a
+partitioning convention based on old CHS cylinders does not express modern
+device geometry.</p><h2 id=choose-mbr-or-gpt-partitioning>Choose MBR or GPT Partitioning
+<a href=#choose-mbr-or-gpt-partitioning class=heading-anchor><span>#</span></a></h2><p>The Master Boot Record occupies logical block 0. Its final two bytes are
+<code>0x55AA</code>; the preceding partition table holds four 16-byte primary entries.
+An entry contains a status byte, legacy CHS fields, a type byte, a starting
+LBA, and a sector count.</p><p>MBR&rsquo;s four-entry limit led to the extended-partition convention. One primary
+entry points to an Extended Boot Record chain, and each EBR describes one
+logical partition plus a link to the next EBR. The chain is a historical
+layout convention, not a filesystem feature. Bootstrap code in the MBR
+chooses or transfers control to a partition&rsquo;s volume boot record; it does not
+define the filesystem.</p><p>GUID Partition Table (GPT) uses LBA and removes the four-partition limit:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Location</th><th>GPT Structure</th></tr></thead><tbody><tr><td>LBA 0</td><td>Protective MBR, preventing MBR-only tools from treating the disk as empty</td></tr><tr><td>LBA 1</td><td>Primary GPT header</td></tr><tr><td>Following LBAs</td><td>Partition-entry array</td></tr><tr><td>Final LBAs</td><td>Backup partition-entry array and backup header</td></tr></tbody></table></div></div><p>A GPT header records the usable LBA range, disk GUID, partition-entry layout,
+and CRC32 checksums. Each partition entry contains a type GUID, unique GUID,
+first and last LBAs, attribute flags, and a UTF-16LE name. Validate both the
+header and entry-array checksums before attempting repair. The backup GPT at
+the end of the disk supports recovery only when it agrees with known device
+size and valid checksums.</p><p>Align partitions to a 1 MiB boundary unless a platform specifies another
+requirement. That alignment works with common physical-sector and RAID-stripe
+layouts without depending on obsolete CHS boundaries.</p><h2 id=read-fat-volume-structures>Read FAT Volume Structures
+<a href=#read-fat-volume-structures class=heading-anchor><span>#</span></a></h2><p>FAT12, FAT16, and FAT32 store a per-cluster allocation table. The name denotes
+the width of a FAT entry, not the sector size. A volume&rsquo;s boot sector contains
+the BIOS Parameter Block (BPB), including bytes per sector, sectors per
+cluster, reserved-sector count, FAT count, root-directory information, and
+total-sector count.</p><p>The root directory is fixed after the FATs in FAT12 and FAT16. FAT32 stores
+the root as an ordinary cluster chain, with its initial cluster recorded in
+the extended BPB. Directory entries map a short 8.3 name, attributes, first
+cluster, size, and timestamps to a file. Long File Name entries precede the
+short entry and store UTF-16 name fragments with a checksum.</p><p>File data is a cluster chain:</p><ol><li>Locate the first cluster from the directory entry.</li><li>Read the cluster&rsquo;s data.</li><li>Read that cluster&rsquo;s FAT entry.</li><li>Continue until an end-of-chain marker appears.</li></ol><p>Free, reserved, bad, and end-of-chain values are format-specific. Validate the
+BPB-derived cluster count before deciding whether a volume is FAT12, FAT16, or
+FAT32; the textual label in a boot sector is not authoritative. FAT has no
+journal, so an interrupted metadata update can leave lost chains or
+cross-linked clusters for a repair utility to reconcile.</p><h2 id=place-ata-in-the-storage-stack>Place ATA in the Storage Stack
+<a href=#place-ata-in-the-storage-stack class=heading-anchor><span>#</span></a></h2><p>IDE was a PC integration name for an ATA disk interface. Parallel ATA (PATA)
+carried ATA commands over a 40- or 80-conductor ribbon cable and exposed
+primary and secondary channels with device-select conventions. Serial ATA
+(SATA) retained the ATA command model while replacing the physical transport
+with point-to-point serial links.</p><p>ATA identifies a drive and its capacity through the <code>IDENTIFY DEVICE</code> command.
+Commands transfer logical sectors through task-file registers or DMA engines;
+the controller, cable, host adapter, and device determine transfer mode and
+error handling. ATAPI used packet commands over an ATA transport for devices
+such as optical drives, while SCSI command sets dominate many other storage
+transports.</p><p>Avoid interpreting a drive&rsquo;s reported logical CHS fields as physical
+geometry. Use LBA capacity and logical/physical sector-size information
+reported by the device and operating system.</p><h2 id=store-and-read-optical-media>Store and Read Optical Media
+<a href=#store-and-read-optical-media class=heading-anchor><span>#</span></a></h2><p>Optical media records a spiral track. A focused laser and photodiode measure
+changes in reflected light. For a pressed CD, pits and lands are molded into
+polycarbonate; the signal changes at transitions because the depth difference
+creates destructive interference across parts of the reflected spot. A pit is
+not directly one binary value, and transition timing is encoded with
+run-length-limited channel coding plus error correction.</p><p>CD uses a near-infrared laser and a 1.6 µm track pitch. DVD and Blu-ray use
+shorter wavelengths and smaller pitches, increasing capacity. Constant linear
+velocity keeps data rate stable by reducing angular speed as the pickup moves
+outward; later formats can use other rotation strategies.</p><p>Pressed discs are read-only. Recordable media changes a dye or inorganic
+recording layer, while rewritable media uses a phase-change alloy. CD, DVD,
+and Blu-ray specifications cover physical format, modulation, error
+correction, and logical formats; a file image format alone does not specify a
+disc&rsquo;s physical recording method.</p><p>ISO 9660 is a read-only optical-disc filesystem derived from the High Sierra
+format. It emphasizes sequential layout and cross-platform interchange. Its
+original naming and directory constraints led to extensions such as Rock Ridge
+for POSIX metadata and Joliet for longer Unicode-oriented names. El Torito
+adds boot records for bootable optical media.</p><p>UDF supersedes ISO 9660 for many DVD and Blu-ray uses. Its descriptor-based
+layout supports incremental updates and can represent rewritable and
+write-once media more naturally. An <code>.iso</code> file is a sector image; it can
+contain ISO 9660, UDF, or a hybrid layout.</p><p>Useful inspection tools include <code>isosize</code> from util-linux and <code>libcdio</code>
+utilities such as <code>iso-info</code> and <code>iso-read</code>. Mount or inspect untrusted images
+with the same caution applied to untrusted archives, because filenames and
+metadata can be hostile input.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/querying-html-with-xpath/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

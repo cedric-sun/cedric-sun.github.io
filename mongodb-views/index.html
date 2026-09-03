@@ -1,0 +1,78 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MongoDB Views</title></head><body><main><article><div class=article-header><h1>MongoDB Views</h1><div class=aux>Last update: 2021-07-25 21:42:07 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/mongodb/>Mongodb</a>
+|
+<a href=/tags/databases/>Databases</a>
+|
+<a href=/tags/aggregation/>Aggregation</a></div></div><div class=article-content><p>MongoDB views are read-only query definitions over a collection or another
+view. A view stores its aggregation pipeline, not the pipeline result, so each
+read applies the pipeline to the current source data. A standard view therefore
+does not provide materialized-view caching.</p><h2 id=creating-a-view>Creating a View
+<a href=#creating-a-view class=heading-anchor><span>#</span></a></h2><p><code>db.createView()</code> takes a target collection name, a source namespace, and an
+aggregation pipeline:</p><div class=jose-wrapper><div class=jose-tools><span>javascript</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#a6e22e>db</span>.<span style=color:#a6e22e>createView</span>(
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;active_orders&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;orders&#34;</span>,
+</span></span><span style=display:flex><span>  [
+</span></span><span style=display:flex><span>    { <span style=color:#a6e22e>$match</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>status</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;active&#34;</span> } },
+</span></span><span style=display:flex><span>    { <span style=color:#a6e22e>$project</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>customerId</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>1</span>, <span style=color:#a6e22e>total</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>1</span>, <span style=color:#a6e22e>createdAt</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>1</span> } }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>)</span></span></code></pre></div></div></div><p>Clients query <code>active_orders</code> as they query a collection:</p><div class=jose-wrapper><div class=jose-tools><span>javascript</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#a6e22e>db</span>.<span style=color:#a6e22e>active_orders</span>.<span style=color:#a6e22e>find</span>({ <span style=color:#a6e22e>customerId</span><span style=color:#f92672>:</span> <span style=color:#a6e22e>customerId</span> })</span></span></code></pre></div></div></div><p>The server combines the view definition with the client query and plans the
+result against the source collection. Standard views use indexes on their
+underlying collections; general-purpose indexes cannot be created, dropped, or
+rebuilt directly on a standard view. Place selective <code>$match</code> stages early and
+index source fields used by the pipeline and client query.</p><p>Views can also be created with <code>db.createCollection()</code>:</p><div class=jose-wrapper><div class=jose-tools><span>javascript</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#a6e22e>db</span>.<span style=color:#a6e22e>createCollection</span>(<span style=color:#e6db74>&#34;recent_orders&#34;</span>, {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>viewOn</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;orders&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>pipeline</span><span style=color:#f92672>:</span> [
+</span></span><span style=display:flex><span>    { <span style=color:#a6e22e>$match</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>createdAt</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>$gte</span><span style=color:#f92672>:</span> <span style=color:#a6e22e>ISODate</span>(<span style=color:#e6db74>&#34;2026-01-01&#34;</span>) } } }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>collation</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>locale</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;en&#34;</span>, <span style=color:#a6e22e>strength</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>2</span> }
+</span></span><span style=display:flex><span>})</span></span></code></pre></div></div></div><p>The view and its source must be in the same database. A view&rsquo;s default
+collation is fixed when the view is created, and a query cannot override it
+with a different collation.</p><h2 id=design-constraints>Design Constraints
+<a href=#design-constraints class=heading-anchor><span>#</span></a></h2><p>A view can expose a subset of fields, rename fields, join another collection
+with <code>$lookup</code>, or aggregate data. It cannot accept inserts, updates, or
+deletes. Unsupported aggregation stages, including <code>$out</code> and <code>$merge</code>, cannot
+appear in a standard view definition because they write data.</p><p>Views can depend on other views, but the dependency graph must not contain a
+cycle. Keep the pipeline deterministic and bounded. A pipeline that performs a
+large <code>$lookup</code>, <code>$group</code>, or sort on every request transfers operational cost
+from writes to reads.</p><p>Views do not support point-in-time or snapshot read isolation. Blocking
+aggregation stages are also subject to the server&rsquo;s aggregation memory and
+temporary-file behavior. Explain and load-test the final query rather than
+assuming that hiding a pipeline behind a view makes it inexpensive.</p><h2 id=authorization-and-schema-boundaries>Authorization and Schema Boundaries
+<a href=#authorization-and-schema-boundaries class=heading-anchor><span>#</span></a></h2><p>When authentication is enabled, creating a view requires <code>createCollection</code>
+privilege on its database and the relevant read privileges for referenced
+namespaces. Querying the view requires <code>find</code> privilege on the view namespace;
+the client does not also need direct <code>find</code> privilege on the source
+collections.</p><p>The authorization separation can expose a controlled projection, such as
+employee records without personally identifiable fields. A view is not a
+complete security boundary if other privileges still expose the source
+collection, metadata, or side channels. Grant the application account only the
+namespaces and commands it requires.</p><p>A standard view has no independent document-validation schema because it cannot
+accept writes. Validation on the source collection constrains writes to that
+collection but does not promise that a projection, <code>$lookup</code>, or computed field
+matches an application schema forever. Version the view definition and consumer
+contract together. The view and every namespace it references must remain in
+the same database; a view cannot cross the database namespace boundary.</p><h2 id=standard-and-on-demand-materialized-views>Standard and On-Demand Materialized Views
+<a href=#standard-and-on-demand-materialized-views class=heading-anchor><span>#</span></a></h2><p>A standard view is appropriate when freshness matters and the underlying query
+is inexpensive. When a derived result is expensive but can tolerate refresh
+latency, MongoDB calls a collection populated by an aggregation pipeline an
+<em>on-demand materialized view</em>:</p><div class=jose-wrapper><div class=jose-tools><span>javascript</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#a6e22e>db</span>.<span style=color:#a6e22e>orders</span>.<span style=color:#a6e22e>aggregate</span>([
+</span></span><span style=display:flex><span>  { <span style=color:#a6e22e>$group</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>_id</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;$customerId&#34;</span>, <span style=color:#a6e22e>lifetimeValue</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>$sum</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;$total&#34;</span> } } },
+</span></span><span style=display:flex><span>  { <span style=color:#a6e22e>$merge</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>into</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;customer_lifetime_value&#34;</span>, <span style=color:#a6e22e>whenMatched</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;replace&#34;</span>,
+</span></span><span style=display:flex><span>              <span style=color:#a6e22e>whenNotMatched</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;insert&#34;</span> } }
+</span></span><span style=display:flex><span>])</span></span></code></pre></div></div></div><p>The destination is a real collection, so it can be indexed and queried
+efficiently. <code>$merge</code> can incrementally replace matching documents, whereas
+<code>$out</code> replaces the destination collection. A scheduler, change-stream
+consumer, Atlas Stream Processing pipeline, or application workflow must
+refresh the result. State its freshness contract explicitly because a normal
+aggregation does not continuously maintain an on-demand materialized view.</p><p>Readers can observe a partially refreshed destination when a <code>$merge</code> job
+updates many documents. If consumers require one-version visibility, write to a
+versioned collection and switch a small metadata pointer after validation, then
+retire the old version. Account for duplicate storage, index builds, change
+capture during the refresh, and cleanup failure in the operating procedure.</p><p>Use <code>$merge</code> when consumers need to watch the destination through change
+streams. A collection replaced through <code>$out</code> cannot be watched as the same
+materialized-view update mechanism.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.mongodb.com/docs/manual/core/views/>MongoDB Views</a></li><li><a href=https://www.mongodb.com/docs/manual/core/views/create-view/>Create and Query a View</a></li><li><a href=https://www.mongodb.com/docs/manual/core/materialized-views/>On-Demand Materialized Views</a></li><li><a href=https://www.mongodb.com/docs/manual/reference/method/db.createView/><code>db.createView()</code></a></li><li><a href=https://www.mongodb.com/docs/manual/core/views/command-support/>Restrictions for Views</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mongodb-views/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

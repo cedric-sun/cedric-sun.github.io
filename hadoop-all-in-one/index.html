@@ -1,0 +1,802 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Docker-based Hadoop/Spark/Hive Orchestration</title></head><body><main><article><div class=article-header><h1>Docker-based Hadoop/Spark/Hive Orchestration</h1><div class=aux>Last update: 2026-07-24 08:48:16 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/hadoop/>Hadoop</a>
+|
+<a href=/tags/spark/>Spark</a>
+|
+<a href=/tags/hive/>Hive</a>
+|
+<a href=/tags/docker/>Docker</a></div></div><div class=article-content><p>Hadoop, Spark, and Hive have overlapping Java, Hadoop-client, and configuration requirements. Installing every distribution on a workstation also mixes cluster state with host files. A Docker Compose lab avoids both problems by mounting an immutable software tree at <code>/opt/ro</code> and placing daemon state in named volumes.</p><p>The guide builds the lab in five stages:</p><ol><li>Start an offline toolbox with the JDK, Hadoop, Hive, and Spark commands but no cluster daemons.</li><li>Add one HDFS NameNode and three DataNodes.</li><li>Add one YARN ResourceManager and three NodeManagers.</li><li>Add HiveServer2 with an embedded Derby metastore.</li><li>Run Spark locally and on YARN.</li></ol><h2 id=scope-and-architecture>Scope and Architecture
+<a href=#scope-and-architecture class=heading-anchor><span>#</span></a></h2><p>The lab runs all roles on one Docker host:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Role</th><th>Hostname</th><th>Address</th><th>Published Port</th></tr></thead><tbody><tr><td>Toolbox</td><td><code>toolbox</code></td><td><code>172.28.0.10</code></td><td>None</td></tr><tr><td>NameNode</td><td><code>namenode</code></td><td><code>172.28.0.11</code></td><td><code>127.0.0.1:9870</code></td></tr><tr><td>DataNode 1</td><td><code>datanode1</code></td><td><code>172.28.0.12</code></td><td>None</td></tr><tr><td>DataNode 2</td><td><code>datanode2</code></td><td><code>172.28.0.13</code></td><td>None</td></tr><tr><td>DataNode 3</td><td><code>datanode3</code></td><td><code>172.28.0.14</code></td><td>None</td></tr><tr><td>ResourceManager</td><td><code>resourcemanager</code></td><td><code>172.28.0.20</code></td><td><code>127.0.0.1:8088</code></td></tr><tr><td>NodeManager 1</td><td><code>nodemanager1</code></td><td><code>172.28.0.21</code></td><td>None</td></tr><tr><td>NodeManager 2</td><td><code>nodemanager2</code></td><td><code>172.28.0.22</code></td><td>None</td></tr><tr><td>NodeManager 3</td><td><code>nodemanager3</code></td><td><code>172.28.0.23</code></td><td>None</td></tr><tr><td>HiveServer2</td><td><code>hiveserver2</code></td><td><code>172.28.0.30</code></td><td><code>127.0.0.1:10000</code></td></tr></tbody></table></div></div><p>Every container receives two read-only bind mounts:</p><ul><li><code>/opt/ro</code> contains extracted binary distributions and stable symlinks.</li><li><code>/opt/conf</code> contains the shared environment script and XML configuration.</li></ul><p>Named volumes hold HDFS, YARN, Hive, and toolbox state. Temporary files and daemon logs use container <code>tmpfs</code> mounts because Compose captures foreground-process output through <code>docker compose logs</code>.</p><p>The topology demonstrates process boundaries, HDFS replication, YARN scheduling, HiveServer2, and Spark submission. Three DataNodes on one physical host do not provide fault tolerance because a host failure still removes every replica.</p><h2 id=treat-version-compatibility-as-a-manifest-decision>Treat Version Compatibility as a Manifest Decision
+<a href=#treat-version-compatibility-as-a-manifest-decision class=heading-anchor><span>#</span></a></h2><p>Do not infer compatibility from a version number or from a successful process launch. Before downloading a combination, verify all of the following against the official release notes and documentation for the exact releases:</p><ol><li>The JDK version and CPU architecture supported by Hadoop, Spark, and Hive.</li><li>The Hadoop client line against which the Spark <code>without-hadoop</code> distribution was built and tested.</li><li>The Hadoop and execution-engine versions supported by Hive.</li><li>Any required JVM module flags, removed components, or changed configuration properties.</li><li>Whether the binary archives contain the example and client JARs used by the validation commands.</li></ol><p>The paths below preserve one concrete example manifest. They are examples rather than a compatibility claim:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ro/
+</span></span><span style=display:flex><span>├── hadoop -&gt; hadoop-3.5.0
+</span></span><span style=display:flex><span>├── hadoop-3.5.0/
+</span></span><span style=display:flex><span>├── hive -&gt; apache-hive-4.2.0-bin
+</span></span><span style=display:flex><span>├── apache-hive-4.2.0-bin/
+</span></span><span style=display:flex><span>├── jdk17 -&gt; zulu17.58.21-ca-jdk17.0.15-linux_aarch64
+</span></span><span style=display:flex><span>├── zulu17.58.21-ca-jdk17.0.15-linux_aarch64/
+</span></span><span style=display:flex><span>├── spark -&gt; spark-4.1.2-bin-without-hadoop
+</span></span><span style=display:flex><span>└── spark-4.1.2-bin-without-hadoop/</span></span></code></pre></div></div></div><p>Replace the symlink targets with a combination verified for the intended host architecture. Keep the stable symlink names because the remaining configuration refers only to <code>/opt/ro/jdk17</code>, <code>/opt/ro/hadoop</code>, <code>/opt/ro/hive</code>, and <code>/opt/ro/spark</code>.</p><p>The Compose image supplies a Linux userspace, not Java or Hadoop. An air-gapped host must already contain <code>debian:bookworm-slim</code>, for example through <code>docker load</code>, in addition to the files under <code>ro/</code>.</p><h2 id=directory-layout>Directory Layout
+<a href=#directory-layout class=heading-anchor><span>#</span></a></h2><p>Create the following tree:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>hadoop-lab/
+</span></span><span style=display:flex><span>├── compose.yaml
+</span></span><span style=display:flex><span>├── conf/
+</span></span><span style=display:flex><span>│   ├── init.sh
+</span></span><span style=display:flex><span>│   ├── hadoop/
+</span></span><span style=display:flex><span>│   │   ├── core-site.xml
+</span></span><span style=display:flex><span>│   │   ├── hdfs-site.xml
+</span></span><span style=display:flex><span>│   │   ├── mapred-site.xml
+</span></span><span style=display:flex><span>│   │   └── yarn-site.xml
+</span></span><span style=display:flex><span>│   └── hive/
+</span></span><span style=display:flex><span>│       └── hive-site.xml
+</span></span><span style=display:flex><span>└── ro/
+</span></span><span style=display:flex><span>    ├── hadoop -&gt; hadoop-3.5.0
+</span></span><span style=display:flex><span>    ├── hadoop-3.5.0/
+</span></span><span style=display:flex><span>    ├── hive -&gt; apache-hive-4.2.0-bin
+</span></span><span style=display:flex><span>    ├── apache-hive-4.2.0-bin/
+</span></span><span style=display:flex><span>    ├── jdk17 -&gt; zulu17.58.21-ca-jdk17.0.15-linux_aarch64
+</span></span><span style=display:flex><span>    ├── zulu17.58.21-ca-jdk17.0.15-linux_aarch64/
+</span></span><span style=display:flex><span>    ├── spark -&gt; spark-4.1.2-bin-without-hadoop
+</span></span><span style=display:flex><span>    └── spark-4.1.2-bin-without-hadoop/</span></span></code></pre></div></div></div><p>Archive files may remain outside <code>ro/</code>; containers need only the extracted distributions. Create relative symlinks so moving the lab directory does not break them:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>cd hadoop-lab/ro
+</span></span><span style=display:flex><span>ln -s hadoop-3.5.0 hadoop
+</span></span><span style=display:flex><span>ln -s apache-hive-4.2.0-bin hive
+</span></span><span style=display:flex><span>ln -s zulu17.58.21-ca-jdk17.0.15-linux_aarch64 jdk17
+</span></span><span style=display:flex><span>ln -s spark-4.1.2-bin-without-hadoop spark</span></span></code></pre></div></div></div><h2 id=add-the-shared-environment-script>Add the Shared Environment Script
+<a href=#add-the-shared-environment-script class=heading-anchor><span>#</span></a></h2><p>Save the following script as <code>conf/init.sh</code>:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e>#!/usr/bin/env bash
+</span></span></span><span style=display:flex><span>set -euo pipefail
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>export JAVA_HOME<span style=color:#f92672>=</span>/opt/ro/jdk17
+</span></span><span style=display:flex><span>export HADOOP_HOME<span style=color:#f92672>=</span>/opt/ro/hadoop
+</span></span><span style=display:flex><span>export HADOOP_COMMON_HOME<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$HADOOP_HOME<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>export HADOOP_HDFS_HOME<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$HADOOP_HOME<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>export HADOOP_MAPRED_HOME<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$HADOOP_HOME<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>export HADOOP_YARN_HOME<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$HADOOP_HOME<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>export HADOOP_CONF_DIR<span style=color:#f92672>=</span>/opt/conf/hadoop
+</span></span><span style=display:flex><span>export YARN_CONF_DIR<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$HADOOP_CONF_DIR<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>export HIVE_HOME<span style=color:#f92672>=</span>/opt/ro/hive
+</span></span><span style=display:flex><span>export HIVE_CONF_DIR<span style=color:#f92672>=</span>/opt/conf/hive
+</span></span><span style=display:flex><span>export SPARK_HOME<span style=color:#f92672>=</span>/opt/ro/spark
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>export HADOOP_LOG_DIR<span style=color:#f92672>=</span>/var/log/hadoop
+</span></span><span style=display:flex><span>export YARN_LOG_DIR<span style=color:#f92672>=</span>/var/log/hadoop
+</span></span><span style=display:flex><span>export HADOOP_PID_DIR<span style=color:#f92672>=</span>/run/hadoop
+</span></span><span style=display:flex><span>export YARN_PID_DIR<span style=color:#f92672>=</span>/run/hadoop
+</span></span><span style=display:flex><span>export HIVE_LOG_DIR<span style=color:#f92672>=</span>/var/log/hive
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Hive must precede Spark because both distributions can contain &#34;beeline&#34;.</span>
+</span></span><span style=display:flex><span>export PATH<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$HIVE_HOME<span style=color:#e6db74>/bin:</span>$SPARK_HOME<span style=color:#e6db74>/bin:</span>$HADOOP_HOME<span style=color:#e6db74>/bin:</span>$HADOOP_HOME<span style=color:#e6db74>/sbin:</span>$JAVA_HOME<span style=color:#e6db74>/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin&#34;</span>
+</span></span><span style=display:flex><span>export LD_LIBRARY_PATH<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$HADOOP_HOME<span style=color:#e6db74>/lib/native</span><span style=color:#e6db74>${</span>LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># A Spark &#34;without-hadoop&#34; archive needs the selected Hadoop client&#39;s JARs.</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#f92672>[[</span> -z <span style=color:#e6db74>&#34;</span><span style=color:#e6db74>${</span>SPARK_DIST_CLASSPATH<span style=color:#66d9ef>:-</span><span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span> <span style=color:#f92672>]]</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>  export SPARK_DIST_CLASSPATH<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span><span style=color:#e6db74>&#34;</span>$HADOOP_HOME<span style=color:#e6db74>/bin/hadoop&#34;</span> classpath<span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>wait_for_port<span style=color:#f92672>()</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>  local host<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$1<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>  local port<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$2<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>  local timeout<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#e6db74>${</span>3<span style=color:#66d9ef>:-</span>120<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>  local deadline<span style=color:#f92672>=</span><span style=color:#66d9ef>$((</span>SECONDS <span style=color:#f92672>+</span> timeout<span style=color:#66d9ef>))</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>until</span> <span style=color:#f92672>(</span>echo &gt;<span style=color:#e6db74>&#34;/dev/tcp/</span><span style=color:#e6db74>${</span>host<span style=color:#e6db74>}</span><span style=color:#e6db74>/</span><span style=color:#e6db74>${</span>port<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span><span style=color:#f92672>)</span> &gt;/dev/null 2&gt;&amp;1; <span style=color:#66d9ef>do</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#f92672>((</span>SECONDS &gt;<span style=color:#f92672>=</span> deadline<span style=color:#f92672>))</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>      echo <span style=color:#e6db74>&#34;Timed out waiting for </span><span style=color:#e6db74>${</span>host<span style=color:#e6db74>}</span><span style=color:#e6db74>:</span><span style=color:#e6db74>${</span>port<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span> &gt;&amp;<span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>    sleep <span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>done</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>wait_for_hdfs<span style=color:#f92672>()</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>  local timeout<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#e6db74>${</span>1<span style=color:#66d9ef>:-</span>180<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>  local deadline<span style=color:#f92672>=</span><span style=color:#66d9ef>$((</span>SECONDS <span style=color:#f92672>+</span> timeout<span style=color:#66d9ef>))</span>
+</span></span><span style=display:flex><span>  local status
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>until</span> status<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span>hdfs dfsadmin -safemode get 2&gt;/dev/null<span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span> <span style=color:#f92672>&amp;&amp;</span>
+</span></span><span style=display:flex><span>    grep -q <span style=color:#e6db74>&#34;Safe mode is OFF&#34;</span> <span style=color:#f92672>&lt;&lt;&lt;</span><span style=color:#e6db74>&#34;</span>$status<span style=color:#e6db74>&#34;</span>; <span style=color:#66d9ef>do</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#f92672>((</span>SECONDS &gt;<span style=color:#f92672>=</span> deadline<span style=color:#f92672>))</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>      echo <span style=color:#e6db74>&#34;Timed out waiting for writable HDFS&#34;</span> &gt;&amp;<span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>    sleep <span style=color:#ae81ff>3</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>done</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>wait_for_yarn_nodes<span style=color:#f92672>()</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>  local expected<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#e6db74>${</span>1<span style=color:#66d9ef>:-</span>1<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>  local timeout<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#e6db74>${</span>2<span style=color:#66d9ef>:-</span>180<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>  local deadline<span style=color:#f92672>=</span><span style=color:#66d9ef>$((</span>SECONDS <span style=color:#f92672>+</span> timeout<span style=color:#66d9ef>))</span>
+</span></span><span style=display:flex><span>  local output
+</span></span><span style=display:flex><span>  local running
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>while</span> true; <span style=color:#66d9ef>do</span>
+</span></span><span style=display:flex><span>    output<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span>yarn node -list -all 2&gt;/dev/null <span style=color:#f92672>||</span> true<span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>    running<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span>awk <span style=color:#e6db74>&#39;$0 ~ /RUNNING/ { count++ } END { print count + 0 }&#39;</span> <span style=color:#f92672>&lt;&lt;&lt;</span><span style=color:#e6db74>&#34;</span>$output<span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#f92672>((</span>running &gt;<span style=color:#f92672>=</span> expected<span style=color:#f92672>))</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#f92672>((</span>SECONDS &gt;<span style=color:#f92672>=</span> deadline<span style=color:#f92672>))</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>      echo <span style=color:#e6db74>&#34;Timed out waiting for </span><span style=color:#e6db74>${</span>expected<span style=color:#e6db74>}</span><span style=color:#e6db74> YARN NodeManagers; found </span><span style=color:#e6db74>${</span>running<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span> &gt;&amp;<span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>    sleep <span style=color:#ae81ff>3</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>done</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>Every service sources the same file, so daemon and client processes use the same Java installation, Hadoop configuration, and binary ordering.</p><h2 id=configure-hadoop>Configure Hadoop
+<a href=#configure-hadoop class=heading-anchor><span>#</span></a></h2><p>Save the following files under <code>conf/hadoop/</code>.</p><h3 id=core-sitexml><code>core-site.xml</code>
+<a href=#core-sitexml class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#75715e>&lt;?xml version=&#34;1.0&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>&lt;?xml-stylesheet type=&#34;text/xsl&#34; href=&#34;configuration.xsl&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;configuration&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>fs.defaultFS<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>hdfs://namenode:8020<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hadoop.tmp.dir<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>/var/lib/hadoop/tmp<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>io.file.buffer.size<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>131072<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/configuration&gt;</span></span></span></code></pre></div></div></div><h3 id=hdfs-sitexml><code>hdfs-site.xml</code>
+<a href=#hdfs-sitexml class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#75715e>&lt;?xml version=&#34;1.0&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>&lt;?xml-stylesheet type=&#34;text/xsl&#34; href=&#34;configuration.xsl&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;configuration&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.namenode.name.dir<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>file:///var/lib/hadoop/name<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.datanode.data.dir<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>file:///var/lib/hadoop/data<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.replication<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>3<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.namenode.rpc-address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>namenode:8020<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.namenode.http-address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>0.0.0.0:9870<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.datanode.address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>0.0.0.0:9866<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.datanode.http.address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>0.0.0.0:9864<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.client.use.datanode.hostname<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>true<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.datanode.use.datanode.hostname<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>true<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.namenode.datanode.registration.ip-hostname-check<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>false<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>dfs.permissions.enabled<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>true<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/configuration&gt;</span></span></span></code></pre></div></div></div><h3 id=yarn-sitexml><code>yarn-site.xml</code>
+<a href=#yarn-sitexml class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#75715e>&lt;?xml version=&#34;1.0&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>&lt;?xml-stylesheet type=&#34;text/xsl&#34; href=&#34;configuration.xsl&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;configuration&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.hostname<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>resourcemanager<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>resourcemanager:8032<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.scheduler.address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>resourcemanager:8030<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.resource-tracker.address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>resourcemanager:8031<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.admin.address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>resourcemanager:8033<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.webapp.address<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>0.0.0.0:8088<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.recovery.enabled<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>true<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.store.class<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.resourcemanager.fs.state-store.uri<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>file:///var/lib/hadoop/yarn/rm-state<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.aux-services<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>mapreduce_shuffle<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.aux-services.mapreduce_shuffle.class<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>org.apache.hadoop.mapred.ShuffleHandler<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.local-dirs<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>/var/lib/hadoop/yarn/local<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.log-dirs<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>/var/lib/hadoop/yarn/log<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.resource.memory-mb<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>1536<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.resource.cpu-vcores<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>2<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.scheduler.minimum-allocation-mb<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>256<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.scheduler.maximum-allocation-mb<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>1536<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.pmem-check-enabled<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>false<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.vmem-check-enabled<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>false<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.nodemanager.env-whitelist<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME,LD_LIBRARY_PATH,PATH,LANG,TZ<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.application.classpath<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>$HADOOP_CONF_DIR,$HADOOP_COMMON_HOME/*,$HADOOP_COMMON_HOME/lib/*,$HADOOP_HDFS_HOME/*,$HADOOP_HDFS_HOME/lib/*,$HADOOP_YARN_HOME/*,$HADOOP_YARN_HOME/lib/*,$HADOOP_MAPRED_HOME/*,$HADOOP_MAPRED_HOME/lib/*<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.log-aggregation-enable<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>false<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/configuration&gt;</span></span></span></code></pre></div></div></div><p>Physical-memory enforcement is disabled because container and JDK accounting can otherwise reject small lab jobs before they start. Production deployments should enforce explicit container limits and retain YARN&rsquo;s memory checks.</p><h3 id=mapred-sitexml><code>mapred-site.xml</code>
+<a href=#mapred-sitexml class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#75715e>&lt;?xml version=&#34;1.0&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>&lt;?xml-stylesheet type=&#34;text/xsl&#34; href=&#34;configuration.xsl&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;configuration&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>mapreduce.framework.name<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>yarn<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>mapreduce.application.classpath<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>$HADOOP_MAPRED_HOME/*,$HADOOP_MAPRED_HOME/lib/*,$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/*,$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/lib/*<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>mapreduce.map.memory.mb<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>512<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>mapreduce.map.java.opts<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>-Xmx384m<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>mapreduce.reduce.memory.mb<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>512<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>mapreduce.reduce.java.opts<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>-Xmx384m<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.app.mapreduce.am.resource.mb<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>512<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>yarn.app.mapreduce.am.command-opts<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>-Xmx384m<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/configuration&gt;</span></span></span></code></pre></div></div></div><h2 id=configure-hive>Configure Hive
+<a href=#configure-hive class=heading-anchor><span>#</span></a></h2><p>Save the following file as <code>conf/hive/hive-site.xml</code>:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#75715e>&lt;?xml version=&#34;1.0&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>&lt;?xml-stylesheet type=&#34;text/xsl&#34; href=&#34;configuration.xsl&#34;?&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;configuration&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>javax.jdo.option.ConnectionURL<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>jdbc:derby:;databaseName=/var/lib/hive/metastore_db;create=true<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>javax.jdo.option.ConnectionDriverName<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>org.apache.derby.jdbc.EmbeddedDriver<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>javax.jdo.option.ConnectionUserName<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>APP<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>javax.jdo.option.ConnectionPassword<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>mine<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.metastore.schema.verification<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>true<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.metastore.warehouse.dir<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>/warehouse/tablespace/managed/hive<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.metastore.warehouse.external.dir<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>/warehouse/tablespace/external/hive<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.server2.thrift.bind.host<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>0.0.0.0<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.server2.thrift.port<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>10000<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.server2.authentication<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>NONE<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.server2.enable.doAs<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>false<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.execution.engine<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>mr<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.exec.scratchdir<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>/tmp/hive<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.exec.local.scratchdir<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>/tmp/hive<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.server2.logging.operation.enabled<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>true<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;name&gt;</span>hive.server2.logging.operation.log.location<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;value&gt;</span>/var/lib/hive/operation_logs<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/property&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/configuration&gt;</span></span></span></code></pre></div></div></div><p>No <code>hive.metastore.uris</code> property is present because HiveServer2 opens Derby in-process. Derby embedded mode permits only one process to own the database, so do not run a second HiveServer2, <code>hive</code> CLI, or standalone metastore against the same volume. Beeline remains safe because it connects to HiveServer2 over JDBC rather than opening Derby.</p><p>The example selects MapReduce as Hive&rsquo;s execution engine to reuse the YARN services already in the lab. Confirm that the chosen Hive release still ships and supports that engine; otherwise install and configure an execution engine documented for that release.</p><h2 id=compose-the-lab>Compose the Lab
+<a href=#compose-the-lab class=heading-anchor><span>#</span></a></h2><p>Save the following file as <code>compose.yaml</code>:</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>x-common-environment</span>: <span style=color:#75715e>&amp;common-environment</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>HADOOP_USER_NAME</span>: <span style=color:#e6db74>&#34;${HADOOP_USER_NAME:-root}&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>x-common</span>: <span style=color:#75715e>&amp;common</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>image</span>: <span style=color:#ae81ff>debian:bookworm-slim</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>user</span>: <span style=color:#e6db74>&#34;${LAB_UID:-0}:${LAB_GID:-0}&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>read_only</span>: <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>init</span>: <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>working_dir</span>: <span style=color:#ae81ff>/tmp</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>stop_grace_period</span>: <span style=color:#ae81ff>30s</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>environment</span>: <span style=color:#75715e>*common-environment</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>tmpfs</span>:
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>/tmp:rw,exec,nosuid,size=1g</span>
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>/run:rw,nosuid,size=64m</span>
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>/var/log/hadoop:rw,nosuid,size=256m</span>
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>/var/log/hive:rw,nosuid,size=256m</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>x-datanode</span>: <span style=color:#75715e>&amp;datanode</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>depends_on</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>namenode</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>condition</span>: <span style=color:#ae81ff>service_started</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>environment</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common-environment</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>HADOOP_DATANODE_OPTS</span>: <span style=color:#e6db74>&#34;-Xms128m -Xmx512m&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>entrypoint</span>: [<span style=color:#e6db74>&#34;/bin/bash&#34;</span>, <span style=color:#e6db74>&#34;-lc&#34;</span>]
+</span></span><span style=display:flex><span>  <span style=color:#f92672>command</span>:
+</span></span><span style=display:flex><span>    - |<span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      mkdir -p /var/lib/hadoop/data /var/lib/hadoop/tmp
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      wait_for_port namenode 8020 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      exec hdfs datanode</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>x-nodemanager</span>: <span style=color:#75715e>&amp;nodemanager</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>depends_on</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>resourcemanager</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>condition</span>: <span style=color:#ae81ff>service_started</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>environment</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common-environment</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>YARN_NODEMANAGER_OPTS</span>: <span style=color:#e6db74>&#34;-Xms128m -Xmx512m&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>entrypoint</span>: [<span style=color:#e6db74>&#34;/bin/bash&#34;</span>, <span style=color:#e6db74>&#34;-lc&#34;</span>]
+</span></span><span style=display:flex><span>  <span style=color:#f92672>command</span>:
+</span></span><span style=display:flex><span>    - |<span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      mkdir -p /var/lib/hadoop/yarn/local /var/lib/hadoop/yarn/log
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      wait_for_port resourcemanager 8031 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      exec yarn nodemanager</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>services</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>toolbox</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>toolbox</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>working_dir</span>: <span style=color:#ae81ff>/work</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>entrypoint</span>: [<span style=color:#e6db74>&#34;/bin/bash&#34;</span>, <span style=color:#e6db74>&#34;-lc&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>command</span>: [<span style=color:#e6db74>&#34;source /opt/conf/init.sh; exec sleep infinity&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>toolbox-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>toolbox-work:/work</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.10</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>namenode</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>namenode</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>environment</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common-environment</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>HADOOP_NAMENODE_OPTS</span>: <span style=color:#e6db74>&#34;-Xms256m -Xmx768m&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>entrypoint</span>: [<span style=color:#e6db74>&#34;/bin/bash&#34;</span>, <span style=color:#e6db74>&#34;-lc&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>command</span>:
+</span></span><span style=display:flex><span>      - |<span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        mkdir -p /var/lib/hadoop/name /var/lib/hadoop/tmp
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        if [[ ! -f /var/lib/hadoop/name/current/VERSION ]]; then
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>          hdfs namenode -format -clusterid hadoop-lab -nonInteractive
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        fi
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        exec hdfs namenode</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>namenode-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>ports</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#34;127.0.0.1:9870:9870&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.11</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>datanode1</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*datanode</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>datanode1</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>datanode1-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.12</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>datanode2</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*datanode</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>datanode2</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>datanode2-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.13</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>datanode3</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*datanode</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>datanode3</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>datanode3-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.14</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>resourcemanager</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>resourcemanager</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>environment</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common-environment</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>YARN_RESOURCEMANAGER_OPTS</span>: <span style=color:#e6db74>&#34;-Xms256m -Xmx768m&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>entrypoint</span>: [<span style=color:#e6db74>&#34;/bin/bash&#34;</span>, <span style=color:#e6db74>&#34;-lc&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>command</span>:
+</span></span><span style=display:flex><span>      - |<span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        mkdir -p /var/lib/hadoop/yarn/rm-state /var/lib/hadoop/tmp
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        exec yarn resourcemanager</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>resourcemanager-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>ports</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#34;127.0.0.1:8088:8088&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.20</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>nodemanager1</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*nodemanager</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>nodemanager1</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>nodemanager1-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.21</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>nodemanager2</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*nodemanager</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>nodemanager2</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>nodemanager2-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.22</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>nodemanager3</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*nodemanager</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>nodemanager3</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>nodemanager3-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.23</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>hiveserver2</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>hostname</span>: <span style=color:#ae81ff>hiveserver2</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>depends_on</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>namenode</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>condition</span>: <span style=color:#ae81ff>service_started</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>resourcemanager</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>condition</span>: <span style=color:#ae81ff>service_started</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>environment</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;&lt;</span>: <span style=color:#75715e>*common-environment</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>HADOOP_HEAPSIZE</span>: <span style=color:#e6db74>&#34;1024&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>entrypoint</span>: [<span style=color:#e6db74>&#34;/bin/bash&#34;</span>, <span style=color:#e6db74>&#34;-lc&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>command</span>:
+</span></span><span style=display:flex><span>      - |<span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        mkdir -p /var/lib/hive/operation_logs /var/lib/hadoop/tmp
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        wait_for_port namenode 8020 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        wait_for_hdfs 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        wait_for_port resourcemanager 8032 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        wait_for_yarn_nodes 1 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        hdfs dfs -mkdir -p /tmp /tmp/hive
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        hdfs dfs -chmod 1777 /tmp /tmp/hive
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        hdfs dfs -mkdir -p /warehouse/tablespace/managed/hive
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        hdfs dfs -mkdir -p /warehouse/tablespace/external/hive
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        hdfs dfs -chmod -R 1777 /warehouse/tablespace
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        if ! /opt/ro/hive/bin/schematool -dbType derby -info; then
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>          /opt/ro/hive/bin/schematool -dbType derby -initSchema
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        fi
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        /opt/ro/hive/bin/schematool -dbType derby -info
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        exec /opt/ro/hive/bin/hiveserver2</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./ro:/opt/ro:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./conf:/opt/conf:ro</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>hiveserver2-state:/var/lib/hive</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>hiveserver2-hadoop-state:/var/lib/hadoop</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>ports</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#34;127.0.0.1:10000:10000&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>ipv4_address</span>: <span style=color:#ae81ff>172.28.0.30</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>networks</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>lab</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-net</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>ipam</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>config</span>:
+</span></span><span style=display:flex><span>        - <span style=color:#f92672>subnet</span>: <span style=color:#ae81ff>172.28.0.0</span><span style=color:#ae81ff>/24</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>toolbox-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-toolbox-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>toolbox-work</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-toolbox-work</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>namenode-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-namenode-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>datanode1-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-datanode1-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>datanode2-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-datanode2-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>datanode3-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-datanode3-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>resourcemanager-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-resourcemanager-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>nodemanager1-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-nodemanager1-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>nodemanager2-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-nodemanager2-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>nodemanager3-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-nodemanager3-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>hiveserver2-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-hiveserver2-state</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>hiveserver2-hadoop-state</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>hadoop-lab-hiveserver2-hadoop-state</span></span></span></code></pre></div></div></div><p><code>depends_on</code> controls container creation order only. DataNodes, NodeManagers, and HiveServer2 also use active readiness loops because a started container does not imply that its daemon socket or distributed service is ready.</p><p>The NameNode formats its volume only when <code>current/VERSION</code> is absent. Restarts therefore preserve the namespace rather than formatting it again.</p><h2 id=stage-1-start-the-offline-toolbox>Stage 1: Start the Offline Toolbox
+<a href=#stage-1-start-the-offline-toolbox class=heading-anchor><span>#</span></a></h2><p>Start only the toolbox:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose up -d toolbox
+</span></span><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  java -version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hadoop version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hive --version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  spark-submit --version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  command -v beeline
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>HDFS and YARN commands load their cluster configuration, but no daemon is running yet. The stage remains useful for inspecting classpaths and running computations that do not access HDFS:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  spark-submit \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --master &#34;local[2]&#34; \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --class org.apache.spark.examples.SparkPi \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    &#34;$SPARK_HOME&#34;/examples/jars/spark-examples_*.jar \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    10
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>The command should print a <code>Pi is roughly ...</code> result from Spark&rsquo;s example application. Failure before Spark creates its context generally indicates a Java, architecture, or classpath mismatch rather than an HDFS problem.</p><h2 id=stage-2-start-hdfs>Stage 2: Start HDFS
+<a href=#stage-2-start-hdfs class=heading-anchor><span>#</span></a></h2><p>Start the NameNode and all three DataNodes:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose up -d namenode datanode1 datanode2 datanode3</span></span></code></pre></div></div></div><p>Wait for HDFS to leave safe mode, inspect the DataNode report, and perform a write/read cycle:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  wait_for_hdfs 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hdfs dfsadmin -report
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hdfs dfs -mkdir -p /tmp /user/root/lab
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hdfs dfs -chmod 1777 /tmp
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  printf &#34;hdfs-ok\n&#34; &gt; /work/hdfs-check.txt
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hdfs dfs -put -f /work/hdfs-check.txt /user/root/lab/
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hdfs dfs -cat /user/root/lab/hdfs-check.txt
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>The report should list three live DataNodes. Open <a href=http://127.0.0.1:9870/>http://127.0.0.1:9870/</a> for the NameNode UI.</p><h2 id=stage-3-start-yarn>Stage 3: Start YARN
+<a href=#stage-3-start-yarn class=heading-anchor><span>#</span></a></h2><p>Start the ResourceManager and all three NodeManagers:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose up -d <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  resourcemanager <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  nodemanager1 nodemanager2 nodemanager3</span></span></code></pre></div></div></div><p>Wait for all workers and submit the bundled MapReduce <code>pi</code> example:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  wait_for_yarn_nodes 3 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  yarn node -list -all
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hadoop jar \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    &#34;$HADOOP_MAPRED_HOME&#34;/share/hadoop/mapreduce/hadoop-mapreduce-examples-*.jar \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    pi 2 10
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>Open <a href=http://127.0.0.1:8088/>http://127.0.0.1:8088/</a> to inspect the application, containers, and NodeManagers. A process that runs entirely in the toolbox does not validate YARN; the ResourceManager UI or <code>yarn application -list -appStates ALL</code> must show the submitted application.</p><h2 id=stage-4-start-hiveserver2>Stage 4: Start HiveServer2
+<a href=#stage-4-start-hiveserver2 class=heading-anchor><span>#</span></a></h2><p>Start the single HiveServer2 process:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose up -d hiveserver2</span></span></code></pre></div></div></div><p>HiveServer2 waits for writable HDFS and at least one running NodeManager, creates warehouse directories, initializes the Derby schema when necessary, and then starts its Thrift endpoint. Wait for the endpoint before invoking Beeline:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  wait_for_port hiveserver2 10000 240
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  beeline \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    -u jdbc:hive2://hiveserver2:10000/default \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    -n root \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --silent=true \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    -e &#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      CREATE TABLE IF NOT EXISTS lab_numbers (n INT);
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      INSERT INTO lab_numbers VALUES (1), (2), (3);
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>      SELECT SUM(n) AS total FROM lab_numbers;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    &#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>The final query should return <code>6</code>. DDL success validates HiveServer2, Derby, and the HDFS warehouse. The insert and aggregation also validate the configured execution path. Consult the HiveServer2 and YARN logs if DDL succeeds but the query engine fails.</p><h2 id=stage-5-run-spark-on-yarn>Stage 5: Run Spark on YARN
+<a href=#stage-5-run-spark-on-yarn class=heading-anchor><span>#</span></a></h2><p>Run the same Spark example through YARN:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  wait_for_yarn_nodes 3 180
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  spark-submit \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --master yarn \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --deploy-mode client \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --conf spark.executor.instances=2 \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --conf spark.executor.cores=1 \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --conf spark.executor.memory=512m \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --conf spark.driver.memory=512m \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    --class org.apache.spark.examples.SparkPi \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    &#34;$SPARK_HOME&#34;/examples/jars/spark-examples_*.jar \
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>    10
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>YARN should allocate an ApplicationMaster and two executors. Confirm completion independently:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  yarn application -list -appStates ALL
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><h2 id=understand-spark_dist_classpath-and-path-precedence>Understand <code>SPARK_DIST_CLASSPATH</code> and <code>PATH</code> Precedence
+<a href=#understand-spark_dist_classpath-and-path-precedence class=heading-anchor><span>#</span></a></h2><p>A Spark <code>without-hadoop</code> archive omits the Hadoop client JARs. Spark reads <code>SPARK_DIST_CLASSPATH</code>, so the environment script populates it from the selected Hadoop distribution:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>export SPARK_DIST_CLASSPATH<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span>hadoop classpath<span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span></span></span></code></pre></div></div></div><p>The setting lets the Spark submission client load YARN and HDFS classes while preserving a single Hadoop installation under <code>/opt/ro/hadoop</code>. Spark uploads or references its own application artifacts through YARN; NodeManagers inherit the same <code>JAVA_HOME</code> and Hadoop environment from their daemon process.</p><p>Some Spark distributions also contain a <code>beeline</code> launcher, but a <code>without-hadoop</code> archive may not contain the Hive classes expected by that launcher. Placing <code>$HIVE_HOME/bin</code> before <code>$SPARK_HOME/bin</code> ensures that an unqualified <code>beeline</code> command uses Hive&rsquo;s client:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>command -v beeline
+</span></span><span style=display:flex><span><span style=color:#75715e># /opt/ro/hive/bin/beeline</span></span></span></code></pre></div></div></div><p>Spark&rsquo;s own scripts remain unambiguous because <code>spark-submit</code>, <code>spark-shell</code>, and their internal relative launchers come from <code>$SPARK_HOME</code>.</p><h2 id=persistence-and-targeted-reset>Persistence and Targeted Reset
+<a href=#persistence-and-targeted-reset class=heading-anchor><span>#</span></a></h2><p><code>docker compose down</code> removes containers and the dedicated network but retains every named volume:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose down</span></span></code></pre></div></div></div><p>Starting the services again reuses the HDFS namespace, DataNode blocks, ResourceManager recovery state, NodeManager local state, Derby database, and toolbox files.</p><p>Reset only the subsystem whose state is invalid:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># Reset Hive metadata and HiveServer2-local Hadoop scratch state.</span>
+</span></span><span style=display:flex><span>docker compose stop hiveserver2
+</span></span><span style=display:flex><span>docker compose rm -f hiveserver2
+</span></span><span style=display:flex><span>docker volume rm <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-hiveserver2-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-hiveserver2-hadoop-state
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Reset YARN state without deleting HDFS or Hive.</span>
+</span></span><span style=display:flex><span>docker compose stop resourcemanager nodemanager1 nodemanager2 nodemanager3
+</span></span><span style=display:flex><span>docker compose rm -f resourcemanager nodemanager1 nodemanager2 nodemanager3
+</span></span><span style=display:flex><span>docker volume rm <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-resourcemanager-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-nodemanager1-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-nodemanager2-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-nodemanager3-state
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Reset HDFS as one consistency unit.</span>
+</span></span><span style=display:flex><span>docker compose stop namenode datanode1 datanode2 datanode3
+</span></span><span style=display:flex><span>docker compose rm -f namenode datanode1 datanode2 datanode3
+</span></span><span style=display:flex><span>docker volume rm <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-namenode-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-datanode1-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-datanode2-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  hadoop-lab-datanode3-state</span></span></code></pre></div></div></div><p>Resetting only the NameNode or only a DataNode can leave incompatible cluster IDs or orphaned block state. Remove all four HDFS volumes together when a fresh filesystem is required. None of the commands above deletes unrelated Docker volumes or host directories.</p><h2 id=troubleshooting>Troubleshooting
+<a href=#troubleshooting class=heading-anchor><span>#</span></a></h2><h3 id=uid-and-volume-permissions>UID and Volume Permissions
+<a href=#uid-and-volume-permissions class=heading-anchor><span>#</span></a></h3><p>The Compose file defaults to UID and GID <code>0</code> because a stock read-only Debian image has no matching lab account and Docker creates named volumes as root. The containers remain isolated from host bind-mounted write paths, but root inside a container is still unsuitable for production.</p><p>To run with another numeric identity, set both variables and make each service volume writable by that identity. A narrowly scoped repair for an existing NameNode volume is:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>LAB_UID<span style=color:#f92672>=</span><span style=color:#ae81ff>1000</span> LAB_GID<span style=color:#f92672>=</span><span style=color:#ae81ff>1000</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>docker compose run --rm --user 0:0 --entrypoint bash namenode <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -lc <span style=color:#e6db74>&#39;chown -R 1000:1000 /var/lib/hadoop&#39;</span></span></span></code></pre></div></div></div><p>Repeat the operation only for the affected service volumes. A purpose-built image with a real passwd entry for the chosen UID is preferable because Hadoop and YARN may query operating-system user and group information.</p><h3 id=cpu-architecture-mismatch>CPU Architecture Mismatch
+<a href=#cpu-architecture-mismatch class=heading-anchor><span>#</span></a></h3><p>The JDK under <code>/opt/ro</code> must be a Linux build for the container architecture. A macOS JDK cannot run in a Linux container, and an AArch64 JDK cannot run in an AMD64 container without matching emulation:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose run --rm --entrypoint bash toolbox -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  uname -m
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  dpkg --print-architecture
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  /opt/ro/jdk17/bin/java -version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>An <code>Exec format error</code> indicates a binary for the wrong architecture or operating system. Select archives for the same architecture or set an explicitly supported Docker platform and accept the cost and limitations of emulation.</p><h3 id=hostname-and-configuration-errors>Hostname and Configuration Errors
+<a href=#hostname-and-configuration-errors class=heading-anchor><span>#</span></a></h3><p>Errors such as <code>UnknownHostException</code>, DataNode registration failures, or YARN clients connecting to localhost indicate inconsistent service names or configuration mounts. Inspect resolution and active configuration from the toolbox:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  getent hosts namenode resourcemanager hiveserver2
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hdfs getconf -confKey fs.defaultFS
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  yarn getconf -confKey yarn.resourcemanager.hostname
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>Keep Compose service names, <code>hostname</code> values, fixed addresses, and XML hostnames aligned. Recreate containers after changing a read-only configuration file:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose up -d --force-recreate</span></span></code></pre></div></div></div><h3 id=memory-and-stalled-allocations>Memory and Stalled Allocations
+<a href=#memory-and-stalled-allocations class=heading-anchor><span>#</span></a></h3><p>Three NodeManagers advertise 1536 MiB each, while Hadoop, Hive, Spark, and Docker also require memory. Allocate enough memory to the Docker runtime, then inspect pending requests:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  yarn node -list -all
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  yarn application -list -appStates ACCEPTED,RUNNING
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>Reduce Spark executor count or memory before increasing YARN&rsquo;s advertised capacity. Advertised YARN memory does not create physical memory.</p><h3 id=logs-and-failed-containers>Logs and Failed Containers
+<a href=#logs-and-failed-containers class=heading-anchor><span>#</span></a></h3><p>Foreground daemons send their primary output to Compose:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose ps
+</span></span><span style=display:flex><span>docker compose logs --tail<span style=color:#f92672>=</span><span style=color:#ae81ff>200</span> namenode
+</span></span><span style=display:flex><span>docker compose logs --tail<span style=color:#f92672>=</span><span style=color:#ae81ff>200</span> nodemanager1
+</span></span><span style=display:flex><span>docker compose logs --tail<span style=color:#f92672>=</span><span style=color:#ae81ff>200</span> hiveserver2</span></span></code></pre></div></div></div><p>Application diagnostics are also available through YARN:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  yarn application -list -appStates ALL
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  yarn logs -applicationId APPLICATION_ID
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>Replace <code>APPLICATION_ID</code> with the identifier reported by YARN.</p><h3 id=derby-schema-initialization>Derby Schema Initialization
+<a href=#derby-schema-initialization class=heading-anchor><span>#</span></a></h3><p>An interrupted first start can leave a partial Derby schema. Inspect the error before deleting anything:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose run --rm --no-deps --entrypoint bash hiveserver2 -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  schematool -dbType derby -info
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>If the database contains no needed metadata and schema initialization cannot recover, reset only <code>hadoop-lab-hiveserver2-state</code> as described above. Do not start another process against the same embedded Derby directory.</p><h3 id=java-compatibility>Java Compatibility
+<a href=#java-compatibility class=heading-anchor><span>#</span></a></h3><p><code>UnsupportedClassVersionError</code>, module-access failures, removed Java APIs, or native-library errors indicate an unsupported release combination. Capture the exact versions:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker compose exec toolbox bash -lc <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  source /opt/conf/init.sh
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  java -version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hadoop version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  hive --version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  spark-submit --version
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span></span></span></code></pre></div></div></div><p>Resolve the mismatch by selecting a combination documented by the component maintainers. Do not add broad JVM <code>--add-opens</code> flags or replace JARs until the relevant release documentation requires that change.</p><h2 id=security-and-production-boundaries>Security and Production Boundaries
+<a href=#security-and-production-boundaries class=heading-anchor><span>#</span></a></h2><p>The lab deliberately omits controls required by a production deployment:</p><ul><li>Hadoop uses simple authentication rather than Kerberos.</li><li>HiveServer2 accepts unauthenticated connections and does not use TLS.</li><li>HDFS and YARN authorization policies are not hardened.</li><li>HiveServer2 impersonation is disabled.</li><li>Derby provides no concurrent metastore service or external backup strategy.</li><li>Daemons run as root by default inside containers.</li><li>Published ports bind to loopback, but every container on <code>hadoop-lab-net</code> can reach the services.</li><li>HDFS replicas and YARN workers share one Docker host.</li><li>Images and mounted archives are not pinned by digest or verified by checksum in Compose.</li><li>Resource limits, monitoring, secret management, high availability, and rolling upgrades are absent.</li></ul><p>Use the topology for local integration work and protocol inspection. A production cluster requires authenticated services, separate hosts or failure domains, a supported external metastore database, non-root identities, durable logging, resource isolation, and a compatibility matrix maintained with each upgrade.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/hadoop-all-in-one/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

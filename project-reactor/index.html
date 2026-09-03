@@ -1,0 +1,610 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Project Reactor</title></head><body><main><article><div class=article-header><h1>Project Reactor</h1><div class=aux>Last update: 2024-12-16 18:45:59 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/reactive-programming/>Reactive-Programming</a>
+|
+<a href=/tags/project-reactor/>Project-Reactor</a>
+|
+<a href=/tags/spring/>Spring</a>
+|
+<a href=/tags/spring-webflux/>Spring-Webflux</a></div></div><div class=article-content><p><a href=https://projectreactor.io/>Project Reactor</a> is a Java library for composing
+asynchronous and event-driven programs. Its core types, <code>Mono&lt;T></code> and
+<code>Flux&lt;T></code>, describe computations that may produce values later rather than
+returning those values immediately.</p><p>Reactor is the reactive foundation used by Spring WebFlux. It is also useful
+outside HTTP servers for asynchronous clients, event streams, messaging,
+concurrent orchestration, and any pipeline whose inputs may arrive over time.</p><p>The important word is <strong>describe</strong>. This code does not fetch a user when the
+line is evaluated:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> user <span style=color:#f92672>=</span> repository.<span style=color:#a6e22e>findById</span>(userId);</span></span></code></pre></div></div></div><p>It creates a publisher that knows how to fetch the user when something
+subscribes. Operators build a processing graph around that publisher:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>UserView<span style=color:#f92672>&gt;</span> view <span style=color:#f92672>=</span> repository.<span style=color:#a6e22e>findById</span>(userId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>filter</span>(User::isActive)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>flatMap</span>(profileService::attachProfile)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(UserView::from);</span></span></code></pre></div></div></div><p>The graph normally starts doing work only after subscription. Values,
+completion, and failures then travel through the graph as signals.</p><p>Reactor is not a way to make blocking code nonblocking by changing its return
+type. Its benefits come when the entire path uses nonblocking APIs or when
+blocking boundaries are isolated deliberately.</p><h2 id=the-programming-model>The Programming Model
+<a href=#the-programming-model class=heading-anchor><span>#</span></a></h2><p>Traditional imperative code expresses control flow through statements:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>User user <span style=color:#f92672>=</span> repository.<span style=color:#a6e22e>findById</span>(userId);
+</span></span><span style=display:flex><span>Profile profile <span style=color:#f92672>=</span> profileClient.<span style=color:#a6e22e>fetch</span>(user.<span style=color:#a6e22e>profileId</span>());
+</span></span><span style=display:flex><span><span style=color:#66d9ef>return</span> UserView.<span style=color:#a6e22e>from</span>(user, profile);</span></span></code></pre></div></div></div><p>Each call returns before the next statement runs. If <code>fetch</code> waits for a
+network response, the current thread usually waits with it.</p><p>Reactor expresses the same dependency as a pipeline:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>UserView<span style=color:#f92672>&gt;</span> result <span style=color:#f92672>=</span> repository.<span style=color:#a6e22e>findById</span>(userId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>flatMap</span>(user <span style=color:#f92672>-&gt;</span>
+</span></span><span style=display:flex><span>                profileClient.<span style=color:#a6e22e>fetch</span>(user.<span style=color:#a6e22e>profileId</span>())
+</span></span><span style=display:flex><span>                        .<span style=color:#a6e22e>map</span>(profile <span style=color:#f92672>-&gt;</span> UserView.<span style=color:#a6e22e>from</span>(user, profile))
+</span></span><span style=display:flex><span>        );</span></span></code></pre></div></div></div><p><code>flatMap</code> says that the second asynchronous operation depends on the first
+value. No thread has to remain blocked solely to remember what should happen
+next. When the profile arrives, Reactor sends it to the next operator.</p><p>This model is:</p><ul><li><strong>declarative</strong>: code describes transformations and dependencies;</li><li><strong>lazy by default</strong>: building a pipeline generally does not execute it;</li><li><strong>asynchronous-capable</strong>: signals may arrive on another thread at a later
+time;</li><li><strong>composable</strong>: a method can return a publisher for another method to extend;</li><li><strong>signal-based</strong>: values, errors, completion, cancellation, and demand are
+part of the protocol;</li><li><strong>backpressure-aware</strong>: a consumer can limit how much data it requests.</li></ul><p>Reactive code is not inherently concurrent. A pipeline can execute
+synchronously on the subscribing thread. Asynchrony and thread switches occur
+only when a source or operator introduces them.</p><h2 id=reactive-streams>Reactive Streams
+<a href=#reactive-streams class=heading-anchor><span>#</span></a></h2><p>Reactor implements the
+<a href=https://www.reactive-streams.org/>Reactive Streams</a> specification. The
+specification defines four interfaces:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>interface</span> <span style=color:#a6e22e>Publisher</span><span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>subscribe</span>(Subscriber<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>super</span> T<span style=color:#f92672>&gt;</span> subscriber);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>interface</span> <span style=color:#a6e22e>Subscriber</span><span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>onSubscribe</span>(Subscription subscription);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>onNext</span>(T value);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>onError</span>(Throwable error);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>onComplete</span>();
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>interface</span> <span style=color:#a6e22e>Subscription</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>request</span>(<span style=color:#66d9ef>long</span> count);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>cancel</span>();
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>interface</span> <span style=color:#a6e22e>Processor</span><span style=color:#f92672>&lt;</span>T, R<span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>extends</span> Subscriber<span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span>, Publisher<span style=color:#f92672>&lt;</span>R<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The protocol is roughly:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Subscriber -&gt; subscribe -&gt; Publisher
+</span></span><span style=display:flex><span>Subscriber &lt;- onSubscribe(Subscription)
+</span></span><span style=display:flex><span>Subscriber -&gt; request(n) -&gt; Subscription
+</span></span><span style=display:flex><span>Subscriber &lt;- onNext(value), at most n times
+</span></span><span style=display:flex><span>Subscriber &lt;- onComplete() or onError(error)</span></span></code></pre></div></div></div><p><code>onComplete</code> and <code>onError</code> are terminal signals. Exactly one of them may end a
+successful subscription, and no more values follow it. Cancellation ends the
+subscriber&rsquo;s interest and should cause upstream work to stop where possible.</p><p>Application code rarely implements these interfaces directly. <code>Mono</code>, <code>Flux</code>,
+and their operators enforce most of the protocol. The interfaces still explain
+why demand, cancellation, and terminal errors behave as they do.</p><h2 id=mono-and-flux><code>Mono</code> and <code>Flux</code>
+<a href=#mono-and-flux class=heading-anchor><span>#</span></a></h2><p>The main APIs are in <code>reactor.core.publisher</code>.</p><h3 id=monot><code>Mono&lt;T></code>
+<a href=#monot class=heading-anchor><span>#</span></a></h3><p>A <code>Mono&lt;T></code> emits:</p><ul><li>one value followed by completion;</li><li>completion without a value; or</li><li>an error.</li></ul><p>It represents cardinality of zero or one:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> user <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>just</span>(existingUser);
+</span></span><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> absent <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>empty</span>();
+</span></span><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> failed <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>error</span>(
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> IllegalStateException(<span style=color:#e6db74>&#34;User service unavailable&#34;</span>)
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Typical uses include one HTTP response, one database row, one command result,
+an optional lookup, or an asynchronous operation that only signals completion:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Void<span style=color:#f92672>&gt;</span> saved <span style=color:#f92672>=</span> repository.<span style=color:#a6e22e>save</span>(user).<span style=color:#a6e22e>then</span>();</span></span></code></pre></div></div></div><p><code>Mono&lt;Void></code> means that completion or failure matters but no value is emitted.
+It does not mean that the operation is synchronous.</p><h3 id=fluxt><code>Flux&lt;T></code>
+<a href=#fluxt class=heading-anchor><span>#</span></a></h3><p>A <code>Flux&lt;T></code> emits zero to many values, then completes or fails:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> names <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>just</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>, <span style=color:#e6db74>&#34;Grace&#34;</span>, <span style=color:#e6db74>&#34;Linus&#34;</span>);
+</span></span><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Integer<span style=color:#f92672>&gt;</span> range <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>range</span>(1, 10);
+</span></span><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span> noEvents <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>empty</span>();</span></span></code></pre></div></div></div><p>It can represent a finite collection, rows streamed from a database, messages
+from a broker, server-sent events, or an unbounded stream:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Long<span style=color:#f92672>&gt;</span> ticks <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>interval</span>(Duration.<span style=color:#a6e22e>ofSeconds</span>(1));</span></span></code></pre></div></div></div><p>An unbounded source does not complete by itself. Consumers must remain
+subscribed, cancel it, or apply an operator such as <code>take</code>.</p><h3 id=cardinality-is-part-of-the-type>Cardinality Is Part of the Type
+<a href=#cardinality-is-part-of-the-type class=heading-anchor><span>#</span></a></h3><p>Operators preserve or change cardinality:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> orders <span style=color:#f92672>=</span> orderRepository.<span style=color:#a6e22e>findByCustomer</span>(customerId);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Long<span style=color:#f92672>&gt;</span> count <span style=color:#f92672>=</span> orders.<span style=color:#a6e22e>count</span>();
+</span></span><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>List<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;&gt;</span> list <span style=color:#f92672>=</span> orders.<span style=color:#a6e22e>collectList</span>();
+</span></span><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> ids <span style=color:#f92672>=</span> orders.<span style=color:#a6e22e>map</span>(Order::id);
+</span></span><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> first <span style=color:#f92672>=</span> orders.<span style=color:#a6e22e>next</span>();</span></span></code></pre></div></div></div><p>Choosing <code>Mono</code> or <code>Flux</code> communicates more than implementation detail. A
+method returning <code>Mono&lt;Account></code> promises at most one account. Returning
+<code>Flux&lt;Account></code> leaves open the possibility of many.</p><p>Neither type permits <code>null</code> as an emitted value. Use <code>Mono.empty()</code> for an
+absent result and map nullable values at the boundary:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> user <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>justOrEmpty</span>(nullableUser);</span></span></code></pre></div></div></div><h2 id=assembly-subscription-and-signals>Assembly, Subscription, and Signals
+<a href=#assembly-subscription-and-signals class=heading-anchor><span>#</span></a></h2><p>Reactor code has three distinct phases.</p><h3 id=assembly>Assembly
+<a href=#assembly class=heading-anchor><span>#</span></a></h3><p>At assembly time, operators create publisher objects:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> pipeline <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>just</span>(<span style=color:#e6db74>&#34;a&#34;</span>, <span style=color:#e6db74>&#34;bb&#34;</span>, <span style=color:#e6db74>&#34;ccc&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>filter</span>(value <span style=color:#f92672>-&gt;</span> value.<span style=color:#a6e22e>length</span>() <span style=color:#f92672>&gt;</span> 1)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(String::toUpperCase);</span></span></code></pre></div></div></div><p>No values normally pass through the pipeline yet.</p><h3 id=subscription>Subscription
+<a href=#subscription class=heading-anchor><span>#</span></a></h3><p>A terminal consumer subscribes:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>pipeline.<span style=color:#a6e22e>subscribe</span>(
+</span></span><span style=display:flex><span>        value <span style=color:#f92672>-&gt;</span> System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(<span style=color:#e6db74>&#34;value: &#34;</span> <span style=color:#f92672>+</span> value),
+</span></span><span style=display:flex><span>        error <span style=color:#f92672>-&gt;</span> System.<span style=color:#a6e22e>err</span>.<span style=color:#a6e22e>println</span>(<span style=color:#e6db74>&#34;error: &#34;</span> <span style=color:#f92672>+</span> error.<span style=color:#a6e22e>getMessage</span>()),
+</span></span><span style=display:flex><span>        () <span style=color:#f92672>-&gt;</span> System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(<span style=color:#e6db74>&#34;complete&#34;</span>)
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>This example is suitable for demonstrating the API, but application services
+should usually return the publisher rather than subscribe internally. The
+framework at the outer boundary, such as Spring WebFlux, owns subscription,
+cancellation, and response writing.</p><p>Calling <code>subscribe()</code> and discarding the returned handle creates detached work
+that is difficult to cancel, observe, test, or include in the caller&rsquo;s error
+handling.</p><h3 id=execution>Execution
+<a href=#execution class=heading-anchor><span>#</span></a></h3><p>After subscription, the source emits signals through the operator chain:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>source -&gt; filter -&gt; map -&gt; subscriber</span></span></code></pre></div></div></div><p>Each subscriber gets a separate execution of a cold pipeline. The same
+publisher object may therefore run its source more than once:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> request <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>fromSupplier</span>(<span style=color:#66d9ef>this</span>::loadValue);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>request.<span style=color:#a6e22e>subscribe</span>(System.<span style=color:#a6e22e>out</span>::println); <span style=color:#75715e>// calls loadValue</span>
+</span></span><span style=display:flex><span>request.<span style=color:#a6e22e>subscribe</span>(System.<span style=color:#a6e22e>out</span>::println); <span style=color:#f92672>//</span> calls loadValue again</span></span></code></pre></div></div></div><h2 id=creating-publishers>Creating Publishers
+<a href=#creating-publishers class=heading-anchor><span>#</span></a></h2><p>Use the narrowest factory that describes the source.</p><h3 id=existing-values>Existing Values
+<a href=#existing-values class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> one <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>just</span>(order);
+</span></span><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> maybe <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>justOrEmpty</span>(optionalOrder);
+</span></span><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> many <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>fromIterable</span>(orders);</span></span></code></pre></div></div></div><p><code>just</code> captures its value at assembly time.</p><h3 id=deferred-work>Deferred Work
+<a href=#deferred-work class=heading-anchor><span>#</span></a></h3><p><code>fromSupplier</code> invokes a synchronous supplier for each subscription:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Instant<span style=color:#f92672>&gt;</span> currentTime <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>fromSupplier</span>(Instant::now);</span></span></code></pre></div></div></div><p><code>defer</code> creates a publisher for each subscription:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> currentUser <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>defer</span>(() <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>    String userId <span style=color:#f92672>=</span> securityContext.<span style=color:#a6e22e>currentUserId</span>();
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> repository.<span style=color:#a6e22e>findById</span>(userId);
+</span></span><span style=display:flex><span>});</span></span></code></pre></div></div></div><p>This distinction matters for mutable state, request context, time, and other
+values that must be read when execution starts rather than when the pipeline is
+assembled.</p><h3 id=callback-apis>Callback APIs
+<a href=#callback-apis class=heading-anchor><span>#</span></a></h3><p><code>Mono.create</code> and <code>Flux.create</code> adapt callback-style APIs:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Result<span style=color:#f92672>&gt;</span> result <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>create</span>(sink <span style=color:#f92672>-&gt;</span>
+</span></span><span style=display:flex><span>        client.<span style=color:#a6e22e>execute</span>(<span style=color:#66d9ef>new</span> Callback() {
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@Override</span>
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>onSuccess</span>(Result value) {
+</span></span><span style=display:flex><span>                sink.<span style=color:#a6e22e>success</span>(value);
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@Override</span>
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>onFailure</span>(Throwable error) {
+</span></span><span style=display:flex><span>                sink.<span style=color:#a6e22e>error</span>(error);
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>        })
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>The adapter must correctly handle cancellation, multiple callback invocations,
+and concurrent signals. Prefer an existing native Reactor integration when one
+is available.</p><p><code>Flux.generate</code> is appropriate for synchronous, one-signal-at-a-time state
+generation. <code>Flux.create</code> supports asynchronous and potentially multi-threaded
+producers, but requires an explicit overflow strategy when the producer can
+outpace demand.</p><h2 id=transforming-values>Transforming Values
+<a href=#transforming-values class=heading-anchor><span>#</span></a></h2><p>Reactor&rsquo;s operators form the vocabulary of the programming model.</p><h3 id=map><code>map</code>
+<a href=#map class=heading-anchor><span>#</span></a></h3><p>Use <code>map</code> for a synchronous one-to-one transformation:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> normalized <span style=color:#f92672>=</span> names
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(String::trim)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(String::toLowerCase);</span></span></code></pre></div></div></div><p>The mapping function returns an ordinary value, not a publisher.</p><h3 id=filter><code>filter</code>
+<a href=#filter class=heading-anchor><span>#</span></a></h3><p><code>filter</code> retains values that match a predicate:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> expensiveOrders <span style=color:#f92672>=</span> orders
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>filter</span>(order <span style=color:#f92672>-&gt;</span> order.<span style=color:#a6e22e>total</span>().<span style=color:#a6e22e>compareTo</span>(minimum) <span style=color:#f92672>&gt;=</span> 0);</span></span></code></pre></div></div></div><p>Filtering the only value from a <code>Mono</code> produces an empty <code>Mono</code>.</p><h3 id=flatmap><code>flatMap</code>
+<a href=#flatmap class=heading-anchor><span>#</span></a></h3><p>Use <code>flatMap</code> when each input starts another asynchronous publisher:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Invoice<span style=color:#f92672>&gt;</span> invoices <span style=color:#f92672>=</span> customerIds
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>flatMap</span>(invoiceService::findCurrentInvoice);</span></span></code></pre></div></div></div><p>For <code>Flux</code>, inner publishers may run concurrently, and their values may be
+interleaved. The overloads accepting <code>concurrency</code> and <code>prefetch</code> limit active
+work and upstream demand:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Invoice<span style=color:#f92672>&gt;</span> invoices <span style=color:#f92672>=</span> customerIds.<span style=color:#a6e22e>flatMap</span>(
+</span></span><span style=display:flex><span>        invoiceService::findCurrentInvoice,
+</span></span><span style=display:flex><span>        16
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Unlimited remote calls are rarely a safe production default.</p><h3 id=concatmap><code>concatMap</code>
+<a href=#concatmap class=heading-anchor><span>#</span></a></h3><p><code>concatMap</code> subscribes to one inner publisher at a time and preserves source
+order:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>ImportResult<span style=color:#f92672>&gt;</span> results <span style=color:#f92672>=</span> files.<span style=color:#a6e22e>concatMap</span>(importer::importFile);</span></span></code></pre></div></div></div><p>It trades concurrency for ordering and serialized side effects.</p><h3 id=flatmapsequential><code>flatMapSequential</code>
+<a href=#flatmapsequential class=heading-anchor><span>#</span></a></h3><p><code>flatMapSequential</code> starts inner publishers concurrently but emits their
+results in source order. Results from later publishers may be buffered while
+an earlier publisher is still running.</p><h3 id=switchmap><code>switchMap</code>
+<a href=#switchmap class=heading-anchor><span>#</span></a></h3><p><code>switchMap</code> cancels the previous inner publisher when a new input arrives:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>SearchResult<span style=color:#f92672>&gt;</span> results <span style=color:#f92672>=</span> queryChanges
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>switchMap</span>(searchService::search);</span></span></code></pre></div></div></div><p>This is useful for live search, where results for an obsolete query should no
+longer be delivered.</p><h2 id=combining-publishers>Combining Publishers
+<a href=#combining-publishers class=heading-anchor><span>#</span></a></h2><p>The correct operator depends on the relationship between inputs.</p><h3 id=zip><code>zip</code>
+<a href=#zip class=heading-anchor><span>#</span></a></h3><p><code>zip</code> waits for one value from each source and combines them:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>AccountPage<span style=color:#f92672>&gt;</span> page <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>zip</span>(
+</span></span><span style=display:flex><span>        accountService.<span style=color:#a6e22e>find</span>(accountId),
+</span></span><span style=display:flex><span>        preferenceService.<span style=color:#a6e22e>find</span>(accountId),
+</span></span><span style=display:flex><span>        AccountPage::<span style=color:#66d9ef>new</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>If a zipped <code>Mono</code> completes empty, the combination cannot be produced.</p><h3 id=merge><code>merge</code>
+<a href=#merge class=heading-anchor><span>#</span></a></h3><p><code>merge</code> subscribes to sources eagerly and interleaves values as they arrive:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span> events <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>merge</span>(auditEvents, securityEvents);</span></span></code></pre></div></div></div><h3 id=concat><code>concat</code>
+<a href=#concat class=heading-anchor><span>#</span></a></h3><p><code>concat</code> completes one source before subscribing to the next:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span> events <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>concat</span>(historicalEvents, liveEvents);</span></span></code></pre></div></div></div><p>This pattern can avoid missing the intended ordering, but a production
+history-to-live transition may still need source-specific coordination to
+avoid losing events between subscriptions.</p><h3 id=combinelatest><code>combineLatest</code>
+<a href=#combinelatest class=heading-anchor><span>#</span></a></h3><p>After every source has emitted at least once, <code>combineLatest</code> recomputes a
+result whenever any source changes. It is useful for continuously changing
+state rather than one-for-one pairing.</p><h3 id=completion-operators>Completion Operators
+<a href=#completion-operators class=heading-anchor><span>#</span></a></h3><p><code>then</code> ignores values and continues after successful completion:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Receipt<span style=color:#f92672>&gt;</span> result <span style=color:#f92672>=</span> validator.<span style=color:#a6e22e>validate</span>(command)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>then</span>(repository.<span style=color:#a6e22e>save</span>(command))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>then</span>(paymentService.<span style=color:#a6e22e>charge</span>(command));</span></span></code></pre></div></div></div><p><code>thenReturn(value)</code> emits a fixed value after completion. <code>thenMany(publisher)</code>
+continues with a multi-value publisher.</p><h2 id=cold-and-hot-publishers>Cold and Hot Publishers
+<a href=#cold-and-hot-publishers class=heading-anchor><span>#</span></a></h2><p>A <strong>cold</strong> publisher creates or replays its sequence independently for each
+subscriber. HTTP client calls, database queries, and <code>Flux.range</code> are commonly
+cold:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>subscriber A -&gt; separate execution A
+</span></span><span style=display:flex><span>subscriber B -&gt; separate execution B</span></span></code></pre></div></div></div><p>A <strong>hot</strong> publisher exists independently of a subscriber. Consumers see values
+emitted while they are attached and may miss earlier values:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>shared event source -&gt; subscriber A
+</span></span><span style=display:flex><span>                    -&gt; subscriber B</span></span></code></pre></div></div></div><p>Operators can change sharing behavior:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Quote<span style=color:#f92672>&gt;</span> shared <span style=color:#f92672>=</span> quoteClient.<span style=color:#a6e22e>stream</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>publish</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>refCount</span>(1);</span></span></code></pre></div></div></div><p>The first subscriber connects to the source, later subscribers share that
+subscription, and the source disconnects when the last subscriber leaves.</p><p><code>share()</code> is a convenient form of reference-counted sharing. <code>cache()</code> stores
+and replays signals to later subscribers:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Configuration<span style=color:#f92672>&gt;</span> cached <span style=color:#f92672>=</span> configurationClient.<span style=color:#a6e22e>load</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>cache</span>(Duration.<span style=color:#a6e22e>ofMinutes</span>(5));</span></span></code></pre></div></div></div><p>Caching also affects errors and empty completion according to the selected
+overload. It must have an intentional lifetime and invalidation policy.</p><h2 id=error-handling>Error Handling
+<a href=#error-handling class=heading-anchor><span>#</span></a></h2><p>An error is a terminal signal. It does not travel as an ordinary value that
+the next <code>map</code> can inspect:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>onNext -&gt; onNext -&gt; onError</span></span></code></pre></div></div></div><p>After <code>onError</code>, that subscription emits nothing else.</p><h3 id=replace-an-error>Replace an Error
+<a href=#replace-an-error class=heading-anchor><span>#</span></a></h3><p><code>onErrorReturn</code> emits a fallback value:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>ExchangeRate<span style=color:#f92672>&gt;</span> rate <span style=color:#f92672>=</span> rateClient.<span style=color:#a6e22e>latest</span>(pair)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>onErrorReturn</span>(ExchangeRate.<span style=color:#a6e22e>unavailable</span>(pair));</span></span></code></pre></div></div></div><p>Use it only when the fallback is semantically valid. Turning infrastructure
+failure into plausible data can hide an outage.</p><h3 id=select-another-publisher>Select Another Publisher
+<a href=#select-another-publisher class=heading-anchor><span>#</span></a></h3><p><code>onErrorResume</code> chooses a fallback publisher:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Product<span style=color:#f92672>&gt;</span> product <span style=color:#f92672>=</span> primary.<span style=color:#a6e22e>find</span>(productId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>onErrorResume</span>(NotFoundException.<span style=color:#a6e22e>class</span>,
+</span></span><span style=display:flex><span>                error <span style=color:#f92672>-&gt;</span> archive.<span style=color:#a6e22e>find</span>(productId));</span></span></code></pre></div></div></div><p>The original upstream sequence has terminated. Recovery continues with a new
+publisher; it does not resume the failed source at the next element.</p><h3 id=translate-an-error>Translate an Error
+<a href=#translate-an-error class=heading-anchor><span>#</span></a></h3><p><code>onErrorMap</code> preserves failure while changing its type:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Product<span style=color:#f92672>&gt;</span> product <span style=color:#f92672>=</span> client.<span style=color:#a6e22e>fetch</span>(productId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>onErrorMap</span>(
+</span></span><span style=display:flex><span>                ClientProtocolException.<span style=color:#a6e22e>class</span>,
+</span></span><span style=display:flex><span>                error <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> CatalogUnavailableException(productId, error)
+</span></span><span style=display:flex><span>        );</span></span></code></pre></div></div></div><h3 id=observe-without-recovering>Observe Without Recovering
+<a href=#observe-without-recovering class=heading-anchor><span>#</span></a></h3><p><code>doOnError</code>, <code>doOnNext</code>, <code>doOnSubscribe</code>, and related <code>doOn...</code> operators add
+side effects without replacing the signal:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Product<span style=color:#f92672>&gt;</span> product <span style=color:#f92672>=</span> client.<span style=color:#a6e22e>fetch</span>(productId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>doOnError</span>(error <span style=color:#f92672>-&gt;</span>
+</span></span><span style=display:flex><span>                LOGGER.<span style=color:#a6e22e>warn</span>(<span style=color:#e6db74>&#34;Product lookup failed: {}&#34;</span>, productId, error));</span></span></code></pre></div></div></div><p>Do not add the same error log at every layer. Log where sufficient context
+exists and where duplicate reporting will not be produced.</p><h3 id=cleanup>Cleanup
+<a href=#cleanup class=heading-anchor><span>#</span></a></h3><p><code>doFinally</code> runs for completion, error, or cancellation:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Response<span style=color:#f92672>&gt;</span> response <span style=color:#f92672>=</span> client.<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>doFinally</span>(signalType <span style=color:#f92672>-&gt;</span> timer.<span style=color:#a6e22e>stop</span>());</span></span></code></pre></div></div></div><p>For resources whose acquisition and cleanup are asynchronous, use
+<code>usingWhen</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> rows <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>usingWhen</span>(
+</span></span><span style=display:flex><span>        connectionFactory.<span style=color:#a6e22e>create</span>(),
+</span></span><span style=display:flex><span>        connection <span style=color:#f92672>-&gt;</span> query(connection),
+</span></span><span style=display:flex><span>        Connection::close
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Cancellation must be treated as a normal termination path, especially for HTTP
+disconnects and timed-out requests.</p><h3 id=retry>Retry
+<a href=#retry class=heading-anchor><span>#</span></a></h3><p>Retry resubscribes to the source:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Response<span style=color:#f92672>&gt;</span> response <span style=color:#f92672>=</span> client.<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>retryWhen</span>(
+</span></span><span style=display:flex><span>                Retry.<span style=color:#a6e22e>backoff</span>(3, Duration.<span style=color:#a6e22e>ofMillis</span>(200))
+</span></span><span style=display:flex><span>                        .<span style=color:#a6e22e>filter</span>(<span style=color:#66d9ef>this</span>::isTransient)
+</span></span><span style=display:flex><span>        );</span></span></code></pre></div></div></div><p>Resubscription repeats upstream work. A retry around a payment, message
+publication, or database mutation can repeat a side effect. Retry only
+transient failures, bound attempts and delay, and make effectful operations
+idempotent where possible.</p><h2 id=backpressure>Backpressure
+<a href=#backpressure class=heading-anchor><span>#</span></a></h2><p>Reactive Streams lets downstream request a bounded number of values. This
+prevents a compliant upstream publisher from sending unlimited data to a
+consumer that cannot keep up:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>subscriber: request(32)
+</span></span><span style=display:flex><span>publisher:  emit at most 32 values
+</span></span><span style=display:flex><span>subscriber: process values, then request more</span></span></code></pre></div></div></div><p>Reactor operators usually manage demand automatically. Prefetching operators
+may request values in batches for throughput.</p><p>Backpressure is not unlimited buffering and cannot slow every external system.
+An HTTP endpoint may be able to stop reading a socket, while a firehose-style
+callback API may continue producing events. At such boundaries the application
+must choose a policy:</p><ul><li>buffer within a strict bound;</li><li>discard old or new values;</li><li>keep only the latest value;</li><li>signal an overflow error;</li><li>apply admission control before accepting work.</li></ul><p>Operators such as <code>onBackpressureBuffer</code>, <code>onBackpressureDrop</code>, and
+<code>onBackpressureLatest</code> make that policy explicit. An unbounded buffer only
+moves the failure from overload to memory exhaustion.</p><p>Backpressure limits items in a stream. It does not by itself limit every
+resource. Use <code>flatMap</code> concurrency, connection pools, queues, timeouts, and
+rate limits to bound downstream calls and work in flight.</p><h2 id=threads-and-schedulers>Threads and Schedulers
+<a href=#threads-and-schedulers class=heading-anchor><span>#</span></a></h2><p>Reactor is concurrency-agnostic. Without a scheduler boundary, operators
+usually execute on the thread that emits the signal:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Integer<span style=color:#f92672>&gt;</span> values <span style=color:#f92672>=</span> Flux.<span style=color:#a6e22e>range</span>(1, 3)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(<span style=color:#66d9ef>this</span>::transform);</span></span></code></pre></div></div></div><p>Reactor exposes execution policies through <code>Schedulers</code>:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Scheduler</th><th>Intended Use</th></tr></thead><tbody><tr><td><code>Schedulers.immediate()</code></td><td>Continue on the current thread</td></tr><tr><td><code>Schedulers.single()</code></td><td>Shared single worker for serialized work</td></tr><tr><td><code>Schedulers.parallel()</code></td><td>Fixed pool for short CPU-bound work</td></tr><tr><td><code>Schedulers.boundedElastic()</code></td><td>Bounded accommodation for blocking I/O</td></tr><tr><td><code>Schedulers.fromExecutorService(...)</code></td><td>Integrate an owned executor</td></tr></tbody></table></div></div><p>Schedulers are shared resources unless an API explicitly creates a new one.
+Do not create a scheduler per request.</p><h3 id=subscribeon><code>subscribeOn</code>
+<a href=#subscribeon class=heading-anchor><span>#</span></a></h3><p><code>subscribeOn</code> affects where subscription and source execution begin:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Report<span style=color:#f92672>&gt;</span> report <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>fromCallable</span>(() <span style=color:#f92672>-&gt;</span> blockingReportClient.<span style=color:#a6e22e>load</span>(id))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>subscribeOn</span>(Schedulers.<span style=color:#a6e22e>boundedElastic</span>());</span></span></code></pre></div></div></div><p>Its effect is not limited to operators textually below it. The placement is
+usually kept close to the blocking source for readability.</p><h3 id=publishon><code>publishOn</code>
+<a href=#publishon class=heading-anchor><span>#</span></a></h3><p><code>publishOn</code> changes the execution context for downstream operators from that
+point:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Result<span style=color:#f92672>&gt;</span> results <span style=color:#f92672>=</span> source
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>publishOn</span>(Schedulers.<span style=color:#a6e22e>parallel</span>())
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(<span style=color:#66d9ef>this</span>::cpuIntensiveTransform)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>publishOn</span>(responseScheduler)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(<span style=color:#66d9ef>this</span>::format);</span></span></code></pre></div></div></div><p>Each boundary introduces queueing and scheduling overhead. Thread switches are
+not automatically an optimization.</p><h3 id=blocking-boundaries>Blocking Boundaries
+<a href=#blocking-boundaries class=heading-anchor><span>#</span></a></h3><p>When a blocking API cannot yet be replaced, isolate it:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Customer<span style=color:#f92672>&gt;</span> customer <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>fromCallable</span>(
+</span></span><span style=display:flex><span>                () <span style=color:#f92672>-&gt;</span> jdbcRepository.<span style=color:#a6e22e>find</span>(customerId)
+</span></span><span style=display:flex><span>        )
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>subscribeOn</span>(Schedulers.<span style=color:#a6e22e>boundedElastic</span>());</span></span></code></pre></div></div></div><p><code>boundedElastic</code> prevents that call from blocking an event-loop worker, but it
+does not turn the database driver into nonblocking I/O. The operation still
+occupies a thread, the scheduler has finite capacity, and overload still needs
+limits.</p><p>Do not put CPU-intensive work on <code>boundedElastic</code>; use a bounded CPU scheduler.
+Do not block Netty event-loop or Reactor <code>parallel</code> workers.</p><h3 id=block><code>block()</code>
+<a href=#block class=heading-anchor><span>#</span></a></h3><p><code>Mono.block()</code> and <code>Flux.blockFirst()</code> bridge reactive code back to an
+imperative caller:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Customer customer <span style=color:#f92672>=</span> customerClient.<span style=color:#a6e22e>find</span>(customerId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>block</span>(Duration.<span style=color:#a6e22e>ofSeconds</span>(2));</span></span></code></pre></div></div></div><p>They are acceptable at a controlled outer boundary such as a command-line
+program or legacy adapter. They should not appear inside a WebFlux request
+pipeline. Blocking there wastes event-loop capacity and may fail on threads
+that reject blocking operations.</p><p>Each <code>block()</code> creates a new subscription. Calling it repeatedly can repeat a
+cold HTTP request or database query.</p><h2 id=reactor-context>Reactor Context
+<a href=#reactor-context class=heading-anchor><span>#</span></a></h2><p>Thread-local state does not reliably follow a reactive pipeline because
+execution may move between threads. Reactor provides <code>Context</code> for metadata
+associated with a subscription:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> greeting <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>deferContextual</span>(contextView <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>    String requestId <span style=color:#f92672>=</span> contextView.<span style=color:#a6e22e>get</span>(<span style=color:#e6db74>&#34;requestId&#34;</span>);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> Mono.<span style=color:#a6e22e>just</span>(<span style=color:#e6db74>&#34;request=&#34;</span> <span style=color:#f92672>+</span> requestId);
+</span></span><span style=display:flex><span>});
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> result <span style=color:#f92672>=</span> greeting.<span style=color:#a6e22e>contextWrite</span>(
+</span></span><span style=display:flex><span>        context <span style=color:#f92672>-&gt;</span> context.<span style=color:#a6e22e>put</span>(<span style=color:#e6db74>&#34;requestId&#34;</span>, <span style=color:#e6db74>&#34;req-123&#34;</span>)
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p><code>Context</code> is:</p><ul><li>scoped to a subscriber rather than a thread;</li><li>immutable, with write operations returning a new context;</li><li>intended for orthogonal metadata such as tracing, security, or request
+correlation;</li><li>propagated from downstream toward upstream when subscription occurs.</li></ul><p>That last point can be surprising. <code>contextWrite</code> makes data visible to
+operators above it in the chain, not arbitrary code below it:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>source
+</span></span><span style=display:flex><span>  -&gt; operator reading Context
+</span></span><span style=display:flex><span>  -&gt; contextWrite
+</span></span><span style=display:flex><span>  -&gt; subscriber</span></span></code></pre></div></div></div><p>Use ordinary arguments and domain objects for business data. Hiding required
+inputs in <code>Context</code> makes APIs difficult to understand and test.</p><p>Spring Security and observability integrations may use Reactor context
+internally. Application code should use their supported APIs rather than
+depending on private context keys.</p><h2 id=important-reactor-apis>Important Reactor APIs
+<a href=#important-reactor-apis class=heading-anchor><span>#</span></a></h2><p>Reactor is broader than <code>Mono</code> and <code>Flux</code>.</p><h3 id=reactorcorepublisher><code>reactor.core.publisher</code>
+<a href=#reactorcorepublisher class=heading-anchor><span>#</span></a></h3><p>This package contains:</p><ul><li><code>Mono</code> and <code>Flux</code>;</li><li><code>Sinks</code> for programmatically emitting signals;</li><li><code>Signal</code> and <code>SignalType</code>;</li><li>grouping, windowing, and parallel-publisher APIs;</li><li>hooks and operator infrastructure.</li></ul><h3 id=sinks><code>Sinks</code>
+<a href=#sinks class=heading-anchor><span>#</span></a></h3><p><code>Sinks</code> replaces older processor-based patterns for safely emitting signals
+from imperative code:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Sinks.<span style=color:#a6e22e>Many</span><span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span> sink <span style=color:#f92672>=</span> Sinks.<span style=color:#a6e22e>many</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>multicast</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>onBackpressureBuffer</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span> events <span style=color:#f92672>=</span> sink.<span style=color:#a6e22e>asFlux</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Sinks.<span style=color:#a6e22e>EmitResult</span> result <span style=color:#f92672>=</span> sink.<span style=color:#a6e22e>tryEmitNext</span>(event);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> (result.<span style=color:#a6e22e>isFailure</span>()) {
+</span></span><span style=display:flex><span>    handleEmissionFailure(result, event);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Sink configuration defines replay, subscriber count, and buffering behavior.
+Emission can fail because there is no subscriber, the sink terminated, demand
+is insufficient, or several threads emit concurrently. Do not ignore
+<code>EmitResult</code>.</p><h3 id=reactorcorescheduler><code>reactor.core.scheduler</code>
+<a href=#reactorcorescheduler class=heading-anchor><span>#</span></a></h3><p>This package contains <code>Scheduler</code>, <code>Schedulers</code>, and worker abstractions.
+Schedulers express where work runs; they are not just interchangeable thread
+pools.</p><h3 id=reactorutilcontext><code>reactor.util.context</code>
+<a href=#reactorutilcontext class=heading-anchor><span>#</span></a></h3><p><code>Context</code> and <code>ContextView</code> expose subscriber-scoped metadata.</p><h3 id=reactorutilretry><code>reactor.util.retry</code>
+<a href=#reactorutilretry class=heading-anchor><span>#</span></a></h3><p><code>Retry</code> and <code>RetryBackoffSpec</code> define bounded retry policies, filters, backoff,
+jitter, and exhausted-retry behavior.</p><h3 id=reactortest><code>reactor.test</code>
+<a href=#reactortest class=heading-anchor><span>#</span></a></h3><p>The separate <code>reactor-test</code> artifact provides <code>StepVerifier</code>,
+<code>TestPublisher</code>, and tools for virtual time.</p><h2 id=testing-with-stepverifier>Testing with <code>StepVerifier</code>
+<a href=#testing-with-stepverifier class=heading-anchor><span>#</span></a></h2><p>Calling <code>subscribe()</code> and sleeping produces slow and unreliable tests.
+<code>StepVerifier</code> describes expected signals:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> values <span style=color:#f92672>=</span> service.<span style=color:#a6e22e>findNames</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>map</span>(String::toUpperCase);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>StepVerifier.<span style=color:#a6e22e>create</span>(values)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>expectNext</span>(<span style=color:#e6db74>&#34;ADA&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>expectNext</span>(<span style=color:#e6db74>&#34;GRACE&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>verifyComplete</span>();</span></span></code></pre></div></div></div><p>Errors can be checked precisely:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>StepVerifier.<span style=color:#a6e22e>create</span>(service.<span style=color:#a6e22e>find</span>(<span style=color:#e6db74>&#34;missing&#34;</span>))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>expectError</span>(NotFoundException.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>verify</span>();</span></span></code></pre></div></div></div><p>Virtual time avoids waiting for real delays:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>StepVerifier.<span style=color:#a6e22e>withVirtualTime</span>(
+</span></span><span style=display:flex><span>                () <span style=color:#f92672>-&gt;</span> Flux.<span style=color:#a6e22e>interval</span>(Duration.<span style=color:#a6e22e>ofHours</span>(1)).<span style=color:#a6e22e>take</span>(2)
+</span></span><span style=display:flex><span>        )
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>expectSubscription</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>expectNoEvent</span>(Duration.<span style=color:#a6e22e>ofHours</span>(1))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>expectNext</span>(0L)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>thenAwait</span>(Duration.<span style=color:#a6e22e>ofHours</span>(1))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>expectNext</span>(1L)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>verifyComplete</span>();</span></span></code></pre></div></div></div><p>The publisher must be created inside the supplier so it uses the virtual
+scheduler installed by the test.</p><p>Use <code>TestPublisher</code> to simulate malformed, delayed, or manually controlled
+sources, and <code>PublisherProbe</code> to verify that a fallback path was subscribed or
+cancelled.</p><h2 id=debugging-pipelines>Debugging Pipelines
+<a href=#debugging-pipelines class=heading-anchor><span>#</span></a></h2><p>Reactive stack traces can be difficult because assembly and execution may
+happen at different places and times.</p><p>Name important sequences and add targeted checkpoints:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Invoice<span style=color:#f92672>&gt;</span> invoice <span style=color:#f92672>=</span> repository.<span style=color:#a6e22e>find</span>(invoiceId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;invoice-lookup&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>checkpoint</span>(<span style=color:#e6db74>&#34;load invoice for payment&#34;</span>);</span></span></code></pre></div></div></div><p>A checkpoint adds assembly information to later errors. A forced checkpoint
+captures more detail but adds stack-trace overhead.</p><p><code>Hooks.onOperatorDebug()</code> enables broad assembly tracing and is useful during
+diagnosis, but it has a runtime cost. Prefer framework-supported development
+diagnostics or targeted checkpoints in production code.</p><p>The <code>log()</code> operator prints reactive signals:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Flux<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> orders <span style=color:#f92672>=</span> repository.<span style=color:#a6e22e>findAll</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>log</span>(<span style=color:#e6db74>&#34;orders&#34;</span>);</span></span></code></pre></div></div></div><p>It can be noisy and may expose values. Use it temporarily or configure the
+logger deliberately rather than leaving high-volume signal logging enabled.</p><h2 id=spring-webflux>Spring WebFlux
+<a href=#spring-webflux class=heading-anchor><span>#</span></a></h2><p><a href=https://docs.spring.io/spring-framework/reference/web/webflux.html>Spring WebFlux</a>
+is Spring Framework&rsquo;s reactive web stack. It supports nonblocking request
+handling, Reactive Streams backpressure, and servers including Reactor Netty
+and Servlet containers.</p><p>The relationship is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Reactive Streams: interoperability protocol
+</span></span><span style=display:flex><span>        |
+</span></span><span style=display:flex><span>Project Reactor: Mono, Flux, operators, schedulers, Context
+</span></span><span style=display:flex><span>        |
+</span></span><span style=display:flex><span>Spring WebFlux: HTTP programming model, routing, codecs, controllers, clients</span></span></code></pre></div></div></div><p>WebFlux uses Reactor as its primary implementation. Controller methods may use
+the generic <code>Publisher</code> interface, but <code>Mono</code> and <code>Flux</code> provide the operator
+API used in normal application code.</p><p>Reactor does not know about HTTP routes, request bodies, status codes, or
+content negotiation. WebFlux adds those web concerns and subscribes to the
+publishers returned by application code.</p><h2 id=annotated-controllers>Annotated Controllers
+<a href=#annotated-controllers class=heading-anchor><span>#</span></a></h2><p>WebFlux supports familiar Spring annotations:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@RestController</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RequestMapping</span>(<span style=color:#e6db74>&#34;/users&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>UserController</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> UserService userService;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>UserController</span>(UserService userService) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>userService</span> <span style=color:#f92672>=</span> userService;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@GetMapping</span>(<span style=color:#e6db74>&#34;/{id}&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> Mono<span style=color:#f92672>&lt;</span>ResponseEntity<span style=color:#f92672>&lt;</span>UserView<span style=color:#f92672>&gt;&gt;</span> <span style=color:#a6e22e>find</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@PathVariable</span> String id
+</span></span><span style=display:flex><span>    ) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> userService.<span style=color:#a6e22e>find</span>(id)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>map</span>(UserView::from)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>map</span>(ResponseEntity::ok)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>defaultIfEmpty</span>(ResponseEntity.<span style=color:#a6e22e>notFound</span>().<span style=color:#a6e22e>build</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@GetMapping</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> Flux<span style=color:#f92672>&lt;</span>UserView<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>findAll</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> userService.<span style=color:#a6e22e>findAll</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>map</span>(UserView::from);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The controller does not call <code>subscribe()</code>. WebFlux subscribes and translates:</p><ul><li>emitted values into an HTTP response body;</li><li>empty completion into a response with no body;</li><li>errors into configured error handling;</li><li>request cancellation or client disconnect into upstream cancellation.</li></ul><p>For a normal JSON array, codecs may need to collect or buffer enough data to
+write valid JSON. Streaming media types such as newline-delimited JSON and
+server-sent events let values be flushed incrementally.</p><h3 id=request-bodies>Request Bodies
+<a href=#request-bodies class=heading-anchor><span>#</span></a></h3><p>A request body can also be reactive:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@PostMapping</span>(
+</span></span><span style=display:flex><span>        path <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;/events&#34;</span>,
+</span></span><span style=display:flex><span>        consumes <span style=color:#f92672>=</span> MediaType.<span style=color:#a6e22e>APPLICATION_NDJSON_VALUE</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> Mono<span style=color:#f92672>&lt;</span>Void<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>ingest</span>(<span style=color:#a6e22e>@RequestBody</span> Flux<span style=color:#f92672>&lt;</span>EventInput<span style=color:#f92672>&gt;</span> inputs) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> inputs
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>map</span>(Event::from)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>transform</span>(eventService::saveAll)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>then</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Whether processing is truly streaming depends on the media type, codec,
+validation, and downstream service. A <code>Flux</code> return type alone does not
+guarantee constant memory use.</p><h2 id=functional-endpoints>Functional Endpoints
+<a href=#functional-endpoints class=heading-anchor><span>#</span></a></h2><p>WebFlux also provides a functional routing API:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>RouterFunction<span style=color:#f92672>&lt;</span>ServerResponse<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>userRoutes</span>(UserHandler handler) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> RouterFunctions.<span style=color:#a6e22e>route</span>()
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>GET</span>(<span style=color:#e6db74>&#34;/users/{id}&#34;</span>, handler::find)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>GET</span>(<span style=color:#e6db74>&#34;/users&#34;</span>, handler::findAll)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Handlers receive <code>ServerRequest</code> and return <code>Mono&lt;ServerResponse></code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> Mono<span style=color:#f92672>&lt;</span>ServerResponse<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>find</span>(ServerRequest request) {
+</span></span><span style=display:flex><span>    String id <span style=color:#f92672>=</span> request.<span style=color:#a6e22e>pathVariable</span>(<span style=color:#e6db74>&#34;id&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> userService.<span style=color:#a6e22e>find</span>(id)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>flatMap</span>(user <span style=color:#f92672>-&gt;</span> ServerResponse.<span style=color:#a6e22e>ok</span>().<span style=color:#a6e22e>bodyValue</span>(user))
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>switchIfEmpty</span>(ServerResponse.<span style=color:#a6e22e>notFound</span>().<span style=color:#a6e22e>build</span>());
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Annotated and functional endpoints use the same WebFlux runtime. The choice is
+about API style and route composition, not different performance behavior.</p><h2 id=webclient><code>WebClient</code>
+<a href=#webclient class=heading-anchor><span>#</span></a></h2><p><code>WebClient</code> is Spring&rsquo;s reactive HTTP client:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> Mono<span style=color:#f92672>&lt;</span>Product<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>findProduct</span>(String productId) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> webClient.<span style=color:#a6e22e>get</span>()
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>uri</span>(<span style=color:#e6db74>&#34;/products/{id}&#34;</span>, productId)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>retrieve</span>()
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>bodyToMono</span>(Product.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>timeout</span>(Duration.<span style=color:#a6e22e>ofSeconds</span>(2));
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Streaming bodies use <code>bodyToFlux</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> Flux<span style=color:#f92672>&lt;</span>Event<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>streamEvents</span>() {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> webClient.<span style=color:#a6e22e>get</span>()
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>uri</span>(<span style=color:#e6db74>&#34;/events&#34;</span>)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>accept</span>(MediaType.<span style=color:#a6e22e>TEXT_EVENT_STREAM</span>)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>retrieve</span>()
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>bodyToFlux</span>(Event.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>retrieve()</code> provides convenient status-to-error handling. Use
+<code>exchangeToMono</code> or <code>exchangeToFlux</code> when response status, headers, and body
+require coordinated handling:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Product<span style=color:#f92672>&gt;</span> product <span style=color:#f92672>=</span> webClient.<span style=color:#a6e22e>get</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>uri</span>(<span style=color:#e6db74>&#34;/products/{id}&#34;</span>, productId)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>exchangeToMono</span>(response <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>if</span> (response.<span style=color:#a6e22e>statusCode</span>().<span style=color:#a6e22e>is2xxSuccessful</span>()) {
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>return</span> response.<span style=color:#a6e22e>bodyToMono</span>(Product.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>if</span> (response.<span style=color:#a6e22e>statusCode</span>().<span style=color:#a6e22e>value</span>() <span style=color:#f92672>==</span> 404) {
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>return</span> Mono.<span style=color:#a6e22e>empty</span>();
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span> response.<span style=color:#a6e22e>createError</span>();
+</span></span><span style=display:flex><span>        });</span></span></code></pre></div></div></div><p>The response body must be consumed or released in low-level exchange handling
+so pooled network buffers are not leaked.</p><p><code>WebClient</code> can also be used by a Spring MVC application. Using the client does
+not require converting the entire server to WebFlux; an MVC boundary may block
+on the result in a controlled way or return an asynchronous type supported by
+that stack.</p><h2 id=data-access-must-match-the-model>Data Access Must Match the Model
+<a href=#data-access-must-match-the-model class=heading-anchor><span>#</span></a></h2><p>A nonblocking HTTP server does not make a blocking persistence layer
+nonblocking:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>WebFlux controller
+</span></span><span style=display:flex><span>  -&gt; blocking JPA repository
+</span></span><span style=display:flex><span>  -&gt; JDBC driver
+</span></span><span style=display:flex><span>  -&gt; thread waits</span></span></code></pre></div></div></div><p>Reactive relational access commonly uses R2DBC. Reactive MongoDB, Redis,
+Cassandra, and messaging integrations provide their own publishers. Their
+actual behavior still depends on the driver.</p><p>Wrapping a JPA call in <code>boundedElastic</code> protects the event loop:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> user <span style=color:#f92672>=</span> Mono.<span style=color:#a6e22e>fromCallable</span>(
+</span></span><span style=display:flex><span>                () <span style=color:#f92672>-&gt;</span> jpaRepository.<span style=color:#a6e22e>findById</span>(id).<span style=color:#a6e22e>orElse</span>(<span style=color:#66d9ef>null</span>)
+</span></span><span style=display:flex><span>        )
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>flatMap</span>(Mono::justOrEmpty)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>subscribeOn</span>(Schedulers.<span style=color:#a6e22e>boundedElastic</span>());</span></span></code></pre></div></div></div><p>This is an interoperability technique, not the same architecture as a
+nonblocking driver. It keeps one thread occupied per blocking call and can
+become the bottleneck under load.</p><h2 id=webflux-backpressure-has-boundaries>WebFlux Backpressure Has Boundaries
+<a href=#webflux-backpressure-has-boundaries class=heading-anchor><span>#</span></a></h2><p>Within a Reactive Streams chain, WebFlux and Reactor propagate demand. At the
+network boundary, behavior also depends on the protocol and transport:</p><ul><li>a server can pause socket reads when downstream is slow;</li><li>response writes may wait for the network to accept more data;</li><li>an upstream broker or callback API may not support matching demand;</li><li>an HTTP client cannot force a remote server to implement application-level
+backpressure;</li><li>request and response codecs may buffer complete objects or collections.</li></ul><p>Backpressure is useful flow control, not an end-to-end guarantee across every
+system. Configure maximum in-memory codec sizes, request limits, queue bounds,
+timeouts, and concurrency explicitly.</p><h2 id=webflux-versus-spring-mvc>WebFlux Versus Spring MVC
+<a href=#webflux-versus-spring-mvc class=heading-anchor><span>#</span></a></h2><p>Spring MVC and Spring WebFlux are two web stacks with overlapping programming
+features but different execution assumptions.</p><p>Choose WebFlux when:</p><ul><li>most I/O dependencies have nonblocking drivers;</li><li>the application maintains many concurrent slow connections;</li><li>endpoints stream data or server-sent events;</li><li>the system composes several asynchronous services per request;</li><li>backpressure and cancellation are useful throughout the path.</li></ul><p>Spring MVC is often the simpler choice when:</p><ul><li>the application is primarily CRUD over blocking JDBC or JPA;</li><li>libraries and team conventions are imperative;</li><li>request concurrency is moderate;</li><li>the work is dominated by blocking APIs anyway.</li></ul><p>WebFlux can handle high concurrency with a small event-loop pool because
+threads are not parked for compatible I/O. It does not make CPU work faster,
+reduce the latency of a remote service, or eliminate capacity planning.
+Reactive pipelines also have a learning and debugging cost.</p><p>Virtual threads change the trade-off for thread-per-request applications by
+making blocking code more scalable. They do not replace streaming,
+backpressure, cancellation propagation, or reactive APIs, but they make Spring
+MVC a stronger option when the application&rsquo;s dependencies are naturally
+blocking.</p><p>Do not select WebFlux merely because it is newer or because a controller can
+return <code>Mono</code>. Select one coherent execution model based on the whole call
+path.</p><h2 id=common-mistakes>Common Mistakes
+<a href=#common-mistakes class=heading-anchor><span>#</span></a></h2><h3 id=subscribing-in-a-service>Subscribing in a Service
+<a href=#subscribing-in-a-service class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>update</span>(User user) {
+</span></span><span style=display:flex><span>    repository.<span style=color:#a6e22e>save</span>(user).<span style=color:#a6e22e>subscribe</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>This detaches errors and cancellation from the caller. Return <code>Mono&lt;Void></code> or
+<code>Mono&lt;User></code> and let the boundary subscribe.</p><h3 id=blocking-inside-an-operator>Blocking Inside an Operator
+<a href=#blocking-inside-an-operator class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>return</span> users.<span style=color:#a6e22e>map</span>(user <span style=color:#f92672>-&gt;</span> blockingClient.<span style=color:#a6e22e>load</span>(user.<span style=color:#a6e22e>id</span>()));</span></span></code></pre></div></div></div><p>The mapping function runs on the signal thread and may block an event loop.
+Use a nonblocking client or isolate the blocking source on <code>boundedElastic</code>.</p><h3 id=calling-block-in-webflux>Calling <code>block()</code> in WebFlux
+<a href=#calling-block-in-webflux class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>User user <span style=color:#f92672>=</span> userService.<span style=color:#a6e22e>find</span>(id).<span style=color:#a6e22e>block</span>();
+</span></span><span style=display:flex><span><span style=color:#66d9ef>return</span> Mono.<span style=color:#a6e22e>just</span>(user);</span></span></code></pre></div></div></div><p>This defeats the execution model and can deadlock or throw on nonblocking
+workers. Compose with <code>map</code> and <code>flatMap</code>.</p><h3 id=using-map-for-an-asynchronous-function>Using <code>map</code> for an Asynchronous Function
+<a href=#using-map-for-an-asynchronous-function class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Mono<span style=color:#f92672>&lt;</span>Profile<span style=color:#f92672>&gt;&gt;</span> nested <span style=color:#f92672>=</span> user.<span style=color:#a6e22e>map</span>(profileService::find);</span></span></code></pre></div></div></div><p>Use <code>flatMap</code> to avoid a nested publisher:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>Profile<span style=color:#f92672>&gt;</span> profile <span style=color:#f92672>=</span> user.<span style=color:#a6e22e>flatMap</span>(profileService::find);</span></span></code></pre></div></div></div><h3 id=ignoring-empty-publishers>Ignoring Empty Publishers
+<a href=#ignoring-empty-publishers class=heading-anchor><span>#</span></a></h3><p>An empty <code>Mono</code> does not invoke <code>map</code> or <code>flatMap</code>. Use <code>switchIfEmpty</code>,
+<code>defaultIfEmpty</code>, or preserve absence intentionally:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> user <span style=color:#f92672>=</span> repository.<span style=color:#a6e22e>findById</span>(id)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>switchIfEmpty</span>(Mono.<span style=color:#a6e22e>error</span>(<span style=color:#66d9ef>new</span> NotFoundException(id)));</span></span></code></pre></div></div></div><p>Use <code>defer</code> when constructing a fallback has side effects or material cost:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Mono<span style=color:#f92672>&lt;</span>User<span style=color:#f92672>&gt;</span> user <span style=color:#f92672>=</span> primary.<span style=color:#a6e22e>find</span>(id)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>switchIfEmpty</span>(Mono.<span style=color:#a6e22e>defer</span>(() <span style=color:#f92672>-&gt;</span> archive.<span style=color:#a6e22e>find</span>(id)));</span></span></code></pre></div></div></div><h3 id=assuming-flatmap-preserves-order>Assuming <code>flatMap</code> Preserves Order
+<a href=#assuming-flatmap-preserves-order class=heading-anchor><span>#</span></a></h3><p>Concurrent inner publishers complete in arrival order. Use <code>concatMap</code> or
+<code>flatMapSequential</code> when ordering is part of the contract.</p><h3 id=unbounded-concurrency>Unbounded Concurrency
+<a href=#unbounded-concurrency class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ids.<span style=color:#a6e22e>flatMap</span>(remoteClient::fetch);</span></span></code></pre></div></div></div><p>For a large or unbounded source, limit concurrency and ensure the HTTP client&rsquo;s
+connection pool has compatible bounds.</p><h3 id=treating-context-as-a-map-of-method-arguments>Treating <code>Context</code> as a Map of Method Arguments
+<a href=#treating-context-as-a-map-of-method-arguments class=heading-anchor><span>#</span></a></h3><p>Required domain inputs belong in parameters and values. Context is for
+cross-cutting subscription metadata.</p><h3 id=hiding-errors-with-broad-fallbacks>Hiding Errors with Broad Fallbacks
+<a href=#hiding-errors-with-broad-fallbacks class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>.<span style=color:#a6e22e>onErrorResume</span>(error <span style=color:#f92672>-&gt;</span> Mono.<span style=color:#a6e22e>empty</span>())</span></span></code></pre></div></div></div><p>This turns every failure into absence. Match only errors whose fallback meaning
+is defined, and let unexpected failures remain failures.</p><h2 id=a-complete-service-example>A Complete Service Example
+<a href=#a-complete-service-example class=heading-anchor><span>#</span></a></h2><p>The following service validates a request, performs two independent calls,
+limits execution time, translates expected failures, and leaves subscription
+to WebFlux:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Service</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>CheckoutService</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> InventoryClient inventoryClient;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> PricingClient pricingClient;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderRepository orderRepository;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>CheckoutService</span>(
+</span></span><span style=display:flex><span>            InventoryClient inventoryClient,
+</span></span><span style=display:flex><span>            PricingClient pricingClient,
+</span></span><span style=display:flex><span>            OrderRepository orderRepository
+</span></span><span style=display:flex><span>    ) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>inventoryClient</span> <span style=color:#f92672>=</span> inventoryClient;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>pricingClient</span> <span style=color:#f92672>=</span> pricingClient;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>orderRepository</span> <span style=color:#f92672>=</span> orderRepository;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> Mono<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>checkout</span>(CheckoutCommand command) {
+</span></span><span style=display:flex><span>        Mono<span style=color:#f92672>&lt;</span>InventoryReservation<span style=color:#f92672>&gt;</span> reservation <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>                inventoryClient.<span style=color:#a6e22e>reserve</span>(command.<span style=color:#a6e22e>items</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        Mono<span style=color:#f92672>&lt;</span>Price<span style=color:#f92672>&gt;</span> price <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>                pricingClient.<span style=color:#a6e22e>calculate</span>(command.<span style=color:#a6e22e>items</span>(), command.<span style=color:#a6e22e>coupon</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> Mono.<span style=color:#a6e22e>zip</span>(reservation, price)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>map</span>(tuple <span style=color:#f92672>-&gt;</span> Order.<span style=color:#a6e22e>create</span>(
+</span></span><span style=display:flex><span>                        command.<span style=color:#a6e22e>customerId</span>(),
+</span></span><span style=display:flex><span>                        tuple.<span style=color:#a6e22e>getT1</span>(),
+</span></span><span style=display:flex><span>                        tuple.<span style=color:#a6e22e>getT2</span>()
+</span></span><span style=display:flex><span>                ))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>flatMap</span>(orderRepository::save)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>timeout</span>(Duration.<span style=color:#a6e22e>ofSeconds</span>(3))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>onErrorMap</span>(
+</span></span><span style=display:flex><span>                        TimeoutException.<span style=color:#a6e22e>class</span>,
+</span></span><span style=display:flex><span>                        error <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> CheckoutUnavailableException(error)
+</span></span><span style=display:flex><span>                )
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>checkpoint</span>(<span style=color:#e6db74>&#34;checkout order&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>Mono.zip</code> subscribes to the inventory and pricing publishers so they can
+progress concurrently. If either fails, the combined publisher fails and the
+other subscription is cancelled where possible. Saving starts only after both
+values arrive.</p><p>Real checkout logic must also define compensation and idempotency. Cancellation
+does not guarantee that a remote reservation or payment was undone, because
+the external system may already have committed it.</p><h2 id=practical-design-rules>Practical Design Rules
+<a href=#practical-design-rules class=heading-anchor><span>#</span></a></h2><ol><li>Return publishers from reusable code; subscribe at application boundaries.</li><li>Use <code>map</code> for synchronous values and <code>flatMap</code> for publishers.</li><li>Treat empty completion, failure, and cancellation as distinct outcomes.</li><li>Bound <code>flatMap</code> concurrency, buffers, retries, and timeouts.</li><li>Keep blocking work off event-loop and parallel workers.</li><li>Prefer native nonblocking clients over wrapping blocking APIs.</li><li>Use <code>Context</code> for cross-cutting subscription metadata, not domain inputs.</li><li>Make side effects idempotent before retrying them.</li><li>Test signals with <code>StepVerifier</code> instead of sleeps.</li><li>Choose WebFlux only when the broader application can benefit from its
+nonblocking model.</li></ol><p>Project Reactor&rsquo;s central idea is not “everything is a stream.” It is that an
+asynchronous computation can be represented as a composable publisher with a
+defined protocol for values, completion, errors, demand, and cancellation.
+Spring WebFlux applies that model to HTTP, but Reactor remains the lower-level
+programming model that makes the composition possible.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/project-reactor/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

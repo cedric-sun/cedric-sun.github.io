@@ -1,0 +1,156 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>DNS and Anycast</title></head><body><main><article><div class=article-header><h1>DNS and Anycast</h1><div class=aux>Last update: 2021-01-16 09:41:58 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/dns/>Dns</a>
+|
+<a href=/tags/networking/>Networking</a>
+|
+<a href=/tags/anycast/>Anycast</a>
+|
+<a href=/tags/dnssec/>Dnssec</a></div></div><div class=article-content><p>DNS is a distributed database whose keys are structured names. Its hierarchy lets
+administrators divide both data storage and responsibility: no organization must
+maintain every mapping, and an organization can delegate a subordinate namespace to
+another administrator. The same hierarchy also supplies a path by which a resolver
+can find the server that is authoritative for an unknown name.</p><h2 id=the-hierarchical-namespace-and-domains>The Hierarchical Namespace and Domains
+<a href=#the-hierarchical-namespace-and-domains class=heading-anchor><span>#</span></a></h2><p>The DNS namespace is a rooted tree. Every node has a label of zero to 63 octets;
+siblings cannot have equal labels, although unrelated nodes can. The root has the
+zero-length, or null, label. Labels on the path from a node to the root, written from
+the most specific to the least specific and separated by dots, form a <em>domain name</em>.
+For example:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>org
+</span></span><span style=display:flex><span>com
+</span></span><span style=display:flex><span>wikipedia.org
+</span></span><span style=display:flex><span>example.com</span></span></code></pre></div></div></div><p>An absolute domain name includes the root label and is conventionally written with a
+trailing dot: <code>wikipedia.org.</code> and <code>example.com.</code> are fully qualified domain names
+(FQDNs). The trailing dot distinguishes an absolute name from a name that a resolver
+or zone-file parser may qualify with a search suffix or <code>$ORIGIN</code>. On the wire, a
+domain name is length-prefixed labels ending in a zero-length label; the final zero
+byte represents the root, not a text character.</p><p>A <em>domain</em> is the subtree rooted at a node. Thus, <code>example.com.</code> names both a node
+and the conceptual subtree below it, including names that may be added later. DNS
+comparisons are case-insensitive; implementations should preserve the received case
+where practical. A domain name alone does not identify an address, host, or
+organization. It identifies a location in the namespace at which resource records
+can be published.</p><h2 id=zones-delegation-and-resource-records>Zones, Delegation, and Resource Records
+<a href=#zones-delegation-and-resource-records class=heading-anchor><span>#</span></a></h2><p>DNS answers queries for a <code>(name, type, class)</code> tuple with resource records (RRs).
+<code>IN</code> is the Internet class used by contemporary Internet DNS. Types describe the
+requested data: <code>A</code> publishes an IPv4 address, <code>AAAA</code> an IPv6 address, <code>MX</code> a mail
+exchanger, and <code>NS</code> a name server. For example, an <code>A</code> lookup for
+<code>ns3.dnsv5.com.</code> may return multiple records:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  1.12.0.17
+</span></span><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  1.12.0.18
+</span></span><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  1.12.0.20
+</span></span><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  1.12.14.17
+</span></span><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  1.12.14.18
+</span></span><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  108.136.87.44
+</span></span><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  125.94.59.200
+</span></span><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  163.177.5.75
+</span></span><span style=display:flex><span>ns3.dnsv5.com.  172800  IN  A  35.165.107.227</span></span></code></pre></div></div></div><p>Other classes existed for separate database-like services, such as Hesiod&rsquo;s <code>HS</code>
+class, but Internet software queries <code>IN</code>. DNS has therefore become a
+general-purpose, replicated key-value system within the constraints of its naming,
+RR, and caching model.</p><p>A <em>zone</em> is the contiguous portion of the namespace for which an operator publishes
+authoritative data as one administrative unit. It is the unit replicated between a
+primary server and secondary servers, historically through a master file and now
+often through generated configuration or an API-backed database. A zone has an apex,
+whose <code>SOA</code> and apex <code>NS</code> RRsets identify its authority. In a zone file, <code>@</code> denotes
+the current <code>$ORIGIN</code>, so an apex NS record has <code>@</code> as its owner.</p><p>The apex NS RRset describes the servers that provide the zone&rsquo;s authoritative
+service; it is therefore a property of the zone, even though its textual records
+have the apex as an owner name. Each NS record names a host rather than embedding an
+address. A resolver obtains that host&rsquo;s <code>A</code> or <code>AAAA</code> records when it has no usable
+address already. Operators must ensure that every published name-server name is
+resolvable. An out-of-bailiwick name-server address can be resolved independently;
+an in-bailiwick address needs glue at the parent to break the delegation cycle.</p><p>Zones and domains are not interchangeable. A domain remains a complete conceptual
+subtree, whereas a parent zone stops being authoritative below a <em>zone cut</em>. For
+example, the <code>com.</code> zone delegates <code>example.com.</code> by publishing an NS RRset at
+<code>example.com.</code>. That delegation NS RRset belongs to the parent zone; the child
+publishes its own apex NS RRset. The parent retains the delegation records but not
+the child&rsquo;s ordinary data.</p><p>Name-server names in a delegation can be inside the delegated domain, such as
+<code>ns1.example.com.</code> for <code>example.com.</code>. Resolving that name by first following the
+delegation would be circular, so the parent supplies address records as <em>glue</em> in
+the referral&rsquo;s Additional section. Glue is not authoritative child-zone data and is
+accepted only under resolver bailiwick rules. A resolver treats data as eligible
+glue only when it is within the delegated zone&rsquo;s bailiwick, preventing unrelated
+Additional-section data from being inserted into its cache as if it were
+authoritative.</p><p><code>CNAME</code> makes its owner an alias for the canonical name in its RDATA. A CNAME owner
+cannot also have other ordinary data, because an alias must not provide a competing
+mapping. When a server returns a CNAME while answering another type, the response
+may include the target data when available; the resolver can otherwise continue at
+the canonical name. Caching the CNAME is safe because no alternative RR type may
+exist at the alias owner.</p><h2 id=authoritative-servers-and-referrals>Authoritative Servers and Referrals
+<a href=#authoritative-servers-and-referrals class=heading-anchor><span>#</span></a></h2><p>An authoritative name server is reachable at an IP address and, by configuration,
+serves one or more zones. Authority is local to the server&rsquo;s loaded zones, not a
+claim over every name below a suffix. A root server, for example, is authoritative
+for the root zone only; it delegates top-level domains rather than answering
+<code>www.example.com.</code> directly.</p><p>For a query within its authority, a server can return the answer and set the <code>AA</code>
+(authoritative answer) bit. For a query below a zone cut, it returns a referral:
+the Answer section is empty, the Authority section contains the delegated zone&rsquo;s NS
+RRset, and the Additional section may contain usable glue. A server may instead
+return an error, including <code>NXDOMAIN</code> when the queried name does not exist.
+<code>NOERROR</code> with no requested RRset is different: it is a NODATA response, meaning
+the name exists but has no record of the requested type.</p><p>The Question section identifies the requested tuple, while Answer, Authority, and
+Additional carry the result and material needed to use it. Their contents are
+contextual rather than interchangeable: an authoritative negative response includes
+the zone&rsquo;s SOA in Authority so a resolver can cache the denial, whereas a referral
+contains delegation NS records there. A CNAME can appear in Answer before the
+canonical target&rsquo;s records. Additional-section data assists resolution but does not
+change the meaning of the question or make an unrelated name authoritative.</p><p>The three outcomes—answer, referral, and error—describe the authority hierarchy.
+They do not require every server to recurse. A server that declines a request it is
+not configured to serve can reply <code>REFUSED</code> (<code>RCODE=5</code>). The <code>RD</code> bit asks a server
+for recursion, while <code>RA</code> advertises that the responding server provides recursive
+service; <code>RA</code> is a capability indication rather than proof that every query will
+succeed.</p><h2 id=stub-resolvers-recursive-resolvers-and-caches>Stub Resolvers, Recursive Resolvers, and Caches
+<a href=#stub-resolvers-recursive-resolvers-and-caches class=heading-anchor><span>#</span></a></h2><p>A stub resolver is the DNS component in an endpoint operating system or application.
+It accepts application lookup requests and sends DNS queries, commonly with <code>RD=1</code>,
+to configured recursive resolvers. For example, the glibc resolver reads
+<code>/etc/resolv.conf</code>; it does not itself normally walk the global DNS delegation tree.</p><p>A full-service recursive resolver accepts that request and performs the work on the
+client&rsquo;s behalf. On a cache miss for <code>www.example.com.</code>, it begins with a root
+server, receives a referral for <code>com.</code>, obtains a referral for <code>example.com.</code>, and
+queries an authoritative server for the final answer. These upstream queries are
+normally iterative: the resolver asks each authoritative server for the best answer
+it has, then follows referrals itself. A forwarding resolver also accepts recursive
+queries but sends them to another recursive resolver rather than initiating that
+walk. Central forwarding resolvers reduce duplicate external lookups and concentrate
+policy and cache administration.</p><p>Resolvers cache positive RRsets until their TTLs expire. They also cache authoritative
+negative answers: the zone&rsquo;s SOA supplies the basis for the negative-cache lifetime,
+bounded by the SOA TTL and its <code>MINIMUM</code> field under current DNS rules. Consequently,
+both NXDOMAIN and NODATA can persist after a zone is changed. Lowering a record&rsquo;s TTL
+before a planned migration limits new cache entries, but caches that already received
+the old TTL remain valid until it expires.</p><p>Caching is also why referrals, glue, and bailiwick boundaries matter. The resolver
+can reuse a delegation and its eligible addresses to avoid a root lookup, but it
+must not mistake non-authoritative auxiliary data for a durable answer. Authoritative
+servers publish the source data; recursive resolvers make that hierarchy practical
+for clients by caching and by following its referrals.</p><h2 id=root-and-top-level-infrastructure>Root and Top-Level Infrastructure
+<a href=#root-and-top-level-infrastructure class=heading-anchor><span>#</span></a></h2><p>The root zone has a single apex, <code>.</code>. Its NS RRset names the root-server system,
+whose operators serve identical root-zone content from many network instances.
+Those servers direct resolvers to top-level domains such as <code>com.</code>, <code>org.</code>, and
+<code>edu.</code>. Each TLD publishes delegations for domains beneath it, so administrative
+control follows suffix boundaries without requiring a monolithic global zone.</p><p>Redundant authoritative servers improve availability at every level. Zone transfer
+keeps secondary servers synchronized with a primary&rsquo;s version of the zone, but
+ordinary resolution and zone transfer have separate purposes. Standard DNS query
+messages carry lookups and referrals; AXFR and IXFR transfer whole zones or
+incremental changes between authorized servers. Implementations may use different
+storage systems and provisioning paths internally, provided the authoritative
+servers publish consistent zone contents.</p><p>DNS was designed around UDP, whose low setup cost suits small independent queries.
+A client retries with TCP when a UDP response has the <code>TC</code> truncation bit, and
+servers also use TCP for responses or operations that require it, including zone
+transfers. EDNS extends the DNS message format with negotiated capabilities and a
+larger advertised UDP payload size; it does not eliminate TCP fallback. Encryption
+transports such as DNS-over-TLS and DNS-over-HTTPS carry the same DNS semantics over
+protected connections, while authoritative delegation remains based on DNS records.</p><h2 id=dnssec>DNSSEC
+<a href=#dnssec class=heading-anchor><span>#</span></a></h2><p>DNSSEC adds origin authentication to RRsets, not encryption or availability.
+<code>RRSIG</code> records sign RRsets, <code>DNSKEY</code> records publish public keys, and a <code>DS</code> record
+in a parent zone links a delegated child to that parent. A validating recursive
+resolver starts from a configured trust anchor, commonly the root key, and validates
+each signed delegation in the chain. <code>NSEC</code> and <code>NSEC3</code> provide authenticated denial
+of existence; <code>CDS</code> and <code>CDNSKEY</code> let a child signal a requested update to its
+parent&rsquo;s DS record.</p><h2 id=anycast-for-dns>Anycast for DNS
+<a href=#anycast-for-dns class=heading-anchor><span>#</span></a></h2><p>Anycast assigns one service address to multiple, geographically distributed server
+instances. Internet routing selects a reachable instance for packets addressed to
+that shared address. Root-server operators, authoritative DNS providers, and
+recursive-resolver fleets use anycast because it distributes load and provides
+alternative paths when an instance or network becomes unavailable.</p><p>Anycast does not make an individual server stateful across the fleet. A BGP routing
+change can send a later packet to another instance, so DNS service must not depend
+on a client remaining attached to a particular anycast node. The request-response
+shape of UDP DNS fits that property. For TCP and encrypted DNS transports, operators
+keep existing flows routable to the selected instance where possible and design
+failover with the possibility of connection loss. Replicated zone data and
+consistent recursive policy therefore matter as much as the shared address.</p><p>For message fields, domain-name compression, and resource-record encoding, see
+<a href=/dns-wire-format/>DNS Wire Format</a>. For BIND configuration, see
+<a href=/bind-9-dns/>BIND 9 Authoritative and Recursive DNS</a>.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/dns-and-anycast/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

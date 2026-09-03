@@ -1,0 +1,167 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Mem0</title></head><body><main><article><div class=article-header><h1>Mem0</h1><div class=aux>Last update: 2023-10-11 05:09:43 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ai/>Ai</a>
+|
+<a href=/tags/llm/>Llm</a>
+|
+<a href=/tags/memory/>Memory</a>
+|
+<a href=/tags/python/>Python</a>
+|
+<a href=/tags/vector-search/>Vector-Search</a></div></div><div class=article-content><p><a href=https://mem0.ai/>Mem0</a> is a memory layer for AI applications. It extracts
+facts from interactions, reconciles those facts with existing memories, and
+retrieves selected memories for later prompts.</p><p>For example, an assistant may receive these statements over time:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>I drink dark-roast coffee without sugar.
+</span></span><span style=display:flex><span>I have switched to decaf.</span></span></code></pre></div></div></div><p>A transcript store preserves both statements as events. A memory system may
+instead retain a current fact such as “The user drinks decaffeinated
+dark-roast coffee without sugar.” Mem0 packages the model calls, storage, and
+retrieval needed for that process.</p><h2 id=mem0s-place-in-an-ai-application>Mem0&rsquo;s Place in an AI Application
+<a href=#mem0s-place-in-an-ai-application class=heading-anchor><span>#</span></a></h2><p>An application using Mem0 has two main flows:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>interaction
+</span></span><span style=display:flex><span>  -&gt; extract candidate facts
+</span></span><span style=display:flex><span>  -&gt; compare with existing memories
+</span></span><span style=display:flex><span>  -&gt; add, update, retain, or delete
+</span></span><span style=display:flex><span>  -&gt; persist
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>new request
+</span></span><span style=display:flex><span>  -&gt; search memories
+</span></span><span style=display:flex><span>  -&gt; filter or rerank results
+</span></span><span style=display:flex><span>  -&gt; add relevant results to the model prompt</span></span></code></pre></div></div></div><p>Mem0 therefore differs from chat history. Chat history records what happened,
+while memory represents selected information that may remain useful in future
+interactions.</p><p>Memories can be scoped by identifiers such as:</p><ul><li><code>user_id</code> for facts about one user;</li><li><code>agent_id</code> for facts available to one agent;</li><li><code>run_id</code> for facts associated with one execution or conversation; and</li><li><code>app_id</code> for application-level isolation.</li></ul><p>The platform also supports metadata, generated categories, memory history,
+feedback, webhooks, and exports. Such features help operate a memory service,
+but they do not change the fundamental data model: a memory remains a record
+that can be created, retrieved, updated, and deleted.</p><h2 id=is-mem0-more-than-elasticsearch-crud>Is Mem0 More Than Elasticsearch CRUD?
+<a href=#is-mem0-more-than-elasticsearch-crud class=heading-anchor><span>#</span></a></h2><p>The storage-facing API resembles CRUD plus search. Elasticsearch can already
+store documents, filter metadata, run BM25 full-text search, perform vector
+search, and combine retrieval signals. Mem0 is not a replacement for those
+database capabilities.</p><p>Mem0 adds a model-driven lifecycle above storage:</p><ol><li><strong>Extraction</strong> converts a conversation into durable facts instead of
+storing every message as a memory.</li><li><strong>Reconciliation</strong> decides whether a candidate fact should add a memory,
+update an existing memory, or make no change.</li><li><strong>Normalization</strong> rewrites conversational input into a standalone memory.</li><li><strong>Scoping</strong> associates memories with users, agents, applications, and runs.</li><li><strong>Prompt retrieval</strong> exposes relevant memories for inclusion in subsequent
+model requests.</li></ol><p>Consider a user who first says “I drink caffeinated coffee” and later says “I
+have switched to decaf.” Elasticsearch can find and update the original
+document, but application code must decide that the second statement
+contradicts the first and formulate the replacement. Mem0 supplies that
+decision pipeline.</p><p>The distinction is architectural rather than magical. A team that already
+implements fact extraction, contradiction handling, deduplication, retention,
+retrieval evaluation, and prompt assembly gains less from Mem0. A team that
+wants those policies behind an SDK or hosted API gains an integrated
+implementation.</p><h2 id=python-example>Python Example
+<a href=#python-example class=heading-anchor><span>#</span></a></h2><p>Install the hosted-platform SDK:</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>uv add mem0ai</span></span></code></pre></div></div></div><p>Keep the API key outside source control. The following example reads it from a
+local <code>key.txt</code> file, adds a preference, waits for asynchronous processing, and
+searches for the resulting memory:</p><div class=jose-wrapper><div class=jose-tools><span>python</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> pathlib <span style=color:#f92672>import</span> Path
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> time <span style=color:#f92672>import</span> sleep
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> typing <span style=color:#f92672>import</span> Any, Final
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> mem0 <span style=color:#f92672>import</span> MemoryClient
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>USER_ID: Final[str] <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;mem0-python-demo&#34;</span>
+</span></span><span style=display:flex><span>KEY_FILE: Final[Path] <span style=color:#f92672>=</span> Path(__file__)<span style=color:#f92672>.</span>with_name(<span style=color:#e6db74>&#34;key.txt&#34;</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>load_api_key</span>() <span style=color:#f92672>-&gt;</span> str:
+</span></span><span style=display:flex><span>    api_key <span style=color:#f92672>=</span> KEY_FILE<span style=color:#f92672>.</span>read_text(encoding<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;utf-8&#34;</span>)<span style=color:#f92672>.</span>strip()
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#f92672>not</span> api_key:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>ValueError</span>(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;Mem0 API key file is empty: </span><span style=color:#e6db74>{</span>KEY_FILE<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> api_key
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>main</span>() <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>None</span>:
+</span></span><span style=display:flex><span>    client: MemoryClient <span style=color:#f92672>=</span> MemoryClient(api_key<span style=color:#f92672>=</span>load_api_key())
+</span></span><span style=display:flex><span>    messages: list[dict[str, str]] <span style=color:#f92672>=</span> [
+</span></span><span style=display:flex><span>        {
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;I prefer dark-roast coffee and drink it without sugar.&#34;</span>,
+</span></span><span style=display:flex><span>        },
+</span></span><span style=display:flex><span>        {
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;I will remember your coffee preference.&#34;</span>,
+</span></span><span style=display:flex><span>        },
+</span></span><span style=display:flex><span>    ]
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    added: dict[str, Any] <span style=color:#f92672>=</span> client<span style=color:#f92672>.</span>add(messages, user_id<span style=color:#f92672>=</span>USER_ID)
+</span></span><span style=display:flex><span>    print(added)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e># Hosted Mem0 processes additions asynchronously.</span>
+</span></span><span style=display:flex><span>    sleep(<span style=color:#ae81ff>3</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    found: dict[str, Any] <span style=color:#f92672>=</span> client<span style=color:#f92672>.</span>search(
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;How does the user like coffee?&#34;</span>,
+</span></span><span style=display:flex><span>        filters<span style=color:#f92672>=</span>{<span style=color:#e6db74>&#34;user_id&#34;</span>: USER_ID},
+</span></span><span style=display:flex><span>        top_k<span style=color:#f92672>=</span><span style=color:#ae81ff>5</span>,
+</span></span><span style=display:flex><span>        threshold<span style=color:#f92672>=</span><span style=color:#ae81ff>0.3</span>,
+</span></span><span style=display:flex><span>        rerank<span style=color:#f92672>=</span><span style=color:#66d9ef>True</span>,
+</span></span><span style=display:flex><span>    )
+</span></span><span style=display:flex><span>    print(found)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> __name__ <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;__main__&#34;</span>:
+</span></span><span style=display:flex><span>    main()</span></span></code></pre></div></div></div><p>Add <code>key.txt</code> to <code>.gitignore</code>:</p><div class=jose-wrapper><div class=jose-tools><span>gitignore</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-gitignore data-lang=gitignore>key.txt</code></pre></div></div><p>An environment variable or secret manager is preferable in a deployed
+application. The local file keeps the example small but must not be committed.</p><p><code>client.add</code> may return a <code>PENDING</code> status because memory extraction and
+reconciliation run asynchronously. Production code should poll an appropriate
+operation endpoint or use an event-driven integration when available rather
+than depend on a fixed sleep.</p><h2 id=why-unrelated-queries-can-return-the-same-memory>Why Unrelated Queries Can Return the Same Memory
+<a href=#why-unrelated-queries-can-return-the-same-memory class=heading-anchor><span>#</span></a></h2><p>A retrieval API ranks candidates; it does not necessarily classify each
+candidate as relevant or irrelevant. If a user owns only one memory, that
+memory is the nearest candidate for both a related query and an unrelated
+query:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>memory:  User drinks dark-roast coffee without sugar.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>query A: How does the user like coffee?
+</span></span><span style=display:flex><span>query B: Which country won the World Cup?</span></span></code></pre></div></div></div><p>The coffee memory ranks first for both queries because no other candidate can
+rank above it. A first-place result can still have a low score.</p><p>Mem0 search can combine three signals:</p><ul><li><strong>semantic</strong> measures embedding similarity;</li><li><strong>BM25</strong> measures lexical overlap; and</li><li><strong>entity</strong> measures entity-related relevance.</li></ul><p>The returned <code>score</code> combines retrieval signals for ranking. It is not a
+probability that the memory answers the query. Scores also depend on the
+embedding model, query distribution, corpus, and retrieval configuration, so
+a threshold copied from another system has no guaranteed meaning.</p><p>Use an explicit threshold and evaluate it against representative queries:</p><div class=jose-wrapper><div class=jose-tools><span>python</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-python data-lang=python><span style=display:flex><span>results <span style=color:#f92672>=</span> client<span style=color:#f92672>.</span>search(
+</span></span><span style=display:flex><span>    query,
+</span></span><span style=display:flex><span>    filters<span style=color:#f92672>=</span>{<span style=color:#e6db74>&#34;user_id&#34;</span>: USER_ID},
+</span></span><span style=display:flex><span>    top_k<span style=color:#f92672>=</span><span style=color:#ae81ff>5</span>,
+</span></span><span style=display:flex><span>    threshold<span style=color:#f92672>=</span><span style=color:#ae81ff>0.3</span>,
+</span></span><span style=display:flex><span>    rerank<span style=color:#f92672>=</span><span style=color:#66d9ef>True</span>,
+</span></span><span style=display:flex><span>)</span></span></code></pre></div></div></div><p>Increasing <code>threshold</code> favors precision and may return no memory. Decreasing it
+favors recall and admits weaker matches. <code>rerank=True</code> adds a relevance pass
+but does not eliminate the need for evaluation.</p><p>Mem0 documentation describes a default threshold, but clients and hosted API
+versions can change. Passing the value explicitly makes application behavior
+less dependent on a server default. An application may also reject results
+after retrieval:</p><div class=jose-wrapper><div class=jose-tools><span>python</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-python data-lang=python><span style=display:flex><span>relevant <span style=color:#f92672>=</span> [
+</span></span><span style=display:flex><span>    memory
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> memory <span style=color:#f92672>in</span> results[<span style=color:#e6db74>&#34;results&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> memory[<span style=color:#e6db74>&#34;score&#34;</span>] <span style=color:#f92672>&gt;=</span> <span style=color:#ae81ff>0.3</span>
+</span></span><span style=display:flex><span>]</span></span></code></pre></div></div></div><p>Choose the cutoff from labeled examples containing both questions that should
+recall a memory and questions that should return nothing. Measure retrieval
+precision and recall instead of judging a threshold from one query.</p><h2 id=search-response-fields>Search Response Fields
+<a href=#search-response-fields class=heading-anchor><span>#</span></a></h2><p>A result can look like this:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;id&#34;</span>: <span style=color:#e6db74>&#34;8e8426d1-b944-4fe2-8ae6-af89d84066f9&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;memory&#34;</span>: <span style=color:#e6db74>&#34;User prefers dark-roast coffee without sugar.&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;user_id&#34;</span>: <span style=color:#e6db74>&#34;mem0-python-demo&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;agent_id&#34;</span>: <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;app_id&#34;</span>: <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;run_id&#34;</span>: <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;score&#34;</span>: <span style=color:#ae81ff>0.0903</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;score_breakdown&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;semantic&#34;</span>: <span style=color:#ae81ff>0.1901</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;bm25&#34;</span>: <span style=color:#ae81ff>0.0356</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;entity&#34;</span>: <span style=color:#ae81ff>0.0</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;metadata&#34;</span>: {},
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;categories&#34;</span>: [<span style=color:#e6db74>&#34;food&#34;</span>, <span style=color:#e6db74>&#34;user_preferences&#34;</span>],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;created_at&#34;</span>: <span style=color:#e6db74>&#34;2026-08-03T08:52:11+00:00&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;updated_at&#34;</span>: <span style=color:#e6db74>&#34;2026-08-03T08:52:48.825031+00:00&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;expiration_date&#34;</span>: <span style=color:#66d9ef>null</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody><tr><td><code>id</code></td><td>Stable identifier for get, update, delete, history, and feedback operations</td></tr><tr><td><code>memory</code></td><td>Extracted or normalized fact stored by Mem0</td></tr><tr><td><code>user_id</code></td><td>User scope attached to the memory</td></tr><tr><td><code>agent_id</code></td><td>Agent scope, or <code>null</code> when none was supplied</td></tr><tr><td><code>app_id</code></td><td>Application scope, or <code>null</code> when none was supplied</td></tr><tr><td><code>run_id</code></td><td>Run or session scope, or <code>null</code> when none was supplied</td></tr><tr><td><code>score</code></td><td>Combined ranking score; larger values rank ahead of smaller values within the same search configuration</td></tr><tr><td><code>score_breakdown.semantic</code></td><td>Contribution from embedding-based similarity</td></tr><tr><td><code>score_breakdown.bm25</code></td><td>Contribution from lexical matching</td></tr><tr><td><code>score_breakdown.entity</code></td><td>Contribution from entity matching</td></tr><tr><td><code>metadata</code></td><td>Application-provided attributes</td></tr><tr><td><code>categories</code></td><td>Categories assigned during memory processing</td></tr><tr><td><code>created_at</code></td><td>Memory creation timestamp</td></tr><tr><td><code>updated_at</code></td><td>Most recent update timestamp</td></tr><tr><td><code>expiration_date</code></td><td>Scheduled expiration timestamp, or <code>null</code></td></tr></tbody></table></div></div><p>A result with <code>score=0.0903</code>, weak semantic and BM25 values, and no entity
+contribution should be treated as a weak candidate even when it occupies the
+first position.</p><h2 id=operational-considerations>Operational Considerations
+<a href=#operational-considerations class=heading-anchor><span>#</span></a></h2><p>Adopting Mem0 still requires application-level decisions:</p><ul><li>define which interactions are eligible for memory extraction;</li><li>isolate tenants and users with enforced authorization, not only filters;</li><li>decide whether sensitive data may be sent to or retained by the service;</li><li>establish retention and deletion behavior;</li><li>evaluate extraction errors and contradictory memories;</li><li>evaluate retrieval with positive and negative queries; and</li><li>cap the number and size of memories inserted into prompts.</li></ul><p>Memory extraction can convert an incorrect model inference into persistent
+state. Retrieval can then repeat that error across future interactions.
+Observability, user correction, history, and deletion are therefore part of
+correctness rather than optional administration.</p><p>Mem0 is useful when an application needs a managed fact lifecycle across
+conversations. Elasticsearch or another database remains sufficient when the
+application only needs document storage and retrieval, or when the team
+already owns the memory-management pipeline.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mem0/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

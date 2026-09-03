@@ -1,0 +1,54 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>OpenSSL Command-Line Guide</title></head><body><main><article><div class=article-header><h1>OpenSSL Command-Line Guide</h1><div class=aux>Last update: 2023-07-16 12:40:14 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/openssl/>Openssl</a>
+|
+<a href=/tags/cryptography/>Cryptography</a>
+|
+<a href=/tags/tls/>TLS</a></div></div><div class=article-content><p>OpenSSL provides cryptographic primitives, protocol libraries, and command-line
+tools. Commands are useful for inspection, interoperability tests, and local
+administration; application code should use a maintained language library and
+its safe defaults.</p><h2 id=keys-csrs-and-certificates>Keys, CSRs, and Certificates
+<a href=#keys-csrs-and-certificates class=heading-anchor><span>#</span></a></h2><p>Generate a private key with the generic key interface:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl genpkey -algorithm RSA <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -pkeyopt rsa_keygen_bits:3072 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -out private-key.pem
+</span></span><span style=display:flex><span>openssl pkey -in private-key.pem -pubout -out public-key.pem</span></span></code></pre></div></div></div><p>Create a certificate-signing request and inspect it:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl req -new -key private-key.pem -out request.csr
+</span></span><span style=display:flex><span>openssl req -in request.csr -noout -text -verify
+</span></span><span style=display:flex><span>openssl x509 -in certificate.pem -noout -text</span></span></code></pre></div></div></div><p><code>req -verify</code> checks the CSR&rsquo;s proof of possession. It does not validate the
+requested identity or issue a certificate. A CSR contains a public key and
+request attributes, never the private key.</p><p>Verify a certificate path against an explicit trust store:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl verify -CAfile roots.pem -untrusted intermediate.pem certificate.pem</span></span></code></pre></div></div></div><p>PEM wraps a DER object in base64 text with type markers. Convert explicitly and
+retain the object type:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl x509 -in certificate.pem -outform DER -out certificate.der
+</span></span><span style=display:flex><span>openssl x509 -inform DER -in certificate.der -out certificate.pem
+</span></span><span style=display:flex><span>openssl pkey -in private-key.pem -outform DER -out private-key.der</span></span></code></pre></div></div></div><p>TLS clients also require hostname verification. For a diagnostic connection,
+pass the expected server name and verification options:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl s_client -connect example.com:443 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -servername example.com -verify_hostname example.com</span></span></code></pre></div></div></div><h2 id=digests-and-signatures>Digests and Signatures
+<a href=#digests-and-signatures class=heading-anchor><span>#</span></a></h2><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl dgst -sha256 artifact.tar
+</span></span><span style=display:flex><span>openssl rand -hex <span style=color:#ae81ff>32</span>
+</span></span><span style=display:flex><span>openssl dgst -sha256 -sign private-key.pem -out artifact.sig artifact.tar
+</span></span><span style=display:flex><span>openssl dgst -sha256 -verify public-key.pem -signature artifact.sig artifact.tar</span></span></code></pre></div></div></div><p>A digest detects accidental changes only when its expected value arrives through
+an authenticated channel. A signature verifies both the digest and possession of
+the corresponding private key, but trust in the public key remains a separate
+deployment decision.</p><h2 id=password-based-encryption>Password-Based Encryption
+<a href=#password-based-encryption class=heading-anchor><span>#</span></a></h2><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl enc -aes-256-cbc -pbkdf2 -salt <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -in plaintext -out ciphertext</span></span></code></pre></div></div></div><p><code>openssl enc</code> does not provide modern AEAD modes through its traditional
+interface. Do not use it to invent an application encryption protocol. Use a
+specified AEAD format or a dedicated tool for files requiring authenticated
+encryption. When interoperability requires <code>enc</code>, state the digest and iteration
+count explicitly because defaults can change, and understand that CBC ciphertext
+remains unauthenticated.</p><p>Pass secrets through protected files or descriptors where the command supports
+them. A password written as a command argument can appear in process listings and
+shell history. Restrict private-key permissions and remove temporary plaintext
+only through storage-appropriate procedures.</p><h2 id=tls-diagnostics>TLS Diagnostics
+<a href=#tls-diagnostics class=heading-anchor><span>#</span></a></h2><p><code>s_client</code> is a diagnostic client rather than a policy-complete replacement for
+an application. Add <code>-showcerts</code>, <code>-verify_return_error</code>, and the application&rsquo;s
+expected protocol options when investigating path or handshake failures:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl s_client -connect example.com:443 -servername example.com <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -verify_hostname example.com -verify_return_error -showcerts</span></span></code></pre></div></div></div><p>Avoid deprecated commands such as <code>rsautl</code> in new automation; <code>pkeyutl</code> and
+<code>genpkey</code> expose current interfaces. Inspect locally installed documentation
+with <code>openssl list -commands</code> and <code>openssl list -providers</code> because providers,
+algorithms, and defaults vary by OpenSSL release.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/openssl/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,151 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Installing Slackware in QEMU</title></head><body><main><article><div class=article-header><h1>Installing Slackware in QEMU</h1><div class=aux>Last update: 2025-05-15 00:27:41 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/qemu/>Qemu</a>
+|
+<a href=/tags/slackware/>Slackware</a>
+|
+<a href=/tags/virtualization/>Virtualization</a></div></div><div class=article-content><p>Slackware retains a direct relationship between its mirror tree, installation
+media, package series, and text-mode installer. Understanding that structure
+helps when selecting packages and diagnosing an installation. The examples
+below install Slackware64 15.0 in a UEFI QEMU virtual machine.</p><h2 id=slackware-resources-and-mirror-tree>Slackware Resources and Mirror Tree
+<a href=#slackware-resources-and-mirror-tree class=heading-anchor><span>#</span></a></h2><p>The primary project resources are:</p><ul><li><a href=http://www.slackware.com/>Slackware Linux</a> for release announcements and
+project information</li><li><a href=https://docs.slackware.com/>Slackware Documentation Project</a> for
+installation and administration documentation</li><li><a href=http://www.slackbook.org/>Slackware Linux Essentials</a> for the SlackBook</li><li><a href=https://mirrors.slackware.com/>Slackware mirrors</a> and the
+<a href=https://mirrors.slackware.com/mirrorlist/>mirror list</a> for release files</li></ul><p>A mirror root contains historical releases, stable-release aliases,
+development trees, ISO images, and unsupported additions:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>slackware/
+</span></span><span style=display:flex><span>├── slackware-15.0/          # 32-bit x86 release
+</span></span><span style=display:flex><span>├── slackware/               # current stable 32-bit release
+</span></span><span style=display:flex><span>├── slackware-current/       # development branch
+</span></span><span style=display:flex><span>├── slackware64-15.0/        # 64-bit x86 release
+</span></span><span style=display:flex><span>├── slackware64/             # current stable 64-bit release
+</span></span><span style=display:flex><span>├── slackware64-current/     # 64-bit development branch
+</span></span><span style=display:flex><span>├── slackware-iso/           # release ISO images and verification files
+</span></span><span style=display:flex><span>├── slackware-pre-1.0-beta/  # early historical material
+</span></span><span style=display:flex><span>└── unsupported/             # contributed boot media, packages, and add-ons</span></span></code></pre></div></div></div><p><code>slackware-current</code> and <code>slackware64-current</code> are development branches, not
+aliases for the latest stable release. The version sequence jumps from 4.0 to
+7.0; versions 5 and 6 were skipped when the project aligned its version number
+with contemporary distributions.</p><p>A release directory is also an installable repository. Slackware64 15.0, for
+example, contains:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>slackware64-15.0/
+</span></span><span style=display:flex><span>├── ChangeLog.txt
+</span></span><span style=display:flex><span>├── CHECKSUMS.md5
+</span></span><span style=display:flex><span>├── CHECKSUMS.md5.asc
+</span></span><span style=display:flex><span>├── FILELIST.TXT
+</span></span><span style=display:flex><span>├── GPG-KEY
+</span></span><span style=display:flex><span>├── PACKAGES.TXT
+</span></span><span style=display:flex><span>├── README_UEFI.TXT
+</span></span><span style=display:flex><span>├── Slackware-HOWTO
+</span></span><span style=display:flex><span>├── EFI/
+</span></span><span style=display:flex><span>├── extra/
+</span></span><span style=display:flex><span>├── isolinux/
+</span></span><span style=display:flex><span>├── kernels/
+</span></span><span style=display:flex><span>├── patches/
+</span></span><span style=display:flex><span>├── slackware64/
+</span></span><span style=display:flex><span>├── source/
+</span></span><span style=display:flex><span>├── testing/
+</span></span><span style=display:flex><span>└── usb-and-pxe-installers/</span></span></code></pre></div></div></div><p><code>slackware64/</code> contains the release package series. <code>patches/</code> receives
+security and correctness updates for the stable release, while <code>source/</code>
+contains the corresponding build material. <code>PACKAGES.TXT</code> describes packages,
+and <code>FILELIST.TXT</code> lists the complete tree.</p><h2 id=boot-media>Boot Media
+<a href=#boot-media class=heading-anchor><span>#</span></a></h2><p>Slackware originally divided its packages into floppy-sized disk sets because
+downloading an entire distribution was impractical. Floppy installation is no
+longer supported, but the package-series organization remains.</p><p>The Slackware64 15.0 ISO directory provides
+<code>slackware64-15.0-install-dvd.iso</code> together with an MD5 file, a detached
+signature, and a text file containing the ISO manifest. The installation DVD
+contains the binary package tree but omits the source tree so that the image
+fits on single-layer DVD media. A mirror tree can also be used for HTTP, FTP,
+NFS, PXE, or manually mounted installation sources.</p><p>The installer ISO is hybrid media with BIOS and UEFI boot data. QEMU can attach
+it directly as a virtual CD-ROM, so writing it to physical media is
+unnecessary.</p><p>Download the image and its signature from the same release directory, import
+the project&rsquo;s <code>GPG-KEY</code>, and verify the signature before booting:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>curl -O https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/slackware64-15.0-install-dvd.iso
+</span></span><span style=display:flex><span>curl -O https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/slackware64-15.0-install-dvd.iso.asc
+</span></span><span style=display:flex><span>curl -O https://mirrors.slackware.com/slackware/slackware64-15.0/GPG-KEY
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>gpg --import GPG-KEY
+</span></span><span style=display:flex><span>gpg --verify slackware64-15.0-install-dvd.iso.asc <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  slackware64-15.0-install-dvd.iso</span></span></code></pre></div></div></div><h2 id=package-series>Package Series
+<a href=#package-series class=heading-anchor><span>#</span></a></h2><p>Slackware64 15.0 divides its binary packages into the following series:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Series</th><th>Contents</th></tr></thead><tbody><tr><td><code>a</code></td><td>Base system; the installer requires this series</td></tr><tr><td><code>ap</code></td><td>Console applications and other non-X programs</td></tr><tr><td><code>d</code></td><td>Compilers, debuggers, interpreters, and development tools</td></tr><tr><td><code>e</code></td><td>GNU Emacs</td></tr><tr><td><code>f</code></td><td>FAQs, HOWTOs, and other documentation</td></tr><tr><td><code>k</code></td><td>Linux kernel source</td></tr><tr><td><code>kde</code></td><td>KDE Plasma and its applications</td></tr><tr><td><code>l</code></td><td>Shared libraries and supporting software</td></tr><tr><td><code>n</code></td><td>Networking programs and services</td></tr><tr><td><code>t</code></td><td>TeX typesetting software</td></tr><tr><td><code>tcl</code></td><td>Tcl, Tk, and related tools</td></tr><tr><td><code>x</code></td><td>X Window System</td></tr><tr><td><code>xap</code></td><td>Graphical applications outside a desktop series</td></tr><tr><td><code>xfce</code></td><td>Xfce desktop environment</td></tr><tr><td><code>y</code></td><td>Text-mode BSD games</td></tr></tbody></table></div></div><p>The series are categories rather than independently resolved dependency
+groups. For example, Slackware64 15.0 places Vim in <code>ap</code> and one of its shared
+libraries, libsodium, in <code>l</code>. Removing an entire series by category can
+therefore break programs retained from another series.</p><p>The Slackware64 15.0 HOWTO calculates about 16 GB for all series. A 32 GiB
+virtual disk leaves room for the installed system, package updates, logs, and
+working data. A full installation is the least error-prone choice when disk
+space is available.</p><h2 id=creating-the-virtual-machine>Creating the Virtual Machine
+<a href=#creating-the-virtual-machine class=heading-anchor><span>#</span></a></h2><p>Install QEMU and OVMF through the host package manager. OVMF package paths vary
+by distribution; locate the code and variable-store images before running the
+commands below. Copy the variable-store template because QEMU must write UEFI
+variables without modifying the packaged template.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>qemu-img create -f qcow2 slackware64-15.0.qcow2 32G
+</span></span><span style=display:flex><span>cp /usr/share/OVMF/OVMF_VARS.fd ./OVMF_VARS.fd
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>qemu-system-x86_64 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -machine q35 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -m 4G <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -smp <span style=color:#ae81ff>4</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -drive <span style=color:#66d9ef>if</span><span style=color:#f92672>=</span>pflash,format<span style=color:#f92672>=</span>raw,readonly<span style=color:#f92672>=</span>on,file<span style=color:#f92672>=</span>/usr/share/OVMF/OVMF_CODE.fd <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -drive <span style=color:#66d9ef>if</span><span style=color:#f92672>=</span>pflash,format<span style=color:#f92672>=</span>raw,file<span style=color:#f92672>=</span>OVMF_VARS.fd <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -drive file<span style=color:#f92672>=</span>slackware64-15.0.qcow2,format<span style=color:#f92672>=</span>qcow2,if<span style=color:#f92672>=</span>virtio <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -drive file<span style=color:#f92672>=</span>slackware64-15.0-install-dvd.iso,media<span style=color:#f92672>=</span>cdrom,readonly<span style=color:#f92672>=</span>on <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -nic user,model<span style=color:#f92672>=</span>virtio-net-pci <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -boot order<span style=color:#f92672>=</span>d</span></span></code></pre></div></div></div><p>The virtio disk appears as <code>/dev/vda</code>, and the virtual CD-ROM normally appears
+as <code>/dev/sr0</code>. Omitting both pflash drives starts QEMU with its default legacy
+BIOS instead; a BIOS installation uses LILO rather than ELILO.</p><h2 id=partitioning-the-virtual-disk>Partitioning the Virtual Disk
+<a href=#partitioning-the-virtual-disk class=heading-anchor><span>#</span></a></h2><p>Accept the default installer kernel, select a keyboard map if required, and log
+in as <code>root</code> without a password. Inspect the devices before changing the
+partition table:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>lsblk
+</span></span><span style=display:flex><span>cgdisk /dev/vda</span></span></code></pre></div></div></div><p>Create a GPT with these partitions:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Partition</th><th style=text-align:right>Size</th><th>GPT type</th><th>Purpose</th></tr></thead><tbody><tr><td><code>/dev/vda1</code></td><td style=text-align:right>512 MiB</td><td><code>EF00</code></td><td>EFI System Partition</td></tr><tr><td><code>/dev/vda2</code></td><td style=text-align:right>4 GiB</td><td><code>8200</code></td><td>Swap</td></tr><tr><td><code>/dev/vda3</code></td><td style=text-align:right>Remaining space</td><td><code>8300</code></td><td>Linux root filesystem</td></tr></tbody></table></div></div><p>Write the table and quit <code>cgdisk</code>. The installer formats the swap and root
+partitions later. Setup also detects the EFI System Partition, formats it as
+FAT when required, and mounts it at <code>/boot/efi</code>.</p><h2 id=running-setup>Running Setup
+<a href=#running-setup class=heading-anchor><span>#</span></a></h2><p>Start the installer:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>setup</span></span></code></pre></div></div></div><p>A standard installation follows the setup menu in this order:</p><ol><li><strong>KEYMAP</strong> is optional when the default US layout is suitable.</li><li><strong>ADDSWAP</strong> detects <code>/dev/vda2</code>, formats it as swap, activates it, and adds
+it to the future <code>/etc/fstab</code>.</li><li><strong>TARGET</strong> selects <code>/dev/vda3</code> as <code>/</code> and formats it. Ext4 is a suitable
+default for this virtual machine.</li><li><strong>SOURCE</strong> selects <strong>Install from a Slackware CD or DVD</strong> and scans for the
+media. The attached ISO should be detected as <code>/dev/sr0</code>.</li><li><strong>SELECT</strong> chooses package series. Retain <code>a</code>; choose all series for a full
+installation or remove only sets whose dependency consequences are known.</li><li><strong>INSTALL</strong> chooses a package-prompting mode and copies the selected
+packages.</li><li><strong>CONFIGURE</strong> installs the kernel and configures the boot loader, network,
+services, console, clock, time zone, and root password.</li></ol><p>The installation modes control prompting rather than dependency resolution:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Mode</th><th>Behavior</th></tr></thead><tbody><tr><td><code>full</code></td><td>Installs every package in each selected series</td></tr><tr><td><code>terse</code></td><td>Performs the same installation as <code>full</code> with one-line progress</td></tr><tr><td><code>menu</code> or <code>expert</code></td><td>Presents per-series package checklists</td></tr><tr><td><code>newbie</code></td><td>Prompts for each package not marked as required</td></tr><tr><td><code>custom</code> or <code>tagpath</code></td><td>Applies administrator-supplied tagfiles</td></tr></tbody></table></div></div><p><code>full</code> or <code>terse</code> avoids omissions caused by cross-series dependencies.
+Tagfiles are useful when reproducing the same package selection across
+multiple machines.</p><p>During package installation, <code>Alt+F2</code> opens another installer console.
+Commands such as <code>df -hT</code> can then monitor the target filesystem. <code>Alt+F1</code>
+returns to setup. The mounted installation tree can also be inspected from the
+second console, commonly below <code>/mnt/cdrom</code>.</p><h2 id=configuring-uefi-boot>Configuring UEFI Boot
+<a href=#configuring-uefi-boot class=heading-anchor><span>#</span></a></h2><p>Because the virtual machine booted the installer through OVMF, setup detects a
+UEFI installation. Skip LILO when prompted, install ELILO, and allow setup to
+create the Slackware firmware entry. ELILO places its files under
+<code>/boot/efi/EFI/Slackware</code>.</p><p>Finish the remaining configuration screens and set a root password. Exit
+setup, shut down the guest, remove the ISO drive from the QEMU command, and
+start the virtual machine with the disk first:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>qemu-system-x86_64 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -machine q35 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -m 4G <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -smp <span style=color:#ae81ff>4</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -drive <span style=color:#66d9ef>if</span><span style=color:#f92672>=</span>pflash,format<span style=color:#f92672>=</span>raw,readonly<span style=color:#f92672>=</span>on,file<span style=color:#f92672>=</span>/usr/share/OVMF/OVMF_CODE.fd <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -drive <span style=color:#66d9ef>if</span><span style=color:#f92672>=</span>pflash,format<span style=color:#f92672>=</span>raw,file<span style=color:#f92672>=</span>OVMF_VARS.fd <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -drive file<span style=color:#f92672>=</span>slackware64-15.0.qcow2,format<span style=color:#f92672>=</span>qcow2,if<span style=color:#f92672>=</span>virtio <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -nic user,model<span style=color:#f92672>=</span>virtio-net-pci <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -boot order<span style=color:#f92672>=</span>c</span></span></code></pre></div></div></div><p>After the first boot, select one repository in <code>/etc/slackpkg/mirrors</code> and
+apply stable-release patches:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>slackpkg update gpg
+</span></span><span style=display:flex><span>slackpkg update
+</span></span><span style=display:flex><span>slackpkg upgrade-all</span></span></code></pre></div></div></div><h2 id=post-installation-verification>Post-Installation Verification
+<a href=#post-installation-verification class=heading-anchor><span>#</span></a></h2><p>Create an unprivileged account with <code>adduser</code> and grant only the administrative
+group access required by local policy. Review enabled startup scripts with
+<code>ls -l /etc/rc.d/</code>; Slackware starts a service when its corresponding script is
+executable, so disable an unused service by removing execute permission rather
+than deleting the packaged file.</p><p>Verify the installed boot and network state before treating the disk image as a
+reusable base:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>findmnt /
+</span></span><span style=display:flex><span>swapon --show
+</span></span><span style=display:flex><span>ip address
+</span></span><span style=display:flex><span>ip route
+</span></span><span style=display:flex><span>efibootmgr --verbose
+</span></span><span style=display:flex><span>uname -a</span></span></code></pre></div></div></div><p><code>efibootmgr</code> requires access to UEFI variables and therefore reports useful data
+only when the guest booted through OVMF with a writable variable store. Shut down
+the guest cleanly before copying or snapshotting the qcow2 image.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/installing-slackware-in-qemu/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

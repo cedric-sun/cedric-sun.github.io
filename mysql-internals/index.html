@@ -1,0 +1,59 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MySQL InnoDB Internals</title></head><body><main><article><div class=article-header><h1>MySQL InnoDB Internals</h1><div class=aux>Last update: 2022-08-14 15:11:43 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/mysql/>Mysql</a>
+|
+<a href=/tags/innodb/>Innodb</a>
+|
+<a href=/tags/databases/>Databases</a></div></div><div class=article-content><p>InnoDB stores table data and indexes in pages organized into tablespaces. A
+tablespace has a fixed page size, selected when the data directory is
+initialized. The default page size is 16 KiB. Page-oriented I/O explains why
+index locality, buffer-pool capacity, and row width affect query cost.</p><h2 id=data-dictionary-and-metadata>Data Dictionary and Metadata
+<a href=#data-dictionary-and-metadata class=heading-anchor><span>#</span></a></h2><p>MySQL 8 stores the transactional data dictionary in InnoDB. Server metadata,
+including schemas, tables, columns, indexes, stored programs, and privileges,
+is therefore crash-safe and participates in atomic data-definition operations.
+Applications must use <code>INFORMATION_SCHEMA</code>, the Performance Schema, or <code>SHOW</code>
+statements to inspect metadata; internal dictionary tables are not an
+application interface.</p><p><code>INFORMATION_SCHEMA</code> exposes SQL views over metadata. The <code>sys</code> schema adds
+human-oriented views over Performance Schema and Information Schema data, such
+as expensive statements and unused indexes.</p><p>Data-definition operations update dictionary metadata and storage-engine state
+as one atomic DDL transaction when the operation supports atomic DDL. Dictionary
+records remain server internals; reading or modifying underlying InnoDB tables
+directly is unsupported.</p><h2 id=tablespaces>Tablespaces
+<a href=#tablespaces class=heading-anchor><span>#</span></a></h2><p>An InnoDB installation can use:</p><ul><li>The <strong>system tablespace</strong> for change-buffer data and other shared InnoDB
+structures.</li><li><strong>File-per-table tablespaces</strong>, which are created for InnoDB tables when
+<code>innodb_file_per_table</code> is enabled.</li><li><strong>General tablespaces</strong>, which an administrator creates and assigns to
+compatible tables.</li><li>Separate undo and temporary tablespaces managed by InnoDB.</li></ul><p>A table does not map safely to one operating-system file across all
+configurations. Backup and restore must use MySQL-aware tools or a documented
+physical-backup procedure because a consistent database spans data files, redo
+logs, and metadata.</p><h2 id=pages-extents-and-index-records>Pages, Extents, and Index Records
+<a href=#pages-extents-and-index-records class=heading-anchor><span>#</span></a></h2><p>A tablespace is divided into pages, and pages are grouped into extents. With the
+default 16 KiB page size, an extent contains 64 pages and occupies 1 MiB.
+InnoDB allocates small segments page by page before using whole extents as they
+grow.</p><p>Each table is organized around its clustered index. Clustered leaf pages contain
+row records, while internal pages contain separator keys and child-page
+pointers. Secondary-index leaf records contain secondary keys plus the primary
+key used to locate the clustered record. Undo pages retain older row versions
+needed by MVCC, and internal temporary tables can use the global temporary
+tablespace or session temporary tablespaces depending on their kind and release.</p><h2 id=doublewrite-buffer-and-recovery>Doublewrite Buffer and Recovery
+<a href=#doublewrite-buffer-and-recovery class=heading-anchor><span>#</span></a></h2><p>InnoDB writes dirty pages through the doublewrite mechanism before making the
+final tablespace write. A storage failure can otherwise leave a partially
+written page, called a torn page. During recovery, InnoDB can use the valid
+doublewrite copy when page checksums identify a torn final write.</p><p>Redo logging records changes before affected pages are flushed. During crash
+recovery, InnoDB replays required redo and rolls back incomplete transactions
+with undo records. Disabling durability settings changes acknowledged-write
+semantics and must be treated as a data-loss decision, not a performance-only
+tuning choice.</p><h2 id=inspection>Inspection
+<a href=#inspection class=heading-anchor><span>#</span></a></h2><p>Use supported schemas rather than file inspection:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> name, space_type
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> information_schema.innodb_tablespaces
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ORDER</span> <span style=color:#66d9ef>BY</span> name;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> pool_id, pool_size, free_buffers, database_pages
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> information_schema.innodb_buffer_pool_stats;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> event_name, count_star, sum_timer_wait
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> performance_schema.events_waits_summary_global_by_event_name
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> event_name <span style=color:#66d9ef>LIKE</span> <span style=color:#e6db74>&#39;wait/io/file/innodb/%&#39;</span>;</span></span></code></pre></div></div></div><p><code>INFORMATION_SCHEMA.INNODB_*</code> tables describe logical InnoDB objects and buffer
+state. Performance Schema attributes observed work and waits. Both interfaces
+change across releases, so operational queries must target the deployed MySQL
+version.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-architecture.html>InnoDB Architecture</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-tablespace.html>InnoDB Tablespaces</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-page-structure.html>InnoDB Page Structure</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mysql-internals/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

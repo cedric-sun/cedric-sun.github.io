@@ -1,0 +1,77 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring MVC</title></head><body><main><article><div class=article-header><h1>Spring MVC</h1><div class=aux>Last update: 2023-11-03 17:36:24 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spring/>Spring</a>
+|
+<a href=/tags/spring-mvc/>Spring-Mvc</a>
+|
+<a href=/tags/web/>Web</a></div></div><div class=article-content><p>Spring MVC is the Servlet-based web framework in Spring Framework. Its front
+controller, <code>DispatcherServlet</code>, coordinates request mapping, argument
+resolution, controller invocation, return-value handling, and exception
+translation. Spring WebFlux uses a different reactive runtime and threading
+model; the two frameworks must not be treated as interchangeable.</p><h2 id=bootstrap-and-dispatch>Bootstrap and Dispatch
+<a href=#bootstrap-and-dispatch class=heading-anchor><span>#</span></a></h2><p>A non-Boot Servlet application can register a web application context and
+dispatcher through <code>WebApplicationInitializer</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>WebInitializer</span> <span style=color:#66d9ef>implements</span> WebApplicationInitializer {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Override</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>onStartup</span>(ServletContext servletContext) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> context <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> AnnotationConfigWebApplicationContext();
+</span></span><span style=display:flex><span>        context.<span style=color:#a6e22e>register</span>(WebConfiguration.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> servlet <span style=color:#f92672>=</span> servletContext.<span style=color:#a6e22e>addServlet</span>(
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;mvc&#34;</span>, <span style=color:#66d9ef>new</span> DispatcherServlet(context));
+</span></span><span style=display:flex><span>        servlet.<span style=color:#a6e22e>setLoadOnStartup</span>(1);
+</span></span><span style=display:flex><span>        servlet.<span style=color:#a6e22e>addMapping</span>(<span style=color:#e6db74>&#34;/&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring Boot performs equivalent registration for an MVC application. Mapping
+the dispatcher to <code>/</code> lets the Servlet container retain special handling for
+static resources and JSPs; <code>/*</code> also captures those dispatches.</p><p>For each request, the dispatcher:</p><ol><li>asks ordered <code>HandlerMapping</code> implementations for a handler and interceptors;</li><li>selects a <code>HandlerAdapter</code> capable of invoking that handler;</li><li>invokes pre-handle interceptors and the handler;</li><li>processes the return value as a response body, view, async result, or another
+supported form; and</li><li>runs exception resolvers and completion interceptors.</li></ol><p>MVC strategy objects are beans in the dispatcher context. <code>@EnableWebMvc</code>
+imports the standard configuration for a plain Spring application. In Spring
+Boot, implement <code>WebMvcConfigurer</code> to extend Boot&rsquo;s configuration instead of
+adding <code>@EnableWebMvc</code>, which takes full control from auto-configuration.</p><h2 id=request-mapping-binding-and-validation>Request Mapping, Binding, and Validation
+<a href=#request-mapping-binding-and-validation class=heading-anchor><span>#</span></a></h2><p>Annotated controllers map by path, HTTP method, parameters, headers, consumed
+media types, and produced media types:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@PostMapping</span>(
+</span></span><span style=display:flex><span>    path <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;/orders&#34;</span>,
+</span></span><span style=display:flex><span>    consumes <span style=color:#f92672>=</span> MediaType.<span style=color:#a6e22e>APPLICATION_JSON_VALUE</span>,
+</span></span><span style=display:flex><span>    produces <span style=color:#f92672>=</span> MediaType.<span style=color:#a6e22e>APPLICATION_JSON_VALUE</span>)
+</span></span><span style=display:flex><span>ResponseEntity<span style=color:#f92672>&lt;</span>OrderView<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>create</span>(<span style=color:#a6e22e>@Valid</span> <span style=color:#a6e22e>@RequestBody</span> CreateOrder request) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> ResponseEntity.<span style=color:#a6e22e>status</span>(HttpStatus.<span style=color:#a6e22e>CREATED</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>body</span>(orderService.<span style=color:#a6e22e>create</span>(request));
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>HandlerMethodArgumentResolver</code> implementations supply path variables, query
+parameters, headers, cookies, principals, Servlet objects, model attributes,
+and request bodies. Simple textual values use conversion and formatting.
+<code>@ModelAttribute</code> binds named properties through <code>WebDataBinder</code>; define
+allowed fields or use a dedicated command type because binding is an input
+security boundary. <code>@RequestBody</code> instead delegates media decoding to an
+<code>HttpMessageConverter</code>.</p><p><code>@Valid</code> applies Jakarta Bean Validation, while <code>@Validated</code> can also select
+validation groups. For model-attribute binding, a <code>BindingResult</code> parameter
+immediately following the bound argument lets the controller inspect conversion
+and validation errors. Without local handling, MVC translates validation
+exceptions through its exception-resolution chain.</p><h2 id=return-values-and-content-negotiation>Return Values and Content Negotiation
+<a href=#return-values-and-content-negotiation class=heading-anchor><span>#</span></a></h2><p><code>HandlerMethodReturnValueHandler</code> implementations process values such as
+<code>ModelAndView</code>, view names, <code>ResponseEntity</code>, <code>ProblemDetail</code>, and objects
+annotated with <code>@ResponseBody</code>. Response-body values are encoded by an
+<code>HttpMessageConverter</code>.</p><p>Content negotiation compares the handler&rsquo;s <code>produces</code> conditions, the request&rsquo;s
+acceptable media types, and converter capabilities. A request body with an
+unsupported <code>Content-Type</code> produces 415; no acceptable response representation
+produces 406. Prefer the <code>Accept</code> header and explicit defaults over path-extension
+negotiation.</p><h2 id=exception-resolution>Exception Resolution
+<a href=#exception-resolution class=heading-anchor><span>#</span></a></h2><p><code>HandlerExceptionResolver</code> turns failures into a model, status, or response.
+The standard annotated configuration includes:</p><ul><li><code>ExceptionHandlerExceptionResolver</code> for controller and
+<code>@ControllerAdvice</code> exception methods;</li><li><code>ResponseStatusExceptionResolver</code> for <code>@ResponseStatus</code> and
+<code>ResponseStatusException</code>; and</li><li><code>DefaultHandlerExceptionResolver</code> for framework exceptions.</li></ul><p>Central advice should map domain failures to stable status codes and a
+consistent error schema. Spring Framework 6 introduced <code>ProblemDetail</code> and
+<code>ErrorResponse</code>; Spring 6.1 documentation describes their problem-details
+support in terms of RFC 9457, which superseded RFC 7807.</p><h2 id=threads-async-requests-and-context>Threads, Async Requests, and Context
+<a href=#threads-async-requests-and-context class=heading-anchor><span>#</span></a></h2><p>Synchronous MVC handling runs on a Servlet-container thread. Blocking database
+or HTTP calls retain that thread until completion, so configure deadlines and
+capacity from the connector through every downstream dependency.</p><p>A controller can return <code>Callable</code>, <code>DeferredResult</code>, or <code>WebAsyncTask</code>.
+MVC starts Servlet asynchronous processing, releases the container thread, and
+performs a later <code>ASYNC</code> dispatch when the result is ready. Async MVC does not
+make blocking code non-blocking; it moves work to another executor. Configure
+that executor, timeouts, cancellation, and overload behavior explicitly.</p><p>Thread-local logging, locale, security, and observation state do not
+automatically follow arbitrary executor tasks. Use supported interceptors or
+task decorators, or pass context explicitly, and always clear restored state.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-servlet.html>Spring MVC <code>DispatcherServlet</code></a></li><li><a href=https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller.html>Annotated controllers</a></li><li><a href=https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-async.html>Spring MVC asynchronous requests</a></li><li><a href=https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html>Spring MVC error responses</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-mvc/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

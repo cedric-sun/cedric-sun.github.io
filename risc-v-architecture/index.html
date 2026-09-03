@@ -1,0 +1,74 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>RISC-V Architecture Introduction</title></head><body><main><article><div class=article-header><h1>RISC-V Architecture Introduction</h1><div class=aux>Last update: 2023-01-29 16:47:11 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/risc-v/>Risc-V</a>
+|
+<a href=/tags/cpu/>Cpu</a>
+|
+<a href=/tags/computer-architecture/>Computer Architecture</a></div></div><div class=article-content><p>RISC-V is an open instruction set architecture organized as a base integer ISA
+plus separately versioned extensions. The ISA defines instruction behavior and
+privileged execution; a platform profile, ABI, and execution environment add the
+requirements needed to run interoperable software.</p><h2 id=base-integer-isa-and-register-convention>Base Integer ISA and Register Convention
+<a href=#base-integer-isa-and-register-convention class=heading-anchor><span>#</span></a></h2><p><code>RV32I</code> and <code>RV64I</code> provide 32-bit and 64-bit integer registers respectively.
+Both define thirty-two general-purpose registers, <code>x0</code> through <code>x31</code>. <code>x0</code>
+always reads as zero and discards writes. The program counter is
+architecturally visible through control-flow effects rather than as a
+general-purpose register.</p><p>RISC-V uses a load-store design. Integer arithmetic reads register operands and
+writes a register; loads and stores move values between registers and memory.
+The base ISA uses fixed 32-bit encodings. <code>RV64I</code> adds 64-bit registers and
+operations plus sign-extending <code>*W</code> operations on low 32-bit values; it is not
+only <code>RV32I</code> with wider addresses.</p><p>The standard integer calling convention assigns ABI names and roles:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Registers</th><th>ABI names</th><th>Role</th></tr></thead><tbody><tr><td><code>x0</code></td><td><code>zero</code></td><td>Constant zero</td></tr><tr><td><code>x1</code></td><td><code>ra</code></td><td>Return address</td></tr><tr><td><code>x2</code></td><td><code>sp</code></td><td>Stack pointer</td></tr><tr><td><code>x5</code>-<code>x7</code>, <code>x28</code>-<code>x31</code></td><td><code>t0</code>-<code>t6</code></td><td>Caller-saved temporaries</td></tr><tr><td><code>x8</code>-<code>x9</code>, <code>x18</code>-<code>x27</code></td><td><code>s0</code>-<code>s11</code></td><td>Callee-saved registers</td></tr><tr><td><code>x10</code>-<code>x17</code></td><td><code>a0</code>-<code>a7</code></td><td>Arguments and return values</td></tr></tbody></table></div></div><p>Floating-point and vector calling conventions add their own rules. Assembly
+that interoperates with compiled code must follow the complete psABI, including
+stack alignment, preserved state, relocations, and code models.</p><h2 id=extensions-isa-strings-and-profiles>Extensions, ISA Strings, and Profiles
+<a href=#extensions-isa-strings-and-profiles class=heading-anchor><span>#</span></a></h2><p>Single-letter standard extensions include <code>M</code> for integer multiply/divide, <code>A</code>
+for atomics, <code>F</code> and <code>D</code> for floating point, <code>C</code> for compressed instructions,
+and <code>V</code> for vectors. Multi-letter extensions cover narrower facilities and are
+separated by underscores where the ISA-string grammar requires it. Extension
+versions matter because ratification and later revisions can change the precise
+contract.</p><p>The historical <code>G</code> abbreviation denotes a general-purpose extension set
+centered on <code>IMAFD</code> plus required dependencies. A string such as <code>rv64gc</code> is
+convenient but does not communicate every platform facility, ABI, or privileged
+feature. Toolchains canonicalize extension order and expand dependencies; use
+their <code>-march</code> diagnostics rather than constructing ambiguous strings.</p><p>The <code>C</code> extension provides 16-bit encodings for frequent operations, improving
+code density. Compressed instructions execute with the semantics of their
+defined operations and can be interleaved with longer encodings. Instruction
+alignment and branch targets must honor the extensions implemented by the
+target.</p><p>A RISC-V <strong>profile</strong> selects a named set of mandatory and optional ISA features
+for a class of systems. An implementation can also expose custom extensions.
+Portable software should target a profile or explicit extension set supported
+by both the hardware and execution environment rather than assuming every
+<code>RV64</code> processor implements the same ISA.</p><h2 id=privilege-modes-csrs-and-traps>Privilege Modes, CSRs, and Traps
+<a href=#privilege-modes-csrs-and-traps class=heading-anchor><span>#</span></a></h2><p>The privileged architecture defines machine mode (M), supervisor mode (S), and
+user mode (U). M-mode is mandatory and controls the machine. S-mode supports
+operating systems and virtual memory, while U-mode supports applications.
+Optional virtualization adds hypervisor-controlled variants and two-stage
+translation.</p><p>Control and status registers (CSRs) hold trap state, interrupt enables, address
+translation controls, counters, and extension-specific state. CSR addresses
+encode access and privilege constraints. An instruction that lacks permission
+traps rather than silently accessing a more privileged register.</p><p>A trap records a cause, exception PC, and selected status, then transfers to the
+configured trap vector. Delegation registers can route selected traps from
+M-mode to S-mode. <code>ECALL</code> requests a service from the execution environment, and
+<code>MRET</code> or <code>SRET</code> performs a checked return from a privileged handler.</p><p>Supervisor software should not depend on vendor-specific M-mode firmware calls.
+The Supervisor Binary Interface (SBI) defines a portable interface for services
+such as timer programming, interprocessor interrupts, hart management, system
+reset, and firmware-assisted performance monitoring. SBI is an execution
+environment interface, not an instruction-set extension.</p><h2 id=virtual-memory-and-translation-fences>Virtual Memory and Translation Fences
+<a href=#virtual-memory-and-translation-fences class=heading-anchor><span>#</span></a></h2><p>S-mode translation schemes include Sv32 for RV32 and schemes such as Sv39,
+Sv48, and Sv57 for RV64. Page-table entries carry validity, read/write/execute,
+user, accessed, dirty, and other attributes. The active scheme and root are
+selected through <code>satp</code>.</p><p>Page-table writes do not automatically make all cached translations coherent.
+<code>SFENCE.VMA</code> orders relevant page-table updates and invalidates address-
+translation cache entries in its specified scope. Multiprocessor shootdown also
+requires coordination with remote harts, commonly through an SBI or
+platform-specific interprocessor-interrupt path.</p><h2 id=memory-ordering-fences-and-atomics>Memory Ordering, Fences, and Atomics
+<a href=#memory-ordering-fences-and-atomics class=heading-anchor><span>#</span></a></h2><p>The base RISC-V weak memory model allows observations that differ from program
+order when dependencies or synchronization do not forbid them. <code>FENCE</code> orders
+selected predecessor and successor classes, while <code>FENCE.I</code> coordinates data
+writes with later instruction fetches on the executing hart.</p><p>The <code>A</code> extension provides load-reserved/store-conditional operations and atomic
+memory operations. Acquire (<code>aq</code>) and release (<code>rl</code>) bits add ordering to an
+atomic operation; <code>aqrl</code> supplies both directions. Atomicity and ordering solve
+different problems: an indivisible counter update does not publish unrelated
+data unless the required ordering is also present.</p><p>Language-level atomics should be preferred in C, C++, and Rust because the
+compiler maps their memory model to an available RISC-V sequence. Hand-written
+assembly must account for the extension set, memory and I/O domains, reservation
+failure, and forward-progress rules.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.riscv.org/reference/isa/unpriv/unpriv-index.html>RISC-V Unprivileged ISA Specification</a></li><li><a href=https://docs.riscv.org/reference/isa/priv/priv-index.html>RISC-V Privileged Architecture Specification</a></li><li><a href=https://github.com/riscv-non-isa/riscv-elf-psabi-doc>RISC-V ABIs Specification</a></li><li><a href=https://github.com/riscv-non-isa/riscv-sbi-doc>RISC-V Supervisor Binary Interface Specification</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/risc-v-architecture/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

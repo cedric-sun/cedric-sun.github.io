@@ -1,0 +1,44 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java Generics</title></head><body><main><article><div class=article-header><h1>Java Generics</h1><div class=aux>Last update: 2025-02-02 05:23:41 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/generics/>Generics</a>
+|
+<a href=/tags/java/>Java</a></div></div><div class=article-content><p>Java generics provide compile-time type checking while preserving compatibility
+with pre-generics bytecode. The compiler erases type arguments, inserts casts
+where required, and may generate bridge methods to preserve overriding after
+erasure. Consequently <code>List&lt;String></code> and <code>List&lt;Integer></code> have the same runtime
+class, and generic type arguments cannot reliably be recovered from an object.</p><h2 id=invariance-and-bounds>Invariance and Bounds
+<a href=#invariance-and-bounds class=heading-anchor><span>#</span></a></h2><p>Generic classes are invariant: <code>List&lt;Integer></code> is not a <code>List&lt;Number></code>, because
+the latter would permit inserting a <code>Double</code>. Wildcards express variance at an
+API boundary.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>double</span> <span style=color:#a6e22e>sum</span>(List<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>extends</span> Number<span style=color:#f92672>&gt;</span> values) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> values.<span style=color:#a6e22e>stream</span>().<span style=color:#a6e22e>mapToDouble</span>(Number::doubleValue).<span style=color:#a6e22e>sum</span>();
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>addDefaults</span>(List<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>super</span> Integer<span style=color:#f92672>&gt;</span> destination) {
+</span></span><span style=display:flex><span>    destination.<span style=color:#a6e22e>add</span>(0);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Use <strong>extends</strong> for a producer from which callers read and <strong>super</strong> for a
+consumer into which callers write. A <code>List&lt;? extends Number></code> can produce
+<code>Number</code> values but accepts no non-null value; a <code>List&lt;? super Integer></code> accepts
+<code>Integer</code> values but produces only <code>Object</code>. “Read-only” and “write-only” are
+shortcuts, not capability rules: either list can still be queried, cleared, or
+receive <code>null</code> where the implementation permits it.</p><h2 id=capture-and-inference>Capture and Inference
+<a href=#capture-and-inference class=heading-anchor><span>#</span></a></h2><p>Each wildcard denotes an unknown captured type. A wildcard container cannot
+express that two independently wildcarded values have the same type, so use a
+generic helper when the relationship matters:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>reverse</span>(List<span style=color:#f92672>&lt;?&gt;</span> list) { reverseCaptured(list); }
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>reverseCaptured</span>(List<span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> list) {
+</span></span><span style=display:flex><span>    Collections.<span style=color:#a6e22e>reverse</span>(list);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Method inference combines argument constraints, target type, and declared
+bounds. The diamond operator infers type arguments for constructor calls; it
+does not make a raw type safe. Bounds can require capabilities:
+<code>&lt;T extends Comparable&lt;? super T>> T max(List&lt;? extends T> values)</code>.
+An intersection bound may include one class followed by interfaces.</p><h2 id=construction-under-erasure>Construction Under Erasure
+<a href=#construction-under-erasure class=heading-anchor><span>#</span></a></h2><p><code>new T()</code>, <code>new T[n]</code>, and <code>T.class</code> are illegal because erasure does not retain
+the constructor, component type, or class literal needed at runtime. Pass a
+factory instead:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> T <span style=color:#a6e22e>create</span>(Supplier<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>extends</span> T<span style=color:#f92672>&gt;</span> factory) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> factory.<span style=color:#a6e22e>get</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>For reflective integration, accept <code>Class&lt;T></code> and handle its checked reflective
+failures, but prefer <code>Supplier&lt;T></code> when callers own construction. Generic arrays
+remain restricted because arrays are reified and covariant while generic types
+are erased and invariant.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-4.html>JLS §4.5–§4.6, Parameterized Types and Erasure</a></li><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.10>JLS §5.1.10, Capture Conversion</a></li><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-18.html>JLS §18, Type Inference</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-generics/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

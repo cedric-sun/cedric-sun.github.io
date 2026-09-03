@@ -1,0 +1,433 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Model Context Protocol</title></head><body><main><article><div class=article-header><h1>Model Context Protocol</h1><div class=aux>Last update: 2022-03-25 05:36:01 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ai/>Ai</a>
+|
+<a href=/tags/agents/>Agents</a>
+|
+<a href=/tags/mcp/>Mcp</a>
+|
+<a href=/tags/protocol/>Protocol</a>
+|
+<a href=/tags/spring-ai/>Spring-Ai</a></div></div><div class=article-content><blockquote><p>MCP just say that: here is a jsonrpc-based schema, please follow this for the http request-response if the communication parties happened to be an LLM-using program (agent) and an arbitrary http server that is meant to provide arbitrary abilities.</p></blockquote><p><a href=https://modelcontextprotocol.io/>Model Context Protocol</a>, usually abbreviated as
+MCP, is an open protocol for connecting AI applications to tools and contextual
+data. It gives an AI host one consistent way to discover and invoke capabilities
+provided by local programs, remote services, databases, and other systems.</p><p>Without MCP, every integration tends to be custom. A chat application might use
+one proprietary plug-in format for GitHub, another adapter for a database, and
+special application code for a local file system. Each AI host and each external
+system must understand the other side&rsquo;s API. MCP puts a protocol between them:
+an MCP server publishes capabilities, and an MCP client consumes those
+capabilities on behalf of an AI application.</p><p>MCP does not replace the external system&rsquo;s API or business logic. An MCP server
+is normally an adapter over those existing components. For example, a shop may
+already have an <code>OrderService</code> used by REST controllers and batch jobs. An MCP
+server can expose selected methods of that same service as tools suitable for an
+AI client.</p><h2 id=the-problem-mcp-solves>The Problem MCP Solves
+<a href=#the-problem-mcp-solves class=heading-anchor><span>#</span></a></h2><p>Large language models can generate text, but useful applications often need
+information or actions outside the model:</p><ul><li>Read a document whose contents were not in the model&rsquo;s training data.</li><li>Query a database for the current state of an order.</li><li>Create an issue, send an email, or deploy an application.</li><li>Ask a user to approve a risky operation.</li><li>Use another model through the host application.</li></ul><p>An application can implement each integration with ordinary function calling,
+REST clients, and custom prompts. That works, but it couples the integration to
+one application and often to one model SDK. MCP standardizes discovery,
+schemas, invocation, results, notifications, and lifecycle management. An MCP
+server written for one conforming host can therefore be reused by other hosts.</p><p>The value is similar to a database driver or Language Server Protocol:
+standardization does not remove the underlying complexity, but it prevents
+every consumer and provider from inventing a different connection contract.</p><h2 id=architecture>Architecture
+<a href=#architecture class=heading-anchor><span>#</span></a></h2><p>MCP uses a host-client-server architecture.</p><p><strong>Host</strong></p><p>The host is the AI application the user interacts with, such as a desktop
+assistant, an IDE, or a Spring AI application. It controls model access,
+permissions, user consent, and the overall conversation. A host may connect to
+many MCP servers.</p><p><strong>Client</strong></p><p>An MCP client is the protocol participant inside the host. It maintains a
+connection to one server, negotiates capabilities, sends requests, and receives
+responses and notifications. A host normally creates a separate client for
+each server connection so that security boundaries and server state remain
+isolated.</p><p><strong>Server</strong></p><p>An MCP server publishes tools, resources, prompts, or other protocol
+capabilities. It may be a local subprocess connected through standard input and
+output, or a remote service reached over HTTP. The server can wrap a narrow
+utility, an existing REST application, or an entire business system, but it
+should expose a deliberately limited and well-descr ibed interface.</p><p>Consider an AI coding assistant connected to three MCP servers:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>                         +------------------+
+</span></span><span style=display:flex><span>                         |  Git MCP server  |
+</span></span><span style=display:flex><span>                         +------------------+
+</span></span><span style=display:flex><span>                                  ^
+</span></span><span style=display:flex><span>                                  | MCP
+</span></span><span style=display:flex><span>+--------+     +-------------+    |
+</span></span><span style=display:flex><span>|  User  | --&gt; | Host + LLM  | ---+----&gt; Database MCP server
+</span></span><span style=display:flex><span>+--------+     +-------------+    |
+</span></span><span style=display:flex><span>                                  | MCP
+</span></span><span style=display:flex><span>                                  v
+</span></span><span style=display:flex><span>                         +------------------+
+</span></span><span style=display:flex><span>                         | Docs MCP server  |
+</span></span><span style=display:flex><span>                         +------------------+</span></span></code></pre></div></div></div><p>The model does not open arbitrary network connections to these servers. The
+host decides which MCP capabilities to present to the model, sends protocol
+requests when appropriate, and can require user approval before a call.</p><h2 id=protocol-lifecycle>Protocol Lifecycle
+<a href=#protocol-lifecycle class=heading-anchor><span>#</span></a></h2><p>MCP messages use <a href=https://www.jsonrpc.org/specification>JSON-RPC 2.0</a>.
+Requests expect responses, notifications do not, and errors use JSON-RPC error
+objects. MCP adds a lifecycle and typed methods on top of this message format.</p><p>A stateful connection normally proceeds as follows:</p><ol><li>The client sends <code>initialize</code> with the MCP version it supports, client
+information, and client capabilities.</li><li>The server chooses a mutually supported protocol version and returns its
+server information and capabilities.</li><li>The client sends an <code>initialized</code> notification.</li><li>The two parties exchange normal MCP requests and notifications.</li><li>The transport is closed when the session ends.</li></ol><p>This negotiation matters because MCP is extensible. A server must not assume
+that every client supports sampling, elicitation, or list-change notifications.
+Likewise, a client should call only the server features advertised during
+initialization.</p><p>MCP is stateful by default: initialization establishes a logical session and
+both sides can send requests during that session. Streamable HTTP also defines
+stateless operation for servers that do not need server-to-client requests,
+server-initiated notifications, or session state. Stateless mode is useful for
+simple horizontally scaled tool servers, but it is a constrained deployment
+choice rather than a description of MCP as a whole.</p><h2 id=server-capabilities>Server Capabilities
+<a href=#server-capabilities class=heading-anchor><span>#</span></a></h2><h3 id=tools>Tools
+<a href=#tools class=heading-anchor><span>#</span></a></h3><p>A tool is an operation the model can ask the host to invoke. The server
+publishes a name, description, JSON input schema, and optionally an output
+schema. Examples include:</p><ul><li><code>get_order</code> for a read-only lookup.</li><li><code>cancel_order</code> for a state-changing operation.</li><li><code>search_knowledge_base</code> for retrieval.</li><li><code>run_test_suite</code> for a long-running task.</li></ul><p>The client discovers tools with <code>tools/list</code> and invokes one with <code>tools/call</code>.
+Servers can notify clients when the available list changes.</p><p>Tool descriptions and schemas are part of the application&rsquo;s control plane.
+They should state important preconditions and effects, use unambiguous
+parameter names, and validate every argument. Tool annotations can provide
+hints such as whether a tool is read-only, destructive, idempotent, or
+open-world. These are hints for clients, not security controls; the server must
+still authenticate, authorize, and validate every call.</p><h3 id=resources>Resources
+<a href=#resources class=heading-anchor><span>#</span></a></h3><p>A resource is data that a server makes readable through a URI. Resources are
+appropriate for contextual information rather than actions:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>order://12345
+</span></span><span style=display:flex><span>config://shipping-policy
+</span></span><span style=display:flex><span>repo://acme/payments/README.md</span></span></code></pre></div></div></div><p>The server may publish concrete resources and URI templates. Clients can list
+resources, read their contents, and, when supported, subscribe to updates.
+Resources can contain text or binary data and declare a MIME type.</p><p>The distinction between a resource and a tool is primarily semantic. Reading a
+known document is naturally a resource; performing a search with several
+parameters is usually a tool. A server need not turn every underlying REST
+<code>GET</code> endpoint into a resource.</p><h3 id=prompts>Prompts
+<a href=#prompts class=heading-anchor><span>#</span></a></h3><p>A prompt is a reusable, server-provided interaction template. A server can
+publish a prompt such as <code>investigate_failed_order</code> that accepts an order ID
+and returns one or more messages instructing the model how to perform the
+investigation.</p><p>Prompts help a domain owner package a recommended workflow near its tools and
+resources. They are generally user-selectable templates, whereas tools are
+operations the model may choose during inference.</p><h2 id=client-capabilities>Client Capabilities
+<a href=#client-capabilities class=heading-anchor><span>#</span></a></h2><p>MCP is bidirectional. A server may use capabilities offered by the client, but
+only after negotiation.</p><p><strong>Sampling</strong> allows a server to request a model completion through the client.
+The host remains in control of model selection, permissions, and user consent.
+This lets a server use an LLM without owning model credentials, although hosts
+should guard against recursive or unexpectedly expensive call chains.</p><p><strong>Elicitation</strong> allows a server to ask the user for additional structured
+information. For example, a deployment tool may request a target environment
+or confirmation that downtime is acceptable. Sensitive values should not be
+requested unless the host and protocol flow are designed to handle them
+safely.</p><p><strong>Roots</strong> let a client tell a server which file-system roots or other URI roots
+are in scope. They help a local server understand the intended workspace, but
+they do not replace operating-system sandboxing or file permissions.</p><p>Clients may also handle server logging messages, progress notifications, and
+notifications that capability lists changed.</p><p>The specification also defines experimental <strong>Tasks</strong> for work that cannot
+finish within one request. A task has durable status that can be polled and may
+eventually produce a result. Because Tasks are experimental, implementations
+must negotiate support and should expect the API to evolve.</p><h2 id=transports>Transports
+<a href=#transports class=heading-anchor><span>#</span></a></h2><p>MCP separates protocol messages from their transport. The two standard
+transports are <code>stdio</code> and Streamable HTTP.</p><h3 id=standard-input-and-output>Standard Input and Output
+<a href=#standard-input-and-output class=heading-anchor><span>#</span></a></h3><p>With <code>stdio</code>, the client launches the MCP server as a subprocess. The client
+writes JSON-RPC messages to the process&rsquo;s standard input, and the server writes
+responses and notifications to standard output.</p><p>This transport is a good fit for local tools because it requires no listening
+port and the subprocess naturally shares the user&rsquo;s machine and file-system
+permissions. The launch configuration supplies the executable, arguments, and
+environment variables.</p><p>Standard output is reserved for MCP protocol traffic. A server that writes
+ordinary log lines to standard output corrupts the message stream, so it must
+write logs to standard error instead.</p><h3 id=streamable-http>Streamable HTTP
+<a href=#streamable-http class=heading-anchor><span>#</span></a></h3><p>Streamable HTTP is designed for remote or independently deployed servers. A
+server exposes one MCP endpoint that accepts HTTP <code>POST</code>; it may also accept
+<code>GET</code> to open a Server-Sent Events stream. A response may be a single JSON
+message or an SSE stream, depending on the request and negotiated behavior.
+Sessions can be associated with an <code>Mcp-Session-Id</code>.</p><p>Streamable HTTP replaces the older HTTP+SSE transport. New applications should
+prefer Streamable HTTP unless interoperability with an older client requires
+the deprecated transport.</p><p>Because the endpoint can receive requests from browsers and local networks, a
+server must validate the HTTP <code>Origin</code> header to mitigate DNS rebinding. A
+remote server should use TLS, authenticate every protected request, validate
+that tokens were issued for it, and avoid accepting credentials intended for
+an upstream API.</p><h2 id=mcp-rest-and-a2a>MCP, REST, and A2A
+<a href=#mcp-rest-and-a2a class=heading-anchor><span>#</span></a></h2><p>MCP and REST operate at different layers. REST is an application interface
+between HTTP services. MCP is an AI integration protocol that adds capability
+discovery, JSON schemas, prompts, model-oriented tool results, negotiation, and
+bidirectional interactions.</p><p>An MCP server often calls REST APIs internally, or it can be hosted inside the
+same Spring Boot application as existing REST controllers. MCP should not
+replace a stable REST API used by mobile applications, web front ends, or
+service-to-service integrations. Instead, it presents a curated AI-facing
+surface over the same business logic.</p><p><a href=/a2a-protocol/>Agent2Agent (A2A)</a> addresses a different boundary. MCP connects
+an AI application to tools and resources; A2A connects independent agents that
+have their own goals, identity, conversation state, and potentially long-lived
+tasks. An order agent might use MCP to query an order database while using A2A
+to delegate fraud review to a separate fraud agent.</p><h2 id=using-mcp-in-a-spring-boot-rest-application>Using MCP in a Spring Boot REST Application
+<a href=#using-mcp-in-a-spring-boot-rest-application class=heading-anchor><span>#</span></a></h2><p>Spring AI provides MCP client and server starters. The following example adds a
+Streamable HTTP MCP endpoint to an existing Spring MVC order application. It
+uses Spring AI 2.0 APIs.</p><h3 id=add-the-server-starter>Add the Server Starter
+<a href=#add-the-server-starter class=heading-anchor><span>#</span></a></h3><p>Import the Spring AI bill of materials and add the WebMVC MCP server starter:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.ai<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;artifactId&gt;</span>spring-ai-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;version&gt;</span>2.0.0<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.ai<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;artifactId&gt;</span>spring-ai-starter-mcp-server-webmvc<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p>The WebMVC starter is appropriate when the application already uses
+<code>spring-boot-starter-web</code>. Spring AI also provides WebFlux and WebMVC-less
+server variants for other deployment models.</p><p>Configure the server:</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>spring</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>ai</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>mcp</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>server</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>name</span>: <span style=color:#ae81ff>order-service</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>version</span>: <span style=color:#ae81ff>1.0.0</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>protocol</span>: <span style=color:#ae81ff>STREAMABLE</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>type</span>: <span style=color:#ae81ff>SYNC</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>streamable-http</span>:
+</span></span><span style=display:flex><span>          <span style=color:#f92672>mcp-endpoint</span>: <span style=color:#ae81ff>/mcp</span></span></span></code></pre></div></div></div><p><code>STREAMABLE</code> selects Streamable HTTP, and <code>/mcp</code> is the default endpoint.
+<code>SYNC</code>, also the default, registers synchronous annotated methods. An <code>ASYNC</code>
+server registers asynchronous methods instead; it does not automatically turn
+blocking service calls into nonblocking work.</p><p>Although <code>/mcp</code> uses HTTP, it is not an ordinary REST endpoint. An MCP client
+must initialize the protocol and send MCP JSON-RPC messages rather than making
+application-specific <code>GET</code> and <code>POST</code> requests.</p><h3 id=share-the-application-service>Share the Application Service
+<a href=#share-the-application-service class=heading-anchor><span>#</span></a></h3><p>Keep transport adapters thin. Both the REST controller and MCP provider should
+delegate to the same application service:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>record</span> <span style=color:#a6e22e>OrderView</span>(
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>long</span> id, String customerName, String status, BigDecimal total) {
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>record</span> <span style=color:#a6e22e>CancelOrderCommand</span>(<span style=color:#66d9ef>long</span> orderId, String reason) {
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Service</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderService</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderRepository orders;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>OrderService</span>(OrderRepository orders) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>orders</span> <span style=color:#f92672>=</span> orders;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Transactional</span>(readOnly <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderView <span style=color:#a6e22e>find</span>(<span style=color:#66d9ef>long</span> id) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>findViewById</span>(id)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>orElseThrow</span>(() <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> OrderNotFoundException(id));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Transactional</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderView <span style=color:#a6e22e>cancel</span>(CancelOrderCommand command) {
+</span></span><span style=display:flex><span>        Order order <span style=color:#f92672>=</span> orders.<span style=color:#a6e22e>findById</span>(command.<span style=color:#a6e22e>orderId</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>orElseThrow</span>(() <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> OrderNotFoundException(command.<span style=color:#a6e22e>orderId</span>()));
+</span></span><span style=display:flex><span>        order.<span style=color:#a6e22e>cancel</span>(command.<span style=color:#a6e22e>reason</span>());
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> order.<span style=color:#a6e22e>toView</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The existing REST adapter remains conventional:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@RestController</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RequestMapping</span>(<span style=color:#e6db74>&#34;/api/orders&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderController</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderService orders;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>OrderController</span>(OrderService orders) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>orders</span> <span style=color:#f92672>=</span> orders;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@GetMapping</span>(<span style=color:#e6db74>&#34;/{id}&#34;</span>)
+</span></span><span style=display:flex><span>    OrderView <span style=color:#a6e22e>get</span>(<span style=color:#a6e22e>@PathVariable</span> <span style=color:#66d9ef>long</span> id) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>find</span>(id);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@PostMapping</span>(<span style=color:#e6db74>&#34;/{id}/cancellation&#34;</span>)
+</span></span><span style=display:flex><span>    OrderView <span style=color:#a6e22e>cancel</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@PathVariable</span> <span style=color:#66d9ef>long</span> id,
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@RequestBody</span> CancelOrderRequest request) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>cancel</span>(<span style=color:#66d9ef>new</span> CancelOrderCommand(id, request.<span style=color:#a6e22e>reason</span>()));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Do not make the MCP method call this controller over HTTP. That introduces
+serialization, routing, and authentication overhead inside one process and
+makes business behavior depend on a transport adapter. Sharing
+<code>OrderService</code> keeps validation and transaction boundaries consistent.</p><h3 id=publish-tools>Publish Tools
+<a href=#publish-tools class=heading-anchor><span>#</span></a></h3><p>Spring AI scans Spring beans for MCP annotations by default:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderMcpTools</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderService orders;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>OrderMcpTools</span>(OrderService orders) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>orders</span> <span style=color:#f92672>=</span> orders;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@McpTool</span>(
+</span></span><span style=display:flex><span>            name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;get_order&#34;</span>,
+</span></span><span style=display:flex><span>            description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Get the current details of an order by its numeric ID&#34;</span>,
+</span></span><span style=display:flex><span>            generateOutputSchema <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>            annotations <span style=color:#f92672>=</span> <span style=color:#a6e22e>@McpTool.McpAnnotations</span>(
+</span></span><span style=display:flex><span>                    readOnlyHint <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>                    destructiveHint <span style=color:#f92672>=</span> <span style=color:#66d9ef>false</span>,
+</span></span><span style=display:flex><span>                    idempotentHint <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>                    openWorldHint <span style=color:#f92672>=</span> <span style=color:#66d9ef>false</span>))
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderView <span style=color:#a6e22e>getOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@McpToolParam</span>(
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Numeric order ID&#34;</span>,
+</span></span><span style=display:flex><span>                    required <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>long</span> orderId) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>find</span>(orderId);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@McpTool</span>(
+</span></span><span style=display:flex><span>            name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;cancel_order&#34;</span>,
+</span></span><span style=display:flex><span>            description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Cancel an order that has not shipped&#34;</span>,
+</span></span><span style=display:flex><span>            generateOutputSchema <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>            annotations <span style=color:#f92672>=</span> <span style=color:#a6e22e>@McpTool.McpAnnotations</span>(
+</span></span><span style=display:flex><span>                    destructiveHint <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>                    idempotentHint <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>                    openWorldHint <span style=color:#f92672>=</span> <span style=color:#66d9ef>false</span>))
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderView <span style=color:#a6e22e>cancelOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@McpToolParam</span>(description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Numeric order ID&#34;</span>, required <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>long</span> orderId,
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@McpToolParam</span>(
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Business reason for cancellation&#34;</span>,
+</span></span><span style=display:flex><span>                    required <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>            String reason) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>cancel</span>(<span style=color:#66d9ef>new</span> CancelOrderCommand(orderId, reason));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The names and descriptions are visible to the model, so they should explain
+behavior rather than mirror Java implementation details. The generated input
+schema describes the annotated parameters, while <code>generateOutputSchema</code>
+describes the returned record.</p><p>A destructive hint can help a host decide to ask for confirmation, but it does
+not enforce confirmation. The host and server must implement their own
+approval and authorization policy.</p><h3 id=publish-a-resource-and-prompt>Publish a Resource and Prompt
+<a href=#publish-a-resource-and-prompt class=heading-anchor><span>#</span></a></h3><p>The same server can expose order data as a URI-addressable resource:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderMcpResources</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderService orders;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> ObjectMapper objectMapper;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>OrderMcpResources</span>(
+</span></span><span style=display:flex><span>            OrderService orders,
+</span></span><span style=display:flex><span>            ObjectMapper objectMapper) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>orders</span> <span style=color:#f92672>=</span> orders;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>objectMapper</span> <span style=color:#f92672>=</span> objectMapper;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@McpResource</span>(
+</span></span><span style=display:flex><span>            uri <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;order://{id}&#34;</span>,
+</span></span><span style=display:flex><span>            name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Order&#34;</span>,
+</span></span><span style=display:flex><span>            description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Current order details&#34;</span>,
+</span></span><span style=display:flex><span>            mimeType <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;application/json&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> String <span style=color:#a6e22e>order</span>(String id) <span style=color:#66d9ef>throws</span> JsonProcessingException {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> objectMapper.<span style=color:#a6e22e>writeValueAsString</span>(
+</span></span><span style=display:flex><span>                orders.<span style=color:#a6e22e>find</span>(Long.<span style=color:#a6e22e>parseLong</span>(id)));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>A prompt can package the domain&rsquo;s preferred investigation procedure:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderMcpPrompts</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@McpPrompt</span>(
+</span></span><span style=display:flex><span>            name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;investigate_order&#34;</span>,
+</span></span><span style=display:flex><span>            description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Investigate why an order has not progressed&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> GetPromptResult <span style=color:#a6e22e>investigate</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@McpArg</span>(
+</span></span><span style=display:flex><span>                    name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;orderId&#34;</span>,
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Numeric order ID&#34;</span>,
+</span></span><span style=display:flex><span>                    required <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>            String orderId) {
+</span></span><span style=display:flex><span>        String text <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                Investigate order %s. Read its current details, identify the
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                blocking state, and explain the safest next action. Do not
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                cancel or modify the order without explicit user approval.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                &#34;&#34;&#34;</span>.<span style=color:#a6e22e>formatted</span>(orderId);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> GetPromptResult.<span style=color:#a6e22e>builder</span>(List.<span style=color:#a6e22e>of</span>(<span style=color:#66d9ef>new</span> PromptMessage(
+</span></span><span style=display:flex><span>                        Role.<span style=color:#a6e22e>USER</span>,
+</span></span><span style=display:flex><span>                        TextContent.<span style=color:#a6e22e>builder</span>(text).<span style=color:#a6e22e>build</span>())))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>description</span>(<span style=color:#e6db74>&#34;Order investigation workflow&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Tools, resources, and prompts are complementary. A client can read the order
+resource, invoke <code>get_order</code>, or start from the investigation prompt according
+to its user experience.</p><h3 id=secure-the-mcp-endpoint>Secure the MCP Endpoint
+<a href=#secure-the-mcp-endpoint class=heading-anchor><span>#</span></a></h3><p>Treat MCP as a privileged application API, not as a harmless chat feature. A
+tool call can carry model-generated input and may mutate production data.</p><p>At minimum:</p><ul><li>Use TLS for remote servers.</li><li>Authenticate the MCP client and authorize each capability.</li><li>Apply the same tenant and row-level authorization used by REST endpoints.</li><li>Derive user and tenant identity from trusted authentication context, never
+from a model-supplied tool argument.</li><li>Validate inputs in the application service.</li><li>Require approval for destructive or high-impact actions.</li><li>Rate-limit expensive operations and record security audit events.</li><li>Return only the fields the model needs; do not expose whole entities by
+convenience.</li></ul><p>For an internal resource server using bearer tokens, the existing Spring
+Security policy can protect <code>/mcp</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>SecurityFilterChain <span style=color:#a6e22e>securityFilterChain</span>(HttpSecurity http) <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> http
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>csrf</span>(csrf <span style=color:#f92672>-&gt;</span> csrf.<span style=color:#a6e22e>ignoringRequestMatchers</span>(<span style=color:#e6db74>&#34;/mcp&#34;</span>))
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>authorizeHttpRequests</span>(auth <span style=color:#f92672>-&gt;</span> auth
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>requestMatchers</span>(<span style=color:#e6db74>&#34;/mcp&#34;</span>)
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>hasAuthority</span>(<span style=color:#e6db74>&#34;SCOPE_mcp.invoke&#34;</span>)
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>requestMatchers</span>(<span style=color:#e6db74>&#34;/api/orders/**&#34;</span>)
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>hasAuthority</span>(<span style=color:#e6db74>&#34;SCOPE_orders&#34;</span>)
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>anyRequest</span>().<span style=color:#a6e22e>authenticated</span>())
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>oauth2ResourceServer</span>(oauth2 <span style=color:#f92672>-&gt;</span> oauth2.<span style=color:#a6e22e>jwt</span>())
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Ignoring CSRF is appropriate here only because <code>/mcp</code> uses bearer
+authentication rather than browser cookies. If the application authenticates
+with cookies, keep CSRF protection and design the client flow accordingly.</p><p>MCP&rsquo;s HTTP authorization specification includes OAuth metadata discovery and
+resource indicators in addition to token validation. A generic resource-server
+configuration protects the endpoint but does not by itself implement every
+part of that MCP authorization flow. Confirm the capabilities of the Spring AI
+version and identity provider before claiming standards-compliant public MCP
+authorization.</p><h2 id=consuming-an-mcp-server-with-spring-ai>Consuming an MCP Server with Spring AI
+<a href=#consuming-an-mcp-server-with-spring-ai class=heading-anchor><span>#</span></a></h2><p>A Spring AI application can also be an MCP client. For production Streamable
+HTTP connections, use the WebFlux client starter:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.ai<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>spring-ai-starter-mcp-client-webflux<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>Configure one or more named servers:</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>spring</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>ai</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>mcp</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>client</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>type</span>: <span style=color:#ae81ff>SYNC</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>request-timeout</span>: <span style=color:#ae81ff>20s</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>streamable-http</span>:
+</span></span><span style=display:flex><span>          <span style=color:#f92672>connections</span>:
+</span></span><span style=display:flex><span>            <span style=color:#f92672>orders</span>:
+</span></span><span style=display:flex><span>              <span style=color:#f92672>url</span>: <span style=color:#ae81ff>https://orders.example.com</span>
+</span></span><span style=display:flex><span>              <span style=color:#f92672>endpoint</span>: <span style=color:#ae81ff>/mcp</span></span></span></code></pre></div></div></div><p>The starter initializes an MCP client for each connection and, by default,
+adapts discovered MCP tools to Spring AI <code>ToolCallback</code> objects. They can be
+given to a <code>ChatClient</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@RestController</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RequestMapping</span>(<span style=color:#e6db74>&#34;/assistant&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>AssistantController</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> ChatClient chatClient;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>AssistantController</span>(
+</span></span><span style=display:flex><span>            ChatClient.<span style=color:#a6e22e>Builder</span> builder,
+</span></span><span style=display:flex><span>            SyncMcpToolCallbackProvider mcpTools) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>chatClient</span> <span style=color:#f92672>=</span> builder
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>defaultTools</span>(mcpTools)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@PostMapping</span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>assist</span>(<span style=color:#a6e22e>@RequestBody</span> AssistantRequest request) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>user</span>(request.<span style=color:#a6e22e>message</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>content</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The flow for a question such as “Why is order 123 blocked?” is:</p><ol><li>The client discovers <code>get_order</code> and gives its schema to the chat model.</li><li>The model emits a tool call with <code>orderId</code> set to <code>123</code>.</li><li>Spring AI sends <code>tools/call</code> to the order MCP server.</li><li>The server invokes <code>OrderService</code> and returns structured content.</li><li>Spring AI gives the tool result to the model.</li><li>The model writes the final answer.</li></ol><p>The model chooses when to request a tool, but application code executes the
+call and controls which tools are available. In a high-risk application, do
+not register every discovered tool as a default. Filter tools by user,
+conversation, and operation, and put an approval step between model intent and
+destructive execution.</p><p>For local subprocess servers, use
+<code>spring-ai-starter-mcp-client</code> and configure
+<code>spring.ai.mcp.client.stdio.connections</code>. The command, arguments, and
+environment form the subprocess launch configuration. Keep credentials out of
+source control and remember that the subprocess receives the operating-system
+permissions of the user running the host.</p><h2 id=design-guidelines>Design Guidelines
+<a href=#design-guidelines class=heading-anchor><span>#</span></a></h2><p>An effective MCP server is not merely an automatic wrapper around every
+controller method.</p><p><strong>Expose use cases, not tables.</strong> <code>prepare_refund_quote</code> is safer and easier for
+a model to use than unrestricted CRUD over payment rows.</p><p><strong>Keep tools narrow.</strong> A tool should have one understandable effect and a
+bounded result. Very broad “execute request” tools defeat schema validation and
+permission controls.</p><p><strong>Make effects explicit.</strong> Put read, write, external communication, and
+irreversibility in descriptions and annotations. Use separate tools for
+preview and commit when possible.</p><p><strong>Prefer structured results.</strong> Stable records with generated output schemas are
+easier for clients to validate and for models to interpret than prose assembled
+inside the server.</p><p><strong>Design for retries.</strong> Networks fail and models may retry. Use idempotency keys
+for state-changing operations where duplicate execution would be harmful.</p><p><strong>Bound context.</strong> Paginate lists, truncate large documents deliberately, and
+offer focused retrieval. Sending an entire database result into a model is
+expensive and increases the chance of disclosing unrelated data.</p><p><strong>Treat all content as untrusted.</strong> Tool output and resources may contain
+prompt-injection text. The host should keep data separate from trusted
+instructions and should not let retrieved content expand its own permissions.</p><p><strong>Observe both protocol and domain behavior.</strong> Record request IDs, tool names,
+latency, result size, authenticated identity, and outcome, but redact prompts,
+arguments, and results when they may contain secrets or personal data.</p><h2 id=further-reading>Further Reading
+<a href=#further-reading class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://modelcontextprotocol.io/docs/>MCP documentation</a></li><li><a href=https://modelcontextprotocol.io/specification/>MCP specification</a></li><li><a href=https://docs.spring.io/spring-ai/reference/api/mcp/>Spring AI MCP documentation</a></li><li><a href=/spring-ai/>Spring AI</a></li><li><a href=/a2a-protocol/>Agent2Agent Protocol</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mcp/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

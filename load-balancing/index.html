@@ -1,0 +1,60 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Load Balancing</title></head><body><main><article><div class=article-header><h1>Load Balancing</h1><div class=aux>Last update: 2022-07-21 00:23:46 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/load-balancing/>Load-Balancing</a>
+|
+<a href=/tags/networking/>Networking</a></div></div><div class=article-content><p>Load balancing maps demand to healthy capacity while preserving transport and
+application semantics. Placement, health, retry, and overload policy form one
+system: an algorithm cannot recover capacity that health checks misclassify or
+retries consume.</p><h2 id=placement-layers>Placement Layers
+<a href=#placement-layers class=heading-anchor><span>#</span></a></h2><ul><li><strong>DNS placement</strong> returns regional or service addresses. Resolver and client
+caching makes changes coarse-grained, so DNS cannot drain individual
+connections or react to per-request load.</li><li><strong>Anycast placement</strong> advertises the same address from several sites and lets
+routing select a path. Route changes can move flows, and the nearest network
+path is not necessarily the site with spare application capacity.</li><li><strong>Transport load balancing</strong> selects a backend from TCP, UDP, or QUIC flow
+metadata without interpreting the application request. Direct server return
+and connection tracking affect topology and failure behavior.</li><li><strong>Reverse proxies</strong> terminate an application protocol and can route HTTP by
+authority, path, headers, method, or cookies. Termination enables retries and
+observability but consumes proxy capacity and creates another failure domain.</li><li><strong>Application placement</strong> assigns work using domain state, such as tenant,
+shard ownership, queue partition, or accelerator availability. The
+application must then handle ownership changes and stale routing metadata.</li></ul><p>Large systems combine layers: DNS or anycast chooses a site, an L4 load balancer
+chooses a proxy, and the proxy chooses a workload.</p><h2 id=selection-algorithms>Selection Algorithms
+<a href=#selection-algorithms class=heading-anchor><span>#</span></a></h2><p>Round robin fits endpoints with similar capacity and request cost. Weighted
+round robin reflects known capacity differences. Least-connections uses active
+connection count as a load signal, but long-lived idle connections and
+multiplexed HTTP/2 or HTTP/3 streams can make one connection an inaccurate unit.
+Least-request or latency-aware variants need stable measurements and damping to
+avoid sending every request toward a temporarily fast endpoint.</p><p>Hashing by a stable key provides affinity. Consistent or rendezvous hashing
+reduces remapping when membership changes, but it can concentrate a hot key and
+does not eliminate failover. Locality-aware algorithms prefer the same zone or
+region to reduce latency and transfer cost while retaining spillover capacity
+for a local shortage.</p><h2 id=health-outliers-and-draining>Health, Outliers, and Draining
+<a href=#health-outliers-and-draining class=heading-anchor><span>#</span></a></h2><p>An active health check sends synthetic probes. A passive check observes real
+connection errors, resets, timeouts, or status codes. Readiness should verify the
+dependency boundary needed to serve traffic without turning every transient
+downstream failure into fleet-wide removal.</p><p>Use consecutive-success and consecutive-failure thresholds to avoid flapping.
+Outlier detection temporarily ejects an endpoint whose observed behavior
+differs from peers; bound the ejected percentage so one shared dependency
+failure does not remove the entire service.</p><p>Draining removes an endpoint from new selection while allowing established
+requests or connections to finish within a deadline. Coordinate load-balancer
+drain time, application shutdown hooks, orchestration readiness, and the
+protocol&rsquo;s keep-alive behavior.</p><h2 id=affinity-retries-and-failover>Affinity, Retries, and Failover
+<a href=#affinity-retries-and-failover class=heading-anchor><span>#</span></a></h2><p>Cookie, source-address, or hash affinity can improve cache locality or retain
+legacy session state. Affinity reduces balancing freedom and must define what
+happens when the selected backend disappears. Prefer external or replicated
+session state when requests need transparent failover.</p><p>A timeout means the caller did not receive a result; it does not prove the
+backend performed no work. Retry only within the caller&rsquo;s deadline and a bounded
+retry budget. Safe and idempotent operations are candidates; non-idempotent
+operations require an application idempotency key and durable deduplication.
+Spread retries with backoff and jitter, and avoid retrying overload responses
+onto an already saturated peer set.</p><p>Cross-zone or cross-region failover needs reserved capacity, compatible data,
+and an explicit consistency model. A routing switch alone cannot make a remote
+site ready to accept writes.</p><h2 id=capacity-and-overload>Capacity and Overload
+<a href=#capacity-and-overload class=heading-anchor><span>#</span></a></h2><p>Endpoint count is not capacity. Track concurrent requests, queue depth,
+utilization of the constrained resource, latency percentiles, errors, and
+admission rejections. Autoscaling reacts after measurement and provisioning
+delay, so preserve headroom for bursts and failures.</p><p>When demand exceeds capacity, bound queues, shed lower-priority work, enforce
+per-tenant limits, and return a clear retry signal where the protocol supports
+one. Backpressure should reach callers before memory or connection pools are
+exhausted. Load-balancer metrics must distinguish no healthy endpoint, local
+proxy saturation, backend overload, and policy rejection because each requires
+a different response.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc9110>RFC 9110: HTTP Semantics</a></li><li><a href=https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/overview>Envoy Load Balancing</a></li><li><a href=https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/#terminating>Kubernetes Endpoint Termination</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/load-balancing/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

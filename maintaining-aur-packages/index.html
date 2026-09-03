@@ -1,0 +1,51 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Maintaining AUR Packages</title></head><body><main><article><div class=article-header><h1>Maintaining AUR Packages</h1><div class=aux>Last update: 2022-10-05 15:39:56 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/arch-linux/>Arch-Linux</a>
+|
+<a href=/tags/aur/>Aur</a>
+|
+<a href=/tags/packages/>Packages</a></div></div><div class=article-content><p>The Arch User Repository stores Git repositories containing package recipes,
+not built packages. Maintaining an AUR package therefore means publishing a
+reviewable <code>PKGBUILD</code> and matching <code>.SRCINFO</code>, then validating that recipe in
+an isolated build environment.</p><h2 id=model-the-package-correctly>Model the Package Correctly
+<a href=#model-the-package-correctly class=heading-anchor><span>#</span></a></h2><p>A <code>PKGBUILD</code> defines metadata such as <code>pkgname</code>, <code>pkgver</code>, <code>pkgrel</code>, <code>arch</code>,
+license, sources, checksums, and dependency arrays. Its functions separate
+stages:</p><ul><li><code>prepare()</code> applies patches or prepares sources.</li><li><code>build()</code> compiles or generates software.</li><li><code>check()</code> runs tests and requires <code>checkdepends</code>.</li><li><code>package()</code> installs only below <code>$pkgdir</code>.</li></ul><p>Use <code>$srcdir</code> for sources and build state; never write into the host filesystem
+from a package function. State runtime dependencies in <code>depends</code>, build-only
+tools in <code>makedepends</code>, and test-only packages in <code>checkdepends</code>. Missing
+declarations can remain hidden on a developer workstation and fail for users.</p><p>Review every source URL, patch, and shell expression because <code>makepkg</code> executes
+the recipe with the invoking user&rsquo;s privileges. Pin release packages to
+immutable upstream artifacts and use checksums. When upstream publishes signed
+releases, verify signatures through <code>validpgpkeys</code>; a checksum detects changed
+bytes but does not establish source trust.</p><h2 id=build-and-inspect-in-a-clean-chroot>Build and Inspect in a Clean Chroot
+<a href=#build-and-inspect-in-a-clean-chroot class=heading-anchor><span>#</span></a></h2><p>Do not run <code>makepkg</code> as root. Build in a clean chroot so host dependencies,
+configuration, and stale build artifacts cannot make an incomplete recipe pass.
+With <code>devtools</code> configured:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>extra-x86_64-build</span></span></code></pre></div></div></div><p>For a local iteration outside the chroot, begin from a clean source tree and
+allow makepkg to resolve repository dependencies:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>makepkg --cleanbuild --syncdeps</span></span></code></pre></div></div></div><p><code>--syncdeps</code> calls pacman, so it cannot retrieve AUR dependencies. Review and
+build those dependencies first, then provide their verified packages through a
+local repository or the chroot workflow.</p><p>Inspect the package payload and apply static checks before installation:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>bsdtar -tf ./*.pkg.tar.zst
+</span></span><span style=display:flex><span>namcap PKGBUILD ./*.pkg.tar.zst</span></span></code></pre></div></div></div><p><code>namcap</code> reports heuristics, not proof. Test installation, upgrade, removal,
+runtime dependencies, services, and desktop integration in a disposable
+environment.</p><h2 id=update-versions-and-vcs-packages>Update Versions and VCS Packages
+<a href=#update-versions-and-vcs-packages class=heading-anchor><span>#</span></a></h2><p>For a release update, change <code>pkgver</code>, reset <code>pkgrel</code> when appropriate, update
+sources and checksums after reviewing them, and rebuild. Do not use
+<code>--skipinteg</code> to make a changed source pass.</p><p>A VCS package conventionally uses a suffix such as <code>-git</code> and a <code>pkgver()</code>
+function derived from repository history. Its source must resolve to a
+reproducible revision during one build. Avoid converting a release package into
+a moving branch: users need versioned, reviewable source inputs and predictable
+upgrade behavior.</p><p>Compare repeated clean-chroot builds where practical. Differences in output
+can expose timestamps, locale, build paths, or undeclared inputs that prevent
+reproducibility.</p><h2 id=publish-matching-aur-metadata>Publish Matching AUR Metadata
+<a href=#publish-matching-aur-metadata class=heading-anchor><span>#</span></a></h2><p>Generate <code>.SRCINFO</code> from the current <code>PKGBUILD</code>; do not hand-edit it. Commit
+only tracked AUR packaging files and inspect the staged diff before pushing:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>makepkg --printsrcinfo &gt; .SRCINFO
+</span></span><span style=display:flex><span>git add PKGBUILD .SRCINFO
+</span></span><span style=display:flex><span>git diff --cached
+</span></span><span style=display:flex><span>git commit
+</span></span><span style=display:flex><span>git push</span></span></code></pre></div></div></div><p>Update <code>.SRCINFO</code> for every metadata change, including dependencies, sources,
+and split packages. Respond to reports with reproducible evidence, state
+breaking changes in commit messages or package comments, and avoid pushing
+unreviewed user patches. AUR orphaning and deletion are repository maintenance
+procedures; they do not make a package part of an official Arch repository.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/maintaining-aur-packages/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

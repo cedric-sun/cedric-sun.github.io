@@ -1,0 +1,79 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>x86 and x86-64 Architecture Overview</title></head><body><main><article><div class=article-header><h1>x86 and x86-64 Architecture Overview</h1><div class=aux>Last update: 2021-10-30 22:12:19 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/x86/>X86</a>
+|
+<a href=/tags/x86-64/>X86-64</a>
+|
+<a href=/tags/cpu/>Cpu</a>
+|
+<a href=/tags/computer-architecture/>Computer Architecture</a></div></div><div class=article-content><p>x86 began with Intel&rsquo;s 16-bit 8086. The 80286 introduced protected mode, IA-32
+established the 32-bit programming model and paging, and AMD64 extended the
+architecture to 64-bit execution. Intel calls the combined architecture Intel
+64 and IA-32; AMD documentation uses AMD64. Vendor names do not determine every
+feature, so software must discover extensions explicitly.</p><h2 id=byte-order-and-operand-sizes>Byte Order and Operand Sizes
+<a href=#byte-order-and-operand-sizes class=heading-anchor><span>#</span></a></h2><p>x86 addresses memory in bytes and stores multibyte integers in little-endian
+order: the least-significant byte occupies the lowest address. For the 32-bit
+value <code>0x12345678</code> beginning at address <code>p</code>, memory contains:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>address    p     p+1   p+2   p+3
+</span></span><span style=display:flex><span>byte       78    56    34    12</span></span></code></pre></div></div></div><p>Architectural terminology names a 16-bit value a <strong>word</strong>, a 32-bit value a
+<strong>doubleword</strong>, a 64-bit value a <strong>quadword</strong>, and a 128-bit value a
+<strong>double quadword</strong>. Those names are independent of a C implementation&rsquo;s type
+sizes.</p><p>Instruction operand size depends on execution mode, prefixes, opcode, and REX,
+VEX, or EVEX fields. In 64-bit mode, many integer instructions still default to
+32-bit operands; a <code>REX.W</code> encoding selects 64 bits where supported. Address
+size is a separate attribute and controls effective-address calculation.</p><p>Ordinary integer loads and stores permit unaligned addresses, but crossing a
+cache-line or page boundary can increase latency or fault behavior. Atomicity
+guarantees depend on alignment, width, memory type, and instruction, so shared
+data should satisfy the architecture&rsquo;s explicit requirements.</p><h2 id=execution-modes>Execution Modes
+<a href=#execution-modes class=heading-anchor><span>#</span></a></h2><p>After reset, an x86 processor starts in real-address mode. Firmware establishes
+the tables and control registers required for later modes.</p><ul><li><strong>Real-address mode</strong> uses the 8086-style segment model without protected-mode
+privilege enforcement.</li><li><strong>Protected mode</strong> supports 16- or 32-bit code and data segments, descriptor
+checks, four privilege levels, and optional paging.</li><li><strong>Virtual-8086 mode</strong> runs real-mode-style 8086 software as a protected-mode
+task under operating-system control.</li><li><strong>Long mode</strong> contains 64-bit mode and compatibility mode. Compatibility mode
+executes protected 16- or 32-bit code under a 64-bit operating system.</li><li><strong>System-management mode</strong> is a separate firmware environment entered by a
+system-management interrupt rather than an application execution mode.</li></ul><p>In 64-bit mode, ordinary address generation treats <code>CS</code>, <code>DS</code>, <code>ES</code>, and <code>SS</code>
+bases as zero and does not enforce their legacy limits. <code>FS</code> and <code>GS</code> retain
+usable bases, commonly for thread-local and per-CPU state. Descriptor types and
+privilege checks remain relevant even though flat addressing removes most
+segment arithmetic.</p><h2 id=logical-linear-virtual-and-physical-addresses>Logical, Linear, Virtual, and Physical Addresses
+<a href=#logical-linear-virtual-and-physical-addresses class=heading-anchor><span>#</span></a></h2><p>Intel terminology calls a segment selector plus offset a <strong>logical address</strong>.
+Segmentation validates the access and adds the segment base, producing a
+<strong>linear address</strong>. When paging is disabled, the linear address maps directly
+to a physical address subject to architectural width and platform behavior.
+When paging is enabled, page tables translate the linear address to a
+<strong>physical address</strong>.</p><p>Operating-system documentation often calls a process-visible linear address a
+<strong>virtual address</strong>. Thus &ldquo;linear&rdquo; and &ldquo;virtual&rdquo; can refer to the same numeric
+address at the paging boundary, but they emphasize different models. A guest
+under virtualization can add another translation from guest physical to host
+physical memory.</p><p>An instruction forms an effective offset from base and index registers, a scale,
+and a displacement. In 64-bit mode, a linear address must be canonical for the
+enabled address width. A noncanonical address faults before ordinary paging
+translation. Page tables then apply present, writable, user/supervisor,
+execute-disable, and other permissions.</p><h2 id=exceptions-interrupts-and-control-transfer>Exceptions, Interrupts, and Control Transfer
+<a href=#exceptions-interrupts-and-control-transfer class=heading-anchor><span>#</span></a></h2><p>The interrupt descriptor table maps vectors to gates. Processor-detected
+exceptions, software interrupt instructions, and external interrupts use those
+vectors, although interrupt-controller routing is platform-specific.</p><p>Exceptions are conventionally grouped as:</p><ul><li>A <strong>fault</strong> reports before architectural completion and can often restart the
+instruction after correction, as with a page-not-present fault.</li><li>A <strong>trap</strong> reports after the triggering instruction, as with a breakpoint.</li><li>An <strong>abort</strong> reports a condition for which reliable restart is not generally
+available.</li></ul><p>The vector determines whether the processor pushes an error code and what saved
+state is available. A privilege-changing gate also switches stacks according to
+the task-state segment. Return uses <code>IRET</code> or a system-call-specific return
+instruction after software validates the destination state.</p><p>Near branches change the instruction pointer within the current code segment.
+Far transfers and gates can load a new code segment and perform additional
+checks. <code>SYSCALL</code>/<code>SYSRET</code> and <code>SYSENTER</code>/<code>SYSEXIT</code> provide faster configured
+paths, but their register convention belongs to an operating-system ABI.</p><h2 id=extension-and-operating-system-discovery>Extension and Operating-System Discovery
+<a href=#extension-and-operating-system-discovery class=heading-anchor><span>#</span></a></h2><p><code>CPUID</code> reports vendor identification, topology information, address widths,
+cache parameters, and feature bits through numbered leaves and subleaves.
+Software must first determine the maximum supported leaf and then test every
+feature it intends to use. A family or model number can select an optimization
+after correctness has been established through feature bits.</p><p>Some features require operating-system management in addition to processor
+support. For AVX-family state, software checks <code>CPUID</code> for XSAVE and OSXSAVE,
+then uses <code>XGETBV</code> to confirm that the operating system enabled the required
+<code>XCR0</code> components. AVX-512 and newer state can require additional bits. Similar
+principles apply to supervisor features, where a user-visible CPUID bit does not
+grant privilege.</p><p>Feature use must also account for ABI and deployment policy. A compiler&rsquo;s
+baseline target can differ from the machine running the build, so portable
+binaries use a conservative baseline, function multiversioning, or runtime
+dispatch.</p><p>Related articles cover <a href=/x86-instruction-encoding/>instruction encoding</a>,
+<a href=/x86-instructions/>instruction families</a>, <a href=/x86-registers/>registers</a>,
+<a href=/x86-memory/>memory organization</a>, and
+<a href=/x86-protected-mode/>protected-mode privilege</a>.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html>Intel 64 and IA-32 Architectures Software Developer Manuals</a></li><li><a href="https://www.amd.com/en/search/documentation/hub.html#sortCriteria=%40amd_release_date%20descending&amp;f-amd_archive_status=Active&amp;f-amd_document_type=Programmer%20Reference">AMD64 Architecture Programmer&rsquo;s Manual</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/x86-overview/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

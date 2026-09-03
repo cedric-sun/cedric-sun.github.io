@@ -1,0 +1,79 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Virtual File Systems</title></head><body><main><article><div class=article-header><h1>Virtual File Systems</h1><div class=aux>Last update: 2021-04-17 01:39:12 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/filesystems/>Filesystems</a>
+|
+<a href=/tags/kernel/>Kernel</a>
+|
+<a href=/tags/linux/>Linux</a></div></div><div class=article-content><p>Linux uses filesystem interfaces for both stored data and live kernel state. The
+Virtual Filesystem Switch (VFS) makes those objects accessible through common system
+calls, while pseudo-filesystems such as procfs and sysfs generate their contents from
+kernel objects. Similar path syntax does not give a pseudo-file the persistence or
+I/O semantics of a disk file.</p><h2 id=vfs-as-a-kernel-abstraction>VFS as a Kernel Abstraction
+<a href=#vfs-as-a-kernel-abstraction class=heading-anchor><span>#</span></a></h2><p>The VFS is the kernel layer behind operations such as <code>open</code>, <code>read</code>, <code>write</code>,
+<code>stat</code>, and <code>mount</code>. It represents mounted filesystems through common object types:</p><ul><li>a <strong>superblock</strong> represents a filesystem instance, while a mount attaches that
+instance at a location in one mount namespace;</li><li>an <strong>inode</strong> represents an object and its metadata;</li><li>a <strong>dentry</strong> associates a name with an inode and participates in pathname lookup;</li><li>a <strong>file</strong> represents an open instance and its current position;</li><li>an <strong>address space</strong> connects cacheable file contents to the page cache.</li></ul><p>Filesystem implementations provide operation tables for relevant objects. ext4 can
+map reads to persistent blocks, NFS can issue network requests, and procfs can format
+a kernel structure. Callers still receive file descriptors and use the same system-
+call boundary.</p><p>“Virtual filesystem” is therefore ambiguous. <strong>VFS</strong> names the abstraction layer;
+a <strong>pseudo-filesystem</strong> is one filesystem implementation whose objects do not
+correspond to durable files on a storage volume. tmpfs is also memory-backed, but it
+provides ordinary mutable file semantics and distinct data per mount. procfs and
+sysfs expose purpose-built kernel interfaces instead.</p><h2 id=procfs-process-and-system-views>Procfs Process and System Views
+<a href=#procfs-process-and-system-views class=heading-anchor><span>#</span></a></h2><p>Procfs is conventionally mounted at <code>/proc</code>. Numeric directories expose processes,
+while nonnumeric entries expose system-wide state and control interfaces:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>/proc/1234/status      formatted state for process 1234
+</span></span><span style=display:flex><span>/proc/1234/fd/         links for its open file descriptors
+</span></span><span style=display:flex><span>/proc/self/            the reading process&#39;s own proc directory
+</span></span><span style=display:flex><span>/proc/meminfo          memory-accounting snapshot
+</span></span><span style=display:flex><span>/proc/sys/             sysctl parameters</span></span></code></pre></div></div></div><p>Files under <code>/proc/&lt;pid></code> are checked against process credentials, ptrace access
+rules, capabilities, mount options, and security modules. A pathname being readable
+by root in one context does not make it public to an unprivileged process.</p><h3 id=instances-pid-namespaces-and-mount-namespaces>Instances, PID Namespaces, and Mount Namespaces
+<a href=#instances-pid-namespaces-and-mount-namespaces class=heading-anchor><span>#</span></a></h3><p>Procfs output is namespace-sensitive. A procfs mount associated with a PID namespace
+shows tasks visible in that namespace; <code>/proc/self</code> and <code>/proc/thread-self</code> also
+resolve relative to the caller. A process creating or entering another PID namespace
+must use an appropriate procfs mount to obtain a matching process view.</p><p>Mount namespaces independently control where and whether that procfs instance is
+mounted. Containers can consequently have different <code>/proc</code> mount points, read-only
+settings, and visibility options while sharing the same kernel. Options such as
+<code>hidepid</code> restrict access to other users&rsquo; process directories, and <code>subset=pid</code> can
+hide top-level entries unrelated to tasks on supporting kernels.</p><p>Procfs should not be modeled as one global directory tree cached by pathname. The
+same path can resolve to different information for different callers, namespaces,
+credentials, or moments in time. Open descriptors to a dead process do not become
+handles to a later process that reuses the same PID.</p><h2 id=sysfs-and-the-driver-object-model>Sysfs and the Driver Object Model
+<a href=#sysfs-and-the-driver-object-model class=heading-anchor><span>#</span></a></h2><p>Sysfs, conventionally mounted at <code>/sys</code>, exports the kernel&rsquo;s object model. A
+registered <code>kobject</code> receives a directory beneath its parent, so directory hierarchy
+expresses object relationships and controls lifetime. The Linux device model builds
+devices, drivers, buses, and classes on that infrastructure:</p><ul><li><code>/sys/devices</code> presents devices in their physical or firmware-discovered topology.</li><li><code>/sys/bus/&lt;bus>/devices</code> links to devices participating in a bus.</li><li><code>/sys/bus/&lt;bus>/drivers</code> presents registered drivers and their bindings.</li><li><code>/sys/class/&lt;class></code> groups devices by function, such as network or block devices.</li></ul><p>Many entries outside <code>/sys/devices</code> are symbolic-link views of the same underlying
+device object. Scripts should resolve documented attributes rather than infer
+physical topology from a convenient class path.</p><p>A sysfs <strong>attribute</strong> connects a small file to subsystem-defined <code>show</code> and <code>store</code>
+callbacks. The core allocates a page-sized buffer and asks <code>show</code> to render a value
+or passes one write buffer to <code>store</code>. Attributes should contain one ASCII value, or
+an array of values of the same type, because simple text forms are inspectable and
+avoid embedding an ad hoc structured protocol. Binary attributes exist for data that
+cannot follow that convention and have separate callbacks.</p><h2 id=treat-text-files-as-abi-endpoints>Treat Text Files as ABI Endpoints
+<a href=#treat-text-files-as-abi-endpoints class=heading-anchor><span>#</span></a></h2><p>Text does not mean informal. A documented procfs or sysfs file is a userspace ABI
+with file-specific syntax:</p><ul><li>Read the complete value and parse only forms promised by its ABI documentation.</li><li>Include the expected newline when writing conventional text attributes.</li><li>Do not depend on undocumented whitespace, column positions, directory ordering,
+or the presence of testing-only interfaces.</li><li>Check write errors and short writes; a successful <code>open</code> does not imply that a
+proposed value is accepted.</li></ul><p>Mode bits and file permissions are only one access-control layer. Capability checks,
+ownership, namespaces, lockdown policy, and Linux Security Modules can reject an operation.
+World-writable sysfs attributes are intentionally discouraged because a write often
+changes live device or driver state.</p><p>The kernel&rsquo;s <code>Documentation/ABI</code> tree classifies interfaces as <code>stable</code>, <code>testing</code>,
+<code>obsolete</code>, or <code>removed</code>. Software tied to a testing attribute accepts a different
+compatibility commitment from software using a stable one. Feature detection should
+check for a documented path and handle <code>ENOENT</code>; kernel version comparisons cannot
+account for vendor backports and configuration choices.</p><h2 id=reads-are-snapshots-not-transactions>Reads Are Snapshots, Not Transactions
+<a href=#reads-are-snapshots-not-transactions class=heading-anchor><span>#</span></a></h2><p>Many pseudo-files are generated when read. Kernel state can change between opening,
+reading, and parsing a file, or between reads of two related files. Even one large
+procfs report may summarize fields observed at slightly different times. Rewinding a
+sysfs attribute to offset zero can invoke its <code>show</code> callback again and return a new
+value.</p><p>Consequently, multiple reads do not provide an atomic system snapshot unless the
+specific ABI promises one. Robust consumers should:</p><ol><li>use one read operation or read loop for a small attribute;</li><li>tolerate processes and devices disappearing with <code>ENOENT</code>, <code>ENODEV</code>, or related
+errors;</li><li>validate identifiers again when acting on previously read state;</li><li>use a dedicated transactional API when consistency across objects is required.</li></ol><p>Some sysfs attributes support <code>poll</code>/<code>select</code> notification when their subsystem calls
+the sysfs notification mechanism. Such notification is opt-in per attribute, not a
+property of every file under <code>/sys</code>. Consumers generally reopen or seek to offset
+zero and reread after an event. Procfs entries likewise have file-specific polling
+semantics.</p><h2 id=pseudo-files-are-not-persistent-storage>Pseudo-Files Are Not Persistent Storage
+<a href=#pseudo-files-are-not-persistent-storage class=heading-anchor><span>#</span></a></h2><p>Several ordinary-file assumptions fail for procfs and sysfs:</p><ul><li>reported size can be zero even though <code>read</code> returns data;</li><li><code>mmap</code>, arbitrary seeks, append mode, or partial writes may be unsupported;</li><li>directory entries can appear and disappear as processes and devices change;</li><li>a successful write can trigger hardware activity rather than store retrievable
+bytes;</li><li>data vanishes on shutdown and is reconstructed from the next kernel&rsquo;s state.</li></ul><p>Configuration that must survive reboot belongs in a persistent configuration system
+whose startup logic deliberately writes the required kernel interfaces. Copying
+<code>/proc</code> or <code>/sys</code> cannot back up kernel state, and restoring copied files cannot
+recreate processes or devices.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.kernel.org/filesystems/vfs.html>Linux kernel VFS documentation</a></li><li><a href=https://docs.kernel.org/filesystems/proc.html>Linux kernel procfs documentation</a></li><li><a href=https://docs.kernel.org/filesystems/sysfs.html>Linux kernel sysfs documentation</a></li><li><a href=https://docs.kernel.org/admin-guide/abi.html>Linux kernel userspace ABI documentation</a></li><li><a href=https://man7.org/linux/man-pages/man5/proc.5.html><code>proc(5)</code> manual</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/virtual-file-systems/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

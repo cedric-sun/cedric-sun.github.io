@@ -1,0 +1,66 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring Thread Pools</title></head><body><main><article><div class=article-header><h1>Spring Thread Pools</h1><div class=aux>Last update: 2023-01-02 16:27:18 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/concurrency/>Concurrency</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spring/>Spring</a></div></div><div class=article-content><p>Spring&rsquo;s <code>TaskExecutor</code> abstracts task submission. The common
+<code>ThreadPoolTaskExecutor</code> is a managed JavaBean wrapper around
+<code>ThreadPoolExecutor</code>; its pool, queue, rejection, and lifecycle choices still
+determine system capacity.</p><h2 id=defining-and-naming-an-executor>Defining and Naming an Executor
+<a href=#defining-and-naming-an-executor class=heading-anchor><span>#</span></a></h2><p>Name executors by workload so callers select the intended resource:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Bean</span>(<span style=color:#e6db74>&#34;reportExecutor&#34;</span>)
+</span></span><span style=display:flex><span>ThreadPoolTaskExecutor <span style=color:#a6e22e>reportExecutor</span>() {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>var</span> executor <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ThreadPoolTaskExecutor();
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setCorePoolSize</span>(8);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setMaxPoolSize</span>(24);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setQueueCapacity</span>(100);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setKeepAliveSeconds</span>(30);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setThreadNamePrefix</span>(<span style=color:#e6db74>&#34;report-&#34;</span>);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setRejectedExecutionHandler</span>(
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> ThreadPoolExecutor.<span style=color:#a6e22e>CallerRunsPolicy</span>());
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> executor;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring initializes and shuts down a <code>ThreadPoolTaskExecutor</code> as a managed bean.
+Returning its concrete type preserves lifecycle configuration and monitoring
+methods. Separate executors isolate workloads with different latency,
+blocking, priority, or downstream-capacity requirements.</p><h2 id=pool-queue-and-saturation-behavior>Pool, Queue, and Saturation Behavior
+<a href=#pool-queue-and-saturation-behavior class=heading-anchor><span>#</span></a></h2><p>The underlying executor follows a specific admission sequence:</p><ol><li>Create workers until <code>corePoolSize</code> is reached.</li><li>Queue new tasks while the work queue accepts them.</li><li>Create workers up to <code>maxPoolSize</code> only after the queue refuses an item.</li><li>Apply the rejection policy when both pool and queue are saturated.</li></ol><p>An unbounded queue therefore prevents growth beyond the core size and converts
+overload into growing latency and memory use. A bounded queue makes overload
+observable. <code>AbortPolicy</code> rejects with an exception, <code>CallerRunsPolicy</code> applies
+backpressure by running on the submitting thread, and discard policies lose
+work and require an explicit product decision.</p><p>Core/max size, queue capacity, and keepalive must follow measured task service
+time, blocking ratio, arrival bursts, and downstream limits. A larger pool
+cannot increase a database&rsquo;s connection capacity.</p><h2 id=async-selection-and-failures><code>@Async</code> Selection and Failures
+<a href=#async-selection-and-failures class=heading-anchor><span>#</span></a></h2><p>Enable method interception with <code>@EnableAsync</code>. Select a named executor where
+the application has more than one:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Async</span>(<span style=color:#e6db74>&#34;reportExecutor&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> CompletableFuture<span style=color:#f92672>&lt;</span>Report<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>render</span>(ReportRequest request) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> CompletableFuture.<span style=color:#a6e22e>completedFuture</span>(renderer.<span style=color:#a6e22e>render</span>(request));
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Without an annotation qualifier, the infrastructure looks for a unique
+<code>TaskExecutor</code> or an <code>Executor</code> bean named <code>taskExecutor</code>; <code>AsyncConfigurer</code>
+can provide an explicit default. Proxy-based <code>@Async</code> has the same
+self-invocation constraint as other Spring AOP advice.</p><p>Failures from <code>Future</code> or <code>CompletableFuture</code> methods are observed through that
+result. A <code>void</code> async method has no result channel, so configure an
+<code>AsyncUncaughtExceptionHandler</code>; logging alone is not a delivery or retry
+guarantee.</p><h2 id=context-propagation>Context Propagation
+<a href=#context-propagation class=heading-anchor><span>#</span></a></h2><p>Executor tasks run on another thread. Thread-local MDC, security, locale, and
+observation context do not transfer automatically. A <code>TaskDecorator</code> can
+capture selected state when a task is submitted, restore it around execution,
+and clear it in <code>finally</code>. Copy only required context because stale or secret
+state leaking to a reused worker is a correctness and security defect.</p><h2 id=graceful-shutdown>Graceful Shutdown
+<a href=#graceful-shutdown class=heading-anchor><span>#</span></a></h2><p>Shutdown policy must match task semantics. Configure whether the executor waits
+for queued work and set a finite await-termination period. During service
+shutdown, first stop accepting new requests, then let accepted work finish
+within the deadline, and finally cancel or persist unfinished work. In-memory
+executor queues are not durable.</p><h2 id=spring-boot-and-virtual-threads>Spring Boot and Virtual Threads
+<a href=#spring-boot-and-virtual-threads class=heading-anchor><span>#</span></a></h2><p>Spring Boot 3.2 and later can use Java 21 virtual threads for its
+auto-configured async executor with:</p><div class=jose-wrapper><div class=jose-tools><span>properties</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-properties data-lang=properties><span style=display:flex><span><span style=color:#a6e22e>spring.threads.virtual.enabled</span><span style=color:#f92672>=</span><span style=color:#e6db74>true</span></span></span></code></pre></div></div></div><p>Virtual threads reduce the cost of one blocking thread per task, but they do not
+bound concurrent calls to databases, HTTP services, or other scarce resources.
+Use semaphores, connection pools, or workload admission limits for that purpose.
+Many pool-sizing properties do not apply when Boot selects a per-task
+virtual-thread executor.</p><p>On JDK 21 through 23, blocking while holding a monitor or in some native code
+can pin a virtual thread to its carrier. JDK 24&rsquo;s JEP 491 removes monitor-based
+pinning, but native and foreign-function boundaries still require measurement.
+Use Java Flight Recorder and thread dumps to diagnose the JDK version actually
+deployed rather than assume virtual threads make all blocking harmless.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/integration/scheduling.html>Spring task execution and scheduling</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/concurrent/ThreadPoolTaskExecutor.html><code>ThreadPoolTaskExecutor</code> Javadoc</a></li><li><a href=https://docs.spring.io/spring-boot/reference/features/task-execution-and-scheduling.html>Spring Boot task execution</a></li><li><a href=https://openjdk.org/jeps/444>JEP 444: Virtual Threads</a></li><li><a href=https://openjdk.org/jeps/491>JEP 491: Synchronize Virtual Threads Without Pinning</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-thread-pools/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

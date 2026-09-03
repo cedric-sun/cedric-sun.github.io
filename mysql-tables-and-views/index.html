@@ -1,0 +1,47 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MySQL Tables and Views</title></head><body><main><article><div class=article-header><h1>MySQL Tables and Views</h1><div class=aux>Last update: 2021-09-09 08:09:41 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/mysql/>Mysql</a>
+|
+<a href=/tags/sql/>Sql</a>
+|
+<a href=/tags/databases/>Databases</a></div></div><div class=article-content><p>A base table persists rows. A view persists a query definition and presents its
+result as a table-like object. <code>SHOW FULL TABLES</code> distinguishes them, and
+<code>INFORMATION_SCHEMA.TABLES.TABLE_TYPE</code> reports <code>BASE TABLE</code> or <code>VIEW</code>.</p><h2 id=innodb-row-formats>InnoDB Row Formats
+<a href=#innodb-row-formats class=heading-anchor><span>#</span></a></h2><p>InnoDB supports <code>REDUNDANT</code>, <code>COMPACT</code>, <code>DYNAMIC</code>, and <code>COMPRESSED</code> row
+formats. <code>DYNAMIC</code> is the current default. For variable-length columns, InnoDB
+can store long values on overflow pages and retain a reference in the clustered
+record. The precise inline and overflow behavior depends on the row format,
+page size, column type, and value length; schema design should avoid assuming
+that a <code>TEXT</code> or <code>BLOB</code> value occupies a fixed in-row size.</p><p>Inspect a table&rsquo;s effective configuration:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SHOW</span> <span style=color:#66d9ef>TABLE</span> STATUS <span style=color:#66d9ef>LIKE</span> <span style=color:#e6db74>&#39;orders&#39;</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SHOW</span> <span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>TABLE</span> orders;</span></span></code></pre></div></div></div><h2 id=views>Views
+<a href=#views class=heading-anchor><span>#</span></a></h2><p>Create a view with a stable, explicit column list:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>VIEW</span> active_customer_orders <span style=color:#66d9ef>AS</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> o.id, o.customer_id, o.created_at, o.total
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> orders <span style=color:#66d9ef>AS</span> o
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> o.status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;active&#39;</span>;</span></span></code></pre></div></div></div><p>A view does not store a separate table by default. The optimizer can merge a
+mergeable view into an outer query, or it can materialize a temporary table
+when the definition requires it, such as for aggregation, <code>DISTINCT</code>, or some
+derived-table operations. <code>ALGORITHM = MERGE</code> and <code>ALGORITHM = TEMPTABLE</code>
+express a preference, but a view definition must still satisfy the selected
+algorithm&rsquo;s restrictions.</p><p>Some views are updatable when each affected row maps unambiguously to one base
+table. Views containing aggregation, <code>GROUP BY</code>, <code>DISTINCT</code>, window functions,
+set operations, or non-updatable joins are not updatable. Use the base table
+for writes when the view&rsquo;s update behavior is not part of the required
+interface.</p><p>The <code>DEFINER</code> account and <code>SQL SECURITY</code> setting determine whose privileges
+apply during view execution. Review both when a view exposes a restricted
+projection to an application account.</p><p><code>WITH CHECK OPTION</code> prevents writes through an updatable view from creating rows
+that the view cannot see. <code>CASCADED</code> checks the view and underlying view
+conditions, while <code>LOCAL</code> checks only the current view&rsquo;s condition:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>SQL</span> <span style=color:#66d9ef>SECURITY</span> <span style=color:#66d9ef>INVOKER</span> <span style=color:#66d9ef>VIEW</span> active_customer_orders <span style=color:#66d9ef>AS</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> id, customer_id, created_at, total, status
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> orders
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;active&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WITH</span> <span style=color:#66d9ef>CASCADED</span> <span style=color:#66d9ef>CHECK</span> <span style=color:#66d9ef>OPTION</span>;</span></span></code></pre></div></div></div><p>MySQL stores a view definition in the data dictionary and resolves referenced
+objects when it executes the view, but a schema change can still make the view
+invalid. Use <code>SHOW CREATE VIEW</code> and <code>CHECK TABLE</code> after changing dependent
+tables, and order migrations so callers never observe incompatible definitions.</p><p>MySQL has no native, automatically maintained materialized-view object. Use a
+base table populated by a scheduled transaction, change-data pipeline, or
+application job when precomputation is required. Define refresh atomicity and
+freshness explicitly; swapping or updating that table has different consistency
+and metadata-lock behavior from querying a normal view.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-row-format.html>InnoDB Row Formats</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/view-algorithms.html>View Processing Algorithms</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/view-updatability.html>Updatable Views and Check Options</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mysql-tables-and-views/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>
