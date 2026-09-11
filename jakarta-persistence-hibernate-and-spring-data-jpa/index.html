@@ -1,0 +1,73 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Jakarta Persistence, Hibernate, and Spring Data JPA</title></head><body><main><article><div class=article-header><h1>Jakarta Persistence, Hibernate, and Spring Data JPA</h1><div class=aux>Last update: 2026-03-29 19:32:52 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/jakarta-persistence/>Jakarta-Persistence</a>
+|
+<a href=/tags/hibernate/>Hibernate</a>
+|
+<a href=/tags/spring-data-jpa/>Spring-Data-Jpa</a></div></div><div class=article-content><p>Jakarta Persistence defines the standard Java API for object-relational
+mapping. Hibernate is a widely used implementation. Spring Data JPA builds
+repository abstractions on top of a Jakarta Persistence provider.</p><h2 id=the-jakarta-persistence-model>The Jakarta Persistence Model
+<a href=#the-jakarta-persistence-model class=heading-anchor><span>#</span></a></h2><p>An application maps ordinary classes to database tables with annotations such
+as <code>@Entity</code>, <code>@Table</code>, <code>@Id</code>, and <code>@Column</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Entity</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Table</span>(name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;orders&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>PurchaseOrder</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Id</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@GeneratedValue</span>(strategy <span style=color:#f92672>=</span> GenerationType.<span style=color:#a6e22e>IDENTITY</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> Long id;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Column</span>(nullable <span style=color:#f92672>=</span> <span style=color:#66d9ef>false</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> String status;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The standard APIs live in <code>jakarta.persistence</code>. An implementation discovers a
+<code>jakarta.persistence.spi.PersistenceProvider</code> through Java&rsquo;s service-provider
+mechanism. The provider translates persistence operations and JPQL or Criteria
+queries into database-specific SQL.</p><p>In a standalone application, define a persistence unit in
+<code>META-INF/persistence.xml</code>, create an <code>EntityManagerFactory</code>, and close it when
+the application stops:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>EntityManagerFactory emf <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>        Persistence.<span style=color:#a6e22e>createEntityManagerFactory</span>(<span style=color:#e6db74>&#34;application&#34;</span>);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>    EntityManager em <span style=color:#f92672>=</span> emf.<span style=color:#a6e22e>createEntityManager</span>();
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// begin and commit a transaction around changes</span>
+</span></span><span style=display:flex><span>    em.<span style=color:#a6e22e>close</span>();
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>finally</span> {
+</span></span><span style=display:flex><span>    emf.<span style=color:#a6e22e>close</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The persistence unit supplies the provider, managed entity classes, data source
+or JDBC settings, and provider properties. Prefer a container-managed data
+source and externalized credentials rather than embedding database passwords in
+<code>persistence.xml</code>.</p><h2 id=entity-managers-transactions-and-queries>Entity Managers, Transactions, and Queries
+<a href=#entity-managers-transactions-and-queries class=heading-anchor><span>#</span></a></h2><p>An <code>EntityManager</code> represents a persistence context: within that context, one
+managed Java object identity corresponds to a database identity. Persist,
+merge, remove, and query entities inside an appropriate transaction. An
+<code>EntityManagerFactory</code> is expensive and application-scoped; an
+<code>EntityManager</code> is usually request- or transaction-scoped and is not
+thread-safe.</p><p>JPQL queries entity names and properties, not tables and columns:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>List<span style=color:#f92672>&lt;</span>PurchaseOrder<span style=color:#f92672>&gt;</span> orders <span style=color:#f92672>=</span> em.<span style=color:#a6e22e>createQuery</span>(
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;select o from PurchaseOrder o where o.status = :status&#34;</span>,
+</span></span><span style=display:flex><span>        PurchaseOrder.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setParameter</span>(<span style=color:#e6db74>&#34;status&#34;</span>, <span style=color:#e6db74>&#34;PAID&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>getResultList</span>();</span></span></code></pre></div></div></div><p>Use named parameters instead of concatenating input into JPQL. The Criteria
+API offers a programmatic alternative for dynamic queries.</p><h2 id=hibernate>Hibernate
+<a href=#hibernate class=heading-anchor><span>#</span></a></h2><p>Hibernate implements Jakarta Persistence and also exposes optional native
+features. Start with the standard API to keep portability. Use Hibernate
+extensions only where their value is clear and document the resulting vendor
+dependency.</p><p>Lazy associations defer fetching until accessed. This avoids unnecessary work
+but can cause <code>LazyInitializationException</code> outside a persistence context and
+the N+1 query problem inside one. Design fetch plans explicitly with fetch
+joins, entity graphs, batching, or projections; do not solve every problem by
+making all associations eager.</p><p>Schema generation is convenient for local development, but production schema
+changes should be reviewed and applied through a migration tool.</p><h2 id=spring-data-jpa-repositories>Spring Data JPA Repositories
+<a href=#spring-data-jpa-repositories class=heading-anchor><span>#</span></a></h2><p>Spring Data can generate repository implementations for interfaces that extend
+<code>Repository</code>, commonly <code>JpaRepository</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>interface</span> <span style=color:#a6e22e>PurchaseOrderRepository</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>extends</span> JpaRepository<span style=color:#f92672>&lt;</span>PurchaseOrder, Long<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>    List<span style=color:#f92672>&lt;</span>PurchaseOrder<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>findByStatus</span>(String status);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring discovers repositories through configuration or Boot auto-configuration
+and manages their lifecycle as beans. <code>JpaRepository</code> provides CRUD, paging,
+and sorting methods. Derived query names are useful for simple predicates;
+use <code>@Query</code>, Specifications, or a custom repository when a method name would
+become unclear.</p><p>Transaction boundaries belong in the service layer for business operations
+that involve multiple repositories or external effects. Read-only transactions
+can communicate intent and permit provider optimizations, but they are not a
+security mechanism.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/jakarta-persistence-hibernate-and-spring-data-jpa/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

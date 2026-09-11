@@ -1,0 +1,77 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>FAT Filesystems</title></head><body><main><article><div class=article-header><h1>FAT Filesystems</h1><div class=aux>Last update: 2025-04-10 18:45:27 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/filesystem/>Filesystem</a>
+|
+<a href=/tags/fat/>Fat</a>
+|
+<a href=/tags/storage/>Storage</a></div></div><div class=article-content><p>The File Allocation Table (FAT) family began on small Microsoft systems and became
+the interchange format for DOS and IBM PC media. Simple data structures made FAT
+practical in boot firmware and constrained operating systems. The same design omits
+journaling, ownership, and transaction semantics, so interoperability rather than
+failure isolation explains its continued use.</p><h2 id=volume-layout>Volume Layout
+<a href=#volume-layout class=heading-anchor><span>#</span></a></h2><p>A FAT volume consists of regions measured in logical sectors:</p><ol><li>The <strong>reserved region</strong> starts with the volume boot sector and its BIOS Parameter
+Block (BPB). FAT32 can also place an FSInfo sector and commonly a backup boot
+sector here.</li><li>One or more <strong>FAT copies</strong> contain fixed-width allocation entries. Two copies are
+conventional, although the BPB states the actual count.</li><li>The <strong>root directory region</strong> has a fixed location and entry count on FAT12 and
+FAT16.</li><li>The <strong>data region</strong> contains numbered clusters. On FAT32, the root directory is
+an ordinary cluster chain in this region rather than a fixed region.</li></ol><p>The BPB supplies bytes per sector, sectors per cluster, reserved-sector count, FAT
+count, total sectors, and FAT size. A reader derives region boundaries from those
+fields rather than searching for directory signatures. Arithmetic must be checked
+for overflow because corrupt BPB values can otherwise direct reads outside the
+volume.</p><h2 id=clusters-and-fat-classification>Clusters and FAT Classification
+<a href=#clusters-and-fat-classification class=heading-anchor><span>#</span></a></h2><p>A cluster is the filesystem&rsquo;s allocation unit and contains a power-of-two number of
+sectors in Microsoft-defined FAT formats. Cluster numbers 0 and 1 are reserved; data
+clusters begin at 2. The data-cluster count follows from the BPB:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>root_dir_sectors =
+</span></span><span style=display:flex><span>  ceil(root_entry_count × 32 / bytes_per_sector)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>first_data_sector =
+</span></span><span style=display:flex><span>  reserved_sectors + fat_count × sectors_per_fat + root_dir_sectors
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>data_clusters =
+</span></span><span style=display:flex><span>  floor((total_sectors - first_data_sector) / sectors_per_cluster)</span></span></code></pre></div></div></div><p>Cluster count, not a label string or partition-type byte, classifies a volume:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Classification</th><th style=text-align:right>Data-cluster count</th><th>Entry representation</th></tr></thead><tbody><tr><td>FAT12</td><td style=text-align:right>Fewer than 4,085</td><td>Packed 12-bit entries</td></tr><tr><td>FAT16</td><td style=text-align:right>4,085 through 65,524</td><td>16-bit entries</td></tr><tr><td>FAT32</td><td style=text-align:right>65,525 or more</td><td>32-bit entries, lower 28 bits significant</td></tr></tbody></table></div></div><p>Upper practical limits also depend on cluster size, implementation policy, and fields
+in the BPB. Wider entries permit more clusters but consume more sectors for each FAT
+copy.</p><h2 id=allocation-entries-and-cluster-chains>Allocation Entries and Cluster Chains
+<a href=#allocation-entries-and-cluster-chains class=heading-anchor><span>#</span></a></h2><p>Each FAT entry describes the corresponding cluster. Values represent:</p><ul><li>zero for a free cluster;</li><li>another cluster number for the next link in a chain;</li><li>a reserved or bad-cluster marker;</li><li>a value in the end-of-chain range.</li></ul><p>A file&rsquo;s short directory entry stores its first cluster and byte length. Reading the
+file begins there and follows FAT links until enough bytes have been obtained or an
+end marker appears. The final cluster can contain slack bytes beyond the logical
+length. A directory uses the same chain mechanism on FAT32 and for all non-root
+directories.</p><p>Linked allocation allows a file to grow without finding one contiguous extent, but
+fragmented chains require extra FAT lookups and nonsequential I/O. The table is also
+a shared point of failure. A loop, out-of-range link, premature end marker, or one
+cluster claimed by two files makes directory metadata and allocation state
+inconsistent.</p><p>Multiple FAT copies do not form a journal. A writer can fail after updating one copy,
+the directory entry, or part of a chain. Repair software must choose among stale
+copies and inferred ownership; byte-for-byte agreement between two copies cannot
+prove that directory entries are correct. FAT32&rsquo;s FSInfo free-count and next-free
+hints can also become stale, so readers must treat them as hints.</p><h2 id=directory-entries-and-timestamps>Directory Entries and Timestamps
+<a href=#directory-entries-and-timestamps class=heading-anchor><span>#</span></a></h2><p>A standard directory slot is 32 bytes. A short-name entry contains an 8.3 name,
+attribute flags, timestamp fields, the starting cluster, and file size. FAT32 splits
+the starting cluster between high and low words. Special first-byte values mark an
+unused slot or a deleted entry, while the directory attribute distinguishes
+subdirectories from regular files.</p><p>Classic FAT timestamps encode local civil time rather than a UTC instant:</p><ul><li>modification time has two-second resolution;</li><li>modification and creation dates use packed year, month, and day fields;</li><li>creation time can include a tenths-of-a-second field;</li><li>last-access time stores a date but no time of day.</li></ul><p>Timezone and daylight-saving interpretation belongs to the implementation, thus
+copying a volume between systems can change the displayed instant without changing
+the on-disk bits. Validation must reject impossible dates rather than passing packed
+values directly to calendar APIs.</p><h2 id=vfat-long-file-names>VFAT Long File Names
+<a href=#vfat-long-file-names class=heading-anchor><span>#</span></a></h2><p>VFAT preserves compatibility with 8.3 readers by placing long-file-name (LFN)
+entries immediately before the associated short entry. An LFN slot:</p><ul><li>uses attribute value <code>0x0F</code>, which old FAT readers do not treat as a regular file;</li><li>stores up to 13 UTF-16 code units in discontiguous fields;</li><li>carries an ordinal indicating its position and whether it is the final slot;</li><li>repeats a checksum derived from the short 8.3 name.</li></ul><p>Slots appear on disk in reverse ordinal order, followed by the short entry. A reader
+reconstructs the name only when ordinals, attributes, and checksum agree. Otherwise,
+the short name remains the safe identity. UTF-16 code units can contain surrogate
+pairs, while FAT&rsquo;s forbidden characters and trailing-space rules remain separate
+validation concerns.</p><h2 id=boot-sector-geometry-and-partition-metadata>Boot-Sector Geometry and Partition Metadata
+<a href=#boot-sector-geometry-and-partition-metadata class=heading-anchor><span>#</span></a></h2><p>The BPB retains fields such as sectors per track, head count, media descriptor, and
+hidden sectors because FAT evolved with BIOS CHS booting and partitioned disks.
+Modern systems address the volume through LBAs, so geometry values can be synthetic.
+They describe boot-time compatibility rather than physical platter layout.</p><p>The volume boot sector belongs to FAT, whereas an MBR or GPT entry outside the
+volume locates it. The partition&rsquo;s start and length must agree with BPB-derived
+bounds, but one structure does not replace the other. UEFI firmware uses a FAT
+filesystem for the EFI System Partition under additional UEFI requirements; a
+random FAT volume does not become an EFI System Partition without the appropriate
+partition metadata and boot path.</p><h2 id=operational-consequences>Operational Consequences
+<a href=#operational-consequences class=heading-anchor><span>#</span></a></h2><p>FAT remains suitable for removable media, firmware-visible volumes, and constrained
+devices because independent implementations can parse it with little machinery.
+Applications should still flush data before removal, validate all offsets and chain
+lengths when reading untrusted images, and retain an image before attempting repair.
+No journal can distinguish a completed update from the intermediate states left by
+power loss.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc>Microsoft FAT32 File System Specification, version 1.03</a></li><li><a href=https://uefi.org/specifications>UEFI specifications</a></li><li><a href=https://docs.kernel.org/filesystems/vfat.html>Linux kernel VFAT documentation</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/fat-filesystems/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,107 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Maven</title></head><body><main><article><div class=article-header><h1>Maven</h1><div class=aux>Last update: 2025-10-16 19:43:25 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/build-tools/>Build-Tools</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/maven/>Maven</a></div></div><div class=article-content><p>Maven builds a project by executing plugin goals in lifecycle order. A lifecycle
+contains ordered phases; invoking a phase executes that phase and every earlier
+phase in the same lifecycle. Plugins contribute goals, and lifecycle bindings
+select the goals that run for a project packaging.</p><h2 id=project-model-and-coordinates>Project Model and Coordinates
+<a href=#project-model-and-coordinates class=heading-anchor><span>#</span></a></h2><p>The POM identifies an artifact by <code>groupId</code>, <code>artifactId</code>, <code>version</code>, and
+<code>packaging</code>. Parent POMs, dependency management, and imported BOMs centralize
+versions without adding an artifact to the classpath. <code>dependencyManagement</code>
+therefore constrains dependencies only after a child declares them.</p><p>Inheritance and aggregation are independent. A child inherits from the POM named
+by <code>&lt;parent></code>, while an aggregator lists reactor projects in <code>&lt;modules></code> and builds
+them in dependency order. One POM can perform both roles, but a module need not
+inherit from its aggregator. Inspect the merged model and active profiles with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mvn help:effective-pom
+</span></span><span style=display:flex><span>mvn help:active-profiles</span></span></code></pre></div></div></div><p>Keep repositories, credentials, and deployment configuration separate:</p><ul><li>Commit project repositories only when the project requires them.</li><li>Put credentials and organization-specific mirrors in user or CI
+<code>settings.xml</code>, not in the POM.</li><li>Declare dependency and plugin versions explicitly, either directly or
+through reviewed management sections. A missing plugin version makes a build
+depend on Maven&rsquo;s resolution behavior rather than the source tree.</li></ul><h2 id=lifecycles-and-phases>Lifecycles and Phases
+<a href=#lifecycles-and-phases class=heading-anchor><span>#</span></a></h2><p>Maven provides the <code>clean</code>, <code>default</code>, and <code>site</code> lifecycles. Day-to-day builds
+use the <code>default</code> lifecycle:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Phase Range</th><th>Purpose</th></tr></thead><tbody><tr><td><code>validate</code> through <code>process-resources</code></td><td>Validate the model, generate inputs, and prepare resources.</td></tr><tr><td><code>compile</code> through <code>test</code></td><td>Compile production and test code, then execute unit tests.</td></tr><tr><td><code>package</code></td><td>Create the JAR, WAR, or other distributable artifact.</td></tr><tr><td><code>pre-integration-test</code> through <code>post-integration-test</code></td><td>Prepare, execute, and dismantle an integration-test environment.</td></tr><tr><td><code>verify</code></td><td>Run quality checks after tests.</td></tr><tr><td><code>install</code></td><td>Add the artifact to the local repository.</td></tr><tr><td><code>deploy</code></td><td>Publish the artifact to a remote repository.</td></tr></tbody></table></div></div><p><code>mvn verify</code> is a suitable CI baseline because it reaches the verification
+phase without publishing artifacts. <code>mvn clean verify</code> also removes prior build
+outputs. The <code>clean</code> lifecycle has <code>pre-clean</code>, <code>clean</code>, and <code>post-clean</code>;
+<code>clean</code> removes generated build files. The <code>site</code> lifecycle generates and can
+publish project documentation.</p><h2 id=plugins-goals-and-executions>Plugins, Goals, and Executions
+<a href=#plugins-goals-and-executions class=heading-anchor><span>#</span></a></h2><p>A plugin is build-time code; it is not a project dependency. Configure active
+build plugins in <code>build/plugins</code>. Use <code>build/pluginManagement</code> to provide a
+version and shared configuration that children or the same POM must explicitly
+activate.</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;build&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;plugins&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;plugin&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.maven.plugins<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>maven-compiler-plugin<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>3.13.0<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;configuration&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;release&gt;</span>21<span style=color:#f92672>&lt;/release&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;/configuration&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/plugin&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/plugins&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/build&gt;</span></span></span></code></pre></div></div></div><p>An execution binds one or more goals to a phase. Packaging-specific default
+bindings provide common goals such as compiling Java source and creating a JAR.
+A Mojo&rsquo;s <code>defaultPhase</code> is used when an execution omits <code>&lt;phase></code>; it does not
+bind an arbitrary third-party goal by itself.</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;plugin&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.example<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>example-maven-plugin<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>1.0.0<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;executions&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;execution&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;id&gt;</span>generate-sources<span style=color:#f92672>&lt;/id&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;phase&gt;</span>generate-sources<span style=color:#f92672>&lt;/phase&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;goals&gt;&lt;goal&gt;</span>generate<span style=color:#f92672>&lt;/goal&gt;&lt;/goals&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/execution&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/executions&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/plugin&gt;</span></span></span></code></pre></div></div></div><p>Invoke a goal directly with a prefix or complete coordinates:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mvn dependency:tree
+</span></span><span style=display:flex><span>mvn org.apache.maven.plugins:maven-dependency-plugin:3.7.1:tree</span></span></code></pre></div></div></div><p>Prefix resolution can search configured plugin groups and repositories.
+Complete coordinates are preferable in automation when the POM does not
+already declare the plugin.</p><h2 id=plugin-internals-and-prefix-resolution>Plugin Internals and Prefix Resolution
+<a href=#plugin-internals-and-prefix-resolution class=heading-anchor><span>#</span></a></h2><p>A plugin artifact is identified by <code>&lt;packaging>maven-plugin&lt;/packaging></code>.
+Its executable units are mojos, which are implemented as subclasses of
+<code>AbstractMojo</code>. The plugin&rsquo;s own POM can define a <code>&lt;goalPrefix></code> through
+<code>maven-plugin-plugin</code>, and that prefix becomes the short CLI name.</p><p>Prefix resolution works in layers:</p><ol><li>if the project already declares a plugin with the requested prefix, Maven
+can resolve it from the effective POM;</li><li>otherwise Maven checks the built-in <code>org.apache.maven.plugins</code> group and
+any extra <code>pluginGroups</code> declared in <code>settings.xml</code>;</li><li>if necessary, Maven falls back to artifactId conventions such as
+<code>maven-XXX-plugin</code> or <code>XXX-maven-plugin</code>.</li></ol><p>That resolution model is why <code>mvn dependency:tree</code> works without a fully
+qualified coordinate, while automation often prefers the explicit
+<code>groupId:artifactId:version:goal</code> form.</p><p>The <code>defaultPhase</code> attribute on <code>@Mojo</code> only supplies a phase for an explicit
+execution. It does not create an automatic binding for an unofficial plugin.
+Lifecycle bindings come from the packaging model and Maven&rsquo;s built-in default
+bindings, not from the annotation alone.</p><h2 id=dependencies-and-scopes>Dependencies and Scopes
+<a href=#dependencies-and-scopes class=heading-anchor><span>#</span></a></h2><p>Maven resolves direct and transitive dependencies into classpaths according to
+scope:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Scope</th><th style=text-align:right>Main Compile</th><th style=text-align:right>Main Runtime</th><th style=text-align:right>Test Compile and Runtime</th></tr></thead><tbody><tr><td><code>compile</code></td><td style=text-align:right>yes</td><td style=text-align:right>yes</td><td style=text-align:right>yes</td></tr><tr><td><code>provided</code></td><td style=text-align:right>yes</td><td style=text-align:right>no</td><td style=text-align:right>yes</td></tr><tr><td><code>runtime</code></td><td style=text-align:right>no</td><td style=text-align:right>yes</td><td style=text-align:right>yes</td></tr><tr><td><code>test</code></td><td style=text-align:right>no</td><td style=text-align:right>no</td><td style=text-align:right>yes</td></tr></tbody></table></div></div><p>Use <code>provided</code> only when the deployment environment supplies a compatible API,
+such as a Servlet container. <code>runtime</code> suits drivers and implementations that
+the compiler does not need. <code>system</code> requires a local file path and bypasses
+normal repository resolution, so it should not be used for reproducible builds.
+<code>import</code> applies only to POM dependencies and imports a BOM into dependency
+management.</p><p>Use <code>mvn dependency:tree</code> to find version mediation and exclusions. Maven&rsquo;s
+nearest-definition rule selects among conflicting transitive versions; equal
+depth is resolved by declaration order. A direct declaration or
+<code>dependencyManagement</code> entry makes the choice explicit. Exclusions apply only
+to the dependency path where they are declared, so prefer management or a BOM
+to scattered exclusions.</p><h2 id=repositories-mirrors-and-settings>Repositories, Mirrors, and Settings
+<a href=#repositories-mirrors-and-settings class=heading-anchor><span>#</span></a></h2><p>A repository is an artifact source. A mirror is a <code>settings.xml</code> rule that
+redirects requests for selected repositories; it does not add dependencies or
+replace repository authorization policy.</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;mirrors&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;mirror&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;id&gt;</span>company-proxy<span style=color:#f92672>&lt;/id&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;mirrorOf&gt;</span>central<span style=color:#f92672>&lt;/mirrorOf&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;url&gt;</span>https://repository.example.invalid/maven-central<span style=color:#f92672>&lt;/url&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/mirror&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/mirrors&gt;</span></span></span></code></pre></div></div></div><p>The global settings file is under the Maven installation and the user settings
+file is <code>~/.m2/settings.xml</code>. CI should provide a minimal settings file through
+its secret-management mechanism. Do not store repository passwords in a POM.
+Maven&rsquo;s <code>&lt;relocation></code> metadata lets a publisher redirect an obsolete
+coordinate to a replacement coordinate.</p><h2 id=maven-wrapper>Maven Wrapper
+<a href=#maven-wrapper class=heading-anchor><span>#</span></a></h2><p>Commit <code>mvnw</code>, <code>mvnw.cmd</code>, and <code>.mvn/wrapper/</code> so developers and CI use the
+declared Maven distribution:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mvn wrapper:wrapper -Dmaven<span style=color:#f92672>=</span>3.9.9
+</span></span><span style=display:flex><span>./mvnw clean verify</span></span></code></pre></div></div></div><p>Review the distribution URL and checksum when updating the wrapper. The wrapper
+pins Maven itself; plugin and dependency versions still require POM management.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/maven/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

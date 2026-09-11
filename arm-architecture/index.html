@@ -1,0 +1,62 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>ARM Architecture Introduction</title></head><body><main><article><div class=article-header><h1>ARM Architecture Introduction</h1><div class=aux>Last update: 2025-06-07 09:28:40 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/arm/>Arm</a>
+|
+<a href=/tags/cpu/>Cpu</a>
+|
+<a href=/tags/computer-architecture/>Computer Architecture</a></div></div><div class=article-content><p>Arm defines a family of instruction set architectures (ISAs), not one processor
+implementation. The architecture specifies programmer-visible state, instruction
+semantics, exceptions, privilege, and memory ordering. A core&rsquo;s pipeline, cache
+hierarchy, and branch predictor are microarchitectural choices.</p><p>Architecture profiles separate deployment requirements. A-profile targets
+application processors with virtual memory, R-profile targets real-time systems,
+and M-profile targets microcontrollers. The execution states and privilege model
+below describe A-profile systems unless stated otherwise.</p><h2 id=execution-states-and-instruction-sets>Execution States and Instruction Sets
+<a href=#execution-states-and-instruction-sets class=heading-anchor><span>#</span></a></h2><p><strong>AArch32</strong> provides 32-bit general-purpose registers and can execute the A32
+instruction set or the variable-length T32 instruction set historically called
+Thumb. <strong>AArch64</strong>, introduced by Armv8-A, provides thirty-one 64-bit
+general-purpose registers and the fixed-width A64 instruction set. <code>X0</code> through
+<code>X30</code> name the 64-bit registers; <code>W0</code> through <code>W30</code> name their low 32 bits.
+Writing a <code>W</code> register clears the upper half of its corresponding <code>X</code> register.</p><p>A processor can implement more than one execution state, but support cannot be
+inferred from a product&rsquo;s 64-bit capability. Armv8-A permitted an AArch64
+operating system to support AArch32 applications, while later architecture
+versions permit implementations without AArch32 at selected exception levels.
+Software must therefore use platform documentation and operating-system
+interfaces to determine which states are available.</p><p>An execution state includes more than register width. AArch32 and AArch64 have
+different instruction encodings, exception models, system registers, and ABIs.
+Code cannot switch state with an ordinary branch; an exception return or another
+architecturally defined transition must establish the destination state.</p><h2 id=registers-and-procedure-calls>Registers and Procedure Calls
+<a href=#registers-and-procedure-calls class=heading-anchor><span>#</span></a></h2><p>A64 is a load-store ISA: arithmetic operates on registers, while explicit load
+and store instructions access memory.</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>ldr</span> <span style=color:#66d9ef>w0</span>, [<span style=color:#66d9ef>x1</span>]        <span style=color:#75715e>// load a 32-bit value
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>add</span> <span style=color:#66d9ef>w0</span>, <span style=color:#66d9ef>w0</span>, <span style=color:#75715e>#1
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>str</span> <span style=color:#66d9ef>w0</span>, [<span style=color:#66d9ef>x1</span>]</span></span></code></pre></div></div></div><p>Several register names have architectural or conventional roles:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Register</th><th>AAPCS64 role</th></tr></thead><tbody><tr><td><code>X0</code>-<code>X7</code></td><td>Integer arguments and results</td></tr><tr><td><code>X8</code></td><td>Indirect result location register</td></tr><tr><td><code>X9</code>-<code>X15</code></td><td>Caller-saved temporaries</td></tr><tr><td><code>X16</code>-<code>X17</code></td><td>Intra-procedure-call temporaries</td></tr><tr><td><code>X18</code></td><td>Platform register or temporary, depending on the platform ABI</td></tr><tr><td><code>X19</code>-<code>X28</code></td><td>Callee-saved registers</td></tr><tr><td><code>X29</code></td><td>Frame pointer by convention</td></tr><tr><td><code>X30</code></td><td>Link register</td></tr><tr><td><code>SP</code></td><td>Stack pointer</td></tr></tbody></table></div></div><p><code>BL</code> writes the return address to <code>X30</code>, and <code>RET</code> normally branches through
+<code>X30</code>. The Procedure Call Standard for the Arm 64-bit Architecture (AAPCS64)
+also defines floating-point/vector argument registers, aggregate passing,
+callee-saved state, and 16-byte stack alignment. Those rules are ABI contracts,
+not properties of the A64 instruction syntax. Hand-written assembly that
+interoperates with compiled code must follow the platform&rsquo;s complete ABI.</p><h2 id=exception-levels-and-transitions>Exception Levels and Transitions
+<a href=#exception-levels-and-transitions class=heading-anchor><span>#</span></a></h2><p>A-profile systems use exception levels, where a larger number has greater
+privilege:</p><ul><li><strong>EL0</strong> runs unprivileged applications.</li><li><strong>EL1</strong> normally runs an operating-system kernel.</li><li><strong>EL2</strong> provides virtualization controls for a hypervisor.</li><li><strong>EL3</strong> provides secure-monitor functionality on systems that implement it.</li></ul><p>An implementation need not provide every level. Security states and
+virtualization also affect which resources an EL can access, so an EL number
+alone does not describe the complete protection domain.</p><p>Exceptions include synchronous exceptions, IRQs, FIQs, and system errors.
+Taking an exception records a return address and saved processor state in
+<code>ELR_ELx</code> and <code>SPSR_ELx</code>, selects an entry from the target EL&rsquo;s vector table,
+and masks or changes selected state. <code>ERET</code> restores the saved state after the
+handler validates it. System calls commonly use <code>SVC</code> to enter EL1; hypervisor
+and secure-monitor calls use <code>HVC</code> and <code>SMC</code> where enabled.</p><p>Translation tables and access-control registers enforce memory isolation. EL2
+can add stage-two translation to an EL1 guest&rsquo;s stage-one mapping, while
+TrustZone security states can impose another access boundary. Availability and
+exact register behavior depend on the implemented architecture version.</p><h2 id=memory-ordering-barriers-and-atomics>Memory Ordering, Barriers, and Atomics
+<a href=#memory-ordering-barriers-and-atomics class=heading-anchor><span>#</span></a></h2><p>Arm uses a weakly ordered memory model. A core can observe independent loads and
+stores in an order different from program order when no architectural
+synchronization constrains them. Cache coherence ensures participating observers
+agree on the order of writes to one location; coherence alone does not order
+accesses to different locations.</p><p>Concurrent code should express the minimum ordering required by its protocol:</p><ul><li>Acquire loads prevent later accesses from moving before the acquire.</li><li>Release stores prevent earlier accesses from moving after the release.</li><li>Read-modify-write atomics provide indivisible updates with specified ordering.</li><li><code>DMB</code> orders relevant memory observations within a selected shareability and
+access domain.</li><li><code>DSB</code> waits for the specified memory effects to complete.</li><li><code>ISB</code> flushes the instruction pipeline so later instructions execute in the
+context established by preceding context-changing operations.</li></ul><p>AArch64 supports load-exclusive/store-exclusive loops such as <code>LDXR</code>/<code>STXR</code>.
+Systems with the Large System Extensions can also provide single-instruction
+atomic read-modify-write operations. Both forms require retry or contention
+handling, and neither repairs a language-level data race. C and C++ programs
+should use their language atomic operations because compilers map those
+semantics to the appropriate instructions and barriers.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://developer.arm.com/documentation/ddi0487/latest/>Arm Architecture Reference Manual for A-profile architecture</a></li><li><a href=https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst>Procedure Call Standard for the Arm 64-bit Architecture</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/arm-architecture/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,173 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>GLib Main Loop</title></head><body><main><article><div class=article-header><h1>GLib Main Loop</h1><div class=aux>Last update: 2026-05-24 01:10:27 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/glib/>Glib</a>
+|
+<a href=/tags/gtk/>Gtk</a></div></div><div class=article-content><p>GLib&rsquo;s event loop separates event descriptions from event dispatch. A <code>GSource</code>
+describes when work is ready, a <code>GMainContext</code> owns and schedules a set of
+sources, and a <code>GMainLoop</code> repeatedly iterates one context. Keeping those roles
+separate makes callback placement, cancellation, and lifetime rules explicit.</p><h2 id=sources-contexts-and-loops>Sources, Contexts, and Loops
+<a href=#sources-contexts-and-loops class=heading-anchor><span>#</span></a></h2><p>One iteration of a main context has four conceptual phases:</p><ol><li><strong>Prepare:</strong> Sources report whether they are already ready and how long the
+context may sleep.</li><li><strong>Query and poll:</strong> The context builds the set of file descriptors and waits
+until an event or timeout wakes it.</li><li><strong>Check:</strong> Sources inspect the poll results and decide whether they are
+ready.</li><li><strong>Dispatch:</strong> Ready sources invoke their callbacks.</li></ol><p><code>g_main_context_iteration()</code> performs one iteration. The lower-level
+<code>g_main_context_prepare()</code>, <code>g_main_context_query()</code>,
+<code>g_main_context_check()</code>, and <code>g_main_context_dispatch()</code> calls exist for
+integration with another event loop, but an application must preserve their
+ordering and context-acquisition rules.</p><p><code>GMainLoop</code> adds a running flag around that mechanism:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>GMainContext <span style=color:#f92672>*</span>context <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_main_context_new</span>();
+</span></span><span style=display:flex><span>GMainLoop <span style=color:#f92672>*</span>loop <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_main_loop_new</span>(context, FALSE);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_loop_run</span>(loop);
+</span></span><span style=display:flex><span><span style=color:#75715e>/* A callback eventually calls g_main_loop_quit(loop). */</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_loop_unref</span>(loop);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_context_unref</span>(context);</span></span></code></pre></div></div></div><p><code>g_main_loop_quit()</code> stops the loop after the current dispatch returns. It does
+not destroy the context or its sources. Multiple loops may iterate the same
+context, including nested loops, so nested execution permits re-entrancy into
+every source attached to that context. GTK applications should prefer
+asynchronous APIs over nested loops because synchronous-looking code can
+otherwise dispatch unrelated UI callbacks.</p><h2 id=readiness-priority-and-ownership>Readiness, Priority, and Ownership
+<a href=#readiness-priority-and-ownership class=heading-anchor><span>#</span></a></h2><p>Every source has an integer priority. Smaller numbers mean higher priority:
+<code>G_PRIORITY_HIGH</code> runs before <code>G_PRIORITY_DEFAULT</code>, while
+<code>G_PRIORITY_DEFAULT_IDLE</code> is lower. When sources at different priorities are
+ready, GLib dispatches the higher-priority work first. A continuously ready
+high-priority source can therefore starve lower-priority sources. Code must not
+depend on an undocumented ordering among sources at the same priority.</p><p>Attaching a source associates it with at most one context:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>GSource <span style=color:#f92672>*</span>source <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_timeout_source_new</span>(<span style=color:#ae81ff>250</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_set_priority</span>(source, G_PRIORITY_DEFAULT);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_set_callback</span>(source, refresh_cache, cache, NULL);
+</span></span><span style=display:flex><span>guint source_id <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_source_attach</span>(source, context);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_unref</span>(source); <span style=color:#75715e>/* The context now keeps the source alive. */</span></span></span></code></pre></div></div></div><p>The callback returns <code>G_SOURCE_CONTINUE</code> to remain scheduled or
+<code>G_SOURCE_REMOVE</code> to destroy the source after dispatch. <code>g_source_destroy()</code> is
+the direct cancellation operation and may be called from another thread.
+Source IDs are context-specific and may eventually be reused; retaining a
+<code>GSource *</code> is less ambiguous when code owns a non-default context.</p><p>Attaching transfers no application-data ownership by itself. Pass a
+<code>GDestroyNotify</code> to <code>g_source_set_callback()</code> or a <code>*_add_full()</code> helper when
+callback data needs cleanup. The notify function runs when the callback is
+replaced or the source is finalized, and it must not assume a particular
+thread.</p><h2 id=built-in-and-custom-sources>Built-In and Custom Sources
+<a href=#built-in-and-custom-sources class=heading-anchor><span>#</span></a></h2><p>GLib provides source constructors for common readiness conditions:</p><ul><li><code>g_timeout_source_new()</code> and <code>g_timeout_source_new_seconds()</code> become ready
+after an interval. Repeating timeouts schedule the next interval from GLib&rsquo;s
+monotonic-time calculation; they are not exact periodic real-time timers.</li><li><code>g_idle_source_new()</code> is ready when no higher-priority work is ready. An idle
+callback that returns <code>G_SOURCE_CONTINUE</code> must yield quickly.</li><li><code>g_unix_fd_source_new()</code> watches a Unix file descriptor for a <code>GIOCondition</code>.
+Child-watch and Unix-signal sources follow the same attach-and-dispatch
+model.</li><li><code>g_io_create_watch()</code> adapts a <code>GIOChannel</code>, although new Unix code can often
+watch a nonblocking file descriptor directly.</li></ul><p>The convenience functions <code>g_timeout_add()</code>, <code>g_idle_add()</code>, and
+<code>g_child_watch_add()</code> attach to the global-default context, not the current
+thread-default context. Context-aware library code should construct the source
+and attach it explicitly:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>GSource <span style=color:#f92672>*</span>source <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_idle_source_new</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_set_callback</span>(source, publish_result, result, result_free);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_attach</span>(source, target_context);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_unref</span>(source);</span></span></code></pre></div></div></div><p>A custom source embeds <code>GSource</code> as its first field and supplies
+<code>GSourceFuncs</code>:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>typedef</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>  GSource source;
+</span></span><span style=display:flex><span>  gboolean pending;
+</span></span><span style=display:flex><span>} WorkSource;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> gboolean
+</span></span><span style=display:flex><span><span style=color:#a6e22e>work_prepare</span>(GSource <span style=color:#f92672>*</span>source, gint <span style=color:#f92672>*</span>timeout_ms)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  WorkSource <span style=color:#f92672>*</span>work <span style=color:#f92672>=</span> (WorkSource <span style=color:#f92672>*</span>) source;
+</span></span><span style=display:flex><span>  <span style=color:#f92672>*</span>timeout_ms <span style=color:#f92672>=</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> work<span style=color:#f92672>-&gt;</span>pending;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> gboolean
+</span></span><span style=display:flex><span><span style=color:#a6e22e>work_check</span>(GSource <span style=color:#f92672>*</span>source)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> ((WorkSource <span style=color:#f92672>*</span>) source)<span style=color:#f92672>-&gt;</span>pending;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> gboolean
+</span></span><span style=display:flex><span><span style=color:#a6e22e>work_dispatch</span>(GSource <span style=color:#f92672>*</span>source, GSourceFunc callback, gpointer data)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  WorkSource <span style=color:#f92672>*</span>work <span style=color:#f92672>=</span> (WorkSource <span style=color:#f92672>*</span>) source;
+</span></span><span style=display:flex><span>  work<span style=color:#f92672>-&gt;</span>pending <span style=color:#f92672>=</span> FALSE;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>callback</span>(data);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> GSourceFuncs work_source_funcs <span style=color:#f92672>=</span> {
+</span></span><span style=display:flex><span>  work_prepare, work_check, work_dispatch, NULL
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>Create an instance with
+<code>g_source_new(&amp;work_source_funcs, sizeof(WorkSource))</code>. A source that waits on
+kernel events should register poll descriptors rather than repeatedly report
+itself ready; otherwise it turns the loop into a busy wait. If another thread
+changes custom-source state, protect that state and call
+<code>g_main_context_wakeup()</code> so a blocked poll observes the change.</p><h2 id=thread-default-contexts>Thread-Default Contexts
+<a href=#thread-default-contexts class=heading-anchor><span>#</span></a></h2><p>The global-default context returned by <code>g_main_context_default()</code> is distinct
+from the per-thread stack of thread-default contexts. GIO asynchronous
+operations commonly capture the calling thread&rsquo;s thread-default context and
+deliver completion there.</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>g_main_context_push_thread_default</span>(worker_context);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>start_async_operation</span>();
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_context_pop_thread_default</span>(worker_context);</span></span></code></pre></div></div></div><p>Every push must have a matching pop in the same thread. If the stack is empty,
+<code>g_main_context_get_thread_default()</code> returns <code>NULL</code>, while
+<code>g_main_context_ref_thread_default()</code> returns a referenced thread-default
+context or the global default. Libraries should document the context in which
+each callback and signal is delivered instead of silently assuming the global
+default.</p><p>A context can be acquired by only one thread at a time, although ownership may
+move between iterations. To send work to a context normally run by another
+thread, use <code>g_main_context_invoke_full()</code>:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>g_main_context_invoke_full</span>(ui_context,
+</span></span><span style=display:flex><span>                           G_PRIORITY_DEFAULT,
+</span></span><span style=display:flex><span>                           apply_worker_result,
+</span></span><span style=display:flex><span>                           result,
+</span></span><span style=display:flex><span>                           result_free);</span></span></code></pre></div></div></div><p>The function executes while <code>ui_context</code> is owned. Invocation may happen
+directly when the caller already owns the context. It may also run directly
+when the context is the caller&rsquo;s thread-default context and the caller can
+acquire it; thus it is not an unconditional asynchronous queue operation. A
+design that requires thread affinity should keep the target context running
+and owned by its designated thread, then assert the expected context with
+<code>g_main_context_is_owner()</code>. Use <code>GTask</code> when the requirement is background
+execution rather than a particular worker thread.</p><h2 id=callback-lifetimes>Callback Lifetimes
+<a href=#callback-lifetimes class=heading-anchor><span>#</span></a></h2><p>An attached source can outlive the object represented by its callback data.
+GLib documents two primary ownership strategies:</p><ol><li>Store the source and destroy it when the owner is disposed. This bounds the
+callback&rsquo;s lifetime to the owner.</li><li>Give the source a strong reference and release it with <code>GDestroyNotify</code>.
+This prevents use-after-free, but a source that never runs or is never
+destroyed can keep the owner alive indefinitely.</li></ol><p>A weak reference is useful when the operation may harmlessly disappear with
+its target:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>typedef</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>  GWeakRef target;
+</span></span><span style=display:flex><span>} PendingUpdate;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> gboolean
+</span></span><span style=display:flex><span><span style=color:#a6e22e>apply_update</span>(gpointer user_data)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  PendingUpdate <span style=color:#f92672>*</span>pending <span style=color:#f92672>=</span> user_data;
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_autoptr</span>(GObject) target <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_weak_ref_get</span>(<span style=color:#f92672>&amp;</span>pending<span style=color:#f92672>-&gt;</span>target);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>if</span> (target <span style=color:#f92672>==</span> NULL)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> G_SOURCE_REMOVE;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#75715e>/* Update target while the temporary strong reference is held. */</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> G_SOURCE_REMOVE;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>pending_update_free</span>(gpointer data)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  PendingUpdate <span style=color:#f92672>*</span>pending <span style=color:#f92672>=</span> data;
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_weak_ref_clear</span>(<span style=color:#f92672>&amp;</span>pending<span style=color:#f92672>-&gt;</span>target);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_free</span>(pending);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>schedule_update</span>(GObject <span style=color:#f92672>*</span>target, GMainContext <span style=color:#f92672>*</span>target_context)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  PendingUpdate <span style=color:#f92672>*</span>pending <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_new0</span>(PendingUpdate, <span style=color:#ae81ff>1</span>);
+</span></span><span style=display:flex><span>  GSource <span style=color:#f92672>*</span>source <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_idle_source_new</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_weak_ref_init</span>(<span style=color:#f92672>&amp;</span>pending<span style=color:#f92672>-&gt;</span>target, target);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_source_set_callback</span>(source, apply_update, pending, pending_update_free);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_source_attach</span>(source, target_context);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_source_unref</span>(source);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>GWeakRef</code> is thread-safe: <code>g_weak_ref_get()</code> atomically obtains a strong
+reference or returns <code>NULL</code>. Raw weak pointers installed with
+<code>g_object_add_weak_pointer()</code> do not provide that cross-thread guarantee.
+Weak references solve object validity, not synchronization; mutable state
+still needs confinement to one context or explicit locking.</p><h2 id=upstream-references>Upstream References
+<a href=#upstream-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.gtk.org/glib/main-loop.html>GLib: The Main Event Loop</a></li><li><a href=https://developer.gnome.org/documentation/tutorials/main-contexts.html>GNOME Main Contexts Tutorial</a></li><li><a href=https://docs.gtk.org/glib/struct.MainContext.html><code>GMainContext</code></a> and
+<a href=https://docs.gtk.org/glib/struct.Source.html><code>GSource</code></a></li><li><a href=https://docs.gtk.org/gobject/struct.WeakRef.html><code>GWeakRef</code></a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/glib-main-loop/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

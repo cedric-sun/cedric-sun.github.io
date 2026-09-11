@@ -1,0 +1,92 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>NASM for x86 and x86-64</title></head><body><main><article><div class=article-header><h1>NASM for x86 and x86-64</h1><div class=aux>Last update: 2025-01-13 21:14:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/nasm/>Nasm</a>
+|
+<a href=/tags/assembly/>Assembly</a>
+|
+<a href=/tags/x86/>X86</a></div></div><div class=article-content><p>NASM translates Intel-syntax x86 assembly into a flat binary or an object file.
+A flat binary contains emitted bytes with no standard relocation or symbol
+metadata. An object file such as ELF, Mach-O, or COFF retains sections, symbols,
+and relocations so a linker can combine it with other objects and libraries.</p><h2 id=sections-labels-and-symbols>Sections, Labels, and Symbols
+<a href=#sections-labels-and-symbols class=heading-anchor><span>#</span></a></h2><p>An object-file source normally separates executable code, initialized data, and
+zero-initialized storage:</p><div class=jose-wrapper><div class=jose-tools><span>nasm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-nasm data-lang=nasm><span style=display:flex><span><span style=color:#66d9ef>global</span> add_one
+</span></span><span style=display:flex><span><span style=color:#66d9ef>extern</span> external_value
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>section</span> .text
+</span></span><span style=display:flex><span>add_one:
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> eax, edi
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>add</span> eax, <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>ret</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>section</span> .rodata
+</span></span><span style=display:flex><span>message: <span style=color:#66d9ef>db</span> <span style=color:#e6db74>&#34;hello&#34;</span>, <span style=color:#ae81ff>10</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>message_size</span><span style=color:#66d9ef> equ</span> <span style=color:#66d9ef>$</span> <span style=color:#f92672>-</span> message
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>section</span> .bss
+</span></span><span style=display:flex><span>scratch: <span style=color:#66d9ef>resq</span> <span style=color:#ae81ff>8</span></span></span></code></pre></div></div></div><p>A label defines the current assembly position. <code>GLOBAL</code> exports a symbol to the
+linker, while <code>EXTERN</code> declares a symbol that another object must define. Local
+labels beginning with <code>.</code> are scoped to the preceding non-local label. Section
+names and attributes depend on the output format; <code>.text</code>, <code>.rodata</code>, <code>.data</code>,
+and <code>.bss</code> are ELF conventions rather than universal NASM keywords.</p><p>Flat binaries selected with <code>-f bin</code> have no linker to assign virtual addresses.
+<code>ORG</code> changes the origin used in address calculations but does not insert
+padding or load the bytes at that address. Boot sectors, firmware, and embedded
+images must establish their own layout and fill requirements.</p><h2 id=effective-addresses-and-position-independence>Effective Addresses and Position Independence
+<a href=#effective-addresses-and-position-independence class=heading-anchor><span>#</span></a></h2><p>NASM places the destination operand first. Brackets denote a memory effective
+address:</p><div class=jose-wrapper><div class=jose-tools><span>nasm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-nasm data-lang=nasm><span style=display:flex><span><span style=color:#a6e22e>mov</span> rax, value          <span style=color:#75715e>; address/immediate determined by relocation rules</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>mov</span> rbx, [value]        <span style=color:#75715e>; load from memory</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>mov</span> ecx, [base <span style=color:#f92672>+</span> index<span style=color:#f92672>*</span><span style=color:#ae81ff>4</span> <span style=color:#f92672>+</span> <span style=color:#ae81ff>8</span>]
+</span></span><span style=display:flex><span><span style=color:#a6e22e>lea</span> rdx, [base <span style=color:#f92672>+</span> index<span style=color:#f92672>*</span><span style=color:#ae81ff>4</span> <span style=color:#f92672>+</span> <span style=color:#ae81ff>8</span>]  <span style=color:#75715e>; calculate address; do not load</span></span></span></code></pre></div></div></div><p>x86 addressing permits a base, an index scaled by 1, 2, 4, or 8, and a
+displacement, subject to mode-specific encoding rules. The size of a memory
+operand may need an explicit qualifier such as <code>byte</code>, <code>dword</code>, or <code>qword</code> when
+no register determines it.</p><p><code>BITS 16</code>, <code>BITS 32</code>, and <code>BITS 64</code> select the target instruction-encoding mode.
+They do not switch the processor at run time. Object formats set an appropriate
+default; <code>-f bin</code> defaults to 16-bit mode, so flat 32- or 64-bit code should state
+its mode.</p><p>In 64-bit mode, <code>DEFAULT REL</code> makes registerless memory references RIP-relative
+unless overridden by <code>ABS</code>; <code>FS</code> and <code>GS</code> overrides have special defaults
+documented by NASM. RIP-relative references can reach code or static data within
+±2 GiB and are useful for position-independent code. Position independence also
+depends on the object format, relocation type, code model, symbol visibility,
+and linker. <code>DEFAULT REL</code> cannot by itself make arbitrary external-symbol or
+absolute-address uses position independent.</p><h2 id=defining-reserving-and-aligning-data>Defining, Reserving, and Aligning Data
+<a href=#defining-reserving-and-aligning-data class=heading-anchor><span>#</span></a></h2><p><code>DB</code>, <code>DW</code>, <code>DD</code>, <code>DQ</code>, <code>DT</code>, <code>DO</code>, <code>DY</code>, and <code>DZ</code> emit initialized values of
+increasing sizes. Common definitions include:</p><div class=jose-wrapper><div class=jose-tools><span>nasm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-nasm data-lang=nasm><span style=display:flex><span>bytes:  <span style=color:#66d9ef>db</span> <span style=color:#ae81ff>0x7f</span>, <span style=color:#e6db74>&#34;NASM&#34;</span>, <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>words:  <span style=color:#66d9ef>dw</span> <span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>2</span>, <span style=color:#ae81ff>3</span>
+</span></span><span style=display:flex><span>value:  <span style=color:#66d9ef>dq</span> <span style=color:#ae81ff>42</span>
+</span></span><span style=display:flex><span>table:  <span style=color:#66d9ef>times</span> <span style=color:#ae81ff>16</span> dd <span style=color:#ae81ff>0</span></span></span></code></pre></div></div></div><p><code>RESB</code>, <code>RESW</code>, <code>RESD</code>, and <code>RESQ</code> reserve uninitialized storage in a section
+that supports it. <code>EQU</code> defines an assembly-time constant, and <code>$</code> represents
+the current position. Reservation does not necessarily add bytes to an object
+file because a BSS-like section records a size rather than initialized contents.</p><p><code>ALIGN n</code> advances to the requested boundary and can fill the gap according to
+its arguments and the active section. Alignment in an object also depends on
+section alignment and linker placement, so an aligned offset inside an
+under-aligned section is insufficient. Use <code>SECTION ... align=n</code> or the
+format-specific mechanism when the entire section needs a stronger guarantee.</p><h2 id=preprocessor-macros-and-includes>Preprocessor Macros and Includes
+<a href=#preprocessor-macros-and-includes class=heading-anchor><span>#</span></a></h2><p>NASM runs a token-based preprocessor before assembly:</p><ul><li><code>%define</code> and <code>%xdefine</code> define single-line macros with different expansion
+timing.</li><li><code>%macro</code> and <code>%endmacro</code> define multi-line macros; <code>%1</code>, <code>%2</code>, and so on name
+positional arguments.</li><li><code>%if</code>, <code>%ifdef</code>, <code>%elif</code>, and <code>%endif</code> select source conditionally.</li><li><code>%include</code> reads another source file, while <code>-I</code> adds include search paths.</li><li><code>%assign</code> maintains a numeric preprocessor variable.</li></ul><div class=jose-wrapper><div class=jose-tools><span>nasm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-nasm data-lang=nasm><span style=display:flex><span><span style=color:#75715e>%ifndef WORD_SIZE
+</span></span></span><span style=display:flex><span><span style=color:#75715e>    %define WORD_SIZE 8
+</span></span></span><span style=display:flex><span><span style=color:#75715e>%endif
+</span></span></span><span style=display:flex><span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>%macro save_pair 2
+</span></span></span><span style=display:flex><span>    <span style=color:#a6e22e>push</span> <span style=color:#f92672>%</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>push</span> <span style=color:#f92672>%</span><span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>%endmacro</span></span></span></code></pre></div></div></div><p>Macros generate source, not callable routines. They can duplicate code, capture
+names, or produce surprising diagnostics, so listings (<code>-l file.lst</code>) and
+disassembly are useful when inspecting their expansion. Include guards prevent
+multiple definitions when shared macro files are included more than once.</p><h2 id=assembling-and-linking-for-an-abi>Assembling and Linking for an ABI
+<a href=#assembling-and-linking-for-an-abi class=heading-anchor><span>#</span></a></h2><p>The output format and the ABI are separate choices. On a 64-bit Linux System V
+target:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>nasm -f elf64 -g -F dwarf -o add_one.o add_one.asm
+</span></span><span style=display:flex><span>cc -o demo main.c add_one.o</span></span></code></pre></div></div></div><p>On a 32-bit Linux target, use <code>-f elf32</code> and a linker/compiler configured with
+the required 32-bit runtime, such as <code>cc -m32</code>. Windows x64 uses <code>win64</code> and the
+Microsoft x64 calling convention; macOS uses <code>macho64</code> and Mach-O symbol rules.
+Object files are not portable across those formats.</p><p>Hand-written functions must implement the target ABI&rsquo;s argument registers, stack
+alignment, return values, preserved registers, unwind metadata, and symbol
+naming. A Linux <code>syscall</code> sequence follows the kernel syscall ABI rather than
+the user-space function ABI. Link with the compiler driver when C or C++ runtime
+startup, default libraries, position-independent-executable policy, or platform
+linker options are required.</p><p>NASM&rsquo;s <a href=https://www.nasm.us/doc/>current manual</a> defines directives and
+format-specific behavior. The operating-system ABI and processor manuals define
+the contracts outside the assembler.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/nasm/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

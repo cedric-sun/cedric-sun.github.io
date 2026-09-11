@@ -1,0 +1,47 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>DNS Wire Format</title></head><body><main><article><div class=article-header><h1>DNS Wire Format</h1><div class=aux>Last update: 2025-05-29 15:04:54 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/dns/>Dns</a>
+|
+<a href=/tags/networking/>Networking</a>
+|
+<a href=/tags/protocols/>Protocols</a></div></div><div class=article-content><p>DNS queries and responses begin with a 12-byte header followed by Question,
+Answer, Authority, and Additional sections. All multi-octet integer fields use
+network byte order. RFC 1035 defines the base format; EDNS, DNSSEC, and later
+extensions add records and header semantics without changing the base header.</p><h2 id=header>Header
+<a href=#header class=heading-anchor><span>#</span></a></h2><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Field</th><th style=text-align:right>Bits</th><th>Purpose</th></tr></thead><tbody><tr><td>ID</td><td style=text-align:right>16</td><td>Client-selected identifier echoed in the response</td></tr><tr><td>QR</td><td style=text-align:right>1</td><td>Query (<code>0</code>) or response (<code>1</code>)</td></tr><tr><td>Opcode</td><td style=text-align:right>4</td><td>Operation; <code>QUERY</code> is zero</td></tr><tr><td>AA</td><td style=text-align:right>1</td><td>Authoritative answer indicator in responses</td></tr><tr><td>TC</td><td style=text-align:right>1</td><td>Message was truncated</td></tr><tr><td>RD</td><td style=text-align:right>1</td><td>Client requests recursion</td></tr><tr><td>RA</td><td style=text-align:right>1</td><td>Server offers recursion</td></tr><tr><td>Z</td><td style=text-align:right>3</td><td>Reserved base bits; extensions use AD and CD</td></tr><tr><td>RCODE</td><td style=text-align:right>4</td><td>Base response code</td></tr><tr><td>QDCOUNT</td><td style=text-align:right>16</td><td>Question count</td></tr><tr><td>ANCOUNT</td><td style=text-align:right>16</td><td>Answer record count</td></tr><tr><td>NSCOUNT</td><td style=text-align:right>16</td><td>Authority record count</td></tr><tr><td>ARCOUNT</td><td style=text-align:right>16</td><td>Additional record count</td></tr></tbody></table></div></div><p><code>RD</code> asks the receiving server to perform recursion; <code>RA</code> advertises that the
+server can do so. <code>AA</code> says the responding server is authoritative for the
+answer, not that every record in the message is authoritative. <code>TC</code> tells a
+client that it must retry over TCP or another supported transport when the
+truncated response is insufficient.</p><h2 id=names-and-questions>Names and Questions
+<a href=#names-and-questions class=heading-anchor><span>#</span></a></h2><p>A domain name is a sequence of labels. Each ordinary label begins with an
+octet length from 0 to 63, and the zero-length root label terminates the name:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>03 www 07 example 03 com 00</span></span></code></pre></div></div></div><p>The complete encoded name, including length octets and root label, is limited
+to 255 octets. A Question contains <code>QNAME</code>, a 16-bit <code>QTYPE</code>, and a 16-bit
+<code>QCLASS</code>; Internet class (<code>IN</code>) is value 1.</p><p>To avoid repeated suffixes, a name can use a compression pointer. A pointer&rsquo;s
+first two bits are <code>11</code>; its remaining 14 bits are an offset from the message
+start. Pointers may point only to an earlier location. Parsers must bound
+pointer depth, validate offsets, and detect loops because DNS messages are
+untrusted input.</p><h2 id=resource-records>Resource Records
+<a href=#resource-records class=heading-anchor><span>#</span></a></h2><p>Answer, Authority, and Additional sections carry resource records:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>NAME | TYPE | CLASS | TTL | RDLENGTH | RDATA</span></span></code></pre></div></div></div><p><code>TTL</code> is encoded in a 32-bit field and treated as a nonnegative cache lifetime
+with an effective range of 0 through \(2^{31}-1\) under RFC 2181. <code>RDLENGTH</code> bounds the
+type-specific RDATA bytes. An RRset is the set of records with the same owner
+name, class, and type; DNSSEC signs RRsets rather than individual records.</p><p>Common RDATA includes four-byte IPv4 addresses (<code>A</code>), 16-byte IPv6 addresses
+(<code>AAAA</code>), domain names (<code>NS</code>, <code>CNAME</code>, <code>PTR</code>), and structured values such as
+<code>MX</code> preference plus exchange name or the <code>SOA</code> timers. Names in RDATA may also
+use compression where the applicable RFC permits it.</p><p>EDNS uses an <code>OPT</code> pseudo-record in the Additional section to advertise a UDP
+payload size, extended RCODE bits, flags, and options. A server must not assume
+that UDP DNS is limited to 512 bytes when EDNS has been negotiated, but clients
+must still handle truncation and retry.</p><h2 id=safe-parsing>Safe Parsing
+<a href=#safe-parsing class=heading-anchor><span>#</span></a></h2><p>Treat the received datagram or stream frame as the only valid byte range.
+Before reading each fixed-width field, label, pointer, or RDATA value, verify
+that the complete field remains inside that range. Section counts are untrusted;
+stop if the claimed number of records cannot fit.</p><p>Name decompression needs two positions: the caller&rsquo;s next unread offset and the
+pointer-following offset used to reconstruct the name. Count pointer hops or
+track visited offsets to reject cycles, reject reserved label prefixes, enforce
+the 63-octet label and 255-octet expanded-name limits, and never interpret a
+pointer target outside the message.</p><p>For TCP and TLS transports, a two-octet length prefix frames each DNS message
+but is not part of the DNS header. Read exactly that many bytes before parsing.
+For an OPT record, combine the extended RCODE from its TTL field with the base
+header RCODE and parse each option within both <code>RDLENGTH</code> and the message bound.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc1035>RFC 1035: DNS Implementation and Specification</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc6891>RFC 6891: EDNS</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc2181>RFC 2181: Clarifications to the DNS Specification</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/dns-wire-format/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

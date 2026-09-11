@@ -1,0 +1,73 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>CPU Architecture Overview</title></head><body><main><article><div class=article-header><h1>CPU Architecture Overview</h1><div class=aux>Last update: 2021-07-15 15:11:38 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/cpu/>Cpu</a>
+|
+<a href=/tags/computer-architecture/>Computer Architecture</a>
+|
+<a href=/tags/assembly/>Assembly</a></div></div><div class=article-content><p>A processor implements an instruction set architecture (ISA): the contract that
+defines instructions, registers, data types, address formation, exceptions, and
+privilege behavior. A <strong>microarchitecture</strong> implements that contract with
+pipelines, execution units, caches, predictors, and internal queues. Programs
+observe architectural state; performance depends on microarchitectural state.</p><h2 id=from-fetch-to-retirement>From Fetch to Retirement
+<a href=#from-fetch-to-retirement class=heading-anchor><span>#</span></a></h2><p>At a conceptual level, a processor fetches instruction bytes, decodes an
+instruction, obtains operands, executes the operation, accesses memory when
+required, and commits the result. A simple processor can perform those steps
+sequentially. A pipelined processor overlaps steps from several instructions,
+thus improving throughput without requiring every instruction to have low
+latency.</p><p>Architectural state includes general-purpose registers, status registers, the
+program counter, and architecturally visible memory. Microarchitectural state
+includes decoded-operation caches, physical registers, reorder buffers, branch
+history, and cache replacement metadata. A context switch must preserve the
+architectural state promised by the ABI; it neither saves nor exposes every
+internal predictor or pipeline entry.</p><p>Pipelines must handle three classes of dependency:</p><ul><li><strong>Data hazards</strong> arise when one operation consumes a result that another has
+not produced.</li><li><strong>Structural hazards</strong> arise when operations contend for an execution unit,
+port, queue, or cache resource.</li><li><strong>Control hazards</strong> arise because a branch can change the next fetch address.</li></ul><p>Forwarding supplies a result before register write-back. Register renaming maps
+architectural names onto a larger physical register set, thereby removing false
+write-after-read and write-after-write dependencies. A reorder buffer lets
+independent operations execute out of order while retiring completed operations
+in an order that preserves precise architectural exceptions.</p><h2 id=superscalar-and-speculative-execution>Superscalar and Speculative Execution
+<a href=#superscalar-and-speculative-execution class=heading-anchor><span>#</span></a></h2><p>A superscalar front end can decode or issue several operations per cycle.
+Dispatch width is only one limit: true dependencies, execution-port pressure,
+cache misses, and retirement width can reduce sustained throughput.</p><p>Branch prediction chooses a likely control-flow path before the branch resolves.
+A correct prediction keeps the pipeline supplied; a misprediction discards
+younger speculative work and restarts fetch at the resolved target. Speculation
+must not commit incorrect architectural state, although transient execution can
+affect caches and other shared microarchitectural resources. Isolation code must
+therefore follow platform guidance for transient-execution vulnerabilities
+rather than relying only on architectural privilege checks.</p><h2 id=cache-hierarchy-and-memory-latency>Cache Hierarchy and Memory Latency
+<a href=#cache-hierarchy-and-memory-latency class=heading-anchor><span>#</span></a></h2><p>Processor cores reach DRAM through a hierarchy because fast storage is expensive
+and physically constrained. L1 instruction and data caches are small and close
+to a core. Larger L2 and last-level caches trade latency for capacity. Cache
+lines transfer adjacent bytes together, so sequential access exploits spatial
+locality and reuse exploits temporal locality.</p><p>A cache divides addresses into tags, set indexes, and line offsets. Associativity
+allows more than one line in a set, reducing conflict misses at the cost of tag
+comparison and replacement complexity. Hardware prefetchers can hide predictable
+latency, but pointer chasing and capacity misses still expose lower-level cache
+or DRAM delays.</p><p>Multicore systems use a coherence protocol to coordinate cached copies of the
+same line. Coherence establishes an order for writes to one location; a memory
+consistency model defines the allowed ordering among different accesses. Correct
+concurrent software must use language atomics, locks, or other synchronization
+because cache coherence does not make unsynchronized compound operations atomic.</p><p>Virtual-memory hardware translates virtual addresses through page tables.
+Translation lookaside buffers cache recent translations; thus a TLB miss adds a
+page-table walk even when the data itself is cached. NUMA systems add another
+distance: a core can reach local memory with lower latency or higher bandwidth
+than memory attached to another socket.</p><h2 id=cores-threads-and-simd>Cores, Threads, and SIMD
+<a href=#cores-threads-and-simd class=heading-anchor><span>#</span></a></h2><p>A <strong>core</strong> contains one or more architectural execution contexts. Simultaneous
+multithreading (SMT) lets hardware threads share a core&rsquo;s front end, caches, and
+execution resources. SMT can fill otherwise idle issue slots, but contention can
+also reduce per-thread performance. Operating-system threads are scheduling
+objects and can outnumber both cores and hardware threads.</p><p>Multiple cores execute independent instruction streams. Shared-memory programs
+must still account for synchronization, cache-line contention, and false sharing.
+Adding cores does not accelerate a serial dependency chain.</p><p>SIMD instructions apply one operation to several lanes in a vector register.
+x86 provides SSE, AVX, and AVX-512 families; Arm and RISC-V provide their own
+vector facilities. A nominal vector width describes architectural state, not
+latency or throughput. Compilers need aliasing, alignment, dependency, and target
+feature information before they can vectorize safely.</p><h2 id=assembly-syntax-and-abi-boundaries>Assembly Syntax and ABI Boundaries
+<a href=#assembly-syntax-and-abi-boundaries class=heading-anchor><span>#</span></a></h2><p>Assembly syntax is a tool convention rather than an ISA property. x86 Intel
+syntax places the destination first:</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rax</span>, <span style=color:#66d9ef>rbx</span></span></span></code></pre></div></div></div><p>AT&amp;T syntax places the source first, prefixes registers with <code>%</code>, and places an
+operand-size suffix on many mnemonics:</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>movq</span> %rbx, %rax</span></span></code></pre></div></div></div><p>NASM uses Intel syntax, while GNU <code>objdump -d</code> defaults to AT&amp;T syntax and accepts
+<code>-Mintel</code>. Other architectures have their own syntaxes and tool-specific
+directives. Syntax also does not define a calling convention: argument registers,
+callee-saved state, stack alignment, and object format belong to an ABI. See
+<a href=/nasm/>NASM</a> for an assembler workflow.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cpu-overview/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

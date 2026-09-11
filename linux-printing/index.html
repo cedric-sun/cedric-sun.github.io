@@ -1,0 +1,73 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Printing</title></head><body><main><article><div class=article-header><h1>Linux Printing</h1><div class=aux>Last update: 2024-03-21 21:27:10 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/cups/>Cups</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/printing/>Printing</a></div></div><div class=article-content><p>CUPS provides an Internet Printing Protocol (IPP) client and scheduler. A CUPS
+<strong>destination</strong> is a named printer queue or class; a physical or network printer is
+the device reached by that queue. Consequently, queue state, job state, and device
+reachability are separate diagnostic concerns.</p><h2 id=queues-printers-and-ipp>Queues, Printers, and IPP
+<a href=#queues-printers-and-ipp class=heading-anchor><span>#</span></a></h2><p>Clients encode job documents and attributes in IPP requests. A local client commonly
+connects to the scheduler over a Unix-domain socket, while a remote client uses
+<code>ipp://</code> or encrypted <code>ipps://</code>, conventionally on TCP port 631. The scheduler
+spools the job, selects a destination, converts data when required, and sends output
+through a backend or a driverless IPP connection.</p><p>Modern IPP Everywhere printers advertise formats and finishing capabilities
+directly. Legacy queues can instead use PPD-driven filter chains and backends. The
+queue remains the stable client-facing object in either case.</p><h2 id=submit-jobs>Submit Jobs
+<a href=#submit-jobs class=heading-anchor><span>#</span></a></h2><p><code>lp</code> supplies the System V interface, while <code>lpr</code> supplies the BSD-compatible
+interface. Both submit through CUPS:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>lp report.pdf
+</span></span><span style=display:flex><span>lp -d office report.pdf
+</span></span><span style=display:flex><span>lpr -P office report.pdf
+</span></span><span style=display:flex><span>printf <span style=color:#e6db74>&#39;status report\n&#39;</span> | lp -d office</span></span></code></pre></div></div></div><p><code>lp -d</code> and <code>lpr -P</code> require an explicit destination. For <code>lp</code>, CUPS chooses the
+default from <code>LPDEST</code>, then <code>PRINTER</code>, then the per-user <code>lpoptions</code> default, and
+finally the server default.</p><p>Pass IPP job-template attributes with <code>-o</code>; query the destination first because
+printer-specific values differ:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>lpoptions -p office -l
+</span></span><span style=display:flex><span>lp -d office -n <span style=color:#ae81ff>2</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -o media<span style=color:#f92672>=</span>A4 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -o sides<span style=color:#f92672>=</span>two-sided-long-edge <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -o print-quality<span style=color:#f92672>=</span><span style=color:#ae81ff>4</span> report.pdf</span></span></code></pre></div></div></div><p><code>lpoptions -p office -o name=value</code> saves a default for subsequent jobs.
+<code>lp -o name=value</code> changes only the submitted job. CUPS also supports named printer
+instances such as <code>office/duplex</code> for saved option sets.</p><h2 id=inspect-queues-and-printers>Inspect Queues and Printers
+<a href=#inspect-queues-and-printers class=heading-anchor><span>#</span></a></h2><p>Use separate status views to identify where work stopped:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>lpstat -r                 <span style=color:#75715e># scheduler running</span>
+</span></span><span style=display:flex><span>lpstat -p -d              <span style=color:#75715e># printer queues and default</span>
+</span></span><span style=display:flex><span>lpstat -a                 <span style=color:#75715e># whether queues accept jobs</span>
+</span></span><span style=display:flex><span>lpstat -v                 <span style=color:#75715e># queue device URIs</span>
+</span></span><span style=display:flex><span>lpstat -o office          <span style=color:#75715e># incomplete jobs for one destination</span>
+</span></span><span style=display:flex><span>lpstat -W completed -o office
+</span></span><span style=display:flex><span>lpq -P office             <span style=color:#75715e># BSD-compatible queue view</span></span></span></code></pre></div></div></div><p><code>lpstat -p</code> reports whether a queue is enabled for printing, while <code>lpstat -a</code>
+reports whether it accepts new jobs. A disabled queue can still retain jobs, and a
+nonaccepting queue can continue processing work already present.</p><h2 id=cancel-and-control-jobs>Cancel and Control Jobs
+<a href=#cancel-and-control-jobs class=heading-anchor><span>#</span></a></h2><p>The submission response and <code>lpstat -o</code> provide identifiers such as <code>office-42</code>.
+Cancel one job with either interface:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>cancel office-42
+</span></span><span style=display:flex><span>lprm -P office <span style=color:#ae81ff>42</span></span></span></code></pre></div></div></div><p><code>cancel -a office</code> cancels every job on the destination and therefore normally
+requires administrative authorization. <code>lp -i office-42 -H resume</code> releases a held
+job. Queue administration is separate: <code>cupsdisable</code>/<code>cupsenable</code> stop or start
+printing, while <code>cupsreject</code>/<code>cupsaccept</code> reject or accept submissions.</p><h2 id=diagnose-filters-and-backends>Diagnose Filters and Backends
+<a href=#diagnose-filters-and-backends class=heading-anchor><span>#</span></a></h2><p>Start with <code>lpstat -t</code>, then inspect the affected job and queue. A stopped queue
+often records a filter exit, backend connection failure, authentication failure, or
+unsupported document format. CUPS writes scheduler and job messages to <code>error_log</code>;
+the configured <code>ErrorLog</code> can be a file, standard error, or the system journal.
+<code>cupsctl --debug-logging</code> enables additional diagnostics and should be disabled after
+reproducing the failure because logs can contain document names, user names, and
+device details.</p><p>For legacy pipelines, confirm that each filter exists and is executable, and test
+conversion with <code>cupsfilter</code> where available. For device failures, compare
+<code>lpstat -v</code> with the intended URI, resolve and connect to the endpoint, then inspect
+backend messages. The queue&rsquo;s <code>ErrorPolicy</code> determines whether CUPS aborts, retries,
+or stops the printer after a backend or filter failure.</p><h2 id=permissions-and-remote-servers>Permissions and Remote Servers
+<a href=#permissions-and-remote-servers class=heading-anchor><span>#</span></a></h2><p>Users can normally submit and cancel their own jobs. Server policy in
+<code>cupsd.conf</code> controls printer administration and cancellation of other users&rsquo; jobs;
+membership in a distribution-specific group is only one possible policy mechanism.
+<code>-U NAME</code> selects the asserted authentication username but does not bypass
+authentication.</p><p>Select another scheduler with <code>-h server[:port]</code> on CUPS commands or with the
+<code>CUPS_SERVER</code> environment variable:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>lpstat -h print.example.com:631 -p -d
+</span></span><span style=display:flex><span>lp -h print.example.com:631 -E -d office report.pdf</span></span></code></pre></div></div></div><p><code>-E</code> forces transport encryption. The remote server must listen on a reachable
+interface, advertise or configure the destination, and authorize the requested IPP
+operation.</p><p>The upstream <a href=https://www.cups.org/doc/options.html>command-line printing guide</a>,
+<a href=https://www.cups.org/doc/man-lpstat.html><code>lpstat(1)</code></a>, and
+<a href=https://www.cups.org/doc/man-cupsd-logs.html><code>cupsd-logs(5)</code></a> document these
+interfaces.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-printing/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,389 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Hadoop Overview</title></head><body><main><article><div class=article-header><h1>Hadoop Overview</h1><div class=aux>Last update: 2026-07-11 12:27:16 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/hadoop/>Hadoop</a>
+|
+<a href=/tags/hdfs/>Hdfs</a>
+|
+<a href=/tags/mapreduce/>Mapreduce</a>
+|
+<a href=/tags/yarn/>Yarn</a></div></div><div class=article-content><p>Apache Hadoop is a Java framework for storing data across a cluster and
+executing distributed applications near that data. Its original batch model
+combines three separate responsibilities:</p><ol><li>HDFS stores one logical filesystem across machines.</li><li>YARN allocates cluster resources and launches application processes.</li><li>MapReduce divides a batch computation into map, shuffle, and reduce
+phases.</li></ol><p>Hadoop Common supplies the configuration, filesystem abstractions, security
+support, native-library integration, and command launchers used by those
+projects. Separating the responsibilities matters because HDFS can store data
+for applications other than MapReduce, and YARN can schedule application
+frameworks other than MapReduce.</p><h2 id=hadoop-distribution-and-components>Hadoop Distribution and Components
+<a href=#hadoop-distribution-and-components class=heading-anchor><span>#</span></a></h2><p>Hadoop is built with Maven and released as a set of JARs, scripts, XML
+configuration files, documentation, and optional native libraries. A binary
+distribution places the Java components under <code>share/hadoop</code>; its <code>bin</code> and
+<code>sbin</code> scripts assemble a class path and start client commands or daemons.
+Native libraries under <code>lib/native</code> provide selected performance-sensitive
+features, including compression and the <code>libhdfs</code> interface. Their availability
+depends on the operating system and architecture, so an installation should
+run <code>hadoop checknative</code> rather than assume that every optional native feature
+is loaded. Production Hadoop deployments are generally Linux-based.</p><p>The top-level projects have distinct roles:</p><ul><li><strong>Hadoop Common</strong> contains the <code>Configuration</code> API, generic filesystem
+client, security utilities, shell launchers, and common services.</li><li><strong>HDFS</strong> implements the distributed filesystem, its metadata service, block
+storage service, administrative tools, and optional federation features.</li><li><strong>YARN</strong> provides cluster-wide resource management and a container execution
+protocol.</li><li><strong>MapReduce</strong> provides a batch programming model and a YARN application
+implementation, including its application master and job history service.</li></ul><p>The release archive also contains optional connectors and tools. For example,
+the S3A connector brings AWS SDK dependencies, and the native directory may
+contain both shared objects and static archives. Archive size therefore does
+not predict the memory footprint of the NameNode, DataNode, ResourceManager,
+or application processes.</p><p>Use the Apache release page for the supported release line and verify an
+archive against its published signature and SHA-512 checksum. Source archives,
+binary archives, documentation archives, and architecture-specific binary
+archives serve different purposes; a file name alone is not a compatibility
+guarantee. A cluster&rsquo;s client libraries, server daemons, and applications
+should use compatible Hadoop versions.</p><h2 id=hadoop-common-and-the-command-line>Hadoop Common and the Command Line
+<a href=#hadoop-common-and-the-command-line class=heading-anchor><span>#</span></a></h2><p>The <code>hadoop</code> launcher is the common entry point. It establishes Hadoop&rsquo;s
+environment and class path before dispatching a named command or a Java main
+class. <code>hadoop classpath</code> prints the effective application class path, which
+includes the configuration directory and the Common, HDFS, MapReduce, and YARN
+libraries in a standard distribution. Use that output to diagnose a manually
+launched Java process rather than copying paths from another installation.</p><p>The command namespace includes both application-facing and operational tools:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>hadoop fs</code></td><td>Runs the generic filesystem shell against the configured default filesystem.</td></tr><tr><td><code>hadoop classpath</code></td><td>Prints the class path assembled by the launcher.</td></tr><tr><td><code>hadoop conftest</code></td><td>Validates Hadoop XML configuration files.</td></tr><tr><td><code>hadoop checknative</code></td><td>Reports native Hadoop and compression-library availability.</td></tr><tr><td><code>hadoop version</code></td><td>Prints the installed Hadoop version.</td></tr><tr><td><code>hadoop archive</code></td><td>Creates a Hadoop archive from filesystem input.</td></tr><tr><td><code>hadoop distcp</code></td><td>Copies trees between Hadoop-compatible filesystems in parallel.</td></tr><tr><td><code>hadoop credential</code> and <code>hadoop key</code></td><td>Manage credential-provider and key-provider entries.</td></tr><tr><td><code>hadoop kdiag</code>, <code>hadoop kerbname</code>, and <code>hadoop dtutil</code></td><td>Diagnose Kerberos naming and work with delegation tokens.</td></tr><tr><td><code>hadoop gridmix</code> and Rumen tools</td><td>Model, replay, or process MapReduce workload traces.</td></tr></tbody></table></div></div><p>Some commands require optional modules or a server-side feature to be enabled.
+For example, federation balancing tools require the corresponding HDFS
+federation deployment. Treat <code>hadoop --help</code> from the installed distribution
+as the authoritative command list, because commands change between releases.</p><p><code>hadoop jar application.jar example.Main</code> invokes an application&rsquo;s main class
+through the launcher. MapReduce clients can also use <code>yarn jar</code>; both commands
+reach the Hadoop client environment in current distributions. Prefer the
+command documented by the deployed distribution and application framework,
+because a YARN application still needs the correct site configuration,
+credentials, and class path before it contacts the ResourceManager.</p><p>The <code>hdfs</code>, <code>yarn</code>, and <code>mapred</code> launchers expose project-specific commands.
+For example:</p><ul><li><code>hdfs dfs</code> is the HDFS filesystem shell, while <code>hadoop fs</code> is the generic
+shell. With an HDFS default filesystem, their ordinary filesystem operations
+address the same service.</li><li><code>hdfs dfsadmin</code>, <code>hdfs fsck</code>, <code>hdfs balancer</code>, and <code>hdfs haadmin</code> support
+HDFS administration, health inspection, rebalancing, and high availability.</li><li><code>yarn application</code>, <code>yarn node</code>, <code>yarn queue</code>, <code>yarn logs</code>, and <code>yarn top</code>
+inspect applications, nodes, queues, aggregated logs, and live resource use.</li><li><code>yarn rmadmin</code>, <code>yarn routeradmin</code>, and <code>yarn schedulerconf</code> administer
+ResourceManager, federation-router, and scheduler features when enabled.</li><li><code>mapred historyserver</code> starts the MapReduce JobHistory Server; it is not the
+same process as YARN&rsquo;s Timeline Service.</li></ul><p>Daemon subcommands follow the form <code>hdfs --daemon start namenode</code> or
+<code>yarn --daemon start nodemanager</code>. They are useful for controlled local and
+small-cluster operations. A production service manager should provide the
+same environment, identity, configuration directory, log directory, and
+restart policy explicitly.</p><h2 id=configuration-layers-and-precedence>Configuration Layers and Precedence
+<a href=#configuration-layers-and-precedence class=heading-anchor><span>#</span></a></h2><p>Every Hadoop process constructs one or more <code>Configuration</code> objects. Hadoop
+Common loads the core resources, and project code adds HDFS, YARN, or
+MapReduce resources. Site files contain deployment-specific values; default
+files are packaged with the corresponding module and document the defaults.</p><p>The standard files are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>File</th><th>Responsibility</th></tr></thead><tbody><tr><td><code>core-site.xml</code></td><td>Common settings, including the default filesystem and security settings.</td></tr><tr><td><code>hdfs-site.xml</code></td><td>HDFS storage, NameNode, DataNode, replication, and HA settings.</td></tr><tr><td><code>yarn-site.xml</code></td><td>ResourceManager, NodeManager, scheduler, and container settings.</td></tr><tr><td><code>mapred-site.xml</code></td><td>MapReduce framework, shuffle, history-server, and job settings.</td></tr></tbody></table></div></div><p><code>core-default.xml</code>, <code>hdfs-default.xml</code>, <code>yarn-default.xml</code>, and
+<code>mapred-default.xml</code> are class-path resources supplied by the installed
+version. Do not edit them: an upgrade replaces them, and a site file can
+override non-final defaults. Consult the matching version&rsquo;s configuration
+reference when selecting a property, because names and defaults evolve.</p><p>The launch scripts obtain their configuration directory from <code>HADOOP_CONF_DIR</code>;
+when it is unset, a normal binary installation uses
+<code>${HADOOP_HOME}/etc/hadoop</code>. The <code>*-env.sh</code> files control launcher-level
+settings such as Java selection, daemon heap options, log directories, and
+PID locations. Per-daemon variables such as <code>HDFS_NAMENODE_OPTS</code>,
+<code>HDFS_DATANODE_OPTS</code>, <code>YARN_RESOURCEMANAGER_OPTS</code>, and
+<code>YARN_NODEMANAGER_OPTS</code> add JVM options for the named process.</p><p>Command-line <code>-Dname=value</code> settings and JVM system properties can override
+configuration for a process, subject to Hadoop&rsquo;s final-property rules. Use
+them for a controlled invocation or diagnostic, not as an undocumented
+replacement for a reviewed site configuration. A property in
+<code>HDFS_NAMENODE_OPTS</code> affects the NameNode process; it does not automatically
+configure DataNodes or YARN services.</p><p>A reliable configuration workflow is:</p><ol><li>Put shared Common values in <code>core-site.xml</code>.</li><li>Put service-specific values in the corresponding site file.</li><li>Distribute the same reviewed configuration set to every host that runs the
+affected client or daemon.</li><li>Validate XML with <code>hadoop conftest</code>, inspect generated values with
+<code>hdfs getconf</code> or the relevant command, and restart only the services whose
+settings changed.</li><li>Record the effective values and service version during an incident, because
+a client-side <code>-D</code> override can produce behavior that does not match the
+files on disk.</li></ol><h2 id=cluster-daemons>Cluster Daemons
+<a href=#cluster-daemons class=heading-anchor><span>#</span></a></h2><p>A minimal HDFS and YARN cluster has a NameNode, at least one DataNode, a
+ResourceManager, and at least one NodeManager. MapReduce adds an
+ApplicationMaster per running job and can use a JobHistory Server after jobs
+finish. Other daemons are optional and depend on the deployment.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Daemon</th><th>Launcher</th><th>Responsibility</th></tr></thead><tbody><tr><td>NameNode</td><td><code>hdfs --daemon start namenode</code></td><td>Maintains HDFS namespace and block metadata.</td></tr><tr><td>DataNode</td><td><code>hdfs --daemon start datanode</code></td><td>Stores HDFS block replicas and serves clients.</td></tr><tr><td>SecondaryNameNode</td><td><code>hdfs --daemon start secondarynamenode</code></td><td>Produces namespace checkpoints; it is not a standby.</td></tr><tr><td>ResourceManager</td><td><code>yarn --daemon start resourcemanager</code></td><td>Admits applications and schedules cluster resources.</td></tr><tr><td>NodeManager</td><td><code>yarn --daemon start nodemanager</code></td><td>Launches and monitors containers on one host.</td></tr><tr><td>WebAppProxy</td><td><code>yarn --daemon start proxyserver</code></td><td>Proxies web access to application web interfaces.</td></tr><tr><td>MapReduce JobHistory Server</td><td><code>mapred --daemon start historyserver</code></td><td>Serves completed MapReduce job history.</td></tr></tbody></table></div></div><p>YARN also has optional services such as the Timeline Service, Shared Cache
+Manager, Router, Registry DNS server, and Global Policy Generator. Start them
+only when their feature has been configured. The historical
+<code>yarn historyserver</code> launcher for the application history service is
+deprecated in Hadoop releases that report it as such; use the documented
+Timeline Service launcher instead. It remains distinct from
+<code>mapred historyserver</code>.</p><p>The NameNode and DataNodes, or the ResourceManager and NodeManagers, may run
+on the same kernel during development. Their architecture permits it, but a
+shared host, power domain, or network path defeats the failure isolation that a
+distributed design intends to provide. Put NameNode and DataNode storage in
+separate failure domains in a production cluster, and reserve enough disk and
+network capacity for replication and recovery traffic.</p><h2 id=hdfs-namespace-and-block-storage>HDFS Namespace and Block Storage
+<a href=#hdfs-namespace-and-block-storage class=heading-anchor><span>#</span></a></h2><p>HDFS presents directories and files to clients but stores a file as fixed-size
+blocks distributed across DataNodes. The NameNode owns the namespace:
+directories, file names, ownership, permissions, quotas, file-to-block
+mapping, and block-replica locations. It does not relay file data. A DataNode
+stores block replicas on local volumes and reports its state to the NameNode.</p><p>The separation determines the data path. To read a file, a client asks the
+NameNode for the block locations, chooses a nearby replica when possible, and
+streams bytes directly from that DataNode. To create a file, a client asks the
+NameNode to allocate a block and then writes packets through a DataNode
+pipeline. The first DataNode forwards packets to the next replica, and
+acknowledgements return through the pipeline to the client. The NameNode
+coordinates placement and metadata, while DataNodes carry the file contents.</p><p>The NameNode receives heartbeats and block reports from DataNodes. Missing
+heartbeats mark a node unavailable; reports allow the NameNode to detect
+under-replicated, over-replicated, or misplaced blocks and schedule corrective
+work. The default replication policy and rack awareness aim to preserve
+replicas across failure domains. An administrator should configure the network
+topology when racks or equivalent domains matter, because a replication factor
+alone does not describe placement quality.</p><p>HDFS metadata is stateful and critical. The NameNode persists an <code>fsimage</code>
+snapshot and an edits log. During startup it reconstructs the namespace from
+those records. Back up metadata using a tested procedure, monitor checkpoint
+age and edit-log growth, and test restoration with the same Hadoop version and
+storage layout. Copying a live namespace directory by hand is not a replacement
+for a coordinated backup and recovery procedure.</p><h2 id=hdfs-addresses-and-storage-directories>HDFS Addresses and Storage Directories
+<a href=#hdfs-addresses-and-storage-directories class=heading-anchor><span>#</span></a></h2><p><code>fs.defaultFS</code> identifies the default filesystem URI used by clients, for
+example:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;property&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;name&gt;</span>fs.defaultFS<span style=color:#f92672>&lt;/name&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;value&gt;</span>hdfs://nn1.example.net:8020<span style=color:#f92672>&lt;/value&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/property&gt;</span></span></span></code></pre></div></div></div><p>Clients without an explicit URI use that value. It also gives DataNode and
+other service configurations a common logical NameNode endpoint to reference.
+It does <strong>not</strong> by itself choose every NameNode listening address; HDFS
+server-side properties such as <code>dfs.namenode.rpc-address</code> define the NameNode
+RPC endpoint in configurations that need an explicit address.</p><p>The NameNode stores its metadata in <code>dfs.namenode.name.dir</code>. DataNodes store
+block replicas in <code>dfs.datanode.data.dir</code>, which may name several independent
+volumes. Configure every volume deliberately and monitor each volume. A
+DataNode can continue to use healthy volumes when a failed-volume policy
+allows it, but the lost replicas still require repair and the failed hardware
+requires investigation.</p><p>Running several DataNodes on one development host requires more than changing
+<code>dfs.datanode.data.dir</code>. Each instance needs separate storage directories and
+non-conflicting data-transfer, IPC, and HTTP addresses; each daemon should
+also have an unambiguous configuration and log/PID location. A NameNode
+instance likewise needs its own <code>dfs.namenode.name.dir</code> and RPC/HTTP
+addresses. Formatting creates storage identity, so never format a directory
+that contains a namespace or replicas that must be retained.</p><p>For a fresh, isolated development cluster, the order is:</p><ol><li>Set <code>fs.defaultFS</code> and the HDFS site properties.</li><li>Set safe, empty NameNode and DataNode storage paths.</li><li>Format the NameNode once with <code>hdfs namenode -format</code>.</li><li>Start the NameNode and then DataNodes.</li><li>Confirm registration in the NameNode web UI and with <code>hdfs dfsadmin</code>
+reports before loading data.</li></ol><p>The NameNode web interface is commonly exposed on port 9870 in Hadoop 3
+defaults, but a deployment can change that address. Use the configured URL,
+not a copied port number, to inspect live DataNodes, capacity, block health,
+and filesystem information. Each DataNode also has an administrative web
+interface.</p><h2 id=hdfs-clients-and-operations>HDFS Clients and Operations
+<a href=#hdfs-clients-and-operations class=heading-anchor><span>#</span></a></h2><p>HDFS is a distributed filesystem API and a shell interface, not a local POSIX
+filesystem. A FUSE-based integration can provide a mount in selected
+environments, but it does not make HDFS semantics or operational constraints
+identical to a local Unix filesystem. Use the HDFS client API or filesystem
+shell when application behavior depends on HDFS consistency, permissions, or
+atomic rename semantics.</p><p>The filesystem shell is command-oriented rather than an interactive REPL:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>hdfs dfs -mkdir -p /data/input
+</span></span><span style=display:flex><span>hdfs dfs -put local-events.csv /data/input/
+</span></span><span style=display:flex><span>hdfs dfs -ls /data/input
+</span></span><span style=display:flex><span>hdfs dfs -cat /data/input/local-events.csv
+</span></span><span style=display:flex><span>hdfs dfs -rm -r /data/output</span></span></code></pre></div></div></div><p><code>hadoop fs</code> performs the same generic operations against the configured
+filesystem and can therefore address HDFS, local filesystems, or installed
+object-store connectors depending on the URI. Specify a URI when an operation
+must not depend on a caller&rsquo;s <code>fs.defaultFS</code>.</p><p>Operational commands divide responsibility:</p><ul><li>Run <code>hdfs dfsadmin -report</code> to inspect DataNode capacity and service state.</li><li>Run <code>hdfs fsck /path</code> to inspect block health; it reports a condition and
+does not replace repair planning.</li><li>Run the HDFS balancer after changing capacity or placement, because new
+disks and nodes do not redistribute existing blocks automatically.</li><li>Use <code>hdfs cacheadmin</code>, <code>hdfs crypto</code>, <code>hdfs storagepolicies</code>, <code>hdfs ec</code>, and
+snapshot commands only after configuring the corresponding HDFS feature.</li><li>Use <code>hdfs haadmin</code> for controlled high-availability administration rather
+than attempting to promote a process by editing metadata files.</li></ul><p>HDFS also supplies focused tools for specialized operating tasks. <code>hdfs getconf</code> exposes selected effective configuration values; <code>hdfs jmxget</code>
+queries JMX attributes; and offline image or edits viewers inspect metadata
+copies without making the live NameNode a general-purpose query service.
+<code>hdfs diskbalancer</code> addresses uneven use of volumes within a DataNode, whereas
+the cluster balancer moves replicas between DataNodes. <code>hdfs mover</code> enforces
+storage-policy placement after a policy change. Each tool changes a different
+layer of placement or metadata, so a report of free cluster capacity does not
+by itself identify the appropriate one.</p><p>Optional HDFS services extend the filesystem interface without changing the
+NameNode/DataNode data path. HttpFS exposes filesystem operations through an
+HTTP gateway, while HDFS NFS Gateway supports an NFS interface for compatible
+workloads. Router-based federation presents several namespace subclusters
+through routers and adds commands such as <code>hdfs routeradmin</code>, <code>hdfs rbfbalance</code>, and federation balancing tools. JournalNodes support NameNode HA
+by storing shared edits; they do not store ordinary file blocks. Deploy these
+services only when their additional availability, interoperability, or
+namespace requirements justify their operational cost.</p><h2 id=checkpointing-and-high-availability>Checkpointing and High Availability
+<a href=#checkpointing-and-high-availability class=heading-anchor><span>#</span></a></h2><p>The SecondaryNameNode periodically obtains the NameNode image and edits,
+merges them into a new checkpoint, and returns the checkpoint for the active
+NameNode to use. Its name is historical: it is a checkpointing helper, not a
+hot spare and not a failover target. Losing the active NameNode is not solved
+by starting the SecondaryNameNode.</p><p>High availability uses separate active and standby NameNodes. The active
+NameNode processes namespace mutations; the standby applies the shared edits
+so it can take over when failover occurs. A typical deployment uses a quorum
+of JournalNodes for shared edit-log storage and ZooKeeper Failover Controllers
+for health monitoring and coordinated automatic failover. Fencing protects
+against two NameNodes becoming active at once.</p><p>HA therefore requires a complete design: distinct NameNode identities and
+addresses, shared-edit configuration, failover coordination, client failover
+configuration, fencing, and a tested recovery procedure. A replicated copy of
+<code>dfs.namenode.name.dir</code> does not provide those guarantees. Historical
+single-NameNode checkpointing and modern HA solve different operational
+problems and should not be described as interchangeable.</p><h2 id=yarn-resource-management>YARN Resource Management
+<a href=#yarn-resource-management class=heading-anchor><span>#</span></a></h2><p>YARN separates resource management from a particular computation engine. Its
+primary actors are:</p><ul><li>The <strong>ResourceManager</strong> accepts applications, maintains cluster resource
+state, and uses a scheduler to allocate containers.</li><li>A <strong>NodeManager</strong> runs on each worker host, reports node health and resource
+availability, localizes resources, launches containers, and monitors them.</li><li>An <strong>ApplicationMaster</strong> is created for one application. It negotiates
+containers with the ResourceManager and coordinates that application&rsquo;s work.</li><li>A <strong>container</strong> is a resource allocation and process-execution boundary,
+identified by requested resources such as memory and virtual cores. It is
+not a container-image format.</li></ul><p>The ResourceManager does not execute every task directly. It allocates an
+initial container for an application&rsquo;s ApplicationMaster. After it starts, the
+ApplicationMaster requests additional containers, receives allocations, asks
+the relevant NodeManagers to launch processes, tracks progress, handles
+application-level retries, and releases resources. That delegation lets
+MapReduce, Spark, Tez, distributed services, and custom applications use a
+common cluster allocator while implementing different execution models.</p><p>The scheduler decides <em>where and when</em> resources are allocated according to
+its configured queues and policies. It does not prove that an application is
+correct, preserve an application&rsquo;s intermediate state, or replace the
+ApplicationMaster&rsquo;s retry logic. Capacity planning must account for
+NodeManager-advertised resources, YARN&rsquo;s minimum and maximum allocation
+settings, queue limits, and the operating system resources reserved outside
+YARN.</p><p>Useful client operations include:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>yarn node -list
+</span></span><span style=display:flex><span>yarn queue -status default
+</span></span><span style=display:flex><span>yarn application -list
+</span></span><span style=display:flex><span>yarn application -status application_1234567890123_0001
+</span></span><span style=display:flex><span>yarn logs -applicationId application_1234567890123_0001
+</span></span><span style=display:flex><span>yarn top</span></span></code></pre></div></div></div><p><code>yarn logs</code> needs log aggregation to be configured if logs are no longer on
+the NodeManager host. <code>yarn schedulerconf</code> changes scheduler configuration
+only when that administrative facility is enabled and authorized; a direct
+runtime change should follow the same review and rollback process as an XML
+configuration change.</p><p>Other YARN commands correspond to optional services rather than the core
+resource path. <code>yarn timelinereader</code> queries the Timeline Service reader when
+that service is deployed. <code>yarn scmadmin</code> administers the Shared Cache
+Manager, which can avoid localizing identical public resources repeatedly.
+<code>yarn routeradmin</code> applies to YARN federation routers, and <code>yarn nodeattributes</code> manages or queries node attributes used by placement policy.
+The <code>globalpolicygenerator</code>, <code>router</code>, <code>sharedcachemanager</code>, <code>registrydns</code>,
+and <code>timelineserver</code> daemon names therefore belong in a deployment runbook
+only after their matching service has been configured.</p><h2 id=mapreduce-as-a-yarn-application>MapReduce as a YARN Application
+<a href=#mapreduce-as-a-yarn-application class=heading-anchor><span>#</span></a></h2><p>MapReduce is a batch model in which a mapper transforms input records into
+intermediate key-value pairs and reducers process groups of values for each
+key. It is not the storage layer and it is not YARN itself. On a modern Hadoop
+cluster, the MapReduce client submits an application to YARN, the MapReduce
+ApplicationMaster coordinates tasks, and task containers read and write data
+through HDFS or another configured filesystem.</p><p>A MapReduce job begins with a driver program that creates
+<code>org.apache.hadoop.mapreduce.Job</code> from a <code>Configuration</code>. The driver names
+the application JAR, mapper, reducer, input and output formats, map-output
+types, final-output types, input paths, output path, and reducer count. A
+framework default can be appropriate for a test, but an application should set
+semantics-critical choices explicitly because output types, partitioning, and
+paths determine correctness.</p><p>The submission lifecycle is:</p><ol><li>The client validates the job and stages its JAR, configuration, split
+metadata, and other resources in the configured filesystem.</li><li>The client asks YARN&rsquo;s ResourceManager to start the MapReduce
+ApplicationMaster.</li><li>The ApplicationMaster requests containers, preferring locations near input
+blocks where scheduler policy and capacity allow.</li><li>NodeManagers localize the submitted resources and launch map or reduce task
+JVMs in the allocated containers.</li><li>Tasks report status and counters to the ApplicationMaster. Failed attempts
+can be retried according to configuration; a task attempt is not the same
+as a logical task.</li><li>After output is committed, the ApplicationMaster reports final status to
+YARN. The JobHistory Server can subsequently serve completed MapReduce job
+details when configured.</li></ol><p>YARN resource allocation and HDFS block locality reinforce each other but do
+not guarantee that every mapper runs on the DataNode holding its input. Queue
+pressure, node health, container sizes, and scheduler policy can require a
+remote read. Applications should benefit from locality without assuming it.</p><h2 id=building-and-submitting-a-job>Building and Submitting a Job
+<a href=#building-and-submitting-a-job class=heading-anchor><span>#</span></a></h2><p>Use the <code>hadoop-client</code> dependency to compile a Java MapReduce client. Align
+its version with the deployed cluster&rsquo;s supported client version rather than
+copying an old example version:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.hadoop<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>hadoop-client<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>${hadoop.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>provided<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p><code>provided</code> keeps Hadoop&rsquo;s large framework JARs out of an application JAR when
+the cluster supplies them. Applications that need third-party libraries must
+package or distribute them in a form available to task containers. Build the
+application with Maven or another Java build tool; invoking the JDK compiler
+through an old launcher example is not required for a normal build.</p><p>The MapReduce distribution also includes operational and compatibility tools.
+<code>mapred job</code> and its client APIs inspect submitted jobs, <code>mapred historyserver</code>
+serves completed-job records, and <code>mapred pipes</code> supports the historical
+Hadoop Pipes interface for native applications. Input sampling utilities can
+produce partitioning data for total-order workloads, while framework-upload
+tools can distribute a MapReduce framework archive when a cluster requires
+it. Those tools support the same application lifecycle; they do not bypass
+YARN&rsquo;s application admission, container allocation, or HDFS staging rules.</p><p>A minimal word-count driver and mapper demonstrate the required declarations:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>WordCount</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>CountMapper</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>extends</span> Mapper<span style=color:#f92672>&lt;</span>LongWritable, Text, Text, IntWritable<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> IntWritable ONE <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> IntWritable(1);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> Text word <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Text();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Override</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>map</span>(LongWritable offset, Text line, Context context)
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>throws</span> IOException, InterruptedException {
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>for</span> (String token : line.<span style=color:#a6e22e>toString</span>().<span style=color:#a6e22e>split</span>(<span style=color:#e6db74>&#34;\\s+&#34;</span>)) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>token.<span style=color:#a6e22e>isEmpty</span>()) {
+</span></span><span style=display:flex><span>          word.<span style=color:#a6e22e>set</span>(token);
+</span></span><span style=display:flex><span>          context.<span style=color:#a6e22e>write</span>(word, ONE);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>SumReducer</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>extends</span> Reducer<span style=color:#f92672>&lt;</span>Text, IntWritable, Text, IntWritable<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Override</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>reduce</span>(Text word, Iterable<span style=color:#f92672>&lt;</span>IntWritable<span style=color:#f92672>&gt;</span> counts,
+</span></span><span style=display:flex><span>                       Context context)
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>throws</span> IOException, InterruptedException {
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>int</span> sum <span style=color:#f92672>=</span> 0;
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>for</span> (IntWritable count : counts) {
+</span></span><span style=display:flex><span>        sum <span style=color:#f92672>+=</span> count.<span style=color:#a6e22e>get</span>();
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>      context.<span style=color:#a6e22e>write</span>(word, <span style=color:#66d9ef>new</span> IntWritable(sum));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>    Configuration conf <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Configuration();
+</span></span><span style=display:flex><span>    Job job <span style=color:#f92672>=</span> Job.<span style=color:#a6e22e>getInstance</span>(conf, <span style=color:#e6db74>&#34;word count&#34;</span>);
+</span></span><span style=display:flex><span>    job.<span style=color:#a6e22e>setJarByClass</span>(WordCount.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>    job.<span style=color:#a6e22e>setMapperClass</span>(CountMapper.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>    job.<span style=color:#a6e22e>setCombinerClass</span>(SumReducer.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>    job.<span style=color:#a6e22e>setReducerClass</span>(SumReducer.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>    job.<span style=color:#a6e22e>setOutputKeyClass</span>(Text.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>    job.<span style=color:#a6e22e>setOutputValueClass</span>(IntWritable.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>    FileInputFormat.<span style=color:#a6e22e>addInputPath</span>(job, <span style=color:#66d9ef>new</span> Path(args<span style=color:#f92672>[</span>0<span style=color:#f92672>]</span>));
+</span></span><span style=display:flex><span>    FileOutputFormat.<span style=color:#a6e22e>setOutputPath</span>(job, <span style=color:#66d9ef>new</span> Path(args<span style=color:#f92672>[</span>1<span style=color:#f92672>]</span>));
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>exit</span>(job.<span style=color:#a6e22e>waitForCompletion</span>(<span style=color:#66d9ef>true</span>) <span style=color:#f92672>?</span> 0 : 1);
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Prepare input, submit, and inspect output with separate commands:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>hdfs dfs -mkdir -p /examples/wordcount/input
+</span></span><span style=display:flex><span>hdfs dfs -put input.txt /examples/wordcount/input/
+</span></span><span style=display:flex><span>hadoop jar wordcount.jar example.WordCount <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  /examples/wordcount/input /examples/wordcount/output
+</span></span><span style=display:flex><span>hdfs dfs -cat /examples/wordcount/output/part-r-00000</span></span></code></pre></div></div></div><p>The output directory must not exist at submission time. MapReduce rejects an
+existing output path because replacing a previous result during a distributed
+job would make failed and retried attempts unsafe. Delete an output directory
+only after confirming that it is disposable, or choose a new run-specific
+path.</p><h2 id=input-mapping-and-local-aggregation>Input, Mapping, and Local Aggregation
+<a href=#input-mapping-and-local-aggregation class=heading-anchor><span>#</span></a></h2><p><code>InputFormat</code> maps configured input paths to <code>InputSplit</code> instances. A split is
+a unit of work metadata, not necessarily a physical HDFS block. File-based
+input formats often align splits with block boundaries to improve locality, but
+compression, file format, and custom input logic can change that relationship.</p><p>For each map task, a <code>RecordReader</code> turns one split into a sequence of input
+key-value records. <code>TextInputFormat</code>, for example, commonly supplies a byte
+offset as <code>LongWritable</code> and a line as <code>Text</code>. The framework creates a mapper
+instance and calls its lifecycle in this order:</p><ol><li><code>setup(Context)</code> runs once before records are processed.</li><li><code>map(KEYIN, VALUEIN, Context)</code> runs once for each record.</li><li><code>cleanup(Context)</code> runs once after the record reader is exhausted.</li></ol><p>The generic mapper signature is:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Mapper</span><span style=color:#f92672>&lt;</span>KEYIN, VALUEIN, KEYOUT, VALUEOUT<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>protected</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>map</span>(KEYIN key, VALUEIN value, Context context)
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>throws</span> IOException, InterruptedException {
+</span></span><span style=display:flex><span>    context.<span style=color:#a6e22e>write</span>((KEYOUT) key, (VALUEOUT) value);
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Applications override <code>map</code> to emit their intermediate representation. A map
+method must not retain mutable framework objects beyond the call unless it
+makes a safe copy, because Hadoop can reuse key and value objects while
+reading records.</p><p>Mapper output is buffered, partitioned, spilled, and sorted locally. A
+combiner can run as a local partial reduction before the shuffle, which can
+reduce network traffic. The framework may run a combiner zero, one, or many
+times, however, so its operation must preserve the result under repeated and
+partial application. A sum is safe for word count; an operation that depends
+on receiving every value exactly once is not. A combiner also does not replace
+the reducer&rsquo;s final grouping semantics.</p><h2 id=partitioning-shuffle-and-reduce>Partitioning, Shuffle, and Reduce
+<a href=#partitioning-shuffle-and-reduce class=heading-anchor><span>#</span></a></h2><p>Each map-output record is assigned to a reducer partition. The default
+partitioner hashes the map-output key, but <code>Job#setPartitionerClass</code> can
+select a custom partitioner. The driver sets the number of reduce tasks with
+<code>Job#setNumReduceTasks</code>; it is not derived from the number of map tasks.
+Setting zero reducers produces map-only output, while a positive reducer count
+creates one final output partition per reducer.</p><p>The shuffle transfers every mapper&rsquo;s partition for reducer <em>r</em> to reducer
+<em>r</em>. Reducer tasks merge and sort those segments by key before invoking
+<code>reduce</code>. The default sort comparator compares the map-output key. A custom
+sort comparator can change ordering, and
+<code>Job#setGroupingComparatorClass</code> can define which adjacent sorted keys form
+one reduce group. Use custom comparators only with a partitioning strategy
+that sends all keys in a group to the same reducer.</p><p>The reducer lifecycle mirrors the mapper lifecycle:</p><ol><li><code>setup(Context)</code> runs once.</li><li><code>reduce(KEYOUT, Iterable&lt;VALUEOUT>, Context)</code> runs once for each grouped
+key after shuffle and sort.</li><li><code>cleanup(Context)</code> runs once.</li></ol><p>The iterable of values can stream from shuffle data. A reducer should process
+it during the call rather than retaining it for later use. The output format
+and output committer write task output to a work location and coordinate the
+job commit. The commit protocol is why output-path existence, speculative
+attempts, and filesystem rename behavior are operational concerns rather than
+mere command-line details.</p><h2 id=operating-the-combined-system>Operating the Combined System
+<a href=#operating-the-combined-system class=heading-anchor><span>#</span></a></h2><p>Hadoop&rsquo;s components form a deliberate dependency chain:</p><ol><li>Hadoop Common loads configuration, supplies clients, and launches processes.</li><li>HDFS records where input and output blocks live, while clients transfer
+data directly to DataNodes.</li><li>YARN allocates the ApplicationMaster and task containers on available
+NodeManagers.</li><li>MapReduce uses those containers to run input reading, mapping, local sort,
+partitioning, shuffle, reducing, and output commit.</li></ol><p>An operational investigation should follow the same chain. A job that cannot
+read input may have an HDFS path, permission, block-health, or DataNode
+problem before it has a MapReduce problem. A job that remains accepted may be
+waiting for an ApplicationMaster allocation because of a YARN queue or
+container-size constraint. A job with completed maps but stalled reducers may
+require examination of shuffle failures, reducer allocations, comparator
+semantics, or network capacity.</p><p>Start diagnosis with the effective configuration and command output, then use
+the service appropriate to the observed state:</p><ol><li>Confirm the filesystem URI, input path, output path, permissions, and HDFS
+health with <code>hdfs dfs</code>, <code>hdfs fsck</code>, and NameNode reports.</li><li>Confirm DataNode and NodeManager registration, capacity, and health.</li><li>Inspect YARN application state, queue state, container diagnostics, and
+aggregated logs.</li><li>Inspect MapReduce counters, attempts, task diagnostics, and job history.</li><li>Change one reviewed configuration or operational condition, then verify the
+resulting state rather than treating a daemon restart as proof of recovery.</li></ol><p>The progression preserves Hadoop&rsquo;s boundaries: Common provides the shared
+runtime, HDFS provides storage, YARN provides resources, and MapReduce
+provides one batch execution model over both.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/hadoop-overview/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

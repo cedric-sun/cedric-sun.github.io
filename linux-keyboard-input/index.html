@@ -1,0 +1,93 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Keyboard Input</title></head><body><main><article><div class=article-header><h1>Linux Keyboard Input</h1><div class=aux>Last update: 2022-11-20 20:04:02 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/input/>Input</a>
+|
+<a href=/tags/keyboard/>Keyboard</a>
+|
+<a href=/tags/linux/>Linux</a></div></div><div class=article-content><p>Linux separates a keyboard&rsquo;s transport-level report from a stable input key code and
+from the text or action produced by a keyboard layout. Keeping those layers distinct
+explains why a PS/2 and a USB keyboard can generate different hardware data but both
+report <code>KEY_F</code>.</p><h2 id=overview>Overview
+<a href=#overview class=heading-anchor><span>#</span></a></h2><p>Input follows four conceptual stages:</p><ol><li>A transport driver receives bytes or reports. The <code>atkbd</code> driver handles AT and
+PS/2 scan-code sets, while <code>usbhid</code> parses USB HID usages.</li><li>The driver parses make, break, prefix, and repeat state, then reports a Linux
+input key code such as <code>KEY_F</code> (33) with a press, release, or repeat value.</li><li>The input core publishes events through evdev. A graphical compositor or input
+library normally applies its own layout to these events.</li><li>For a Linux virtual console, the kernel keyboard layer applies the active console
+keymap and emits bytes, Unicode characters, strings, or console actions to the
+terminal layer.</li></ol><p>A scan code is therefore not a character, and a Linux key code is not an X11,
+Wayland, or Unicode code point.</p><h2 id=ibm-pc-xt-and-at-protocols>IBM PC, XT, and AT Protocols
+<a href=#ibm-pc-xt-and-at-protocols class=heading-anchor><span>#</span></a></h2><p>The original 83-key IBM PC and PC/XT keyboards established the byte assignments now
+called scan-code set 1. Their interface was effectively keyboard-to-host: the
+keyboard supplied clocked serial data, but the host did not have the AT command
+protocol for controlling LEDs, repeat, and scan-set selection. An ordinary set-1
+press uses a make byte from <code>0x01</code> through <code>0x7f</code>; releasing that key sets bit 7.
+For example, Escape produces <code>0x01</code> on press and <code>0x81</code> on release.</p><p>The 84-key IBM PC/AT keyboard introduced a bidirectional interface and scan-code set
+2. Set 2 changed positions rather than extending set 1 numerically: left Control is
+<code>0x14</code> in set 2 but <code>0x1d</code> in set 1. A break sequence uses an <code>0xf0</code> prefix, so left
+Control produces <code>14</code> on press and <code>f0 14</code> on release. The host can send commands to
+set LEDs, typematic behavior, and the active set.</p><p>PC-compatible AT controllers commonly translate keyboard set-2 bytes into set-1
+form for software compatibility. Linux consequently identifies many built-in
+keyboards as <code>AT Translated Set 2 keyboard</code>: the physical keyboard speaks set 2,
+while the controller exposes translated bytes. Scan-code set 3, associated with IBM
+terminal and later PS/2 designs, assigns additional keys independently and supports
+per-key make, break, and typematic configuration. Current Linux <code>atkbd</code> source
+supports translated set 2, raw set 2, and set 3; set 2 remains its default.</p><p>USB keyboards do not send these AT byte streams. They send HID reports containing
+usage identifiers, and the HID input driver maps those usages to the same Linux
+<code>KEY_*</code> namespace.</p><h2 id=scan-code-sequences>Scan-Code Sequences
+<a href=#scan-code-sequences class=heading-anchor><span>#</span></a></h2><p>Press is also called <strong>make</strong>, and release is called <strong>break</strong>. A held typematic key
+generates repeated make reports after the configured delay; it does not alternate
+make and break. The Linux input interface represents hardware or software
+autorepeat as <code>EV_KEY</code> value 2.</p><p>The <code>0xe0</code> prefix extends both set 1 and set 2. For example, set-1 left Control uses
+<code>1d</code>/<code>9d</code>, while right Control uses <code>e0 1d</code>/<code>e0 9d</code>. Set 2 instead uses
+<code>14</code>/<code>f0 14</code> and <code>e0 14</code>/<code>e0 f0 14</code>. The <code>0xe1</code> prefix introduces exceptional
+sequences such as Pause. Print Screen and Pause are multi-byte compatibility
+sequences rather than ordinary keys with a single byte. A driver must parse the
+stream as a state machine because treating each byte independently creates phantom
+Shift or Control events.</p><p>The term “scan code” is also used for higher-level transport identifiers. For
+example, an evdev <code>EV_MSC</code>/<code>MSC_SCAN</code> value can encode a USB HID usage such as
+<code>0x70009</code>, while the associated <code>EV_KEY</code> event is still <code>KEY_F</code> (33). Numeric
+coincidence between old set-1 values and early Linux key codes is historical, not an
+interface invariant.</p><h2 id=kernel-scan-code-to-keycode-mapping>Kernel Scan-Code-to-Keycode Mapping
+<a href=#kernel-scan-code-to-keycode-mapping class=heading-anchor><span>#</span></a></h2><p>Each low-level driver owns its protocol mapping. The AT driver indexes a default,
+replaceable scan-code-to-keycode table; HID drivers derive key codes from HID
+usages. Linux key codes are defined in the UAPI
+<a href=https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h><code>input-event-codes.h</code></a>
+and extend beyond the original 1–255 console range.</p><p><code>setkeycodes</code> modifies selected mappings for the console AT keyboard path. It accepts
+pairs such as an escaped set-1 scan code and a decimal key code:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>sudo setkeycodes e06f <span style=color:#ae81ff>112</span></span></span></code></pre></div></div></div><p>The command does not remap arbitrary USB HID devices, and it does not define the
+character produced by key code 112. A console keymap loaded with <code>loadkeys</code> performs
+that second operation. Modern desktop input stacks apply userspace layouts instead.</p><h2 id=console-keymaps-modifiers-and-character-sets>Console Keymaps, Modifiers, and Character Sets
+<a href=#console-keymaps-modifiers-and-character-sets class=heading-anchor><span>#</span></a></h2><p>A <code>keymaps(5)</code> file describes the Linux virtual-console translation table.
+<code>keycode N = ...</code> selects an action according to the active modifier mask. The
+kernel keyboard layer defines weights for Shift (1), AltGr (2), Control (4), Alt
+(8), ShiftL (16), ShiftR (32), CtrlL (64), CtrlR (128), and CapsShift (256).
+Map files list only the combinations they need:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>keymaps 0-2,4-5,8,12
+</span></span><span style=display:flex><span>keycode 30 = +a A
+</span></span><span style=display:flex><span>control alt keycode 111 = Boot</span></span></code></pre></div></div></div><p>Keysyms can emit characters, strings, change a modifier or lock, switch virtual
+consoles, or request another console action. A leading <code>+</code> marks a letter as
+Caps-Lock-sensitive. <code>string F100 = "text"</code> binds a function-string action, while a
+compose definition combines two input characters after a Compose or dead-key action:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>compose &#39;`&#39; &#39;a&#39; to &#39;à&#39;</span></span></code></pre></div></div></div><p>A <code>charset "iso-8859-1"</code> declaration controls how subsequent symbolic keysyms are
+interpreted. Numeric keysyms are not portable between kernel versions; symbolic
+names or <code>U+hhhh</code> Unicode notation are preferable. The virtual console&rsquo;s
+<code>K_UNICODE</code> mode emits UTF-8 for Unicode keysyms, whereas <code>K_XLATE</code> applies the
+legacy byte-oriented translation. <code>K_MEDIUMRAW</code> exposes keycode-oriented data and
+<code>K_RAW</code> exposes an approximation of raw scan bytes. Those console modes do not
+change the evdev ABI.</p><h2 id=input-and-console-device-nodes>Input and Console Device Nodes
+<a href=#input-and-console-device-nodes class=heading-anchor><span>#</span></a></h2><p><code>/proc/bus/input/devices</code> and <code>/sys/class/input</code> enumerate input devices and their
+handlers. <code>/dev/input/eventN</code> is a binary evdev stream of native
+<code>struct input_event</code> records. Keyboard records commonly include:</p><ul><li><code>EV_MSC</code>/<code>MSC_SCAN</code> for a transport identifier when the driver supplies one;</li><li><code>EV_KEY</code> with a <code>KEY_*</code> code and value 0 (release), 1 (press), or 2 (repeat); and</li><li><code>EV_SYN</code>/<code>SYN_REPORT</code> to terminate one event frame.</li></ul><p>Use <code>evtest</code> or <code>libevdev</code> rather than decoding a <code>hexdump</code>, because record size and
+time fields follow the userspace ABI of the reading process:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>grep -A5 -B1 -i keyboard /proc/bus/input/devices
+</span></span><span style=display:flex><span>sudo evtest /dev/input/event4</span></span></code></pre></div></div></div><p>Reading an event node requires the permissions assigned by the system&rsquo;s input-device
+policy and can expose passwords typed anywhere on that device.</p><p><code>/dev/tty1</code>, <code>/dev/tty2</code>, and the other virtual-terminal nodes expose terminal input
+after console keymap translation and line-discipline processing. <code>/dev/tty0</code> refers
+to the active virtual terminal; <code>/dev/console</code> refers to the configured system
+console and is not a raw keyboard device.</p><h2 id=console-utilities>Console Utilities
+<a href=#console-utilities class=heading-anchor><span>#</span></a></h2><p>Run console-mode tools from a real virtual terminal rather than a terminal emulator:</p><ul><li><code>showkey -s</code>, <code>showkey -k</code>, and <code>showkey -a</code> display scan-code, keycode, and
+character-oriented views. Raw mode can make the console temporarily unusable if
+the program is interrupted.</li><li><code>getkeycodes</code> displays the AT driver&rsquo;s current scan-code mappings.</li><li><code>setkeycodes SCANCODE KEYCODE ...</code> changes selected AT mappings.</li><li><code>dumpkeys</code> writes the current console layout in <code>keymaps(5)</code> syntax;
+<code>dumpkeys --long-info</code> also lists known keysyms.</li><li><code>loadkeys FILE</code> compiles and installs a keymap into the kernel console tables.</li></ul><p>The upstream <a href=https://docs.kernel.org/input/input.html>Linux input documentation</a>,
+<a href=https://docs.kernel.org/input/event-codes.html>event-code specification</a>, current
+<a href=https://github.com/torvalds/linux/blob/master/drivers/input/keyboard/atkbd.c><code>atkbd</code> source</a>,
+and upstream <a href=https://man7.org/linux/man-pages/man5/keymaps.5.html><code>keymaps(5)</code></a>
+define the interfaces described here.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-keyboard-input/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

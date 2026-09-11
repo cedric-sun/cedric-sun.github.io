@@ -1,0 +1,202 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>GObject and GTK Type System</title></head><body><main><article><div class=article-header><h1>GObject and GTK Type System</h1><div class=aux>Last update: 2021-09-24 10:04:52 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/glib/>Glib</a>
+|
+<a href=/tags/gtk/>Gtk</a></div></div><div class=article-content><p>GTK builds its object model on GType and GObject. GType records runtime type
+relationships and metadata; GObject adds reference-counted instances,
+properties, and signals; GIO and GTK then use those facilities for actions and
+widgets. C macros generate repetitive registration code, but the object and
+class layouts remain ordinary C structures.</p><h2 id=instance-and-class-layout>Instance and Class Layout
+<a href=#instance-and-class-layout class=heading-anchor><span>#</span></a></h2><p>A classed, instantiable type has two related structures:</p><ul><li>The <strong>instance structure</strong> occupies memory in every object. Its first member
+is the parent instance.</li><li>The <strong>class structure</strong> is shared by instances of a type. Its first member is
+the parent class, followed by virtual-function slots and class-wide state.</li></ul><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>struct</span> _Shape {
+</span></span><span style=display:flex><span>  GObject parent_instance;
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> _ShapeClass {
+</span></span><span style=display:flex><span>  GObjectClass parent_class;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>double</span> (<span style=color:#f92672>*</span>area)(Shape <span style=color:#f92672>*</span>self);
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> _Circle {
+</span></span><span style=display:flex><span>  Shape parent_instance;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>double</span> radius;
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> _CircleClass {
+</span></span><span style=display:flex><span>  ShapeClass parent_class;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>The parent member at offset zero lets a <code>Circle *</code> be viewed as a <code>Shape *</code>
+without changing the address. The corresponding class prefix makes inherited
+virtual slots available in <code>CircleClass</code>. GObject supports one implementation
+parent; interfaces provide multiple independent contracts without embedding
+multiple parent instances.</p><p>Generated cast macros such as <code>SHAPE()</code> combine a C cast with runtime checks in
+appropriate builds. They express a registered relationship and do not make an
+unrelated structure layout valid.</p><h2 id=declaring-and-defining-types>Declaring and Defining Types
+<a href=#declaring-and-defining-types class=heading-anchor><span>#</span></a></h2><p>Public headers declare a type, while one implementation file defines its
+registration and private representation. A final type cannot be subclassed:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>/* note-pad.h */</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#define NOTE_TYPE_PAD (note_pad_get_type())
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>G_DECLARE_FINAL_TYPE</span>(NotePad, note_pad, NOTE, PAD, GObject)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>NotePad <span style=color:#f92672>*</span><span style=color:#a6e22e>note_pad_new</span>(<span style=color:#66d9ef>void</span>);</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>/* note-pad.c */</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> _NotePad {
+</span></span><span style=display:flex><span>  GObject parent_instance;
+</span></span><span style=display:flex><span>  GString <span style=color:#f92672>*</span>text;
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>G_DEFINE_TYPE</span>(NotePad, note_pad, G_TYPE_OBJECT)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>note_pad_class_init</span>(NotePadClass <span style=color:#f92672>*</span>klass)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#75715e>/* Install properties, signals, and virtual methods here. */</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>note_pad_init</span>(NotePad <span style=color:#f92672>*</span>self)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  self<span style=color:#f92672>-&gt;</span>text <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_string_new</span>(NULL);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>G_DECLARE_FINAL_TYPE()</code> declares <code>note_pad_get_type()</code>, the instance and class
+names, cast and type-check helpers, and automatic-cleanup support derived from
+the parent type. The implementation owns the complete instance layout, so
+fields remain private.</p><p>A derivable type exposes the inheritance boundary:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>#define DOCUMENT_TYPE (document_get_type())
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>G_DECLARE_DERIVABLE_TYPE</span>(Document, document, DOCUMENT, OBJECT, GObject)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> _DocumentClass {
+</span></span><span style=display:flex><span>  GObjectClass parent_class;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>gboolean</span> (<span style=color:#f92672>*</span>save)(Document <span style=color:#f92672>*</span>self, GError <span style=color:#f92672>**</span>error);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  gpointer padding[<span style=color:#ae81ff>8</span>];
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p><code>G_DECLARE_DERIVABLE_TYPE()</code> defines the public instance structure containing
+only the parent instance. The API author defines the class structure because
+subclasses must compile against its virtual-method slots. Instance state
+should remain private:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>typedef</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>char</span> <span style=color:#f92672>*</span>path;
+</span></span><span style=display:flex><span>  gboolean modified;
+</span></span><span style=display:flex><span>} DocumentPrivate;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>G_DEFINE_TYPE_WITH_PRIVATE</span>(Document, document, G_TYPE_OBJECT)</span></span></code></pre></div></div></div><p><code>document_get_instance_private()</code> then locates storage whose offset GType
+assigned during registration. Reserved class padding can preserve room for
+future ABI additions, but adding fields to an installed public class structure
+without an ABI plan remains unsafe. An implementation-only base can use
+<code>G_DEFINE_ABSTRACT_TYPE()</code> when direct construction must be prohibited.</p><h2 id=gtype-registration-and-generated-functions>GType Registration and Generated Functions
+<a href=#gtype-registration-and-generated-functions class=heading-anchor><span>#</span></a></h2><p>A <code>GType</code> is an integer identifier backed by process-wide metadata. The
+lower-level static registration API accepts a parent type, a name,
+<code>GTypeInfo</code>, and flags:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>typedef</span> <span style=color:#66d9ef>struct</span> _GTypeInfo {
+</span></span><span style=display:flex><span>  guint16                class_size;
+</span></span><span style=display:flex><span>  GBaseInitFunc          base_init;
+</span></span><span style=display:flex><span>  GBaseFinalizeFunc      base_finalize;
+</span></span><span style=display:flex><span>  GClassInitFunc         class_init;
+</span></span><span style=display:flex><span>  GClassFinalizeFunc     class_finalize;
+</span></span><span style=display:flex><span>  gconstpointer          class_data;
+</span></span><span style=display:flex><span>  guint16                instance_size;
+</span></span><span style=display:flex><span>  guint16                n_preallocs;
+</span></span><span style=display:flex><span>  GInstanceInitFunc      instance_init;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>const</span> GTypeValueTable <span style=color:#f92672>*</span>value_table;
+</span></span><span style=display:flex><span>} GTypeInfo;</span></span></code></pre></div></div></div><p>Class and instance sizes describe allocations. Class initialization installs
+virtual methods, properties, and signals once for a class; instance
+initialization establishes state for every new instance. The value table
+integrates non-object values with <code>GValue</code>. Dynamic registration supports
+loadable type modules, while registering new fundamental root types is a
+specialized operation rather than normal application practice.</p><p><code>G_DEFINE_TYPE(NotePad, note_pad, G_TYPE_OBJECT)</code> generates the supported
+<code>note_pad_get_type()</code> implementation and internal registration helpers. In
+conceptual terms, the generated function:</p><ol><li>Registers <code>NotePad</code> as a child of <code>GObject</code> exactly once.</li><li>Supplies <code>sizeof(NotePadClass)</code> and <code>sizeof(NotePad)</code>.</li><li>Associates <code>note_pad_class_init()</code> and <code>note_pad_init()</code> with the type.</li><li>Returns the stable type identifier on subsequent calls.</li></ol><p>Names of generated internal variables are macro implementation details and
+must not become API. The public contract consists of <code>note_pad_get_type()</code>,
+declared functions, documented properties and signals, and any supported
+class layout.</p><p>Interfaces use the parallel declaration and definition macros:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>#define APP_TYPE_PRINTABLE (app_printable_get_type())
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>G_DECLARE_INTERFACE</span>(AppPrintable, app_printable, APP, PRINTABLE, GObject)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> _AppPrintableInterface {
+</span></span><span style=display:flex><span>  GTypeInterface parent_iface;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>void</span> (<span style=color:#f92672>*</span>print)(AppPrintable <span style=color:#f92672>*</span>self);
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>G_DEFINE_INTERFACE</span>(AppPrintable, app_printable, G_TYPE_OBJECT)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>app_printable_default_init</span>(AppPrintableInterface <span style=color:#f92672>*</span>iface)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  (<span style=color:#66d9ef>void</span>) iface;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>A concrete type attaches the interface during its one-time registration:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>G_DEFINE_TYPE_WITH_CODE</span>(
+</span></span><span style=display:flex><span>    Report, report, G_TYPE_OBJECT,
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>G_IMPLEMENT_INTERFACE</span>(APP_TYPE_PRINTABLE,
+</span></span><span style=display:flex><span>                          report_printable_init))</span></span></code></pre></div></div></div><p><code>G_IMPLEMENT_INTERFACE()</code> associates the implementation initializer with the
+interface while <code>Report</code> is registered.</p><h2 id=signal-declaration-and-emission>Signal Declaration and Emission
+<a href=#signal-declaration-and-emission class=heading-anchor><span>#</span></a></h2><p>Signals are registered against an instantiable type, commonly in class
+initialization:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>enum</span> {
+</span></span><span style=display:flex><span>  CHANGED,
+</span></span><span style=display:flex><span>  N_SIGNALS
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> guint signals[N_SIGNALS];
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>note_pad_class_init</span>(NotePadClass <span style=color:#f92672>*</span>klass)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  signals[CHANGED] <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>      <span style=color:#a6e22e>g_signal_new</span>(<span style=color:#e6db74>&#34;changed&#34;</span>,
+</span></span><span style=display:flex><span>                   <span style=color:#a6e22e>G_TYPE_FROM_CLASS</span>(klass),
+</span></span><span style=display:flex><span>                   G_SIGNAL_RUN_LAST,
+</span></span><span style=display:flex><span>                   <span style=color:#ae81ff>0</span>,
+</span></span><span style=display:flex><span>                   NULL, NULL, NULL,
+</span></span><span style=display:flex><span>                   G_TYPE_NONE,
+</span></span><span style=display:flex><span>                   <span style=color:#ae81ff>1</span>, G_TYPE_STRING);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The registration fixes the name, parameter types, return type, emission flags,
+and optional class-handler slot. Consumers connect handlers to a particular
+instance:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>gulong handler_id <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>g_signal_connect</span>(pad, <span style=color:#e6db74>&#34;changed&#34;</span>, <span style=color:#a6e22e>G_CALLBACK</span>(on_changed), editor);</span></span></code></pre></div></div></div><p>The implementation emits on a particular instance:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>g_signal_emit</span>(pad, signals[CHANGED], <span style=color:#ae81ff>0</span>, changed_text);</span></span></code></pre></div></div></div><p>Emission is synchronous on the emitting thread. Depending on signal flags, a
+class handler runs before, after, or during cleanup around normal and <code>after</code>
+handlers. Normal handlers run in connection order, but handlers can stop an
+emission or connect, disconnect, block, and unblock other handlers. Signal
+callbacks must therefore tolerate re-entrancy and must not be treated as an
+asynchronous queue.</p><p>The emitter automatically disconnects its handlers when it is finalized.
+Destruction of <code>editor</code>, the user-data object above, does not automatically
+disconnect the handler. Safe lifetime choices are:</p><ol><li>Save <code>handler_id</code> and disconnect it while the receiver is disposed.</li><li>Use <code>g_signal_connect_object()</code> in single-threaded code so receiver
+destruction disconnects automatically. Upstream documentation states that
+this helper is not thread-safe.</li><li>Use <code>g_signal_connect_data()</code> with a closure notify and an explicitly held
+strong reference. This can retain the receiver indefinitely if the handler
+is never disconnected.</li></ol><p>Disconnecting explicitly provides the clearest ownership boundary. Holding an
+object reference only for the duration of a callback protects that call; it
+does not make concurrent mutation safe.</p><h2 id=actions-state-and-groups>Actions, State, and Groups
+<a href=#actions-state-and-groups class=heading-anchor><span>#</span></a></h2><p><code>GAction</code> names an operation without describing its label, icon, or widget. An
+action has:</p><ul><li>an immutable name and parameter type;</li><li>an enabled flag;</li><li>an optional state with an immutable state type; and</li><li>an optional state hint describing valid values.</li></ul><p>Activation parameters are transient inputs. State persists and represents a
+toggle or one choice from a set. A stateless <code>"open-bookmark"</code> action can take
+a string parameter, while a <code>"fullscreen"</code> action can hold Boolean state. A
+radio-style <code>"justify"</code> action commonly uses the same string type for its
+activation parameter and state.</p><p><code>GSimpleAction</code> is the standard implementation:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>GSimpleAction <span style=color:#f92672>*</span>action <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>g_simple_action_new_stateful</span>(<span style=color:#e6db74>&#34;wrap&#34;</span>,
+</span></span><span style=display:flex><span>                                 NULL,
+</span></span><span style=display:flex><span>                                 <span style=color:#a6e22e>g_variant_new_boolean</span>(FALSE));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_signal_connect</span>(action, <span style=color:#e6db74>&#34;activate&#34;</span>, <span style=color:#a6e22e>G_CALLBACK</span>(toggle_wrap), view);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_action_map_add_action</span>(<span style=color:#a6e22e>G_ACTION_MAP</span>(window), <span style=color:#a6e22e>G_ACTION</span>(action));
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_object_unref</span>(action);</span></span></code></pre></div></div></div><p>For a custom state transition, connect <code>change-state</code>, validate the proposed
+<code>GVariant</code>, apply the operation, and call <code>g_simple_action_set_state()</code>.
+Changing state and activating are separate operations; neither should be used
+to smuggle presentation data into the action.</p><p><code>GActionMap</code> supports adding, looking up, and removing actions by their own
+unprefixed names. <code>GActionGroup</code> exposes a group for querying, activating, and
+observing actions. <code>GtkApplication</code> and <code>GtkApplicationWindow</code> implement the
+relevant interfaces, which makes application and window scopes direct action
+maps.</p><p>GTK references scoped actions with prefixes:</p><ul><li><code>app.quit</code> resolves in the application scope.</li><li><code>win.fullscreen</code> resolves in the current window scope.</li><li>A group inserted with
+<code>gtk_widget_insert_action_group(widget, "view", group)</code> supplies names such
+as <code>view.wrap</code> below that widget.</li></ul><p>Widgets implementing <code>GtkActionable</code>, including buttons and switches, expose
+<code>action-name</code> and <code>action-target</code> properties. When the widget activates, GTK
+walks its widget ancestry and then the application to resolve the scoped name.
+The nearest matching scope controls behavior and state. Class-wide widget
+actions installed with <code>gtk_widget_class_install_action()</code> provide another
+mechanism for actions shared by every instance of a widget class.</p><p>The resulting separation is deliberate: GType defines runtime relationships,
+GObject defines instances and synchronous signals, GAction defines operations,
+and GTK resolves those operations through widget, window, and application
+scopes.</p><h2 id=upstream-references>Upstream References
+<a href=#upstream-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.gtk.org/gobject/concepts.html>GObject Type System Concepts</a></li><li><a href=https://docs.gtk.org/gobject/signals.html>GObject Signals</a></li><li><a href=https://docs.gtk.org/gio/iface.Action.html>GIO <code>GAction</code></a></li><li><a href=https://docs.gtk.org/gtk4/actions.html>GTK Actions</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/gobject-and-gtk-type-system/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

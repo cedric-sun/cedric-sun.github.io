@@ -1,0 +1,77 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>HTTP Video Streaming</title></head><body><main><article><div class=article-header><h1>HTTP Video Streaming</h1><div class=aux>Last update: 2022-11-26 21:49:55 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/http/>Http</a>
+|
+<a href=/tags/streaming/>Streaming</a>
+|
+<a href=/tags/video/>Video</a></div></div><div class=article-content><p>HTTP video delivery ranges from one seekable file to an adaptive sequence of
+short media segments. HTTP moves representations and validators; a container
+organizes timed tracks, and codecs encode the audio and video samples. Keeping
+those layers separate makes range handling, caching, and playback failures
+easier to diagnose.</p><h2 id=progressive-download>Progressive Download
+<a href=#progressive-download class=heading-anchor><span>#</span></a></h2><p>A browser can play a self-contained media file through a <code>&lt;video></code> element. It
+may begin with a normal <code>GET</code> or request only a byte range:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#a6e22e>GET</span> /media/talk.mp4 <span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span>
+</span></span><span style=display:flex><span>Host<span style=color:#f92672>:</span> <span style=color:#ae81ff>media.example</span>
+</span></span><span style=display:flex><span>Range<span style=color:#f92672>:</span> <span style=color:#ae81ff>bytes=0-</span></span></span></code></pre></div></div></div><p>When the selected representation supports ranges, the server returns
+<code>206 Partial Content</code>, the selected interval, and the full representation
+length:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span> <span style=color:#ae81ff>206</span> <span style=color:#a6e22e>Partial Content</span>
+</span></span><span style=display:flex><span>Accept-Ranges<span style=color:#f92672>:</span> <span style=color:#ae81ff>bytes</span>
+</span></span><span style=display:flex><span>Content-Type<span style=color:#f92672>:</span> <span style=color:#ae81ff>video/mp4</span>
+</span></span><span style=display:flex><span>Content-Range<span style=color:#f92672>:</span> <span style=color:#ae81ff>bytes 0-1048575/73400320</span>
+</span></span><span style=display:flex><span>Content-Length<span style=color:#f92672>:</span> <span style=color:#ae81ff>1048576</span>
+</span></span><span style=display:flex><span>ETag<span style=color:#f92672>:</span> <span style=color:#ae81ff>&#34;talk-v3&#34;</span></span></span></code></pre></div></div></div><p>A satisfiable single range must contain exactly the bytes described by
+<code>Content-Range</code>. An unsatisfiable range returns <code>416 Range Not Satisfiable</code> with
+<code>Content-Range: bytes */73400320</code>. A server that ignores <code>Range</code> can return the
+complete representation with <code>200 OK</code>; it must not label a complete body as a
+partial response.</p><h2 id=validators-and-cache-revalidation>Validators and Cache Revalidation
+<a href=#validators-and-cache-revalidation class=heading-anchor><span>#</span></a></h2><p>Ranges apply to one representation version. Send a strong <code>ETag</code> or
+<code>Last-Modified</code>, and let a client use <code>If-Range</code> when resuming or seeking:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>Range: bytes=32243712-32955076
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>If-Range: &#34;talk-v3&#34;</span></span></span></code></pre></div></div></div><p>If the validator still matches, the server can return the requested range.
+Otherwise it returns the complete current representation, preventing bytes from
+two encodes from being combined. Ordinary conditional requests use
+<code>If-None-Match</code> or <code>If-Modified-Since</code> and can receive <code>304 Not Modified</code>.
+Define <code>Cache-Control</code> according to mutability: content-addressed segments can
+be immutable, while manifests for live content require short freshness.</p><h2 id=codecs-containers-files-and-streams>Codecs, Containers, Files, and Streams
+<a href=#codecs-containers-files-and-streams class=heading-anchor><span>#</span></a></h2><p>A codec such as H.264, AV1, AAC, or Opus transforms sample data. A container
+such as ISO Base Media File Format or WebM stores one or more encoded tracks,
+timestamps, indexes, and metadata. One file can contain multiple codecs, and the
+same codec can appear in several containers.</p><p>A finite MP4 file delivered by ranges is progressive download, even when
+playback begins before download finishes. A live source is continuous at
+capture time, but HTTP delivery still exposes finite resources such as a moving
+manifest and media segments. For progressive MP4, place initialization and
+index metadata where the client can obtain it before media bytes, commonly by
+fast-start processing that moves <code>moov</code> metadata near the beginning.</p><h2 id=hls-and-dash>HLS and DASH
+<a href=#hls-and-dash class=heading-anchor><span>#</span></a></h2><p>HTTP Live Streaming (HLS) uses media playlists and a multivariant playlist.
+MPEG-DASH uses a Media Presentation Description. Both describe renditions and
+addressable media segments. A player estimates throughput and buffer health,
+then selects a rendition whose codec, dimensions, bitrate, and device
+capabilities fit current conditions.</p><p>Segment boundaries should align across renditions so a switch preserves the
+timeline. Small segments can reduce live latency but increase request, manifest,
+and CDN overhead. Low-latency modes add shorter partial segments and stricter
+origin-to-player timing; neither protocol removes encoder and player buffering.</p><p>CDNs cache manifests and segments as ordinary HTTP resources. Use versioned
+segment URLs, correct <code>Content-Type</code>, validators, and cache directives. Avoid
+cookies or query strings that unintentionally fragment cache keys. Live
+playlists must expire quickly enough to reveal new segments, while completed
+video-on-demand segments can use long immutable lifetimes.</p><h2 id=preload-seekability-and-latency>Preload, Seekability, and Latency
+<a href=#preload-seekability-and-latency class=heading-anchor><span>#</span></a></h2><p>The HTML <code>preload</code> attribute is a hint: <code>none</code>, <code>metadata</code>, or <code>auto</code>. User
+settings, data-saving policies, autoplay rules, and implementation decisions can
+override it. An application must not assume <code>preload="auto"</code> downloads the
+entire file.</p><p>Seeking requires a mapping from playback time to accessible bytes or segments.
+A container index enables range-based file seeking; an HLS or DASH timeline
+identifies the corresponding segment. Live windows can discard old segments,
+so a seek outside the advertised window must fail or move to the earliest
+available point.</p><p>Startup latency includes manifest or metadata retrieval, connection setup,
+initial segment transfer, decoding, and the player&rsquo;s safety buffer. End-to-end
+live latency also includes capture, encode, packaging, CDN propagation, and
+playout buffering. Measure each stage rather than attributing every delay to
+network bandwidth.</p><h2 id=server-checklist>Server Checklist
+<a href=#server-checklist class=heading-anchor><span>#</span></a></h2><ul><li>Support <code>HEAD</code>, full <code>GET</code>, valid single or multipart byte ranges, and <code>416</code>
+responses consistently for progressive files.</li><li>Preserve representation validators across nodes and return exact
+<code>Content-Length</code>, <code>Content-Range</code>, and media <code>Content-Type</code> values.</li><li>Authorize every range and segment request; a cached partial response must not
+bypass the access policy for the full object.</li><li>Test seeks near the beginning and end, concurrent ranges, stale <code>If-Range</code>,
+CDN cache hits, bandwidth changes, and manifest refresh during live playback.</li></ul><p>Use a progressive file when one representation and ordinary seeking satisfy the
+product. Use HLS or DASH when clients need adaptive bitrate, live publication,
+multiple renditions, or a segment-oriented CDN workflow.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc9110#name-range-requests>RFC 9110: HTTP Semantics, Range Requests</a></li><li><a href=https://html.spec.whatwg.org/multipage/media.html#the-video-element>WHATWG HTML: The Video Element</a></li><li><a href=https://developer.apple.com/streaming/>Apple HTTP Live Streaming</a></li><li><a href=https://dashif.org/guidelines/>DASH Industry Forum Guidelines</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/http-video-streaming/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

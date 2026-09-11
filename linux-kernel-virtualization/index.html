@@ -1,0 +1,78 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Kernel Virtualization</title></head><body><main><article><div class=article-header><h1>Linux Kernel Virtualization</h1><div class=aux>Last update: 2024-10-12 06:57:35 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/kernel/>Kernel</a>
+|
+<a href=/tags/kvm/>Kvm</a>
+|
+<a href=/tags/linux/>Linux</a></div></div><div class=article-content><p>KVM exposes Linux hardware virtualization through <code>/dev/kvm</code>. KVM supplies the
+kernel execution mechanism, while a virtual machine monitor such as QEMU constructs
+and operates a complete guest machine.</p><h2 id=division-of-responsibilities>Division of Responsibilities
+<a href=#division-of-responsibilities class=heading-anchor><span>#</span></a></h2><p>KVM uses Intel VT-x, AMD-V, Arm virtualization extensions, or the corresponding host
+facility to execute guest instructions directly when possible. Kernel code manages
+vCPU state, second-stage memory translation, interrupt delivery, timers, and
+transitions between guest and host execution. KVM intentionally does not provide a
+complete firmware and device model.</p><p>QEMU provides that machine model: firmware interfaces, PCI topology, storage and
+network controllers, display and input devices, image backends, migration, and
+management through QMP. With <code>-accel kvm</code>, QEMU delegates accelerated CPU execution
+to KVM; without an accelerator it can use its TCG instruction translator instead.
+QEMU&rsquo;s supported options remain machine- and architecture-specific.</p><h2 id=guest-memory-and-memory-slots>Guest Memory and Memory Slots
+<a href=#guest-memory-and-memory-slots class=heading-anchor><span>#</span></a></h2><p>QEMU first reserves host virtual memory, backed by anonymous memory, <code>memfd</code>, a file,
+or huge pages. It then registers portions of that address space with a VM file
+descriptor by using <code>KVM_SET_USER_MEMORY_REGION</code>. Each region describes:</p><ul><li>a slot number and flags;</li><li>a guest-physical base and size; and</li><li>the userspace virtual address that backs the slot.</li></ul><p>Setting a slot&rsquo;s size to zero removes it. Slots describe mappings rather than
+allocating guest RAM, so userspace must preserve the backing mapping while KVM uses
+it. Optional dirty-page logging records writes for migration and snapshot
+coordination.</p><p>A guest memory reference can involve two translations. Guest page tables translate a
+guest virtual address to a guest-physical address; KVM and the MMU hardware then
+translate that address to a host physical page corresponding to the registered
+userspace mapping. Intel calls the hardware second stage EPT, while AMD calls it NPT.
+KVM handles missing or invalid second-stage mappings and can install new mappings
+without exiting to QEMU when the access targets ordinary RAM. Access to an emulated
+MMIO range instead causes an exit or an in-kernel device operation.</p><p>NUMA placement, transparent or explicit huge pages, swapping, and memory overcommit
+affect latency without changing the guest-visible address model. Device assignment
+adds DMA mappings; VFIO therefore relies on an IOMMU and an isolation boundary that
+does not expose unrelated host devices or memory.</p><h2 id=devkvm-lifecycle><code>/dev/kvm</code> Lifecycle
+<a href=#devkvm-lifecycle class=heading-anchor><span>#</span></a></h2><p>The stable KVM userspace ABI is organized by file-descriptor type:</p><ol><li>Open <code>/dev/kvm</code>, then require <code>KVM_GET_API_VERSION</code> to return
+<code>KVM_API_VERSION</code> (currently 12). Query optional behavior with
+<code>KVM_CHECK_EXTENSION</code>, not a kernel-version comparison.</li><li>Issue <code>KVM_CREATE_VM</code> on the system descriptor. The returned VM descriptor starts
+with no RAM and no vCPUs.</li><li>Register memory slots and create the architecture&rsquo;s interrupt controller and
+other in-kernel devices where required.</li><li>Issue <code>KVM_CREATE_VCPU</code> on the VM descriptor. Use
+<code>KVM_GET_VCPU_MMAP_SIZE</code>, then map the vCPU descriptor&rsquo;s shared <code>struct kvm_run</code>
+area.</li><li>Configure the CPU model and initial register state, then execute <code>KVM_RUN</code> from
+the vCPU&rsquo;s host thread.</li></ol><p>VM and device ioctls must follow the process and thread restrictions documented by
+the KVM API. The VM&rsquo;s lifetime follows references to its file descriptor rather than
+the lifetime of the process that created it; accidental references inherited through
+<code>fork</code> or created by <code>dup</code> can therefore retain VM resources.</p><h2 id=virtual-cpus-exits-and-interrupts>Virtual CPUs, Exits, and Interrupts
+<a href=#virtual-cpus-exits-and-interrupts class=heading-anchor><span>#</span></a></h2><p>Each vCPU has a KVM descriptor and commonly has a corresponding QEMU thread.
+<code>KVM_RUN</code> enters guest mode and returns when userspace must act, a signal interrupts
+the host thread, or an exit condition occurs. QEMU examines
+<code>kvm_run.exit_reason</code>, handles an exit such as port I/O, MMIO, shutdown, or a debug
+event, and calls <code>KVM_RUN</code> again. Instructions that KVM can virtualize entirely in
+the kernel do not require a userspace exit.</p><p>Interrupts can enter through an emulated userspace controller or an in-kernel
+irqchip. <code>KVM_IRQ_LINE</code>, MSI routing, and <code>irqfd</code> connect device events to guest
+interrupts; <code>ioeventfd</code> lets selected guest MMIO or PIO writes notify an eventfd
+without a round trip through the main emulation loop. KVM injects a pending
+interrupt when the guest CPU can accept it.</p><h2 id=virtio-and-exit-reduction>Virtio and Exit Reduction
+<a href=#virtio-and-exit-reduction class=heading-anchor><span>#</span></a></h2><p>Trap-and-emulate devices reproduce hardware register interfaces, but every
+userspace-handled access crosses the KVM boundary. Virtio instead defines a
+paravirtual device and shared virtqueues: the guest places descriptors in memory,
+then notifies the host after batching work. QEMU, an in-kernel <code>vhost</code> backend, or a
+<code>vhost-user</code> process can service the queue. Batching, interrupt suppression, and
+<code>irqfd</code>/<code>ioeventfd</code> reduce exits, while device passthrough can remove the software
+device model from the data path at the cost of stricter IOMMU and migration
+constraints.</p><h2 id=isolation-and-operational-observability>Isolation and Operational Observability
+<a href=#isolation-and-operational-observability class=heading-anchor><span>#</span></a></h2><p>Access to <code>/dev/kvm</code> controls who can create KVM VMs, but a QEMU process also handles
+guest-controlled device input and host files. Run untrusted guests under a dedicated
+identity and constrain QEMU with cgroups, namespaces, seccomp, and SELinux or
+AppArmor. Minimize emulated devices, keep the kernel, QEMU, and guest firmware
+updated, and treat VFIO IOMMU groups and shared-memory backends as explicit trust
+boundaries. CPU side channels can also require SMT and scheduling policy beyond
+memory isolation.</p><p>Basic host checks are:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>test -r /dev/kvm <span style=color:#f92672>&amp;&amp;</span> test -w /dev/kvm
+</span></span><span style=display:flex><span>ls -l /dev/kvm
+</span></span><span style=display:flex><span>lscpu | grep -i virtualization</span></span></code></pre></div></div></div><p>QMP and management layers such as libvirt report guest state, vCPU time, block I/O,
+and migration progress. At the host level, <code>perf kvm stat</code> summarizes costly KVM
+exits, KVM tracepoints under the tracing filesystem expose entry, exit, MMIO, and
+interrupt events, and <code>/proc/PID/task</code> identifies the QEMU vCPU threads. Debugfs and
+tracefs require elevated access and can be unavailable when the kernel was built
+without the relevant options.</p><p>The authoritative interfaces are the
+<a href=https://docs.kernel.org/virt/kvm/api.html>KVM API</a> and the
+<a href=https://www.qemu.org/docs/master/system/introduction.html>QEMU system-emulation documentation</a>.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-kernel-virtualization/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

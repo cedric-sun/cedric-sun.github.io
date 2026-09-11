@@ -1,0 +1,225 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>agent-browser: Browser Automation for AI Agents</title></head><body><main><article><div class=article-header><h1>agent-browser: Browser Automation for AI Agents</h1><div class=aux>Last update: 2026-09-11 11:02:01 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ai/>Ai</a>
+|
+<a href=/tags/agents/>Agents</a>
+|
+<a href=/tags/browser/>Browser</a>
+|
+<a href=/tags/automation/>Automation</a>
+|
+<a href=/tags/rust/>Rust</a></div></div><div class=article-content><p><a href=https://github.com/vercel-labs/agent-browser>agent-browser</a> is an
+Apache-2.0 browser-automation CLI designed for AI agents. Instead of requiring
+an agent to generate a complete Playwright program, it exposes navigation,
+interaction, inspection, state, network, and observability operations as
+shell commands. A persistent native daemon retains the browser between those
+commands.</p><p>The project combines three ideas:</p><ol><li>A compact accessibility snapshot gives the model a structured view of the
+page without sending the complete DOM.</li><li>Snapshot references identify elements in subsequent commands.</li><li>A long-lived daemon separates browser lifetime from the lifetime of each
+CLI process.</li></ol><p>Version 0.37.1 is current as of September 11, 2026. The project changes
+quickly, so version-sensitive behavior in this article links to the
+<a href=https://github.com/vercel-labs/agent-browser/tree/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2>0.37.1 source revision</a>.</p><h2 id=why-browser-automation-needs-an-agent-oriented-interface>Why Browser Automation Needs an Agent-Oriented Interface
+<a href=#why-browser-automation-needs-an-agent-oriented-interface class=heading-anchor><span>#</span></a></h2><p>Playwright and similar libraries expose precise browser APIs, but an
+LLM-driven process pays additional costs when it uses them directly:</p><ul><li>Generated source code consumes context and needs a runtime.</li><li>A raw DOM contains scripts, styles, hidden nodes, and framework-generated
+structure that rarely contributes to the next action.</li><li>CSS selectors generated from one observation can become invalid after a
+render.</li><li>Separate scripts require explicit browser and context lifecycle management.</li></ul><p>agent-browser changes the interface rather than the browser. An agent observes
+a compact tree, chooses an operation, executes one command, and observes
+again:</p><div class=mermaid><div class=mermaid-toolbar aria-label="Diagram zoom controls" hidden><button class=mermaid-zoom-out type=button aria-label="Zoom out" title="Zoom out" disabled>-</button>
+<output class=mermaid-zoom-level aria-live=polite>100%</output>
+<button class=mermaid-zoom-in type=button aria-label="Zoom in" title="Zoom in" disabled>+</button></div><div class=mermaid-viewport aria-label=Diagram><pre class=mermaid-source>flowchart LR
+    Goal[User Goal] --&gt; Model[Agent]
+    Model --&gt;|open or snapshot| CLI[agent-browser CLI]
+    CLI --&gt; Daemon[Native Daemon]
+    Daemon --&gt;|CDP or WebDriver| Browser[Browser]
+    Browser --&gt; Daemon
+    Daemon --&gt;|Snapshot and Refs| Model
+    Model --&gt;|click @e2| CLI</pre></div></div><p>The model still decides what to do, while the CLI provides a stable action
+vocabulary and manages browser state. According to the
+<a href=https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/page.mdx>project overview</a>,
+a typical text snapshot uses approximately 200&ndash;400 tokens, compared with
+3,000&ndash;5,000 for a full DOM. Those numbers are project estimates rather than
+an independent benchmark, but the underlying reason is clear: the
+accessibility tree omits much of the implementation detail that an agent does
+not need.</p><h2 id=architecture>Architecture
+<a href=#architecture class=heading-anchor><span>#</span></a></h2><p>Each invocation starts a small CLI client. The client parses arguments and
+communicates with a native Rust daemon, while the daemon owns or attaches to a
+browser and sends commands over the Chrome DevTools Protocol (CDP).</p><div class=mermaid><div class=mermaid-toolbar aria-label="Diagram zoom controls" hidden><button class=mermaid-zoom-out type=button aria-label="Zoom out" title="Zoom out" disabled>-</button>
+<output class=mermaid-zoom-level aria-live=polite>100%</output>
+<button class=mermaid-zoom-in type=button aria-label="Zoom in" title="Zoom in" disabled>+</button></div><div class=mermaid-viewport aria-label=Diagram><pre class=mermaid-source>flowchart TB
+    subgraph Commands[Short-Lived Processes]
+        C1[open]
+        C2[snapshot]
+        C3[click]
+    end
+
+    Socket[Local IPC]
+    Daemon[Persistent Rust Daemon]
+    CDP[Chrome DevTools Protocol]
+    Chrome[Chrome or Chromium]
+
+    C1 --&gt; Socket
+    C2 --&gt; Socket
+    C3 --&gt; Socket
+    Socket --&gt; Daemon
+    Daemon --&gt; CDP
+    CDP --&gt; Chrome</pre></div></div><p>Persistence matters because a login, open tab, cookie jar, and in-memory
+application state survive between shell commands. The daemon starts
+automatically. By default, it saves configured restore state, closes a locally
+owned headless browser, and exits after one hour without commands or dashboard
+input. Headed browsers, Safari and iOS WebDriver sessions, and browsers
+attached through CDP are exempt from that default shutdown behavior. The
+timeout is configurable through <code>--idle-timeout</code> or
+<code>AGENT_BROWSER_IDLE_TIMEOUT_MS</code>.</p><p>Current releases use a
+<a href=https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/native-mode/page.mdx>native Rust implementation</a>;
+the earlier Node.js and Playwright daemon has been removed. Chrome and
+Chromium are the primary targets because the native path speaks CDP directly.
+The project also provides:</p><ul><li>a CDP-compatible Lightpanda engine, with no headed mode, extensions, or
+persistent profiles;</li><li>Safari in an iOS Simulator through Appium and XCUITest; and</li><li>cloud-browser providers for Browser Use, Browserbase, Browserless, Kernel,
+and AWS Bedrock AgentCore.</li></ul><p>Different back ends do not have identical capabilities. For example,
+annotated screenshots operate on the CDP path but not on the Safari WebDriver
+path.</p><h2 id=installing-and-running-agent-browser>Installing and Running agent-browser
+<a href=#installing-and-running-agent-browser class=heading-anchor><span>#</span></a></h2><p>The npm package installs a platform-specific native binary:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>npm install -g agent-browser
+</span></span><span style=display:flex><span>agent-browser install</span></span></code></pre></div></div></div><p><code>agent-browser install</code> finds a compatible existing browser or downloads
+Chrome for Testing. Linux hosts can request browser system dependencies as
+well:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>agent-browser install --with-deps</span></span></code></pre></div></div></div><p>Other supported installation paths include <code>npx</code>, a project-local npm
+dependency, Homebrew on macOS, and Cargo. The installed daemon does not
+require Playwright. The npm distribution declares Node.js 24 as a requirement because its launcher
+selects the native binary, while the Homebrew-installed binary does not need a
+Node.js daemon. pnpm 11 and Rust are required when building the repository. The
+<a href=https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/installation/page.mdx>installation guide</a>
+also documents <code>agent-browser doctor</code>, which checks browser discovery,
+configuration, daemon files, provider connectivity, and a scratch headless
+launch.</p><p>A minimal interaction sequence is:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>agent-browser open https://example.com
+</span></span><span style=display:flex><span>agent-browser snapshot -i
+</span></span><span style=display:flex><span>agent-browser click @e2
+</span></span><span style=display:flex><span>agent-browser screenshot page.png
+</span></span><span style=display:flex><span>agent-browser close</span></span></code></pre></div></div></div><p>The CLI includes more than 50 commands. Relevant groups include navigation,
+forms, keyboard and pointer input, tabs, frames, files, cookies, storage,
+network routing, HAR capture, screenshots, PDF generation, video recording,
+profiling, and diffing. <code>agent-browser read &lt;url></code> can fetch agent-readable
+content without starting Chrome, while <code>agent-browser mcp</code> exposes the command
+surface through an MCP stdio server.</p><h2 id=snapshots-and-element-references>Snapshots and Element References
+<a href=#snapshots-and-element-references class=heading-anchor><span>#</span></a></h2><p><code>snapshot</code> is the central abstraction. It serializes the accessibility tree
+and assigns references to elements:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>@e1 [heading] &#34;Documentation&#34; [level=1]
+</span></span><span style=display:flex><span>@e2 [input type=&#34;search&#34;] placeholder=&#34;Search&#34;
+</span></span><span style=display:flex><span>@e3 [button] &#34;Submit&#34;</span></span></code></pre></div></div></div><p>The agent can act without inventing a CSS selector:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>agent-browser fill @e2 <span style=color:#e6db74>&#34;session persistence&#34;</span>
+</span></span><span style=display:flex><span>agent-browser click @e3</span></span></code></pre></div></div></div><p>Several filters reduce context use:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Option</th><th>Effect</th></tr></thead><tbody><tr><td><code>-i</code>, <code>--interactive</code></td><td>Include interactive elements only</td></tr><tr><td><code>-c</code>, <code>--compact</code></td><td>Remove empty structural elements</td></tr><tr><td><code>-d</code>, <code>--depth</code></td><td>Limit tree depth</td></tr><tr><td><code>-s</code>, <code>--selector</code></td><td>Restrict the tree to a CSS selector</td></tr><tr><td><code>-u</code>, <code>--urls</code></td><td>Include link destinations</td></tr></tbody></table></div></div><p>References belong to the page state that produced them. Navigation and
+meaningful DOM changes invalidate them, so a reliable agent re-snapshots after
+each state transition:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>agent-browser click @e3
+</span></span><span style=display:flex><span>agent-browser wait --load networkidle
+</span></span><span style=display:flex><span>agent-browser snapshot -i</span></span></code></pre></div></div></div><p>Waiting for <code>networkidle</code> is not correct for every application because
+analytics, streaming, and polling can keep network activity alive. Prefer an
+observable application condition when one exists:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>agent-browser wait <span style=color:#e6db74>&#34;#account-dashboard&#34;</span>
+</span></span><span style=display:flex><span>agent-browser wait --url <span style=color:#e6db74>&#34;**/account&#34;</span></span></span></code></pre></div></div></div><p>The
+<a href=https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/snapshots/page.mdx>snapshot documentation</a>
+also describes one-level iframe expansion. Child references retain frame
+context, so a command can interact with an element in an accessible iframe
+without a separate frame switch. Cross-origin frames that prevent
+accessibility-tree access are omitted.</p><p>Accessibility does not encode every visual fact. Canvas content, unlabeled
+icons, overlapping elements, and layout defects require pixels. An annotated
+screenshot overlays labels such as <code>[2]</code> that correspond to <code>@e2</code>:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>agent-browser screenshot --annotate page.png</span></span></code></pre></div></div></div><p>Snapshots should therefore drive semantic interaction, while screenshots
+provide visual evidence when semantics are insufficient.</p><h2 id=sessions-profiles-and-state>Sessions, Profiles, and State
+<a href=#sessions-profiles-and-state class=heading-anchor><span>#</span></a></h2><p>Named sessions isolate browser instances:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>agent-browser --session buyer open https://shop.example
+</span></span><span style=display:flex><span>agent-browser --session admin open https://admin.example
+</span></span><span style=display:flex><span>agent-browser session list</span></span></code></pre></div></div></div><p>Each locally managed session has separate cookies, storage, history, and
+authentication state. Sessions attached to the same existing Chrome through
+CDP are an exception because they share that Chrome instance and bind to
+different tabs. <code>--pin-tab</code> prevents a session from silently moving to another
+tab when its bound tab closes.</p><p>Three persistence mechanisms solve different problems:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Mechanism</th><th>Purpose</th></tr></thead><tbody><tr><td>Named session</td><td>Isolate concurrent browser instances</td></tr><tr><td><code>--profile</code></td><td>Import a browser profile or use a persistent profile directory</td></tr><tr><td><code>--state</code> or <code>--restore</code></td><td>Save and reload cookies and web storage</td></tr></tbody></table></div></div><p>A session name alone does not persist data across daemon shutdown. Combining
+<code>--session &lt;name></code> with <code>--restore</code> enables automatic state loading and
+periodic saving under <code>~/.agent-browser/sessions/</code>.</p><p>State files contain authentication material and must not enter source control.
+Restore state can be encrypted with AES-256-GCM by setting a 64-character
+hexadecimal <code>AGENT_BROWSER_ENCRYPTION_KEY</code>. The
+<a href=https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/sessions/page.mdx>sessions guide</a>
+documents profile-copy behavior, autosave timing, expiration, and encryption.</p><h2 id=configuration-and-deployment-back-ends>Configuration and Deployment Back Ends
+<a href=#configuration-and-deployment-back-ends class=heading-anchor><span>#</span></a></h2><p>Configuration is resolved from lowest to highest precedence:</p><ol><li><code>~/.agent-browser/config.json</code>;</li><li><code>./agent-browser.json</code>;</li><li><code>AGENT_BROWSER_*</code> environment variables; and</li><li>command-line flags.</li></ol><p>The project publishes an
+<a href=https://agent-browser.dev/schema.json>official JSON Schema</a>, so project
+configuration can be validated by an editor or CI job.</p><p>Local execution can launch a headless or headed Chrome. <code>--executable-path</code>
+selects a specific Chromium-family binary. <code>--cdp</code> instead attaches to a local
+port or a <code>ws://</code> or <code>wss://</code> endpoint:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>agent-browser --cdp <span style=color:#ae81ff>9222</span> snapshot
+</span></span><span style=display:flex><span>agent-browser --cdp <span style=color:#e6db74>&#34;wss://browser.example/cdp?token=...&#34;</span> snapshot</span></span></code></pre></div></div></div><p>Provider mode moves browser infrastructure to a supported service while
+preserving the same CLI:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>BROWSERBASE_API_KEY<span style=color:#f92672>=</span>... <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  agent-browser --provider browserbase open https://example.com</span></span></code></pre></div></div></div><p>Remote execution is useful in CI and serverless environments, but the trust
+boundary changes. Provider credentials, browser-session retention, regional
+egress, and provider-side startup behavior become deployment concerns. A CDP
+debugging endpoint also grants broad control over its browser, so it must not
+be exposed to untrusted networks.</p><h2 id=security-requires-explicit-configuration>Security Requires Explicit Configuration
+<a href=#security-requires-explicit-configuration class=heading-anchor><span>#</span></a></h2><p>All agent-browser security features are
+<a href=https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/security/page.mdx>opt-in</a>.
+Default execution does not restrict navigation, actions, or output. Production
+deployments should therefore define controls as part of the agent harness:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;$schema&#34;</span>: <span style=color:#e6db74>&#34;https://agent-browser.dev/schema.json&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;contentBoundaries&#34;</span>: <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;maxOutput&#34;</span>: <span style=color:#ae81ff>50000</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;allowedDomains&#34;</span>: [
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;app.example.com&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;*.app.example.com&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;cdn.example.net&#34;</span>
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;actionPolicy&#34;</span>: <span style=color:#e6db74>&#34;./agent-browser-policy.json&#34;</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>A restrictive action policy can allow observation and ordinary navigation
+while denying code execution and file transfer:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;default&#34;</span>: <span style=color:#e6db74>&#34;deny&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;allow&#34;</span>: [
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;navigate&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;snapshot&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;click&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;scroll&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;wait&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;get&#34;</span>
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The controls address separate threats:</p><ul><li><strong>Content boundaries</strong> wrap page-derived output with a random nonce and
+origin metadata, helping an orchestrator distinguish untrusted page text
+from tool framing.</li><li><strong>Domain allowlists</strong> block disallowed navigation and subresources and
+disable WebRTC in supported Chromium sessions.</li><li><strong>Action policies</strong> allow or deny categories such as <code>eval</code>, <code>upload</code>,
+<code>download</code>, <code>network</code>, and <code>state</code>.</li><li><strong>Confirmations</strong> place selected categories behind orchestrator or
+interactive approval.</li><li><strong>Output limits</strong> constrain context flooding from page-derived data.</li><li><strong>The authentication vault</strong> encrypts saved credentials and keeps passwords
+out of normal daemon IPC and agent-visible output.</li></ul><p>Content boundaries are defense in depth rather than a proof that a model will
+ignore prompt injection. Domain filtering is not an operating-system firewall,
+and WebSocket or EventSource interception is best-effort. Strong isolation
+therefore combines agent-browser policy with container restrictions,
+filesystem permissions, network egress policy, and narrowly scoped
+credentials.</p><p>The domain allowlist intentionally rejects several combinations, including
+pre-existing CDP attachment, profiles, restored state, and Safari/iOS
+back ends, because those modes can execute existing content before the daemon
+establishes containment. Required CDN, font, API, and identity-provider
+domains must also appear in the allowlist or the site will fail to load.</p><h2 id=choosing-between-agent-browser-and-playwright>Choosing Between agent-browser and Playwright
+<a href=#choosing-between-agent-browser-and-playwright class=heading-anchor><span>#</span></a></h2><p>agent-browser and Playwright operate at different abstraction levels:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Requirement</th><th>Better-Fitting Interface</th></tr></thead><tbody><tr><td>An AI agent must inspect and manipulate arbitrary pages through shell tools</td><td>agent-browser</td></tr><tr><td>A test suite needs assertions, fixtures, retries, parallel workers, and reports</td><td>Playwright</td></tr><tr><td>A workflow needs compact observations and element refs</td><td>agent-browser</td></tr><tr><td>Code needs Firefox, WebKit, and Chromium coverage</td><td>Playwright</td></tr><tr><td>An application needs typed browser logic with source-controlled selectors</td><td>Playwright</td></tr><tr><td>An agent needs persistent command-by-command browser state</td><td>agent-browser</td></tr></tbody></table></div></div><p>Playwright is an end-to-end testing framework and browser-automation library;
+agent-browser is a command interface for an agent loop. Playwright remains the
+better fit for deterministic test programs because its fixtures, assertions,
+trace tooling, and multi-engine coverage belong in code. agent-browser fits
+open-ended agent work because it minimizes the translation from observation
+to action.</p><p>Browser Use is another distinct layer. agent-browser can use Browser Use as a
+hosted-browser provider through <code>--provider browseruse</code>, but that integration
+does not make both projects feature-equivalent. Choose the provider integration
+when the desired interface is agent-browser commands backed by a remote
+browser; use Browser Use directly when its SDK and agent APIs are the required
+application surface.</p><h2 id=operational-guidance>Operational Guidance
+<a href=#operational-guidance class=heading-anchor><span>#</span></a></h2><p>A reliable deployment follows several rules:</p><ol><li>Pin the agent-browser version because command behavior and back-end support
+continue to evolve.</li><li>Re-snapshot after navigation or DOM mutation because element references
+describe a specific page state.</li><li>Wait for an application-visible condition instead of assuming a fixed
+delay or universal <code>networkidle</code>.</li><li>Separate sessions by task and principal, then avoid attaching isolated
+tasks to the same Chrome instance.</li><li>Treat screenshots, downloads, videos, HAR files, profiles, and saved state
+as potentially sensitive artifacts.</li><li>Enable content boundaries, output limits, action policy, and domain
+restrictions explicitly.</li><li>Enforce filesystem and network isolation below the browser process because
+CLI-level policy does not replace an operating-system sandbox.</li></ol><p>agent-browser does not make browser agents deterministic. Pages still change,
+authentication expires, accessibility metadata can be incomplete, and model
+decisions remain probabilistic. Its contribution is a narrower and more
+stateful interface: the browser becomes a persistent tool with compact
+observations, explicit references, and enforceable action categories rather
+than a collection of scripts generated from scratch.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://agent-browser.dev/>agent-browser documentation</a></li><li><a href=https://github.com/vercel-labs/agent-browser>agent-browser source repository</a></li><li><a href=https://agent-browser.dev/commands>Commands</a></li><li><a href=https://agent-browser.dev/configuration>Configuration</a></li><li><a href=https://agent-browser.dev/cdp-mode>CDP and remote providers</a></li><li><a href=https://agent-browser.dev/security>Security model</a></li><li><a href=https://playwright.dev/docs/intro>Playwright introduction</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/agent-browser/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

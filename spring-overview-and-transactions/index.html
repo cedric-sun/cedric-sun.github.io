@@ -1,0 +1,69 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring Overview and Transactions</title></head><body><main><article><div class=article-header><h1>Spring Overview and Transactions</h1><div class=aux>Last update: 2025-05-25 03:36:19 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/aop/>Aop</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spring/>Spring</a>
+|
+<a href=/tags/transactions/>Transactions</a></div></div><div class=article-content><p>Spring Framework provides a dependency-injection container plus focused modules
+for AOP, data access, transactions, messaging, and web applications. Transaction
+management demonstrates the framework&rsquo;s integration model: application code
+declares a boundary, while an interceptor coordinates a resource-specific
+<code>PlatformTransactionManager</code> or reactive transaction manager.</p><h2 id=proxy-based-declarative-transactions>Proxy-Based Declarative Transactions
+<a href=#proxy-based-declarative-transactions class=heading-anchor><span>#</span></a></h2><p>With the default advice mode, Spring wraps an eligible bean in an AOP proxy.
+Calls entering a method matched by <code>@Transactional</code> pass through
+<code>TransactionInterceptor</code>, which reads transaction metadata, starts or joins a
+transaction, invokes the target, and commits or rolls back.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Service</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderService</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderRepository orders;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> PaymentGateway payments;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Transactional</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> Order <span style=color:#a6e22e>place</span>(CreateOrder command) {
+</span></span><span style=display:flex><span>        Order order <span style=color:#f92672>=</span> orders.<span style=color:#a6e22e>insert</span>(command);
+</span></span><span style=display:flex><span>        payments.<span style=color:#a6e22e>reserve</span>(order);
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> order;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Proxying has practical constraints. The call must enter through the proxy, and
+the method must be interceptable by the chosen proxy mechanism. Interface-based
+JDK proxies expose interface methods; class-based proxies subclass the target
+and cannot advise final methods.</p><h2 id=self-invocation>Self-Invocation
+<a href=#self-invocation class=heading-anchor><span>#</span></a></h2><p>A call such as <code>this.reprice()</code> stays inside the target object and does not
+re-enter its proxy. Transaction metadata on <code>reprice()</code> is therefore ignored
+when reached only through self-invocation:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>importOrders</span>(List<span style=color:#f92672>&lt;</span>Order<span style=color:#f92672>&gt;</span> batch) {
+</span></span><span style=display:flex><span>    batch.<span style=color:#a6e22e>forEach</span>(<span style=color:#66d9ef>this</span>::storeOne); <span style=color:#75715e>// bypasses transactional advice on storeOne</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Move the transactional operation to a separate injected service when it
+represents a real boundary. Programmatic transaction management or AspectJ
+weaving are alternatives; injecting a bean&rsquo;s own proxy couples domain code to
+container mechanics and is harder to test.</p><h2 id=boundary-granularity>Boundary Granularity
+<a href=#boundary-granularity class=heading-anchor><span>#</span></a></h2><p>A transaction should contain one application-level consistency operation.
+Controller-level boundaries tend to include serialization and unrelated
+network work, while repository-level boundaries can split one business
+operation across multiple commits. A service method normally provides the
+useful unit because it coordinates repositories around a domain invariant.</p><p>Do not hold a database transaction open across an uncontrolled remote call
+without analyzing lock duration, retries, and failure recovery. A local
+transaction cannot make an external service atomic; outbox, idempotency, or
+saga-style coordination may be required.</p><h2 id=propagation-isolation-and-rollback>Propagation, Isolation, and Rollback
+<a href=#propagation-isolation-and-rollback class=heading-anchor><span>#</span></a></h2><p>Propagation defines how a method relates to an existing transaction:</p><ul><li><code>REQUIRED</code>, the default, joins one or creates a new transaction.</li><li><code>REQUIRES_NEW</code> suspends an existing transaction and starts an independent
+one, which may require another pooled connection.</li><li><code>SUPPORTS</code> joins if one exists and otherwise runs without one.</li><li><code>MANDATORY</code> requires an existing transaction; <code>NEVER</code> forbids one.</li><li><code>NOT_SUPPORTED</code> suspends an existing transaction.</li><li><code>NESTED</code> uses a savepoint within one physical transaction when the transaction
+manager and resource support savepoints.</li></ul><p>Isolation requests map to the resource&rsquo;s capabilities. <code>DEFAULT</code> uses its
+configured default; other values correspond to standard JDBC isolation levels.
+A declaration is not proof that every database implements identical locking or
+snapshot semantics, so verify behavior for the selected database and driver.</p><p>By default, Spring marks a transaction for rollback on <code>RuntimeException</code> and
+<code>Error</code>, not on a checked exception. Configure <code>rollbackFor</code> or
+<code>noRollbackFor</code> when the exception taxonomy means something different. If an
+inner participant marks a shared transaction rollback-only, an outer apparent
+commit can raise <code>UnexpectedRollbackException</code>.</p><h2 id=advisor-ordering>Advisor Ordering
+<a href=#advisor-ordering class=heading-anchor><span>#</span></a></h2><p>Security, retry, cache, metrics, locking, and transaction concerns can all wrap
+the same call. Nesting changes semantics: retrying inside one transaction is not
+equivalent to opening a new transaction for every attempt, and caching before
+authorization can expose data. Use <code>Ordered</code>/<code>@Order</code> where supported, test the
+resulting call order, and avoid stacking annotations when the required order is
+not explicit.</p><h2 id=alternatives-to-declarative-proxies>Alternatives to Declarative Proxies
+<a href=#alternatives-to-declarative-proxies class=heading-anchor><span>#</span></a></h2><p>Use one of three approaches based on the required boundary:</p><ol><li>Refactor the operation into another service and retain declarative advice.</li><li>Use <code>TransactionTemplate</code> for an explicit local block with visible control
+flow and exception handling.</li><li>Enable <code>@Transactional</code> AspectJ mode when woven self-invocation advice is an
+intentional system-wide choice.</li></ol><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Order saved <span style=color:#f92672>=</span> transactionTemplate.<span style=color:#a6e22e>execute</span>(status <span style=color:#f92672>-&gt;</span> orders.<span style=color:#a6e22e>insert</span>(command));</span></span></code></pre></div></div></div><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative.html>Spring declarative transactions</a></li><li><a href=https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html>Transaction propagation</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/annotation/Transactional.html><code>@Transactional</code> Javadoc</a></li><li><a href=https://docs.spring.io/spring-framework/reference/data-access/transaction/programmatic.html>Programmatic transactions</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-overview-and-transactions/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

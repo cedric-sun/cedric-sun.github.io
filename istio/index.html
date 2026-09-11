@@ -1,0 +1,51 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Istio</title></head><body><main><article><div class=article-header><h1>Istio</h1><div class=aux>Last update: 2023-04-28 08:11:31 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/istio/>Istio</a>
+|
+<a href=/tags/kubernetes/>Kubernetes</a>
+|
+<a href=/tags/service-mesh/>Service-Mesh</a></div></div><div class=article-content><p>Istio applies traffic policy, identity, telemetry, and security policy to
+workloads through Envoy proxies and control-plane configuration. Adopt it only
+when those cross-cutting requirements justify the additional operational
+surface.</p><h2 id=data-plane-and-control-plane>Data Plane and Control Plane
+<a href=#data-plane-and-control-plane class=heading-anchor><span>#</span></a></h2><p>The data plane consists of Envoy sidecars or an ambient deployment with a
+per-node ztunnel and optional waypoint proxies. <code>istiod</code> computes and distributes
+service discovery, certificates, and traffic configuration through xDS. A
+workload path captures inbound and outbound traffic according to the selected
+mode; traffic that bypasses that path cannot be governed by mesh policy. Ambient
+mode and sidecars have different L4/L7 enforcement placement, so migration must
+verify where each policy executes.</p><h2 id=traffic-management>Traffic Management
+<a href=#traffic-management class=heading-anchor><span>#</span></a></h2><p><code>Gateway</code> and <code>VirtualService</code> resources define ingress listeners and routing
+rules. <code>DestinationRule</code> defines subsets, load-balancing, connection, and TLS
+policy for a destination. Route by stable labels such as <code>version</code>, and ensure
+that the labels used by subsets are present on workloads.</p><p>Weighted routes can shift a measured percentage from a stable subset to a
+canary. Header or identity matches can direct test traffic first. Gate each
+change on proxy configuration convergence and workload health; route weights do
+not compensate for missing endpoints or an incorrect subset selector.</p><p>Retries, timeouts, circuit breakers, and fault injection change failure
+behavior. Set budgets according to the caller&rsquo;s deadline; an unrestricted retry
+policy can amplify overload and duplicate non-idempotent work.</p><h2 id=identity-and-security>Identity and Security
+<a href=#identity-and-security class=heading-anchor><span>#</span></a></h2><p>Istio issues workload identities based on Kubernetes service accounts and can
+use mutual TLS between proxies. Enforce authorization with <code>AuthorizationPolicy</code>
+after verifying that every required workload participates in the mesh. Start
+with permissive migration only to find unmanaged traffic, then move to strict
+mutual TLS with an explicit migration plan.</p><p>Use <code>PeerAuthentication</code> for mTLS posture, <code>RequestAuthentication</code> to validate
+end-user JWTs where needed, and <code>AuthorizationPolicy</code> for access decisions.
+Workload identity does not replace application authorization for tenant or
+business permissions.</p><p><code>istiod</code> acts as the certificate authority or integrates with an external CA,
+then rotates short-lived workload certificates before expiry. Monitor issuance,
+root transitions, trust-domain configuration, and clock skew. During a root
+rotation, distribute overlapping trust before replacing leaf certificates so
+old and new workloads can authenticate each other.</p><h2 id=operations>Operations
+<a href=#operations class=heading-anchor><span>#</span></a></h2><p>Version the mesh control plane and data plane deliberately, review analyzer
+output before rollout, and monitor proxy resource use, certificate expiration,
+and configuration convergence. Use <code>istioctl proxy-status</code> and
+<code>istioctl proxy-config</code> to diagnose what a proxy received instead of relying on
+the YAML that was intended to apply.</p><p>Envoy emits request metrics, access logs, and traces according to telemetry
+configuration. Preserve request IDs and sampling policy across ingress,
+waypoints or sidecars, and applications. Missing telemetry can mean traffic
+bypassed the proxy, configuration did not converge, or collection failed.</p><p>Control-plane health, data-plane health, and application health are separate
+failure domains. Existing proxies can continue with their last accepted
+configuration during a transient control-plane outage, but new endpoints,
+certificates, and policy changes can stall. Roll out by revision or bounded
+workload set, inspect rejected xDS updates and proxy versions, and retain a
+tested rollback path.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://istio.io/latest/docs/ops/deployment/architecture/>Istio Architecture</a></li><li><a href=https://istio.io/latest/docs/concepts/traffic-management/>Istio Traffic Management</a></li><li><a href=https://istio.io/latest/docs/concepts/security/>Istio Security</a></li><li><a href=https://istio.io/latest/docs/ops/diagnostic-tools/proxy-cmd/>Istio Debugging Envoy and Istiod</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/istio/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

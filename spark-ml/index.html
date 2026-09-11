@@ -1,0 +1,293 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spark ML</title></head><body><main><article><div class=article-header><h1>Spark ML</h1><div class=aux>Last update: 2026-08-06 17:32:00 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/spark/>Spark</a>
+|
+<a href=/tags/machine-learning/>Machine Learning</a>
+|
+<a href=/tags/mllib/>Mllib</a>
+|
+<a href=/tags/java/>Java</a></div></div><div class=article-content><p>Spark includes a machine-learning library named <strong>MLlib</strong>. The phrase &ldquo;Spark
+ML&rdquo; is commonly used for MLlib&rsquo;s DataFrame-based API because its Java and Scala
+classes live under <code>org.apache.spark.ml</code> and its Python classes under
+<code>pyspark.ml</code>.</p><p>These names are easy to confuse:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Name</th><th>Meaning</th></tr></thead><tbody><tr><td>MLlib</td><td>Spark&rsquo;s complete machine-learning library</td></tr><tr><td><code>spark.ml</code></td><td>The primary, DataFrame-based MLlib API</td></tr><tr><td><code>spark.mllib</code></td><td>The older RDD-based API, now in maintenance mode</td></tr><tr><td>Spark ML</td><td>An informal name for the <code>spark.ml</code> API</td></tr></tbody></table></div></div><p><code>spark.mllib</code> is not removed, but new application code should normally use
+<code>spark.ml</code>. The DataFrame API integrates with Spark SQL, has a consistent
+pipeline model, and provides similar APIs across Java, Scala, and Python.</p><p>Spark ML supplies distributed feature preparation, model fitting, evaluation,
+hyperparameter tuning, and batch inference. It is most useful when training or
+scoring data is already large enough to benefit from Spark. It is not a general
+deep-learning framework and does not automatically make every algorithm
+efficient merely by running it on a cluster.</p><h2 id=what-spark-ml-provides>What Spark ML Provides
+<a href=#what-spark-ml-provides class=heading-anchor><span>#</span></a></h2><p>The library covers several categories:</p><ul><li><strong>Classification:</strong> Logistic regression, decision trees, random forests,
+gradient-boosted trees, naive Bayes, linear support vector machines, and
+multilayer perceptrons</li><li><strong>Regression:</strong> Linear and generalized linear regression, decision trees,
+random forests, gradient-boosted trees, survival regression, isotonic
+regression, and factorization machines</li><li><strong>Clustering:</strong> K-means, bisecting k-means, Gaussian mixtures, latent
+Dirichlet allocation, and power iteration clustering</li><li><strong>Recommendation:</strong> Alternating least squares</li><li><strong>Frequent patterns:</strong> FP-growth and prefix-span</li><li><strong>Feature engineering:</strong> Tokenization, categorical encoding, feature
+assembly, scaling, hashing, TF-IDF, discretization, imputation, polynomial
+expansion, dimensionality reduction, and feature selection</li><li><strong>Statistics:</strong> Correlation, hypothesis tests, and vector summaries</li><li><strong>Workflow:</strong> Pipelines, evaluators, cross-validation, train-validation
+splitting, parameter grids, and model persistence</li></ul><p>Algorithm support and parameters vary among Java, Scala, Python, and R. Check
+the API documentation for the Spark version used by the cluster rather than
+assuming every binding has identical coverage.</p><h2 id=dataframes-as-ml-datasets>DataFrames as ML Datasets
+<a href=#dataframes-as-ml-datasets class=heading-anchor><span>#</span></a></h2><p>Spark ML consumes and produces DataFrames. A supervised-learning dataset
+conventionally contains:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>+-----+-------------------+
+</span></span><span style=display:flex><span>|label|features           |
+</span></span><span style=display:flex><span>+-----+-------------------+
+</span></span><span style=display:flex><span>|1.0  |[2.1, 0.0, 3.4]    |
+</span></span><span style=display:flex><span>|0.0  |(3,[0,2],[1.2,4.1])|
+</span></span><span style=display:flex><span>+-----+-------------------+</span></span></code></pre></div></div></div><p><code>label</code> is usually a <code>Double</code>, and <code>features</code> is an
+<code>org.apache.spark.ml.linalg.Vector</code>. A vector can be:</p><ul><li><strong>Dense:</strong> Stores every value.</li><li><strong>Sparse:</strong> Stores the vector size plus only nonzero indices and values.</li></ul><p>Sparse vectors are essential for high-dimensional data such as one-hot encoded
+categories and hashed text. Expanding them into dense arrays can multiply
+memory and network use.</p><p>The default column names are only conventions. Most algorithms let callers
+change them:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>new</span> LogisticRegression()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setLabelCol</span>(<span style=color:#e6db74>&#34;isFraud&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setFeaturesCol</span>(<span style=color:#e6db74>&#34;modelFeatures&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setPredictionCol</span>(<span style=color:#e6db74>&#34;predictedFraud&#34;</span>);</span></span></code></pre></div></div></div><p>Other common output columns are:</p><ul><li><code>rawPrediction</code>: Unnormalized model scores</li><li><code>probability</code>: Class probabilities, when the model provides them</li><li><code>prediction</code>: The selected class or regression value</li></ul><p>DataFrame schemas make pipeline stages composable, but checks occur at runtime.
+Spark validates that required columns exist and have compatible types when a
+stage is fitted or transformed.</p><h2 id=transformers-and-estimators>Transformers and Estimators
+<a href=#transformers-and-estimators class=heading-anchor><span>#</span></a></h2><p>Spark ML standardizes algorithms around two abstractions.</p><p>A <strong>Transformer</strong> converts one DataFrame into another:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>input DataFrame --transform()--&gt; output DataFrame</span></span></code></pre></div></div></div><p>It usually appends columns while retaining the input columns. Feature
+transformers and trained models are both Transformers. For example,
+<code>Tokenizer</code> turns a text column into an array of words, while
+<code>LogisticRegressionModel</code> turns a feature vector into prediction columns.</p><p>An <strong>Estimator</strong> learns from a DataFrame and produces a model:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>training DataFrame --fit()--&gt; Model</span></span></code></pre></div></div></div><p>A Model is a Transformer:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>test DataFrame --model.transform()--&gt; predictions</span></span></code></pre></div></div></div><p>For example:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>LogisticRegression trainer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> LogisticRegression()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setMaxIter</span>(50)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setRegParam</span>(0.<span style=color:#a6e22e>01</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>LogisticRegressionModel model <span style=color:#f92672>=</span> trainer.<span style=color:#a6e22e>fit</span>(training);
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(test);</span></span></code></pre></div></div></div><p><code>fit()</code> and <code>transform()</code> return objects that describe distributed DataFrame
+work. Spark SQL remains lazy where possible; an action such as <code>write</code>,
+<code>evaluate</code>, <code>count</code>, or <code>collect</code> causes jobs to run.</p><h2 id=parameters>Parameters
+<a href=#parameters class=heading-anchor><span>#</span></a></h2><p>Every Estimator and Transformer implements a common parameter API. A parameter
+belongs to a particular stage instance:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>LogisticRegression lr <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> LogisticRegression()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setMaxIter</span>(50)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setRegParam</span>(0.<span style=color:#a6e22e>01</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setElasticNetParam</span>(0.<span style=color:#a6e22e>5</span>);</span></span></code></pre></div></div></div><p>Inspect supported parameters and defaults with:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(lr.<span style=color:#a6e22e>explainParams</span>());
+</span></span><span style=display:flex><span>System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(lr.<span style=color:#a6e22e>extractParamMap</span>());</span></span></code></pre></div></div></div><p>A <code>ParamMap</code> supplied to <code>fit()</code> or <code>transform()</code> overrides values previously
+set on the instance:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ParamMap override <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ParamMap()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>put</span>(lr.<span style=color:#a6e22e>maxIter</span>(), 100)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>put</span>(lr.<span style=color:#a6e22e>regParam</span>(), 0.<span style=color:#a6e22e>05</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>LogisticRegressionModel model <span style=color:#f92672>=</span> lr.<span style=color:#a6e22e>fit</span>(training, override);</span></span></code></pre></div></div></div><p>Because parameters are bound to stage instances, two logistic-regression
+stages can have independent values in one parameter grid.</p><h2 id=feature-engineering>Feature Engineering
+<a href=#feature-engineering class=heading-anchor><span>#</span></a></h2><p>Most algorithms expect one numeric vector column, but source data commonly has
+numeric, categorical, boolean, and text columns. Feature transformers convert
+those columns into a usable vector.</p><h3 id=numeric-features>Numeric Features
+<a href=#numeric-features class=heading-anchor><span>#</span></a></h3><p><code>VectorAssembler</code> combines scalar and vector columns:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>VectorAssembler assembler <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> VectorAssembler()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCols</span>(<span style=color:#66d9ef>new</span> String<span style=color:#f92672>[]</span> {<span style=color:#e6db74>&#34;age&#34;</span>, <span style=color:#e6db74>&#34;income&#34;</span>, <span style=color:#e6db74>&#34;accountAgeDays&#34;</span>})
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;rawFeatures&#34;</span>);</span></span></code></pre></div></div></div><p>Missing values must be handled deliberately. <code>Imputer</code> can replace missing
+numeric values using a mean, median, or mode. It does not make missingness
+semantically harmless; the strategy must fit the data.</p><p><code>StandardScaler</code>, <code>MinMaxScaler</code>, and <code>MaxAbsScaler</code> rescale vectors. Scaling is
+important for distance-based and gradient-based algorithms, while decision
+trees normally do not require it.</p><p>Be careful with centering sparse vectors. Subtracting a nonzero mean turns
+implicit zeros into nonzero values and can make a sparse dataset dense.</p><h3 id=categorical-features>Categorical Features
+<a href=#categorical-features class=heading-anchor><span>#</span></a></h3><p><code>StringIndexer</code> converts category strings to numeric indices:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>StringIndexer countryIndexer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StringIndexer()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCol</span>(<span style=color:#e6db74>&#34;country&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;countryIndex&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setHandleInvalid</span>(<span style=color:#e6db74>&#34;keep&#34;</span>);</span></span></code></pre></div></div></div><p><code>OneHotEncoder</code> converts indices into sparse indicator vectors:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>OneHotEncoder countryEncoder <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> OneHotEncoder()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCol</span>(<span style=color:#e6db74>&#34;countryIndex&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;countryVector&#34;</span>);</span></span></code></pre></div></div></div><p>The indexer must be fitted only on training data. Fitting it independently on
+test or production data can assign different indices to the same categories.
+Putting both stages in a fitted Pipeline preserves the training mapping.</p><p><code>handleInvalid</code> controls what happens when null or unseen values arrive.
+Silently choosing the wrong policy can either fail production scoring or hide
+data-quality problems.</p><h3 id=text-features>Text Features
+<a href=#text-features class=heading-anchor><span>#</span></a></h3><p>A basic text pipeline may use:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>text
+</span></span><span style=display:flex><span>  -&gt; RegexTokenizer
+</span></span><span style=display:flex><span>  -&gt; StopWordsRemover
+</span></span><span style=display:flex><span>  -&gt; HashingTF or CountVectorizer
+</span></span><span style=display:flex><span>  -&gt; IDF
+</span></span><span style=display:flex><span>  -&gt; feature vector</span></span></code></pre></div></div></div><p><code>HashingTF</code> avoids learning a vocabulary but permits hash collisions.
+<code>CountVectorizer</code> learns an explicit vocabulary and can be easier to inspect,
+at the cost of storing and distributing that vocabulary.</p><p>Spark ML&rsquo;s built-in text features are useful for classical models. They are not
+a replacement for modern language-model tokenizers, embeddings, or
+GPU-oriented deep-learning frameworks.</p><h2 id=pipelines>Pipelines
+<a href=#pipelines class=heading-anchor><span>#</span></a></h2><p>A Pipeline records feature preparation and training as one ordered workflow:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>raw data
+</span></span><span style=display:flex><span>  -&gt; StringIndexer
+</span></span><span style=display:flex><span>  -&gt; OneHotEncoder
+</span></span><span style=display:flex><span>  -&gt; VectorAssembler
+</span></span><span style=display:flex><span>  -&gt; StandardScaler
+</span></span><span style=display:flex><span>  -&gt; LogisticRegression</span></span></code></pre></div></div></div><p>Transformer stages call <code>transform()</code>. Estimator stages call <code>fit()</code> to produce
+a Model, then that Model transforms data for subsequent stages.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>StringIndexer indexer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StringIndexer()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCol</span>(<span style=color:#e6db74>&#34;country&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;countryIndex&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setHandleInvalid</span>(<span style=color:#e6db74>&#34;keep&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>OneHotEncoder encoder <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> OneHotEncoder()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCol</span>(<span style=color:#e6db74>&#34;countryIndex&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;countryVector&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>VectorAssembler assembler <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> VectorAssembler()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCols</span>(<span style=color:#66d9ef>new</span> String<span style=color:#f92672>[]</span> {<span style=color:#e6db74>&#34;age&#34;</span>, <span style=color:#e6db74>&#34;income&#34;</span>, <span style=color:#e6db74>&#34;countryVector&#34;</span>})
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;features&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>LogisticRegression classifier <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> LogisticRegression()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setLabelCol</span>(<span style=color:#e6db74>&#34;label&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setFeaturesCol</span>(<span style=color:#e6db74>&#34;features&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Pipeline pipeline <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Pipeline().<span style=color:#a6e22e>setStages</span>(<span style=color:#66d9ef>new</span> PipelineStage<span style=color:#f92672>[]</span> {
+</span></span><span style=display:flex><span>    indexer,
+</span></span><span style=display:flex><span>    encoder,
+</span></span><span style=display:flex><span>    assembler,
+</span></span><span style=display:flex><span>    classifier
+</span></span><span style=display:flex><span>});
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>PipelineModel model <span style=color:#f92672>=</span> pipeline.<span style=color:#a6e22e>fit</span>(training);
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(test);</span></span></code></pre></div></div></div><p><code>Pipeline.fit()</code> is itself an Estimator operation and returns a
+<code>PipelineModel</code>, which is a Transformer. Every Estimator in the original
+pipeline has become a fitted Transformer in the model.</p><p>This is more than syntactic convenience. It guarantees that validation and
+production data use feature mappings learned from training data. Performing
+feature fitting before splitting a dataset leaks information from validation
+data into training and produces an optimistic evaluation.</p><p>Pipeline stages are listed linearly but may form a DAG through their input and
+output columns. Stages must be in topological order and should be unique
+instances because each stage has a unique ID used by the parameter system.</p><h2 id=a-complete-training-flow>A Complete Training Flow
+<a href=#a-complete-training-flow class=heading-anchor><span>#</span></a></h2><p>A reliable supervised-learning job follows a sequence such as:</p><ol><li>Read raw data with an explicit schema.</li><li>Validate labels, ranges, null handling, and row identity.</li><li>Split data into training, validation, and final test sets.</li><li>Fit the entire feature-and-model Pipeline on training data only.</li><li>Select parameters using training and validation data.</li><li>Evaluate the selected model once on untouched test data.</li><li>Save the fitted PipelineModel and its operational metadata.</li></ol><p>For example:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;[]</span> split <span style=color:#f92672>=</span> input.<span style=color:#a6e22e>randomSplit</span>(
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>new</span> <span style=color:#66d9ef>double</span><span style=color:#f92672>[]</span> {0.<span style=color:#a6e22e>8</span>, 0.<span style=color:#a6e22e>2</span>},
+</span></span><span style=display:flex><span>    12345L
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> training <span style=color:#f92672>=</span> split<span style=color:#f92672>[</span>0<span style=color:#f92672>]</span>.<span style=color:#a6e22e>cache</span>();
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> test <span style=color:#f92672>=</span> split<span style=color:#f92672>[</span>1<span style=color:#f92672>]</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>PipelineModel model <span style=color:#f92672>=</span> pipeline.<span style=color:#a6e22e>fit</span>(training);
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(test);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>BinaryClassificationEvaluator evaluator <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>new</span> BinaryClassificationEvaluator()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setLabelCol</span>(<span style=color:#e6db74>&#34;label&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setRawPredictionCol</span>(<span style=color:#e6db74>&#34;rawPrediction&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setMetricName</span>(<span style=color:#e6db74>&#34;areaUnderROC&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>double</span> areaUnderRoc <span style=color:#f92672>=</span> evaluator.<span style=color:#a6e22e>evaluate</span>(predictions);</span></span></code></pre></div></div></div><p>Set seeds where APIs support them, but do not assume a distributed job is
+bit-for-bit deterministic. Partitioning, floating-point reduction order, input
+file layout, and algorithm implementations can affect results.</p><p>For time-dependent data, random splitting is usually wrong. Train on earlier
+events and validate on later events to avoid learning from the future. Grouped
+entities may also require a group-aware split so one user&rsquo;s or device&rsquo;s events
+do not appear on both sides.</p><h2 id=evaluation>Evaluation
+<a href=#evaluation class=heading-anchor><span>#</span></a></h2><p>Choose an Evaluator that matches the task:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Task</th><th>Common Evaluator</th></tr></thead><tbody><tr><td>Binary classification</td><td><code>BinaryClassificationEvaluator</code></td></tr><tr><td>Multiclass classification</td><td><code>MulticlassClassificationEvaluator</code></td></tr><tr><td>Multilabel classification</td><td><code>MultilabelClassificationEvaluator</code></td></tr><tr><td>Regression</td><td><code>RegressionEvaluator</code></td></tr><tr><td>Ranking</td><td><code>RankingEvaluator</code></td></tr><tr><td>Clustering</td><td><code>ClusteringEvaluator</code></td></tr></tbody></table></div></div><p>Accuracy alone can be misleading for imbalanced classification. Depending on
+the business cost, inspect precision, recall, F-measure, area under the
+precision-recall curve, calibration, and confusion matrices. A model that ranks
+well may still need a separately selected decision threshold.</p><p>Regression metrics such as RMSE, MAE, and \(R^2\) answer different questions.
+Select a metric based on the cost of errors rather than whichever number looks
+best.</p><p>Evaluation is a distributed Spark job, but some summaries eventually return
+small matrices, histories, or scalar metrics to the driver. Avoid collecting
+the entire prediction DataFrame merely to compute a metric that Spark can
+aggregate in the cluster.</p><h2 id=hyperparameter-tuning>Hyperparameter Tuning
+<a href=#hyperparameter-tuning class=heading-anchor><span>#</span></a></h2><p>Spark ML provides two model-selection Estimators:</p><ul><li><code>CrossValidator</code> evaluates each parameter map over multiple folds.</li><li><code>TrainValidationSplit</code> evaluates each parameter map with one train/validation
+split and is cheaper but less statistically robust.</li></ul><p>Both require:</p><ol><li>An Estimator, often a complete Pipeline</li><li>An array of parameter maps</li><li>An Evaluator</li></ol><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ParamMap<span style=color:#f92672>[]</span> grid <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ParamGridBuilder()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>addGrid</span>(classifier.<span style=color:#a6e22e>regParam</span>(), <span style=color:#66d9ef>new</span> <span style=color:#66d9ef>double</span><span style=color:#f92672>[]</span> {0.<span style=color:#a6e22e>001</span>, 0.<span style=color:#a6e22e>01</span>, 0.<span style=color:#a6e22e>1</span>})
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>addGrid</span>(classifier.<span style=color:#a6e22e>elasticNetParam</span>(), <span style=color:#66d9ef>new</span> <span style=color:#66d9ef>double</span><span style=color:#f92672>[]</span> {0.<span style=color:#a6e22e>0</span>, 0.<span style=color:#a6e22e>5</span>, 1.<span style=color:#a6e22e>0</span>})
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>CrossValidator cv <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> CrossValidator()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setEstimator</span>(pipeline)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setEvaluator</span>(<span style=color:#66d9ef>new</span> BinaryClassificationEvaluator())
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setEstimatorParamMaps</span>(grid)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setNumFolds</span>(3)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setParallelism</span>(3)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setSeed</span>(12345L);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>CrossValidatorModel selectedModel <span style=color:#f92672>=</span> cv.<span style=color:#a6e22e>fit</span>(training);</span></span></code></pre></div></div></div><p>The example trains:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>3 regParam values
+</span></span><span style=display:flex><span>x 3 elasticNetParam values
+</span></span><span style=display:flex><span>x 3 folds
+</span></span><span style=display:flex><span>= 27 model fits</span></span></code></pre></div></div></div><p>After selecting the best parameters, cross-validation fits that configuration
+again on the complete input dataset. Large grids therefore consume substantial
+CPU, executor memory, storage I/O, and time.</p><p><code>parallelism</code> allows parameter configurations to be evaluated concurrently.
+It does not create free capacity: excessive parallelism can make several
+training jobs compete for the same executors and perform worse.</p><p>Tune the full Pipeline when feature-stage parameters are part of the question.
+This also fits stateful feature transformers independently within each fold,
+avoiding validation leakage.</p><h2 id=distributed-execution>Distributed Execution
+<a href=#distributed-execution class=heading-anchor><span>#</span></a></h2><p>The driver creates Pipeline stages, analyzes DataFrame plans, submits fitting
+and transformation jobs, and holds the resulting model metadata. Executors
+scan partitions, calculate feature transformations, compute distributed
+statistics and gradients, build partial tree statistics, and score rows.</p><p>The exact execution pattern depends on the algorithm:</p><ul><li>Feature transforms often use ordinary DataFrame operations over partitions.</li><li>Iterative algorithms repeatedly run jobs and aggregate updates.</li><li>Tree algorithms exchange histograms and split statistics.</li><li>ALS partitions user and item factors and repeatedly exchanges required
+factor blocks.</li><li>Some learned model state is collected on the driver and later distributed
+for prediction.</li></ul><p>&ldquo;Distributed&rdquo; does not mean that one model object is independently trained in
+each executor. The driver coordinates one fitting operation, while executors
+perform its partition-level work.</p><p>Model size still matters. Coefficients, trees, vocabularies, category maps, and
+other fitted state may need to reside on the driver, be serialized, or be sent
+to executors. A dataset that fits in the cluster does not imply that an
+arbitrarily large model fits.</p><p>Cache reused training data when repeated model fits would otherwise reread and
+recompute it:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> training <span style=color:#f92672>=</span> preparedTraining.<span style=color:#a6e22e>cache</span>();
+</span></span><span style=display:flex><span>training.<span style=color:#a6e22e>count</span>();</span></span></code></pre></div></div></div><p>The action materializes the cache before tuning starts. Unpersist it after the
+last fit:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>training.<span style=color:#a6e22e>unpersist</span>();</span></span></code></pre></div></div></div><p>Caching every intermediate DataFrame wastes memory and can increase spills.
+Persist only expensive data reused by multiple actions.</p><h2 id=saving-and-loading-models>Saving and Loading Models
+<a href=#saving-and-loading-models class=heading-anchor><span>#</span></a></h2><p>Most Spark ML Estimators, Models, Pipelines, and PipelineModels implement
+Spark&rsquo;s ML persistence API:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>model.<span style=color:#a6e22e>write</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>overwrite</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>save</span>(<span style=color:#e6db74>&#34;hdfs:///models/fraud/2026-07-20&#34;</span>);</span></span></code></pre></div></div></div><p>Load it later:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>PipelineModel model <span style=color:#f92672>=</span> PipelineModel.<span style=color:#a6e22e>load</span>(
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;hdfs:///models/fraud/2026-07-20&#34;</span>
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(input);</span></span></code></pre></div></div></div><p>A saved PipelineModel includes fitted feature stages and the trained model. It
+does not automatically include every operational fact needed to reproduce the
+training run. Store additional metadata such as:</p><ul><li>Spark and application versions</li><li>Source-code revision</li><li>Training-data snapshot or version</li><li>Feature and label definitions</li><li>Split method and random seeds</li><li>Evaluation metrics and selected threshold</li><li>Parameter maps</li><li>Expected input and output schemas</li></ul><p>Spark aims for persistence compatibility across minor and patch versions.
+Compatibility across major Spark versions is best-effort, not guaranteed.
+Validate both loading and prediction behavior before upgrading production
+inference jobs.</p><h2 id=batch-inference>Batch Inference
+<a href=#batch-inference class=heading-anchor><span>#</span></a></h2><p>The simplest inference job loads a model and transforms a DataFrame:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>PipelineModel model <span style=color:#f92672>=</span> PipelineModel.<span style=color:#a6e22e>load</span>(modelPath);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(input)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>select</span>(<span style=color:#e6db74>&#34;recordId&#34;</span>, <span style=color:#e6db74>&#34;probability&#34;</span>, <span style=color:#e6db74>&#34;prediction&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>predictions.<span style=color:#a6e22e>write</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>mode</span>(SaveMode.<span style=color:#a6e22e>Overwrite</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>parquet</span>(outputPath);</span></span></code></pre></div></div></div><p>The transformation is lazy. Executors perform scoring when the output action
+runs.</p><p>Spark ML is naturally suited to batch inference. Low-latency online serving is
+a different workload. Starting a Spark job for each request is inappropriate,
+and embedding a Spark driver in every web-service instance is usually
+operationally expensive.</p><p>For online serving, possible approaches include:</p><ul><li>reproducing a compatible model in a serving-oriented runtime;</li><li>exporting supported model types to an interoperable format;</li><li>using a dedicated model server; or</li><li>scoring requests in micro-batches when latency requirements allow it.</li></ul><p>Not every Pipeline stage has a portable representation. Test parity between
+offline Spark features and online features before deploying separate serving
+code.</p><h2 id=custom-transformers-and-estimators>Custom Transformers and Estimators
+<a href=#custom-transformers-and-estimators class=heading-anchor><span>#</span></a></h2><p>A custom Transformer can package application-specific feature logic as a
+pipeline stage. It must define parameters, input/output schema behavior,
+<code>transform()</code>, and copying/persistence semantics.</p><p>Prefer native Spark SQL expressions over row-by-row UDFs:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> prepared <span style=color:#f92672>=</span> input.<span style=color:#a6e22e>withColumn</span>(
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;amountLog&#34;</span>,
+</span></span><span style=display:flex><span>    functions.<span style=color:#a6e22e>log1p</span>(functions.<span style=color:#a6e22e>col</span>(<span style=color:#e6db74>&#34;amount&#34;</span>))
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Native expressions participate in Catalyst optimization and code generation.
+Java or Scala UDFs introduce an opaque call boundary; Python UDFs additionally
+cross the JVM/Python boundary unless a vectorized execution path is available.</p><p>If custom state must be learned from data, implement an Estimator that returns
+a corresponding Model. A one-off sequence of DataFrame transformations may be
+simpler than a custom stage unless persistence, tuning, and pipeline reuse are
+required.</p><h2 id=spark-ml-versus-other-ml-systems>Spark ML Versus Other ML Systems
+<a href=#spark-ml-versus-other-ml-systems class=heading-anchor><span>#</span></a></h2><p>Spark ML is strongest when:</p><ul><li>training data is stored in a distributed data lake;</li><li>feature preparation requires large joins, aggregations, or scans;</li><li>classical algorithms meet the modeling requirement;</li><li>batch training and inference fit the product; and</li><li>the organization already operates Spark reliably.</li></ul><p>It is less compelling when:</p><ul><li>the prepared dataset fits comfortably on one machine;</li><li>GPU-based deep learning is required;</li><li>the desired algorithm is not implemented;</li><li>very low-latency online inference is the primary workload; or</li><li>experiment iteration is dominated by cluster startup and scheduling.</li></ul><p>For small and medium tabular datasets, scikit-learn, XGBoost, LightGBM, or a
+single-machine statistics package may be simpler and faster. Deep-learning
+frameworks such as PyTorch and TensorFlow provide richer neural-network and GPU
+support. Spark can still prepare their datasets, but using Spark for feature
+engineering does not require using Spark ML for the final model.</p><h2 id=common-mistakes>Common Mistakes
+<a href=#common-mistakes class=heading-anchor><span>#</span></a></h2><ol><li><strong>Using <code>spark.mllib</code> for new code.</strong> Prefer the DataFrame-based <code>spark.ml</code>
+API unless maintaining an existing RDD application.</li><li><strong>Fitting feature stages before splitting data.</strong> This leaks information
+into validation and test sets.</li><li><strong>Collecting training or prediction data to the driver.</strong> Keep distributed
+data as DataFrames and aggregate it on executors.</li><li><strong>Creating dense vectors from sparse data.</strong> Memory and shuffle size can
+grow dramatically.</li><li><strong>Ignoring unseen categories and nulls.</strong> Define explicit production
+behavior with stage parameters and data-quality checks.</li><li><strong>Choosing accuracy for an imbalanced problem.</strong> Evaluate metrics aligned
+with business costs.</li><li><strong>Launching an enormous parameter grid.</strong> Model count is the Cartesian
+product of parameter values and folds.</li><li><strong>Assuming every stage scales linearly.</strong> Model state, driver aggregation,
+iteration, skew, and shuffle can remain bottlenecks.</li><li><strong>Logging or performing remote calls per row.</strong> Such side effects execute in
+parallel on executors and are difficult to retry safely.</li><li><strong>Treating a saved model as complete lineage.</strong> Record data, code,
+parameters, schemas, and metrics separately.</li></ol><p>Spark ML provides a consistent way to express classical machine-learning
+workflows over distributed DataFrames. Its central abstraction is not an
+individual algorithm but a fitted PipelineModel that carries feature
+preparation and prediction together. Use it when distributed data processing
+is genuinely part of the problem, and keep evaluation, model size, serving
+requirements, and data leakage in view throughout the workflow.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spark-ml/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

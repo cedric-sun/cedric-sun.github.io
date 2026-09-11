@@ -1,0 +1,47 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Huffman Coding</title></head><body><main><article><div class=article-header><h1>Huffman Coding</h1><div class=aux>Last update: 2024-06-26 21:31:33 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/compression/>Compression</a>
+|
+<a href=/tags/huffman/>Huffman</a>
+|
+<a href=/tags/coding-theory/>Coding-Theory</a></div></div><div class=article-content><p>Huffman coding maps symbols to variable-length bit strings. A prefix-free code
+has no codeword that is a prefix of another, so a decoder can walk one binary
+tree and emit a symbol as soon as it reaches a leaf. Prefix-free codes are
+uniquely decodable, although uniquely decodable codes do not all have the
+prefix-free property.</p><h2 id=prefix-free-codes-and-krafts-inequality>Prefix-Free Codes and Kraft&rsquo;s Inequality
+<a href=#prefix-free-codes-and-krafts-inequality class=heading-anchor><span>#</span></a></h2><p>For a binary prefix code with codeword lengths <code>lᵢ</code>, Kraft&rsquo;s inequality is</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Σ 2^(-lᵢ) ≤ 1</span></span></code></pre></div></div></div><p>The inequality counts the fraction of the binary tree occupied by each leaf.
+Conversely, every positive integer length sequence satisfying it can be
+realized by a binary prefix code. Equality describes a complete tree; a strict
+inequality leaves unused branches.</p><h2 id=building-a-frequency-tree>Building a Frequency Tree
+<a href=#building-a-frequency-tree class=heading-anchor><span>#</span></a></h2><p>Given symbol frequencies, Huffman&rsquo;s algorithm repeatedly removes the two
+lowest-weight nodes, makes them siblings under a node whose weight is their
+sum, and reinserts that node. The depth of a symbol is its code length. Merging
+rare symbols deepest in the tree gives an intuitive exchange argument for
+optimality: moving a frequent symbol above a less frequent one cannot increase
+the weighted path length. The resulting tree minimizes expected length among
+binary prefix codes for the supplied frequencies.</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>while more than one node remains:
+</span></span><span style=display:flex><span>    a, b = remove the two lowest-weight nodes
+</span></span><span style=display:flex><span>    insert node(weight(a) + weight(b), a, b)</span></span></code></pre></div></div></div><p>Equal weights permit multiple optimal trees. A deterministic implementation
+must define tie-breaking, for example by comparing a stable symbol ordinal
+after frequency. Determinism matters for reproducible output and tests, even
+though the expected bit count is unchanged. A format that imposes a maximum
+code length needs a length-limited Huffman algorithm; simply truncating a
+tree can violate Kraft&rsquo;s inequality or change the intended symbol ordering.</p><p>Codebook overhead can exceed the savings for short or high-entropy input.
+Huffman coding is a representation choice, not a guarantee that every input
+gets smaller.</p><h2 id=canonical-reconstruction>Canonical Reconstruction
+<a href=#canonical-reconstruction class=heading-anchor><span>#</span></a></h2><p>Many formats transmit code lengths rather than left/right tree pointers.
+Canonical construction sorts active symbols by <code>(length, symbol order)</code> and
+assigns consecutive integer codes within each length, shifting the next code
+left whenever the length increases. The decoder repeats that calculation, then
+inserts each code into a lookup table or decoding tree. Identical lengths
+therefore produce identical codes without transmitting tree shape.</p><p>For example, lengths <code>(1, 2, 3, 3)</code> for symbols <code>A</code> through <code>D</code> produce this
+canonical table:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Symbol</th><th style=text-align:right>Length</th><th>Code (canonical notation)</th></tr></thead><tbody><tr><td><code>A</code></td><td style=text-align:right>1</td><td><code>0</code></td></tr><tr><td><code>B</code></td><td style=text-align:right>2</td><td><code>10</code></td></tr><tr><td><code>C</code></td><td style=text-align:right>3</td><td><code>110</code></td></tr><tr><td><code>D</code></td><td style=text-align:right>3</td><td><code>111</code></td></tr></tbody></table></div></div><p>The table records the logical code values. A bit-oriented format can serialize
+those values in a different order; DEFLATE, for example, reverses Huffman
+bits when packing them into the stream.</p><p>A decoder should build the table with checked arithmetic and reject:</p><ul><li>a code length outside the enclosing format&rsquo;s limit;</li><li>an oversubscribed set, where the lengths require more leaves than the tree
+contains;</li><li>an incomplete set when the format requires a complete tree;</li><li>duplicate or out-of-range symbols, malformed repeat instructions, and a
+missing required end-of-block symbol;</li><li>a bit sequence that walks past the table or ends inside a code.</li></ul><p>Lookup tables can decode several bits at a time, but the slow path must still
+validate the code length and remaining input. Treating an invalid table entry
+as a symbol converts malformed input into silent corruption.</p><p>For a concrete canonical format, see <a href=/deflate-and-gzip/>DEFLATE and Gzip Formats</a>.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li>D. A. Huffman, “<a href=https://doi.org/10.1109/JRPROC.1952.273898>A Method for the Construction of Minimum-Redundancy Codes</a>,” <em>Proceedings of the IRE</em>, 1952.</li><li><a href=https://www.rfc-editor.org/rfc/rfc1951>RFC 1951: DEFLATE, sections 3.2.1–3.2.2</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/huffman-coding/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

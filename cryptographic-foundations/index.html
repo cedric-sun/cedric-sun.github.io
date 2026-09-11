@@ -1,0 +1,103 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Cryptography Foundations</title></head><body><main><article><div class=article-header><h1>Cryptography Foundations</h1><div class=aux>Last update: 2026-09-03 15:56:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/cryptography/>Cryptography</a>
+|
+<a href=/tags/encryption/>Encryption</a>
+|
+<a href=/tags/authentication/>Authentication</a></div></div><div class=article-content><p>Cryptography applies mathematical primitives to security goals such as
+confidentiality, integrity, peer authentication, and non-repudiation. A secure
+primitive does not make a protocol secure by itself because encodings, key
+management, randomness, state, and the attacker&rsquo;s capabilities also determine
+the result.</p><h2 id=bits-xor-and-modular-arithmetic>Bits, XOR, and Modular Arithmetic
+<a href=#bits-xor-and-modular-arithmetic class=heading-anchor><span>#</span></a></h2><p>Cryptographic specifications operate on precisely sized bit strings and byte
+strings. Exclusive-or is addition modulo two:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>a</code></th><th><code>b</code></th><th><code>a XOR b</code></th></tr></thead><tbody><tr><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>1</td></tr><tr><td>1</td><td>0</td><td>1</td></tr><tr><td>1</td><td>1</td><td>0</td></tr></tbody></table></div></div><p>XOR is associative, commutative, and self-inverse, so
+<code>(message XOR mask) XOR mask = message</code>. Those identities explain how a stream
+cipher applies and removes a keystream. They do not imply security: repeating
+the mask exposes relationships between plaintexts.</p><p>Modular arithmetic groups integers into congruence classes. The notation
+<code>a ≡ b (mod n)</code> means that <code>n</code> divides <code>a - b</code>. Addition and multiplication
+remain within those classes. An integer <code>a</code> has a multiplicative inverse modulo
+<code>n</code> exactly when <code>gcd(a, n) = 1</code>; the extended Euclidean algorithm finds that
+inverse.</p><p>Prime moduli produce finite fields in which every nonzero element is invertible.
+Other public-key systems operate in carefully selected finite groups, including
+elliptic-curve groups. Implementations must use the group, encoding, validation,
+and subgroup rules defined by the selected standard rather than treating
+arbitrary integers or points as valid keys.</p><h2 id=probability-and-security-parameters>Probability and Security Parameters
+<a href=#probability-and-security-parameters class=heading-anchor><span>#</span></a></h2><p>Cryptographic guarantees are probabilistic and parameterized. If a secret is
+uniformly sampled from <code>2^k</code> possibilities, exhaustive search takes
+approximately <code>2^(k-1)</code> guesses on average. An ideal <code>n</code>-bit hash requires about
+<code>2^n</code> work for a preimage but only <code>2^(n/2)</code> work for a collision because of the
+birthday bound.</p><p>A security parameter states the intended work factor, not the number of bits in
+every object. A 256-bit elliptic-curve group can target about 128-bit classical
+security, while a 256-bit hash targets 256-bit preimage resistance and 128-bit
+collision resistance. Algorithm-specific attacks, quantum attack models,
+implementation leakage, weak random generation, and key lifetime can reduce
+the effective strength. Parameter selection must therefore follow the protocol
+standard and current key-management guidance.</p><p>Probabilities also govern failure limits. Authentication tags can be forged
+with some bounded probability, and nonce-based modes cap the number and total
+size of messages processed under one key. Systems must enforce those usage
+limits rather than assuming that a large key alone makes unlimited use safe.</p><h2 id=one-time-pads-and-stream-ciphers>One-Time Pads and Stream Ciphers
+<a href=#one-time-pads-and-stream-ciphers class=heading-anchor><span>#</span></a></h2><p>For equal-length strings, a one-time pad computes:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ciphertext = plaintext XOR pad
+</span></span><span style=display:flex><span>plaintext  = ciphertext XOR pad</span></span></code></pre></div></div></div><p>Information-theoretic secrecy holds only when the pad is uniformly random,
+secret, at least as long as the plaintext, and never reused in whole or in
+part. Reusing a pad gives
+<code>ciphertext1 XOR ciphertext2 = plaintext1 XOR plaintext2</code>, which leaks
+structure even if neither plaintext is initially known. Generating,
+distributing, and destroying pads safely makes the construction impractical
+for most software systems.</p><p>A stream cipher replaces the truly random pad with a pseudorandom keystream
+derived from a compact secret key and a nonce. The nonce is normally public,
+but its uniqueness requirement is mandatory. Repeating a nonce under one
+ChaCha20-Poly1305 key repeats the ChaCha20 keystream and also reuses the
+one-time authentication key. AES-GCM likewise loses strong confidentiality and
+authentication guarantees after nonce reuse. Use a library API that manages or
+validates nonces, and rotate the key before the mode&rsquo;s message or data limits.</p><h2 id=authenticated-encryption-and-associated-data>Authenticated Encryption and Associated Data
+<a href=#authenticated-encryption-and-associated-data class=heading-anchor><span>#</span></a></h2><p>Encryption alone does not detect modification. An authenticated-encryption
+with associated data (AEAD) scheme returns ciphertext and an authentication tag
+while authenticating:</p><ul><li>the plaintext, which remains confidential;</li><li>associated data, which remains visible but cannot be changed unnoticed; and</li><li>the nonce and algorithm inputs as required by the scheme.</li></ul><p>Headers such as protocol versions, record sequence numbers, tenant identifiers,
+or routing fields can be associated data when intermediaries must read them.
+Both endpoints must serialize exactly the same associated data because a
+difference makes tag verification fail.</p><p>Use a standardized AEAD such as AES-GCM or ChaCha20-Poly1305 through a maintained
+cryptographic library. The receiver must not release or act on unauthenticated
+plaintext. A failed tag is an authentication failure; retries, logs, and error
+responses must not reveal partial plaintext or distinguish useful internal
+failure states. An unkeyed digest appended to ciphertext does not provide this
+protection.</p><h2 id=hashes-macs-and-key-derivation>Hashes, MACs, and Key Derivation
+<a href=#hashes-macs-and-key-derivation class=heading-anchor><span>#</span></a></h2><p>Related-looking primitives have distinct roles:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Primitive</th><th>Secret Input</th><th>Primary Role</th></tr></thead><tbody><tr><td>Cryptographic hash</td><td>No</td><td>Stable digest, commitment component, or protocol-defined transcript hash</td></tr><tr><td>Message authentication code (MAC)</td><td>Shared key</td><td>Integrity and source authentication among key holders</td></tr><tr><td>Key-derivation function (KDF)</td><td>Secret keying material</td><td>Produce context-bound keys with the required length</td></tr><tr><td>Password-hashing function</td><td>Password and salt</td><td>Make offline password guesses costly</td></tr></tbody></table></div></div><p>A plain hash cannot authenticate data because an attacker who replaces a
+message can calculate its new digest. HMAC is a standardized MAC construction;
+do not substitute <code>hash(key || message)</code>. HKDF first extracts a fixed-length
+pseudorandom key from input keying material and then expands it into
+context-specific output. Its salt and <code>info</code> inputs are not passwords and serve
+different purposes from a password hash&rsquo;s per-account random salt.</p><p>KDF context labels separate keys by protocol, version, direction, role, and
+purpose. For example, an encryption key and a MAC key must not be the same bytes
+merely because both came from one shared secret. Follow the enclosing protocol&rsquo;s
+defined labels and encoding because ambiguous concatenation defeats that
+separation.</p><h2 id=asymmetric-key-establishment-and-signatures>Asymmetric Key Establishment and Signatures
+<a href=#asymmetric-key-establishment-and-signatures class=heading-anchor><span>#</span></a></h2><p>Diffie-Hellman and elliptic-curve Diffie-Hellman let two parties derive a shared
+secret across an observable channel. Bare Diffie-Hellman does not authenticate
+either party: an active attacker can negotiate one secret with each endpoint.
+A complete protocol binds the exchange transcript to certificates, pre-shared
+keys, or previously authenticated public keys, then derives traffic keys with a
+KDF.</p><p>A key encapsulation mechanism (KEM) produces a shared secret and an
+encapsulation for a recipient&rsquo;s public key. Protocols may combine independently
+secure components during a cryptographic migration, but the combination and
+its KDF must come from a reviewed protocol specification. Public-key encryption
+is not interchangeable with key agreement or a KEM.</p><p>Digital signatures bind a private signing operation to a message and allow
+verification with the public key. Algorithms such as Ed25519, ECDSA, and
+RSA-PSS define message formatting, hashing, randomness or deterministic nonce
+generation, and verification rules. A signature is not &ldquo;encryption with the
+private key,&rdquo; and signature verification does not make an untrusted public key
+authentic.</p><h2 id=start-with-a-threat-model>Start with a Threat Model
+<a href=#start-with-a-threat-model class=heading-anchor><span>#</span></a></h2><p>Select primitives only after stating the security boundary:</p><ol><li>Identify protected assets and whether confidentiality, integrity, peer
+authentication, replay resistance, or forward secrecy is required.</li><li>Identify attacker capabilities, including observation, active modification,
+chosen inputs, endpoint compromise, side channels, rollback, and denial of
+service.</li><li>Define trust anchors, key ownership, key rotation, compromise recovery, and
+authenticated metadata.</li><li>Choose a standardized protocol and maintained implementation whose security
+properties match those requirements.</li></ol><p>TLS can protect data in transit while leaving compromised endpoints,
+authorization errors, and application-level replay outside its boundary.
+Signatures can prove that a key authorized a message while saying nothing about
+whether that key should be trusted. Explicit boundaries prevent one property
+from being mistaken for another.</p><p>OpenSSH randomart illustrates the same distinction. It is a visual rendering of
+a public-key fingerprint, not an authenticated identity proof. Compare the full
+fingerprint over a separately authenticated channel.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final>NIST SP 800-57 Part 1 Rev. 5: Recommendation for Key Management</a></li><li><a href=https://csrc.nist.gov/pubs/sp/800/38/d/final>NIST SP 800-38D: Galois/Counter Mode</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc8439>RFC 8439: ChaCha20 and Poly1305 for IETF Protocols</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc5869>RFC 5869: HMAC-Based Extract-and-Expand Key Derivation Function</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc7748>RFC 7748: Elliptic Curves for Security</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc8032>RFC 8032: Edwards-Curve Digital Signature Algorithm</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cryptographic-foundations/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

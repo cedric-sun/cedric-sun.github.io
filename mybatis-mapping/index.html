@@ -1,0 +1,81 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MyBatis Mapping</title></head><body><main><article><div class=article-header><h1>MyBatis Mapping</h1><div class=aux>Last update: 2025-10-21 15:55:03 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/mybatis/>Mybatis</a>
+|
+<a href=/tags/sql/>Sql</a></div></div><div class=article-content><p>MyBatis maps Java calls to SQL statements while JDBC owns parameter binding,
+statement execution, and result-set access. A mapper should make that boundary
+visible: SQL column names belong in the statement, Java property names belong in
+parameter and result mappings, and a type handler performs any nonstandard
+conversion between them.</p><h2 id=parameter-and-result-boundaries>Parameter and Result Boundaries
+<a href=#parameter-and-result-boundaries class=heading-anchor><span>#</span></a></h2><p>Simple parameters can use <code>#{id}</code> placeholders. Object and map parameters expose
+named properties, while multiple mapper parameters should use <code>@Param</code> so the
+names do not depend on compiler metadata:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>List<span style=color:#f92672>&lt;</span>Task<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>findByState</span>(<span style=color:#a6e22e>@Param</span>(<span style=color:#e6db74>&#34;state&#34;</span>) State state,
+</span></span><span style=display:flex><span>                       <span style=color:#a6e22e>@Param</span>(<span style=color:#e6db74>&#34;limit&#34;</span>) <span style=color:#66d9ef>int</span> limit);</span></span></code></pre></div></div></div><p><code>#{...}</code> creates a JDBC parameter marker and binds a value. <code>${...}</code> substitutes
+text into SQL before preparation, so reserve it for allow-listed identifiers or
+fragments that cannot be parameterized. Never place request data directly in a
+<code>${...}</code> expression.</p><p>Automatic result mapping is concise when column labels and Java properties
+match. Use <code>resultMap</code> when names differ, nested objects require explicit
+identity, or a join can duplicate parent rows:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;resultMap</span> <span style=color:#a6e22e>id=</span><span style=color:#e6db74>&#34;taskResult&#34;</span> <span style=color:#a6e22e>type=</span><span style=color:#e6db74>&#34;com.example.Task&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;id</span> <span style=color:#a6e22e>property=</span><span style=color:#e6db74>&#34;id&#34;</span> <span style=color:#a6e22e>column=</span><span style=color:#e6db74>&#34;task_id&#34;</span><span style=color:#f92672>/&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;result</span> <span style=color:#a6e22e>property=</span><span style=color:#e6db74>&#34;name&#34;</span> <span style=color:#a6e22e>column=</span><span style=color:#e6db74>&#34;task_name&#34;</span><span style=color:#f92672>/&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;result</span> <span style=color:#a6e22e>property=</span><span style=color:#e6db74>&#34;state&#34;</span> <span style=color:#a6e22e>column=</span><span style=color:#e6db74>&#34;state&#34;</span>
+</span></span><span style=display:flex><span>          <span style=color:#a6e22e>typeHandler=</span><span style=color:#e6db74>&#34;com.example.StateTypeHandler&#34;</span><span style=color:#f92672>/&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/resultMap&gt;</span></span></span></code></pre></div></div></div><p>The <code>&lt;id></code> mapping identifies an object within a joined result and helps MyBatis
+coalesce repeated parent data. It does not declare a database constraint; the
+schema must still enforce identity.</p><h2 id=generated-keys>Generated Keys
+<a href=#generated-keys class=heading-anchor><span>#</span></a></h2><p>For a database and JDBC driver that support generated keys, enable
+<code>useGeneratedKeys</code> and identify the writable Java property. MyBatis calls the
+JDBC generated-key API after the insert and assigns the generated primary key
+to that property.</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;insert</span> <span style=color:#a6e22e>id=</span><span style=color:#e6db74>&#34;insert&#34;</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>parameterType=</span><span style=color:#e6db74>&#34;com.example.Task&#34;</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>useGeneratedKeys=</span><span style=color:#e6db74>&#34;true&#34;</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>keyProperty=</span><span style=color:#e6db74>&#34;id&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  INSERT INTO task (name) VALUES (#{name})
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/insert&gt;</span></span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Task task <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Task();
+</span></span><span style=display:flex><span>task.<span style=color:#a6e22e>setName</span>(<span style=color:#e6db74>&#34;import&#34;</span>);
+</span></span><span style=display:flex><span>mapper.<span style=color:#a6e22e>insert</span>(task);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>long</span> id <span style=color:#f92672>=</span> task.<span style=color:#a6e22e>getId</span>();</span></span></code></pre></div></div></div><p>The assignment fills the generated-key property only. It does not reload
+database defaults, trigger-generated columns, or unrelated fields. Use a
+follow-up <code>SELECT</code>, a database <code>RETURNING</code> clause where supported, or a
+<code>selectKey</code> statement when the database uses a sequence or a driver does not
+support <code>getGeneratedKeys</code>.</p><h2 id=null-parameters>Null Parameters
+<a href=#null-parameters class=heading-anchor><span>#</span></a></h2><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span>UPDATE task
+</span></span><span style=display:flex><span>SET completed_at = #{completedAt, jdbcType=TIMESTAMP}
+</span></span><span style=display:flex><span>WHERE id = #{id}</span></span></code></pre></div></div></div><p>Set a global <code>jdbcTypeForNull</code> only when the database convention is compatible
+with every nullable parameter. A per-parameter type is clearer for columns
+with distinct SQL types. Test inserts and updates against the production
+driver, because generated-key and null-binding behavior is driver-specific.</p><h2 id=dynamic-sql-and-type-handlers>Dynamic SQL and Type Handlers
+<a href=#dynamic-sql-and-type-handlers class=heading-anchor><span>#</span></a></h2><p>Dynamic elements construct statement structure without concatenating arbitrary
+application text:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;select</span> <span style=color:#a6e22e>id=</span><span style=color:#e6db74>&#34;find&#34;</span> <span style=color:#a6e22e>resultMap=</span><span style=color:#e6db74>&#34;taskResult&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  SELECT id AS task_id, name AS task_name, state
+</span></span><span style=display:flex><span>  FROM task
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;where&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;if</span> <span style=color:#a6e22e>test=</span><span style=color:#e6db74>&#34;state != null&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>      state = #{state, typeHandler=com.example.StateTypeHandler}
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/if&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/where&gt;</span>
+</span></span><span style=display:flex><span>  ORDER BY id
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/select&gt;</span></span></span></code></pre></div></div></div><p><code>&lt;where></code> inserts <code>WHERE</code> only when a child emits a condition and removes a
+leading <code>AND</code> or <code>OR</code>. Related elements include <code>&lt;choose></code>, <code>&lt;set></code>, <code>&lt;trim></code>,
+and <code>&lt;foreach></code>. A <code>TypeHandler</code> should define a deliberate Java/JDBC
+representation, such as an enum stored as a stable string; register it narrowly
+when different columns encode the same Java type differently.</p><h2 id=session-and-transaction-ownership>Session and Transaction Ownership
+<a href=#session-and-transaction-ownership class=heading-anchor><span>#</span></a></h2><p>A mapped statement runs through a <code>SqlSession</code>. With direct MyBatis usage, the
+caller opens the session, commits or rolls back, and closes it:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>try</span> (SqlSession session <span style=color:#f92672>=</span> factory.<span style=color:#a6e22e>openSession</span>()) {
+</span></span><span style=display:flex><span>    TaskMapper mapper <span style=color:#f92672>=</span> session.<span style=color:#a6e22e>getMapper</span>(TaskMapper.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>    mapper.<span style=color:#a6e22e>insert</span>(task);
+</span></span><span style=display:flex><span>    session.<span style=color:#a6e22e>commit</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The default session is not autocommit, and <code>SqlSession</code> is not thread-safe.
+Framework integrations such as MyBatis-Spring bind sessions to framework-managed
+transactions; application code must not mix manual commits with that ownership
+model. Generated-key assignment occurs during statement execution, but the row
+is durable only after the owning transaction commits.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://mybatis.org/mybatis-3/sqlmap-xml.html>MyBatis XML Mapping</a></li><li><a href=https://mybatis.org/mybatis-3/dynamic-sql.html>MyBatis Dynamic SQL</a></li><li><a href=https://mybatis.org/mybatis-3/java-api.html>MyBatis Java API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mybatis-mapping/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

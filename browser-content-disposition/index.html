@@ -1,0 +1,65 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Browser Content Disposition and Downloads</title></head><body><main><article><div class=article-header><h1>Browser Content Disposition and Downloads</h1><div class=aux>Last update: 2023-08-16 17:13:20 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/browser/>Browser</a>
+|
+<a href=/tags/http/>Http</a>
+|
+<a href=/tags/security/>Security</a>
+|
+<a href=/tags/web/>Web</a></div></div><div class=article-content><p>Browsers decide whether to display a response, download it, or hand it to an
+external application from several inputs. <code>Content-Disposition</code> provides a
+strong preference, but content type, navigation context, sandboxing, browser
+capabilities, and user settings also affect the result.</p><h2 id=inline-and-attachment-dispositions>Inline and Attachment Dispositions
+<a href=#inline-and-attachment-dispositions class=heading-anchor><span>#</span></a></h2><p>An attachment response requests a download:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span> <span style=color:#ae81ff>200</span> <span style=color:#a6e22e>OK</span>
+</span></span><span style=display:flex><span>Content-Type<span style=color:#f92672>:</span> <span style=color:#ae81ff>application/pdf</span>
+</span></span><span style=display:flex><span>Content-Disposition<span style=color:#f92672>:</span> <span style=color:#ae81ff>attachment; filename=&#34;guide.pdf&#34;</span>
+</span></span><span style=display:flex><span>Content-Length<span style=color:#f92672>:</span> <span style=color:#ae81ff>110352</span>
+</span></span><span style=display:flex><span>X-Content-Type-Options<span style=color:#f92672>:</span> <span style=color:#ae81ff>nosniff</span></span></span></code></pre></div></div></div><p>An inline response permits presentation inside the browser:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>Content-Type: application/pdf
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>Content-Disposition: inline; filename=&#34;guide.pdf&#34;</span></span></span></code></pre></div></div></div><p><code>inline</code> does not guarantee display. The browser needs a viewer for the media
+type, and the user can configure some types to download instead. Omitting the
+header leaves the choice primarily to the media type and navigation context.</p><h2 id=supplying-a-safe-filename>Supplying a Safe Filename
+<a href=#supplying-a-safe-filename class=heading-anchor><span>#</span></a></h2><p><code>filename</code> carries an ASCII-compatible fallback. <code>filename*</code> uses the extended
+parameter encoding defined by RFC 8187, which supersedes RFC 5987, and can
+represent Unicode:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>Content-Disposition: attachment;
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010> filename=&#34;report.pdf&#34;;
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010> filename*=UTF-8&#39;&#39;r%C3%A9sum%C3%A9.pdf</span></span></span></code></pre></div></div></div><p>Send both parameters because older clients may ignore <code>filename*</code>; conforming
+recipients prefer <code>filename*</code> when both are valid. Treat a server-supplied
+filename as untrusted input:</p><ul><li>Remove directory separators and control characters.</li><li>Reject <code>.</code> and <code>..</code> as final names.</li><li>Keep the expected extension consistent with the media type.</li><li>Impose a reasonable length limit.</li><li>Never construct a server filesystem path directly from the value.</li></ul><p>Browsers sanitize filenames independently, so exact renaming behavior differs
+between implementations.</p><h2 id=content-type-and-sniffing>Content Type and Sniffing
+<a href=#content-type-and-sniffing class=heading-anchor><span>#</span></a></h2><p><code>Content-Type</code> describes the representation. A PDF should be
+<code>application/pdf</code>, an SVG should be <code>image/svg+xml</code>, and arbitrary binary data
+should be <code>application/octet-stream</code>.</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>X-Content-Type-Options: nosniff</span></span></span></code></pre></div></div></div><p><code>nosniff</code> makes script and style fetches reject incompatible media types and
+limits MIME-based reinterpretation in other protected fetch paths. It does not
+repair an incorrect <code>Content-Type</code>, make arbitrary content safe, or force a
+download. Serving active content under an incorrect benign type remains a
+security problem because navigation and embedding rules depend on both the
+declared type and the request context.</p><h2 id=html-download-links>HTML Download Links
+<a href=#html-download-links class=heading-anchor><span>#</span></a></h2><p>The <code>download</code> attribute expresses download intent for a link:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>a</span> <span style=color:#a6e22e>href</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/exports/report.csv&#34;</span> <span style=color:#a6e22e>download</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;report.csv&#34;</span>&gt;Download report&lt;/<span style=color:#f92672>a</span>&gt;</span></span></code></pre></div></div></div><p>For HTTP(S) URLs, browsers honor <code>download</code> only for same-origin resources.
+<code>blob:</code> and <code>data:</code> URLs are also eligible; CORS response headers do not make a
+cross-origin HTTP URL eligible. A response <code>Content-Disposition</code> filename can
+affect the suggested name, and <code>attachment</code> remains the reliable server-side
+mechanism for a cross-origin download. Authorization must remain on the
+download endpoint because hiding a URL behind a button does not protect it.</p><p>Blob URLs support generated client-side files:</p><div class=jose-wrapper><div class=jose-tools><span>js</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-js data-lang=js><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>blob</span> <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> <span style=color:#a6e22e>Blob</span>([<span style=color:#a6e22e>csv</span>], { <span style=color:#a6e22e>type</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;text/csv;charset=utf-8&#34;</span> });
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>url</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>URL</span>.<span style=color:#a6e22e>createObjectURL</span>(<span style=color:#a6e22e>blob</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>link</span> <span style=color:#f92672>=</span> document.<span style=color:#a6e22e>createElement</span>(<span style=color:#e6db74>&#34;a&#34;</span>);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>link</span>.<span style=color:#a6e22e>href</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>url</span>;
+</span></span><span style=display:flex><span><span style=color:#a6e22e>link</span>.<span style=color:#a6e22e>download</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;report.csv&#34;</span>;
+</span></span><span style=display:flex><span>document.<span style=color:#a6e22e>body</span>.<span style=color:#a6e22e>append</span>(<span style=color:#a6e22e>link</span>);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>link</span>.<span style=color:#a6e22e>click</span>();
+</span></span><span style=display:flex><span><span style=color:#a6e22e>link</span>.<span style=color:#a6e22e>remove</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>setTimeout</span>(() =&gt; <span style=color:#a6e22e>URL</span>.<span style=color:#a6e22e>revokeObjectURL</span>(<span style=color:#a6e22e>url</span>), <span style=color:#ae81ff>0</span>);</span></span></code></pre></div></div></div><p>Revoke object URLs after the browser has started the navigation because each
+URL retains its backing data. Run this sequence from a user-initiated event;
+programmatic clicks do not bypass browser download policy.</p><h2 id=automation-and-security-constraints>Automation and Security Constraints
+<a href=#automation-and-security-constraints class=heading-anchor><span>#</span></a></h2><p>Sandboxed frames need the <code>allow-downloads</code> sandbox token, and browsers can
+still block downloads without transient user activation or throttle repeated
+downloads.
+Cross-origin isolation, popup policy, mixed-content policy, and enterprise
+configuration can introduce additional restrictions.</p><p>Test the complete navigation in each supported browser:</p><ol><li>Verify status, <code>Content-Type</code>, and <code>Content-Disposition</code>.</li><li>Confirm the suggested filename and downloaded bytes.</li><li>Exercise authenticated, redirected, and error responses.</li><li>Verify that HTML error pages are not saved under a trusted file extension.</li></ol><p>Header inspection alone cannot prove the user-visible outcome because the
+browser performs the final policy decision.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/browser-content-disposition/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

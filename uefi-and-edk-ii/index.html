@@ -1,0 +1,45 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>UEFI and EDK II</title></head><body><main><article><div class=article-header><h1>UEFI and EDK II</h1><div class=aux>Last update: 2022-04-13 08:27:02 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/edk-ii/>Edk-Ii</a>
+|
+<a href=/tags/firmware/>Firmware</a>
+|
+<a href=/tags/uefi/>Uefi</a></div></div><div class=article-content><p>UEFI is the firmware interface between platform firmware and an operating system.
+The UEFI Forum publishes the UEFI and Platform Initialization (PI) specifications;
+EDK II is the TianoCore reference implementation and build environment.</p><h2 id=boot-phases>Boot Phases
+<a href=#boot-phases class=heading-anchor><span>#</span></a></h2><p>The PI architecture divides early firmware execution into phases. Pre-EFI
+Initialization (PEI) begins with little more than the CPU and temporary storage. The
+PEI Foundation runs PEI modules (PEIMs), publishes PPIs (PEIM-to-PEIM interfaces), and
+uses hand-off blocks (HOBs) to describe discovered resources. Its central job is to
+initialize sufficient RAM for the next phase.</p><p>The Driver Execution Environment (DXE) then loads drivers and services from firmware
+volumes, installs UEFI protocols, and constructs the UEFI system tables. Boot Device
+Selection chooses and loads an operating-system boot option. After <code>ExitBootServices</code>,
+the operating system owns normal boot-time hardware resources; UEFI runtime services
+remain available only where the platform supports them. ACPI tables describe hardware
+and power-management interfaces to the operating system.</p><h2 id=firmware-images>Firmware Images
+<a href=#firmware-images class=heading-anchor><span>#</span></a></h2><p>A flash device (FD) is the physical or logical firmware image. It contains one or
+more firmware volumes (FVs), which are formatted containers—normally using the
+Firmware File System (FFS). FFS files package executable sections, raw data,
+compression sections, and other firmware content. An FDF file describes how these
+pieces become FFS files, FVs, update capsules, option ROMs, and finally an FD image.</p><p>Most modules are relocatable and are loaded into RAM. Execute-in-place modules are
+linked for a fixed ROM address and can run directly from flash; some modules support
+both modes.</p><h2 id=edk-ii-metadata-and-build-flow>EDK II Metadata and Build Flow
+<a href=#edk-ii-metadata-and-build-flow class=heading-anchor><span>#</span></a></h2><p>EDK II packages use several declarative files:</p><ul><li>A <code>.dec</code> package declaration publishes GUIDs, protocols, library classes, and
+include paths.</li><li>An <code>.inf</code> module-information file describes a module&rsquo;s sources, dependencies,
+library classes, packages, and build options. It can describe source, binary, or
+mixed content; the build produces an AsBuilt INF for source modules.</li><li>A <code>.dsc</code> platform-description file selects components, library instances, toolchain
+settings, and platform-wide configuration. <code>.dsc.inc</code> files factor shared fragments.</li><li>An <code>.fdf</code> flash-definition file lays out the final firmware image.</li></ul><p>BaseTools reads this metadata, resolves libraries, and generates <code>AutoGen.c</code> and
+<code>AutoGen.h</code>. The selected toolchain compiles source files and archives library
+objects. The linker produces an intermediate image, often named <code>.dll</code> even on a
+non-Windows host. <code>GenFw</code> converts it to the PE/COFF EFI image (<code>.efi</code>), setting the
+appropriate EFI subsystem, such as an EFI boot-service driver. Modules are then
+packaged into FFS files, FVs, and the final FD image.</p><p>Human Interface Infrastructure (HII) is the umbrella for firmware resources intended
+for people: string, font, image, and setup-form (IFR) databases.</p><h2 id=migrated-reference-material>Migrated Reference Material
+<a href=#migrated-reference-material class=heading-anchor><span>#</span></a></h2><p><code>EFISTUB</code> is a feature of the Linux kernel that allows the <code>vmlinux</code> to be invoked directly as an EFI application, thus eliminating the necessity of using a bootloader e.g. <code>GRUB2</code>.</p><p>First, check that your kernel has EFISTUB enabled:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>zgrep <span style=color:#e6db74>&#39;CONFIG_EFI_STUB&#39;</span> /proc/config.gz</span></span></code></pre></div></div></div><p>Then, create a new UEFI booting entry by:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>efibootmgr --create
+</span></span><span style=display:flex><span>    --disk ... <span style=color:#75715e># device node e.g. /dev/sdX</span>
+</span></span><span style=display:flex><span>    --part ... <span style=color:#75715e># partition number</span>
+</span></span><span style=display:flex><span>    --label ... <span style=color:#75715e># Entry Nickname</span>
+</span></span><span style=display:flex><span>    --loader <span style=color:#e6db74>&#39;/vmlinuz-linux&#39;</span>    <span style=color:#75715e># the executable path under the given partition</span>
+</span></span><span style=display:flex><span>    --unicode       <span style=color:#75715e># interpret the following string in UCS-2 as argument to the EFI application, in our case, the kernel</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#39;root=UUID=01a40dd8-28f0-4636-be1e-aeed60c98095 resume=UUID=2d877d5d-4ca1-4d46-a3d6-b6ee94cbbd78 rw rootflags=subvol=@ loglevel=3 quiet initrd=\initramfs-linux-lts.img&#39;</span>        <span style=color:#75715e># kernel arguments</span></span></span></code></pre></div></div></div><p><code>efibootmgr</code> is provided by the <code>efibootmgr</code> package; check your distro package manager or visit <a href=https://github.com/rhboot/efibootmgr>https://github.com/rhboot/efibootmgr</a>.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/uefi-and-edk-ii/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

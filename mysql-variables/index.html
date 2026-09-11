@@ -1,0 +1,46 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MySQL Variables and Prepared Statements</title></head><body><main><article><div class=article-header><h1>MySQL Variables and Prepared Statements</h1><div class=aux>Last update: 2021-06-24 18:18:18 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/mysql/>Mysql</a>
+|
+<a href=/tags/sql/>Sql</a>
+|
+<a href=/tags/databases/>Databases</a></div></div><div class=article-content><p>MySQL distinguishes server system variables, local routine variables, and
+session user variables. Their scope and evaluation rules differ, so they should
+not be used interchangeably.</p><h2 id=system-and-user-variables>System and User Variables
+<a href=#system-and-user-variables class=heading-anchor><span>#</span></a></h2><p>System variables use <code>@@</code> and may have global, session, or both scopes:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>@@</span><span style=color:#66d9ef>GLOBAL</span>.transaction_isolation, <span style=color:#f92672>@@</span><span style=color:#66d9ef>SESSION</span>.sql_mode;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SET</span> <span style=color:#66d9ef>SESSION</span> sql_safe_updates <span style=color:#f92672>=</span> <span style=color:#ae81ff>1</span>;</span></span></code></pre></div></div></div><p>Changing a global variable affects new sessions when the variable also has a
+session scope; it is not a way to change an existing connection&rsquo;s transaction
+policy. A dynamic variable can change at runtime, whereas a read-only variable
+requires startup configuration. <code>SET PERSIST</code> changes the runtime global value
+and writes <code>mysqld-auto.cnf</code>; <code>SET PERSIST_ONLY</code> writes the persisted value
+without changing runtime state. Verify that a variable is persistable before
+using either form, and keep file ownership with the server rather than editing
+that generated file.</p><p>User variables use <code>@name</code>, are connection-local, and do not have a declared
+type:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SET</span> <span style=color:#f92672>@</span>minimum_total <span style=color:#f92672>=</span> <span style=color:#ae81ff>100</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> id <span style=color:#66d9ef>FROM</span> orders <span style=color:#66d9ef>WHERE</span> total <span style=color:#f92672>&gt;=</span> <span style=color:#f92672>@</span>minimum_total;</span></span></code></pre></div></div></div><p>Do not assign and read the same user variable within one expression or query to
+simulate procedural evaluation. MySQL does not guarantee an evaluation order
+that makes such queries reliable. Use window functions, common table
+expressions, stored-program local variables, or application code instead.
+The value&rsquo;s type is derived when assigned, and prepared-statement references
+retain the variable type established when the statement is first prepared.
+Explicitly <code>CAST</code> values when the required SQL type is part of the contract.</p><h2 id=prepared-statements>Prepared Statements
+<a href=#prepared-statements class=heading-anchor><span>#</span></a></h2><p>Client library prepared statements bind data separately from SQL syntax and
+should be the default for application queries. They prevent a value from being
+interpreted as injected SQL and allow the server to parse the statement
+structure separately.</p><p>Server-side SQL prepared statements follow a connection-scoped lifecycle:
+<code>PREPARE</code> parses one statement, <code>EXECUTE</code> runs it repeatedly, and <code>DEALLOCATE PREPARE</code> releases it. A second <code>PREPARE</code> with the same name first deallocates the
+old statement. Prepared statements are also discarded when the session ends.
+They are useful for administrative dynamic SQL when an identifier must be
+assembled. Parameter markers bind data values, not identifiers, keywords, or SQL
+fragments:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SET</span> <span style=color:#f92672>@</span><span style=color:#66d9ef>sql</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;SELECT id FROM orders WHERE customer_id = ?&#39;</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>PREPARE</span> stmt <span style=color:#66d9ef>FROM</span> <span style=color:#f92672>@</span><span style=color:#66d9ef>sql</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SET</span> <span style=color:#f92672>@</span>customer_id <span style=color:#f92672>=</span> <span style=color:#ae81ff>42</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>EXECUTE</span> stmt <span style=color:#66d9ef>USING</span> <span style=color:#f92672>@</span>customer_id;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>DEALLOCATE</span> <span style=color:#66d9ef>PREPARE</span> stmt;</span></span></code></pre></div></div></div><p>Validate or allow-list any dynamic identifier before concatenating it into SQL.
+Parameter markers cannot stand for an arbitrary expression in every grammar
+position, and prepared statements are limited by <code>max_prepared_stmt_count</code>.
+Deallocate short-lived administrative statements and let application drivers
+manage their own prepared-statement handles.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://dev.mysql.com/doc/refman/8.4/en/using-system-variables.html>Using System Variables</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/user-variables.html>User-Defined Variables</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/prepare.html><code>PREPARE</code> Statement</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mysql-variables/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>
