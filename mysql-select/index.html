@@ -1,0 +1,234 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MySQL SELECT Patterns</title></head><body><main><article><div class=article-header><h1>MySQL SELECT Patterns</h1><div class=aux>Last update: 2026-02-25 16:18:55 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/mysql/>Mysql</a>
+|
+<a href=/tags/sql/>Sql</a>
+|
+<a href=/tags/databases/>Databases</a></div></div><div class=article-content><p><code>SELECT</code> can read rows, combine sources, filter, aggregate, order, and limit a
+result. A useful outline of its syntax is:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> [<span style=color:#66d9ef>DISTINCT</span>] select_expr [, ...]
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> table_references [PARTITION (partition_names)]
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> condition
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> group_expr [, ...]
+</span></span><span style=display:flex><span><span style=color:#66d9ef>HAVING</span> condition
+</span></span><span style=display:flex><span>WINDOW window_name <span style=color:#66d9ef>AS</span> (window_spec) [, ...]
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ORDER</span> <span style=color:#66d9ef>BY</span> order_expr [<span style=color:#66d9ef>ASC</span> <span style=color:#f92672>|</span> <span style=color:#66d9ef>DESC</span>] [, ...]
+</span></span><span style=display:flex><span><span style=color:#66d9ef>LIMIT</span> <span style=color:#960050;background-color:#1e0010>{</span><span style=color:#66d9ef>row_count</span> <span style=color:#f92672>|</span> <span style=color:#66d9ef>offset</span>, <span style=color:#66d9ef>row_count</span> <span style=color:#f92672>|</span> <span style=color:#66d9ef>row_count</span> <span style=color:#66d9ef>OFFSET</span> <span style=color:#66d9ef>offset</span><span style=color:#960050;background-color:#1e0010>}</span>;</span></span></code></pre></div></div></div><p>Logical query processing provides a model for reasoning about a result:</p><ol><li><code>FROM</code>, including joins, constructs candidate rows.</li><li><code>WHERE</code> filters individual rows.</li><li><code>GROUP BY</code> forms groups and aggregate functions compute group values.</li><li><code>HAVING</code> filters groups; named windows are then available for window
+functions.</li><li>The select list produces output columns, <code>DISTINCT</code> removes duplicate output
+rows, <code>ORDER BY</code> orders them, and <code>LIMIT</code> restricts the returned rows.</li></ol><p>The optimizer is free to transform and reorder physical operations when the
+result preserves these semantics. For example, it can push a predicate into an
+index access or choose a different join order. Logical processing is therefore
+not an execution plan; use <code>EXPLAIN</code> or <code>EXPLAIN ANALYZE</code> to inspect the plan.</p><h2 id=displaying-wide-results>Displaying Wide Results
+<a href=#displaying-wide-results class=heading-anchor><span>#</span></a></h2><p>The MySQL command-line client can print one row vertically, which is useful
+when a result has many columns:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span> <span style=color:#66d9ef>FROM</span> <span style=color:#66d9ef>user</span><span style=color:#960050;background-color:#1e0010>\</span><span style=color:#66d9ef>G</span></span></span></code></pre></div></div></div><p><code>\G</code> is a client statement terminator, not SQL syntax. It changes only the
+display format.</p><h2 id=pattern-matching>Pattern Matching
+<a href=#pattern-matching class=heading-anchor><span>#</span></a></h2><h3 id=like-and-not-like><code>LIKE</code> and <code>NOT LIKE</code>
+<a href=#like-and-not-like class=heading-anchor><span>#</span></a></h3><p>Use <code>LIKE</code> or <code>NOT LIKE</code> to compare a string against a pattern:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> <span style=color:#66d9ef>column_name</span> [<span style=color:#66d9ef>NOT</span>] <span style=color:#66d9ef>LIKE</span> pattern;</span></span></code></pre></div></div></div><p><code>LIKE</code> has two pattern metacharacters:</p><ul><li><code>%</code> matches zero or more characters.</li><li><code>_</code> matches exactly one character.</li></ul><p>The expression&rsquo;s collation determines comparisons such as case and accent
+sensitivity. An indexed column can support a constant prefix pattern such as
+<code>'abc%'</code>; a leading <code>%</code>, as in <code>'%abc'</code>, cannot use an ordinary B-tree index
+for that prefix search.</p><h3 id=regular-expressions>Regular Expressions
+<a href=#regular-expressions class=heading-anchor><span>#</span></a></h3><p>MySQL 8.0 uses ICU regular expressions through the <code>REGEXP</code> (or <code>RLIKE</code>)
+operator and functions such as <code>REGEXP_LIKE()</code>. For example:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> pet
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> <span style=color:#66d9ef>owner</span> REGEXP <span style=color:#e6db74>&#39;^B&#39;</span>;</span></span></code></pre></div></div></div><p>Whether <code>^B</code> matches <code>Benny</code>, <code>benny</code>, or both depends on the collation and
+the regex options. Make a case-sensitive requirement explicit rather than
+relying on a server default:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span> <span style=color:#66d9ef>FROM</span> pet
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> REGEXP_LIKE(<span style=color:#66d9ef>owner</span>, <span style=color:#e6db74>&#39;^b&#39;</span>, <span style=color:#e6db74>&#39;c&#39;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span> <span style=color:#66d9ef>FROM</span> pet
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> REGEXP_LIKE(<span style=color:#66d9ef>owner</span>, <span style=color:#e6db74>&#39;^b&#39;</span> <span style=color:#66d9ef>COLLATE</span> utf8mb4_0900_as_cs);</span></span></code></pre></div></div></div><p>The <code>'c'</code> match-type flag requests case-sensitive matching. The collation
+example is specific to MySQL 8.0 collations; it is not portable to MariaDB.
+MariaDB&rsquo;s <code>REGEXP</code> implementation and supported collations differ by version,
+although <code>REGEXP BINARY '^B'</code> is a common way to request bytewise,
+case-sensitive matching there. Consult the manual for the deployed server
+version before sharing regex SQL between MySQL and MariaDB.</p><h2 id=aggregate-functions-and-grouping>Aggregate Functions and Grouping
+<a href=#aggregate-functions-and-grouping class=heading-anchor><span>#</span></a></h2><p>Without <code>GROUP BY</code>, an aggregate query has one implicit group containing all
+rows that survive <code>WHERE</code>. With <code>GROUP BY</code>, aggregate functions operate once
+per group. MySQL documents the available functions, including <code>COUNT</code>, <code>SUM</code>,
+<code>AVG</code>, <code>MIN</code>, and <code>MAX</code>.</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> a, b, <span style=color:#66d9ef>MAX</span>(<span style=color:#66d9ef>c</span>) <span style=color:#66d9ef>AS</span> max_c, <span style=color:#66d9ef>MIN</span>(<span style=color:#66d9ef>c</span>) <span style=color:#66d9ef>AS</span> min_c
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> t
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> a, b;</span></span></code></pre></div></div></div><p>For example, rows with the same <code>(a, b)</code> pair form one group, and the query
+returns its highest and lowest <code>c</code> values. <code>MAX(c)</code> does not identify the
+complete source row that contained that value; retrieve such a row with a
+well-defined join, window function, or subquery when needed.</p><h3 id=group-by-rules><code>GROUP BY</code> Rules
+<a href=#group-by-rules class=heading-anchor><span>#</span></a></h3><p>Enable <code>ONLY_FULL_GROUP_BY</code>, which is the default in current MySQL releases.
+It rejects a nonaggregate select expression unless the expression is listed in
+<code>GROUP BY</code> or MySQL can prove that it is functionally dependent on the grouped
+columns. A primary key supplies a common functional dependency:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#75715e>-- Code is the primary key of country, so it determines Name.
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> co.Name, <span style=color:#66d9ef>COUNT</span>(<span style=color:#f92672>*</span>) <span style=color:#66d9ef>AS</span> language_count
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> countrylanguage <span style=color:#66d9ef>AS</span> cl
+</span></span><span style=display:flex><span><span style=color:#66d9ef>JOIN</span> country <span style=color:#66d9ef>AS</span> co <span style=color:#66d9ef>ON</span> co.Code <span style=color:#f92672>=</span> cl.CountryCode
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> co.Code;</span></span></code></pre></div></div></div><p>Grouping by <code>co.Code</code> forms one group for each country, so <code>co.Name</code> has one
+value per group. A query accepted only because <code>ONLY_FULL_GROUP_BY</code> is
+disabled can select an arbitrary value from each group. Do not disable the
+mode to preserve such ambiguity. Use an aggregate that expresses the desired
+choice, add the column to <code>GROUP BY</code>, or use <code>ANY_VALUE()</code> only when every
+value is genuinely interchangeable.</p><h2 id=the-having-clause>The <code>HAVING</code> Clause
+<a href=#the-having-clause class=heading-anchor><span>#</span></a></h2><p><code>WHERE</code> filters rows before grouping, whereas <code>HAVING</code> filters groups after
+aggregation:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> CountryCode, <span style=color:#66d9ef>SUM</span>(Population) <span style=color:#66d9ef>AS</span> population
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> city
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> CountryCode
+</span></span><span style=display:flex><span><span style=color:#66d9ef>HAVING</span> <span style=color:#66d9ef>SUM</span>(Population) <span style=color:#f92672>&gt;</span> <span style=color:#ae81ff>70000000</span>;</span></span></code></pre></div></div></div><p>MySQL also permits a select-list alias in <code>HAVING</code>:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> CountryCode, <span style=color:#66d9ef>SUM</span>(Population) <span style=color:#66d9ef>AS</span> population
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> city
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> CountryCode
+</span></span><span style=display:flex><span><span style=color:#66d9ef>HAVING</span> population <span style=color:#f92672>&gt;</span> <span style=color:#ae81ff>70000000</span>;</span></span></code></pre></div></div></div><p>Aggregate expressions may appear in <code>HAVING</code>; they do not have to appear in
+the select list. For portability and clarity, repeat the aggregate expression
+or use a derived table when an alias is unavailable in another database.
+Aggregates cannot appear in <code>WHERE</code>, because grouping has not occurred at that
+logical stage.</p><p>MySQL permits <code>HAVING</code> without <code>GROUP BY</code>. Without aggregates, it can act much
+like a late row filter:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> Name, Population
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> city
+</span></span><span style=display:flex><span><span style=color:#66d9ef>HAVING</span> Population <span style=color:#f92672>&gt;</span> <span style=color:#ae81ff>9600000</span>;</span></span></code></pre></div></div></div><p>Use <code>WHERE</code> for that condition because it states the intended stage and lets
+the optimizer consider row filtering directly. More importantly, do not try
+to compare each row to an aggregate in <code>HAVING</code> without grouping:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#75715e>-- Not a per-row maximum comparison.
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> city
+</span></span><span style=display:flex><span><span style=color:#66d9ef>HAVING</span> Population <span style=color:#f92672>=</span> <span style=color:#66d9ef>MAX</span>(Population);</span></span></code></pre></div></div></div><p>The query has one implicit group, and nonaggregated columns are ambiguous or
+rejected under <code>ONLY_FULL_GROUP_BY</code>. Express the per-row comparison with a
+scalar subquery:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> city
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> Population <span style=color:#f92672>=</span> (<span style=color:#66d9ef>SELECT</span> <span style=color:#66d9ef>MAX</span>(Population) <span style=color:#66d9ef>FROM</span> city);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> city
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> Population <span style=color:#f92672>&gt;</span> (<span style=color:#66d9ef>SELECT</span> <span style=color:#66d9ef>AVG</span>(Population) <span style=color:#66d9ef>FROM</span> city);</span></span></code></pre></div></div></div><h2 id=joins>Joins
+<a href=#joins class=heading-anchor><span>#</span></a></h2><p><code>JOIN ... ON</code> supplies a Boolean match condition. <code>JOIN ... USING (column)</code>
+names one or more columns present in both inputs and is equivalent to equality
+conditions for those names, with one coalesced join column in <code>SELECT *</code>:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> t0
+</span></span><span style=display:flex><span><span style=color:#66d9ef>JOIN</span> t1 <span style=color:#66d9ef>ON</span> t0.b <span style=color:#f92672>=</span> t1.b;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> t0
+</span></span><span style=display:flex><span><span style=color:#66d9ef>JOIN</span> t1 <span style=color:#66d9ef>USING</span> (b);</span></span></code></pre></div></div></div><p>Join forms have distinct row-preservation rules:</p><ul><li><code>INNER JOIN</code> returns matching row pairs. <code>CROSS JOIN</code> returns the Cartesian
+product; in MySQL, <code>JOIN</code> without <code>ON</code> or <code>USING</code> also has that effect.</li><li><code>LEFT [OUTER] JOIN</code> retains every left row. A left row with no right match
+produces one result with <code>NULL</code> values for right-side columns.</li><li><code>RIGHT [OUTER] JOIN</code> is the analogous operation for the right input. Reverse
+the inputs and use <code>LEFT JOIN</code> when a consistent left-to-right style helps.</li><li><code>NATURAL [LEFT|RIGHT|INNER] JOIN</code> implicitly uses every identically named
+column. Avoid it because adding an unrelated same-named column changes the
+query&rsquo;s meaning.</li></ul><p>Put a right-side condition in <code>ON</code> when unmatched left rows must remain:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#66d9ef>c</span>.id, o.id
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> customer <span style=color:#66d9ef>AS</span> <span style=color:#66d9ef>c</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>LEFT</span> <span style=color:#66d9ef>JOIN</span> orders <span style=color:#66d9ef>AS</span> o
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>ON</span> o.customer_id <span style=color:#f92672>=</span> <span style=color:#66d9ef>c</span>.id
+</span></span><span style=display:flex><span> <span style=color:#66d9ef>AND</span> o.status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;active&#39;</span>;</span></span></code></pre></div></div></div><p>Moving <code>o.status = 'active'</code> into <code>WHERE</code> discards null-extended rows and
+therefore changes the <code>LEFT JOIN</code> into an effective inner join for that
+condition.</p><p>MySQL does not support <code>FULL OUTER JOIN</code>. A full join returns matched pairs,
+unmatched left rows, and unmatched right rows. When that result is necessary,
+combine a left join with right-only rows using <code>UNION ALL</code>, while excluding
+already matched rows from the second branch:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> l.<span style=color:#f92672>*</span>, r.<span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> left_table <span style=color:#66d9ef>AS</span> l
+</span></span><span style=display:flex><span><span style=color:#66d9ef>LEFT</span> <span style=color:#66d9ef>JOIN</span> right_table <span style=color:#66d9ef>AS</span> r <span style=color:#66d9ef>ON</span> r.key_col <span style=color:#f92672>=</span> l.key_col
+</span></span><span style=display:flex><span><span style=color:#66d9ef>UNION</span> <span style=color:#66d9ef>ALL</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> l.<span style=color:#f92672>*</span>, r.<span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> right_table <span style=color:#66d9ef>AS</span> r
+</span></span><span style=display:flex><span><span style=color:#66d9ef>LEFT</span> <span style=color:#66d9ef>JOIN</span> left_table <span style=color:#66d9ef>AS</span> l <span style=color:#66d9ef>ON</span> l.key_col <span style=color:#f92672>=</span> r.key_col
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> l.key_col <span style=color:#66d9ef>IS</span> <span style=color:#66d9ef>NULL</span>;</span></span></code></pre></div></div></div><p>Choose a nonnullable key for the final anti-match test, and account for the
+desired handling of nullable join keys.</p><h3 id=join-versus-comma-syntax><code>JOIN</code> Versus Comma Syntax
+<a href=#join-versus-comma-syntax class=heading-anchor><span>#</span></a></h3><p>For an inner join, these forms have the same relational meaning:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> t0, t1
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> t0.key_col <span style=color:#f92672>=</span> t1.key_col;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> t0
+</span></span><span style=display:flex><span><span style=color:#66d9ef>INNER</span> <span style=color:#66d9ef>JOIN</span> t1 <span style=color:#66d9ef>ON</span> t0.key_col <span style=color:#f92672>=</span> t1.key_col;</span></span></code></pre></div></div></div><p>The optimizer can produce the same plan for both. Prefer explicit <code>JOIN</code>
+syntax because it separates table relationships from row filters and avoids
+mistakes when outer joins are added.</p><h2 id=limit-and-pagination><code>LIMIT</code> and Pagination
+<a href=#limit-and-pagination class=heading-anchor><span>#</span></a></h2><h3 id=pagination-syntax>Pagination Syntax
+<a href=#pagination-syntax class=heading-anchor><span>#</span></a></h3><p><code>LIMIT</code> supports three forms:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> ... <span style=color:#66d9ef>FROM</span> ... <span style=color:#66d9ef>LIMIT</span> n;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> ... <span style=color:#66d9ef>FROM</span> ... <span style=color:#66d9ef>LIMIT</span> <span style=color:#66d9ef>offset</span>, n;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> ... <span style=color:#66d9ef>FROM</span> ... <span style=color:#66d9ef>LIMIT</span> n <span style=color:#66d9ef>OFFSET</span> <span style=color:#66d9ef>offset</span>;</span></span></code></pre></div></div></div><p>The first returns at most <code>n</code> rows. The latter two skip <code>offset</code> result rows
+and return at most <code>n</code>; the <code>OFFSET</code> spelling makes the two arguments clearer.
+<code>LIMIT</code> does not define an order, so pagination requires <code>ORDER BY</code>.</p><h3 id=tied-order-by-values>Tied <code>ORDER BY</code> Values
+<a href=#tied-order-by-values class=heading-anchor><span>#</span></a></h3><p>Order by enough columns to form a total order. If several rows have the same
+sort value, MySQL may return those tied rows in any relative order, and the
+order can change when a <code>LIMIT</code> changes the chosen plan:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> <span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> ratings
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ORDER</span> <span style=color:#66d9ef>BY</span> category, id
+</span></span><span style=display:flex><span><span style=color:#66d9ef>LIMIT</span> <span style=color:#ae81ff>5</span>;</span></span></code></pre></div></div></div><p>Adding the unique <code>id</code> tiebreaker makes page boundaries deterministic.</p><h3 id=limit--offset-cost><code>LIMIT ... OFFSET</code> Cost
+<a href=#limit--offset-cost class=heading-anchor><span>#</span></a></h3><p>Large offsets cost work because the server must find and discard the preceding
+result rows; an index can reduce scanning but cannot make <code>OFFSET</code> seek to an
+arbitrary result position. Prefer keyset pagination for sequential access:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> id, created_at
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> event
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> tenant_id <span style=color:#f92672>=</span> <span style=color:#ae81ff>7</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>AND</span> (created_at, id) <span style=color:#f92672>&lt;</span> (<span style=color:#e6db74>&#39;2026-08-01 00:00:00&#39;</span>, <span style=color:#ae81ff>9001</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ORDER</span> <span style=color:#66d9ef>BY</span> created_at <span style=color:#66d9ef>DESC</span>, id <span style=color:#66d9ef>DESC</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>LIMIT</span> <span style=color:#ae81ff>100</span>;</span></span></code></pre></div></div></div><p>An index compatible with the equality filter and ordering, such as
+<code>(tenant_id, created_at, id)</code>, lets MySQL continue from the last observed key.
+The suitable index and comparison direction depend on the complete query.</p><p>Keyset pagination is stable only relative to the rows visible to each query. At
+<code>READ COMMITTED</code>, inserts and updates between page requests can move rows across
+the cursor boundary. Use an immutable ordering key, carry the full unique cursor
+tuple, and select an explicit snapshot or product-level consistency contract
+when a multi-page export must represent one database state.</p><h2 id=considerations-for-order-by>Considerations for <code>ORDER BY</code>
+<a href=#considerations-for-order-by class=heading-anchor><span>#</span></a></h2><p><code>ORDER BY</code> accepts multiple expressions; earlier expressions have higher
+priority. A compatible index can provide the required order, whereas an
+incompatible order can require an explicit sort, reported by <code>EXPLAIN</code> as
+<code>Using filesort</code>. <code>filesort</code> is MySQL terminology for a sorting operation; it
+does not imply that a disk file is always used.</p><h2 id=temporary-tables>Temporary Tables
+<a href=#temporary-tables class=heading-anchor><span>#</span></a></h2><p>A temporary table stores an intermediate result for the current connection:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>TEMPORARY</span> <span style=color:#66d9ef>TABLE</span> active_customer <span style=color:#66d9ef>AS</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> customer_id, <span style=color:#66d9ef>SUM</span>(total) <span style=color:#66d9ef>AS</span> total_spent
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> orders
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;paid&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> customer_id;</span></span></code></pre></div></div></div><p>It is distinct from a user-defined variable, which holds a scalar value.
+MySQL drops a temporary table when its session ends, or earlier with <code>DROP TEMPORARY TABLE</code>. A view declared with <code>ALGORITHM = TEMPTABLE</code> can cause
+materialization during a query, but it does not create a session-visible
+temporary table.</p><p>Name and drop temporary tables within the owning workflow when pooled
+connections are used, because connection-local objects survive transaction
+commit and can remain present for the next borrower of that physical session.</p><h2 id=locking-reads>Locking Reads
+<a href=#locking-reads class=heading-anchor><span>#</span></a></h2><p>In an explicit transaction, locking reads coordinate a subsequent update with
+concurrent transactions:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FOR</span> <span style=color:#66d9ef>SHARE</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> ...
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FOR</span> <span style=color:#66d9ef>UPDATE</span>;</span></span></code></pre></div></div></div><p>For InnoDB, <code>FOR SHARE</code> acquires shared locks and <code>FOR UPDATE</code> acquires
+exclusive locks on rows that InnoDB examines and locks, subject to the access
+path, isolation level, and predicate. InnoDB can also use gap or next-key
+locks, so locks are not limited to returned records. These clauses release
+their locks when the transaction commits or rolls back; with autocommit
+enabled and no explicit transaction, they generally provide no interval for a
+later statement to rely on the lock. Locking behavior, including <code>NOWAIT</code> and
+<code>SKIP LOCKED</code> support, is version-specific; consult the InnoDB locking manual
+for the deployed MySQL release.</p><h2 id=subqueries>Subqueries
+<a href=#subqueries class=heading-anchor><span>#</span></a></h2><p>A subquery is a <code>SELECT</code> within another statement. Its context determines
+whether it must return one scalar value, one row, one column, or a table. The
+maximum-population query above is a scalar subquery. A subquery in <code>FROM</code> is a
+derived table, whereas <code>IN (subquery)</code> consumes a single-column result.</p><p>Correlated subqueries refer to a row from their outer query. They are
+logically evaluated in that row context, although the optimizer can transform
+them into joins, semijoins, or other equivalent plans.</p><h2 id=with-clauses><code>WITH</code> Clauses
+<a href=#with-clauses class=heading-anchor><span>#</span></a></h2><p>A common table expression (CTE) names a subquery for one following statement:</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>WITH</span> foo <span style=color:#66d9ef>AS</span> (
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>SELECT</span> name
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>FROM</span> x
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>WHERE</span> <span style=color:#66d9ef>type</span> <span style=color:#f92672>=</span> <span style=color:#ae81ff>13</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> bar.<span style=color:#f92672>*</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> bar
+</span></span><span style=display:flex><span><span style=color:#66d9ef>JOIN</span> foo <span style=color:#66d9ef>ON</span> foo.name <span style=color:#f92672>=</span> bar.name;</span></span></code></pre></div></div></div><p>Defining <code>foo</code> does not make its columns implicitly visible to <code>bar</code>; the
+outer query must reference the CTE in <code>FROM</code> or <code>JOIN</code>. MySQL 8.0 supports
+nonrecursive and recursive CTEs. Depending on the query and MySQL version, the
+optimizer can merge a CTE into the outer query or materialize it, so a CTE is a
+structuring feature rather than a guarantee of a particular execution method.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://dev.mysql.com/doc/refman/8.4/en/select.html><code>SELECT</code> Statement</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/aggregate-functions.html><code>Aggregate Functions</code></a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-locking.html><code>InnoDB Locking</code></a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/explain.html#explain-analyze><code>EXPLAIN ANALYZE</code></a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mysql-select/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

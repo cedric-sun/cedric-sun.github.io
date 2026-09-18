@@ -1,0 +1,45 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Git Line-Ending Conversion</title></head><body><main><article><div class=article-header><h1>Git Line-Ending Conversion</h1><div class=aux>Last update: 2026-04-29 00:23:56 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/git/>Git</a>
+|
+<a href=/tags/version-control/>Version-Control</a></div></div><div class=article-content><p>Git can normalize text to LF at the repository boundary while presenting LF or
+CRLF in a worktree. A stable <code>.gitattributes</code> policy avoids platform-dependent
+commits and leaves editors responsible only for the checked-out form.</p><h2 id=distinguish-head-index-and-worktree-bytes>Distinguish HEAD, Index, and Worktree Bytes
+<a href=#distinguish-head-index-and-worktree-bytes class=heading-anchor><span>#</span></a></h2><p>A tracked path has three relevant representations:</p><ol><li><code>HEAD</code> names the blob stored by the current commit.</li><li>The index holds the blob proposed for the next commit.</li><li>The worktree holds bytes consumed by editors and build tools.</li></ol><p>For normalized text, <code>git add</code> performs a clean conversion from CRLF to LF.
+Checkout performs a smudge conversion from indexed LF to the selected worktree
+ending. Existing commits are not rewritten.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git ls-files --eol -- path/to/file
+</span></span><span style=display:flex><span>git show HEAD:path/to/file | od -An -t x1
+</span></span><span style=display:flex><span>git check-attr -a -- path/to/file</span></span></code></pre></div></div></div><p><code>git ls-files --eol</code> reports index, worktree, and effective attribute forms.
+Inspect those forms before responding to a conversion warning.</p><h2 id=declare-repository-policy-with-gitattributes>Declare Repository Policy with <code>.gitattributes</code>
+<a href=#declare-repository-policy-with-gitattributes class=heading-anchor><span>#</span></a></h2><p>Commit attributes because every clone then shares the policy:</p><div class=jose-wrapper><div class=jose-tools><span>gitattributes</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-gitattributes data-lang=gitattributes>*       text=auto
+*.sh    text eol=lf
+*.py    text eol=lf
+*.bat   text eol=crlf
+*.png   binary
+*.pdf   binary</code></pre></div></div><p><code>text=auto</code> lets Git classify unspecified paths. <code>text</code> forces normalization;
+<code>-text</code> disables it; and <code>binary</code> is a built-in attribute macro for
+<code>-diff -merge -text</code>. An explicit
+<code>eol=lf</code> or <code>eol=crlf</code> marks a path as text and controls its checkout form.
+Mark archives, images, generated binary formats, and signed artifacts as
+non-text because conversion changes their bytes.</p><h2 id=use-configuration-only-as-a-fallback>Use Configuration Only as a Fallback
+<a href=#use-configuration-only-as-a-fallback class=heading-anchor><span>#</span></a></h2><p><code>core.autocrlf</code> and <code>core.eol</code> affect paths whose attributes do not make a
+more-specific decision:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>core.autocrlf</code></th><th>Clean Into Index</th><th>Checkout From Index</th></tr></thead><tbody><tr><td><code>false</code></td><td>No autocrlf conversion</td><td>No autocrlf conversion</td></tr><tr><td><code>input</code></td><td>CRLF becomes LF</td><td>LF remains LF</td></tr><tr><td><code>true</code></td><td>CRLF becomes LF</td><td>LF becomes CRLF</td></tr></tbody></table></div></div><p><code>core.eol</code> selects <code>lf</code>, <code>crlf</code>, or <code>native</code> for normalized text without an
+explicit <code>eol</code> attribute. <code>core.safecrlf=true</code> rejects irreversible
+conversions; <code>warn</code> reports them. Neither setting replaces a committed
+attribute policy.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git config --show-origin --get core.autocrlf
+</span></span><span style=display:flex><span>git config --show-origin --get core.eol
+</span></span><span style=display:flex><span>git config --show-origin --get core.safecrlf</span></span></code></pre></div></div></div><h2 id=renormalize-safely>Renormalize Safely
+<a href=#renormalize-safely class=heading-anchor><span>#</span></a></h2><p>After adding or correcting attributes, start from a clean worktree or preserve
+uncommitted work. Then stage a deliberate normalization and review it:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git add --renormalize .
+</span></span><span style=display:flex><span>git diff --cached --check
+</span></span><span style=display:flex><span>git diff --cached</span></span></code></pre></div></div></div><p>Commit line-ending normalization separately from semantic edits because a
+dedicated commit preserves review, blame, and rollback quality. The operation
+updates the index; it does not change ignored or untracked files.</p><p>Align editor settings with the checked-out policy, especially for files forced
+to CRLF. Editor configuration affects worktree bytes, whereas <code>.gitattributes</code>
+defines the version-controlled boundary. Do not repeatedly add and checkout
+valuable uncommitted files as an experiment; inspect effective attributes and
+save work first.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/git-line-ending-conversion/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

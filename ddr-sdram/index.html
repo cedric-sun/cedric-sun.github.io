@@ -1,0 +1,66 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>DDR SDRAM and Memory Modules</title></head><body><main><article><div class=article-header><h1>DDR SDRAM and Memory Modules</h1><div class=aux>Last update: 2022-12-03 10:49:54 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ddr/>Ddr</a>
+|
+<a href=/tags/sdram/>Sdram</a>
+|
+<a href=/tags/memory/>Memory</a>
+|
+<a href=/tags/hardware/>Hardware</a></div></div><div class=article-content><p>Synchronous dynamic RAM stores charge in cells selected through a hierarchy of
+channels, ranks, banks, rows, and columns. DDR SDRAM adds transfers on both edges of
+the data clock, but the name of a DDR generation denotes a complete electrical and
+command protocol. DDR3, DDR4, and DDR5 modules are therefore not interchangeable
+even when their capacities match.</p><h2 id=from-cells-to-memory-channels>From Cells to Memory Channels
+<a href=#from-cells-to-memory-channels class=heading-anchor><span>#</span></a></h2><p>Each DRAM die divides its cell array into banks. A bank has many rows, and its sense
+amplifiers also serve as a row buffer. Opening a row copies its cells into that
+buffer; a later column selection chooses a subset for transfer. DDR4 divides banks
+into bank groups because some command-to-command delays differ within and across
+groups.</p><p>Several terms describe different levels of the hierarchy:</p><ul><li>A <strong>component</strong> is one DRAM package. Widths such as <code>x4</code>, <code>x8</code>, and <code>x16</code> state
+how many <code>DQ</code> data bits the component supplies per transfer.</li><li>A <strong>rank</strong> is a group of components selected together. Eight <code>x8</code> components form
+one 64-bit rank; a ninth supplies eight check bits on a 72-bit ECC module.</li><li>A <strong>module</strong> is the DIMM or SO-DIMM circuit board that carries one or more ranks.
+Rank count does not follow the number of populated board sides.</li><li>A <strong>channel</strong> is an independently scheduled memory-controller interface. A
+conventional non-ECC channel transfers 64 data bits at a time.</li></ul><p><img src=/ddr-sdram/ddr4_x16.jpg alt="DDR4 x16 component"></p><p>Capacity and width must not be conflated. An 8-Gib <code>x8</code> component stores 1 GiB while
+exposing eight data pins. Eight such components provide a 64-bit-wide, 8-GiB rank:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>8 Gib/component × 8 components ÷ 8 bits/byte = 8 GiB</span></span></code></pre></div></div></div><p>A second equivalent rank raises module capacity to 16 GiB. ECC components add check
+bits rather than application-visible bytes.</p><h2 id=the-row-command-sequence>The Row Command Sequence
+<a href=#the-row-command-sequence class=heading-anchor><span>#</span></a></h2><p>The controller operates a bank through an explicit state machine:</p><ol><li><code>ACTIVATE</code> selects a bank and row and loads that row into the sense amplifiers.</li><li><code>READ</code> or <code>WRITE</code> selects a column in the open row and starts a burst.</li><li>More column commands may reuse the open row.</li><li><code>PRECHARGE</code> restores the cells and closes the row before another row in the same
+bank can be activated.</li></ol><p>Read or write commands can request auto-precharge, which closes the bank after the
+burst. Refresh commands restore charge without software enumerating rows; the memory
+controller issues them often enough to meet the device&rsquo;s retention requirements.</p><p>Timing symbols describe constraints between commands and data, not one scalar
+measure of memory speed:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Timing</th><th>Constraint</th></tr></thead><tbody><tr><td><code>tRCD</code></td><td><code>ACTIVATE</code> to a column command</td></tr><tr><td><code>CL</code></td><td><code>READ</code> command to the first returned data</td></tr><tr><td><code>tRAS</code></td><td>Minimum time that a row remains active</td></tr><tr><td><code>tRP</code></td><td><code>PRECHARGE</code> to the next activation</td></tr><tr><td><code>tRC</code></td><td>Activation-to-activation interval in one bank</td></tr><tr><td><code>tRRD</code></td><td>Minimum interval between activations in different banks</td></tr><tr><td><code>tFAW</code></td><td>Rolling window that limits how many banks may be activated</td></tr></tbody></table></div></div><p>A row hit avoids <code>tRP</code> and <code>tRCD</code>; a row conflict pays both before useful data can
+move. The controller interleaves work across banks and ranks to cover some delays,
+although every rank on a channel ultimately shares the channel&rsquo;s data wires.</p><h2 id=bursts-prefetch-and-marketed-rates>Bursts, Prefetch, and Marketed Rates
+<a href=#bursts-prefetch-and-marketed-rates class=heading-anchor><span>#</span></a></h2><p>DDR SDRAM does not return one independently addressed byte per command. A column
+command initiates a burst, and a DDR4 burst length of eight transfers matches its
+8n-prefetch architecture. The core array supplies a wider group to an I/O buffer,
+which serializes that group over faster external pins. Prefetch width therefore
+describes internal-to-external organization; it is not the module&rsquo;s channel width.</p><p>DDR data rate is measured in transfers per second. DDR4-3200 uses a 1600 MHz I/O
+clock and transfers on both edges, thus its marketed rate is 3200 MT/s rather than
+3200 MHz. Peak bandwidth follows from transfer rate and channel width:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>3200 × 10^6 transfers/s × 64 bits/transfer ÷ 8 = 25.6 GB/s</span></span></code></pre></div></div></div><p>Two independently used 64-bit channels can provide 51.2 GB/s at the same rate.
+Refresh, command slots, bus turnarounds, row misses, and workload locality reduce
+sustained bandwidth; latency timings remain relevant even when two modules advertise
+the same MT/s rating.</p><p><img src=/ddr-sdram/banks_interleaving.gif alt="Bank interleaving illustration"></p><h2 id=ddr4-command-address-and-data-interfaces>DDR4 Command, Address, and Data Interfaces
+<a href=#ddr4-command-address-and-data-interfaces class=heading-anchor><span>#</span></a></h2><p>DDR4 separates command/address signaling from the bidirectional data interface.
+Differential <code>CK_t</code>/<code>CK_c</code> clocks sample command and address signals. Chip-select,
+bank-group, bank, address, and control pins encode operations and identify the
+target rank and location; <code>ACT_n</code> distinguishes activation from other command
+encodings.</p><p><code>DQ</code> pins carry data, while differential <code>DQS_t</code>/<code>DQS_c</code> strobes provide source-
+synchronous timing for each byte lane. Depending on component width and mode,
+<code>DM_n</code> masks write data and <code>DBI_n</code> signals data-bus inversion. Other signals serve
+protocol and electrical control:</p><ul><li><code>CKE</code> participates in clock and power-state control.</li><li><code>ODT</code> selects on-die termination.</li><li><code>ZQ</code> supports impedance calibration.</li><li><code>RESET_n</code>, parity, and <code>ALERT_n</code> support initialization and error reporting where
+the device or module type defines them.</li></ul><p>Mode-register writes configure burst behavior, latencies, termination, power
+features, and related options. Initialization must follow the component data sheet
+because supply, reset, mode-register, and ZQ-calibration ordering are timing
+requirements rather than suggestions.</p><h2 id=modules-ranks-and-platform-limits>Modules, Ranks, and Platform Limits
+<a href=#modules-ranks-and-platform-limits class=heading-anchor><span>#</span></a></h2><p>DIMM means <em>dual inline memory module</em>: contacts on opposite faces carry distinct
+signals. DDR4 UDIMMs have 288 contacts, and DDR4 SO-DIMMs have 260. Key positions,
+voltages, pin assignments, and protocols differ across generations.</p><p>An unbuffered DIMM connects command/address lines directly to its DRAM loads. A
+registered DIMM inserts a register on selected control paths, which permits more
+devices per channel at the cost of an additional command stage. Platform firmware
+must also understand module type, rank topology, supported speeds, and timing data
+from the module&rsquo;s serial-presence-detect EEPROM.</p><p>Memory-controller and motherboard limits determine whether a module can operate at
+its label rate. <code>DDR4-3200</code> states 3200 MT/s, while <code>PC4-25600</code> expresses the
+corresponding 25.6 GB/s peak for one 64-bit data path. Neither label guarantees that
+all populated channels will train at that rate.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.jedec.org/standards-documents/docs/jesd79-4>JEDEC DDR4 SDRAM standard, JESD79-4</a></li><li><a href=https://www.jedec.org/standards-documents/focus/memory-module-designs-dimms/DDR4>JEDEC DDR4 module standards catalog</a></li><li><a href=https://www.micron.com/products/dram/ddr4-sdram>Micron DDR4 SDRAM product documentation</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/ddr-sdram/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

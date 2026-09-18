@@ -1,0 +1,121 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>systemd</title></head><body><main><article><div class=article-header><h1>systemd</h1><div class=aux>Last update: 2024-04-14 21:45:03 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/systemd/>Systemd</a></div></div><div class=article-content><p>systemd is a service manager and a suite of Linux system-management components.
+The system manager runs as PID 1; per-user managers run as <code>systemd --user</code>.
+Both managers load units, calculate transactions of jobs, and supervise process
+groups through Linux control groups.</p><h2 id=units-jobs-and-lifecycle-states>Units, Jobs, and Lifecycle States
+<a href=#units-jobs-and-lifecycle-states class=heading-anchor><span>#</span></a></h2><p>A unit represents a resource known to a manager. Common unit types are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Suffix</th><th>Resource</th></tr></thead><tbody><tr><td><code>.service</code></td><td>A process or daemon</td></tr><tr><td><code>.socket</code></td><td>An IPC or network socket used for activation</td></tr><tr><td><code>.target</code></td><td>A synchronization and grouping point</td></tr><tr><td><code>.mount</code>, <code>.automount</code>, <code>.swap</code></td><td>Storage configuration</td></tr><tr><td><code>.device</code>, <code>.path</code>, <code>.timer</code></td><td>Device or event-based activation</td></tr><tr><td><code>.slice</code>, <code>.scope</code></td><td>cgroup organization and externally started processes</td></tr></tbody></table></div></div><p>A job is a requested unit state change such as start, stop, or reload. Starting
+one unit can pull in other jobs; the manager combines them into a transaction,
+checks for ordering cycles and conflicting jobs, and then dispatches independent
+work in parallel.</p><p>Unit state has several dimensions. <code>LoadState</code> records whether the definition
+loaded; <code>ActiveState</code> reports high-level state such as <code>inactive</code>, <code>activating</code>,
+<code>active</code>, <code>deactivating</code>, or <code>failed</code>; <code>SubState</code> supplies type-specific detail.
+A loaded service is not necessarily running, and an enabled service is not
+necessarily loaded or active. Enabling changes boot or activation links; starting
+creates a runtime job.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemctl show sshd.service <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --property<span style=color:#f92672>=</span>LoadState,ActiveState,SubState,UnitFileState
+</span></span><span style=display:flex><span>systemctl status sshd.service
+</span></span><span style=display:flex><span>systemctl list-jobs
+</span></span><span style=display:flex><span>systemctl --failed</span></span></code></pre></div></div></div><h2 id=requirement-and-ordering-dependencies>Requirement and Ordering Dependencies
+<a href=#requirement-and-ordering-dependencies class=heading-anchor><span>#</span></a></h2><p>Requirement edges determine which units enter a transaction:</p><ul><li><code>Requires=</code> pulls in another unit and propagates selected start failures or
+stops;</li><li><code>Wants=</code> is weaker because the requested unit may fail without failing the
+requester;</li><li><code>Requisite=</code> fails if the other unit is not already active;</li><li><code>BindsTo=</code> couples activity more tightly to a disappearing resource;</li><li><code>Conflicts=</code> schedules the conflicting unit to stop.</li></ul><p>Ordering edges determine sequence. <code>After=</code> and <code>Before=</code> do not pull another
+unit into the transaction, and <code>Requires=</code> or <code>Wants=</code> do not establish order.
+Express both when both relationships are required:</p><div class=jose-wrapper><div class=jose-tools><span>ini</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ini data-lang=ini><span style=display:flex><span><span style=color:#66d9ef>[Unit]</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>Wants</span><span style=color:#f92672>=</span><span style=color:#e6db74>network-online.target</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>After</span><span style=color:#f92672>=</span><span style=color:#e6db74>network-online.target</span></span></span></code></pre></div></div></div><p>Ordering is evaluated differently during shutdown: if a unit ordered after
+another is stopped in the same transaction, it is stopped first.</p><p>Managers add implicit and default dependencies based on unit type and settings.
+For example, mount units acquire relationships to parent mounts, and many
+service units receive default ordering against basic startup and shutdown
+targets. Generators create or modify unit definitions early during manager
+startup; <code>systemd-fstab-generator</code> translates <code>/etc/fstab</code>, and other generators
+handle kernel command-line and compatibility inputs. Inspect the calculated
+graph rather than assuming every edge appears literally in one file:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemctl list-dependencies example.service
+</span></span><span style=display:flex><span>systemctl list-dependencies --reverse example.service
+</span></span><span style=display:flex><span>systemctl show example.service --property<span style=color:#f92672>=</span>Wants,Requires,Before,After
+</span></span><span style=display:flex><span>systemd-analyze critical-chain</span></span></code></pre></div></div></div><h2 id=discovery-naming-and-overrides>Discovery, Naming, and Overrides
+<a href=#discovery-naming-and-overrides class=heading-anchor><span>#</span></a></h2><p>Unit names encode the type in the suffix. Names derived from paths use systemd
+escaping: <code>/var/lib</code> becomes <code>var-lib.mount</code>, while <code>/</code> becomes <code>-.mount</code>.
+Template names such as <code>worker@.service</code> create instances such as
+<code>worker@blue.service</code>; <code>%i</code> expands to the escaped instance and <code>%I</code> to its
+unescaped form.</p><p>The manager searches a compile-time unit load path. Administrator definitions in
+<code>/etc/systemd/system</code> take precedence over vendor definitions commonly installed
+under <code>/usr/lib/systemd/system</code> or <code>/lib/systemd/system</code>; transient and generated
+directories have defined positions in the same search order. Query the running
+manager because distributions can differ:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemd-analyze unit-paths
+</span></span><span style=display:flex><span>systemd-analyze --user unit-paths
+</span></span><span style=display:flex><span>systemctl cat example.service
+</span></span><span style=display:flex><span>systemctl list-unit-files <span style=color:#e6db74>&#39;example*&#39;</span></span></span></code></pre></div></div></div><p>An alias is another valid unit name implemented by a symlink or <code>Alias=</code> during
+enablement. <code>.wants/</code> and <code>.requires/</code> directories encode dependency links.
+<code>[Install]</code> settings such as <code>WantedBy=</code> and <code>RequiredBy=</code> tell <code>systemctl enable</code> which links to create; the manager does not interpret <code>[Install]</code> while
+starting a unit.</p><p>Never edit a packaged vendor file for a local policy. Create a drop-in:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemctl edit example.service
+</span></span><span style=display:flex><span>systemctl daemon-reload
+</span></span><span style=display:flex><span>systemctl restart example.service
+</span></span><span style=display:flex><span>systemd-delta</span></span></code></pre></div></div></div><p>Drop-ins named <code>*.conf</code> are merged lexicographically. Scalar settings replace
+earlier values, while list settings can accumulate and may require an empty
+assignment before replacement:</p><div class=jose-wrapper><div class=jose-tools><span>ini</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ini data-lang=ini><span style=display:flex><span><span style=color:#66d9ef>[Service]</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ExecStart</span><span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ExecStart</span><span style=color:#f92672>=</span><span style=color:#e6db74>/usr/local/bin/example --foreground</span></span></span></code></pre></div></div></div><p><code>systemctl revert</code> removes local overrides created for a unit. Review the merged
+definition with <code>systemctl cat</code> before restarting production service.</p><h2 id=service-tracking-and-cgroups>Service Tracking and cgroups
+<a href=#service-tracking-and-cgroups class=heading-anchor><span>#</span></a></h2><p>systemd places service processes in a unit cgroup. Descendants remain associated
+with the service even after double-forking, so PID files are not the fundamental
+tracking mechanism. Slices organize service and scope cgroups hierarchically;
+resource settings such as <code>CPUWeight=</code>, <code>MemoryMax=</code>, and <code>TasksMax=</code> apply
+through the kernel cgroup controllers available on the host.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemctl status example.service
+</span></span><span style=display:flex><span>systemd-cgls
+</span></span><span style=display:flex><span>systemctl show example.service --property<span style=color:#f92672>=</span>ControlGroup,MainPID,TasksCurrent</span></span></code></pre></div></div></div><p><code>Type=simple</code> treats the <code>ExecStart</code> process as the main process and does not
+wait for a readiness protocol. <code>Type=exec</code> waits until execution succeeds.
+<code>Type=notify</code> waits for <code>READY=1</code> from a service implementing the notification
+protocol. <code>Type=forking</code> supports traditional self-daemonizing programs, while
+<code>Type=oneshot</code> waits for the command to exit. Choose a readiness contract that
+matches the daemon; ordering after a <code>simple</code> service proves only that its
+process was launched.</p><h2 id=targets-boot-and-compatibility>Targets, Boot, and Compatibility
+<a href=#targets-boot-and-compatibility class=heading-anchor><span>#</span></a></h2><p><code>default.target</code> is the normal boot goal. A kernel <code>systemd.unit=</code> argument can
+select another target for one boot; otherwise the configured default is used:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemctl get-default
+</span></span><span style=display:flex><span>systemctl set-default multi-user.target
+</span></span><span style=display:flex><span>systemctl isolate rescue.target</span></span></code></pre></div></div></div><p><code>isolate</code> stops units not required by the target and can terminate sessions, so
+inspect target dependencies before using it remotely. <code>emergency.target</code> and
+<code>rescue.target</code> provide restricted recovery environments.</p><p>Targets group work but do not impose order by themselves. Boot performance and
+failure diagnosis therefore use both the job graph and timestamps:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemd-analyze time
+</span></span><span style=display:flex><span>systemd-analyze blame
+</span></span><span style=display:flex><span>systemd-analyze critical-chain
+</span></span><span style=display:flex><span>journalctl -b -p warning</span></span></code></pre></div></div></div><p>SysV compatibility is distribution-dependent. A generator can wrap legacy init
+scripts as service units, and familiar commands such as <code>shutdown</code> may be links
+to systemd tools. Native units provide more precise dependencies, cgroup
+tracking, activation, and sandboxing; do not assume an init script receives all
+native service semantics.</p><h2 id=logind-and-user-managers>logind and User Managers
+<a href=#logind-and-user-managers class=heading-anchor><span>#</span></a></h2><p><code>systemd-logind</code> tracks seats, login sessions, users, and inhibitor locks using
+kernel and userspace device/session information. <code>loginctl</code> inspects that state:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>loginctl list-sessions
+</span></span><span style=display:flex><span>loginctl session-status
+</span></span><span style=display:flex><span>loginctl user-status <span style=color:#e6db74>&#34;</span>$USER<span style=color:#e6db74>&#34;</span></span></span></code></pre></div></div></div><p>A PAM login commonly starts a user&rsquo;s <code>user@UID.service</code>, which runs the user
+manager. User units follow a separate load path and are controlled with
+<code>systemctl --user</code>. By default, the manager&rsquo;s lifetime follows login policy.
+<code>loginctl enable-linger USER</code> requests startup at boot and persistence after the
+last session; use it deliberately because lingering user services consume
+resources without an interactive login.</p><p>The system and user managers have separate privileges and buses. A user service
+cannot acquire system-manager authority merely by declaring a unit option, and
+system services should not depend on a transient desktop session unless that
+coupling is intentional.</p><h2 id=operational-inspection>Operational Inspection
+<a href=#operational-inspection class=heading-anchor><span>#</span></a></h2><p>Use the manager&rsquo;s own interfaces rather than inferring state from files alone:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemctl list-units --all
+</span></span><span style=display:flex><span>systemctl list-unit-files
+</span></span><span style=display:flex><span>systemctl cat example.service
+</span></span><span style=display:flex><span>systemctl show example.service
+</span></span><span style=display:flex><span>systemd-analyze verify /etc/systemd/system/example.service
+</span></span><span style=display:flex><span>journalctl --unit<span style=color:#f92672>=</span>example.service --boot</span></span></code></pre></div></div></div><p>After changing unit files outside <code>systemctl edit</code>, run <code>systemctl daemon-reload</code>; this reparses definitions but does not restart services.
+Validate first, reload, inspect the merged unit, and then restart or reload the
+smallest affected unit. The upstream manuals <code>systemd.unit(5)</code>,
+<code>systemd.service(5)</code>, <code>systemd.special(7)</code>, and <code>systemd.generator(7)</code> define the
+version installed on a host.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/systemd/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

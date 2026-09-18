@@ -1,0 +1,84 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>RSA Encryption and Signatures</title></head><body><main><article><div class=article-header><h1>RSA Encryption and Signatures</h1><div class=aux>Last update: 2025-05-10 18:23:26 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/cryptography/>Cryptography</a>
+|
+<a href=/tags/rsa/>Rsa</a></div></div><div class=article-content><p>RSA defines trapdoor operations on integers modulo a composite number. Secure
+systems use those operations only through standardized encryption or signature
+schemes because textbook RSA is deterministic, malleable, and structurally
+unsafe.</p><h2 id=key-generation>Key Generation
+<a href=#key-generation class=heading-anchor><span>#</span></a></h2><p>An RSA key generator obtains distinct, independently generated probable primes
+<code>p</code> and <code>q</code>, then calculates:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>n      = p * q
+</span></span><span style=display:flex><span>phi(n) = (p - 1) * (q - 1)
+</span></span><span style=display:flex><span>lambda = lcm(p - 1, q - 1)</span></span></code></pre></div></div></div><p>The modulus <code>n</code> determines the key size. Generation standards impose additional
+conditions on prime size, difference, primality testing, and random-bit
+generation; selecting two values that merely pass a small-prime trial division
+is insufficient. Applications should call an approved library key generator
+rather than generate primes themselves.</p><p>Choose a public exponent <code>e</code> such that <code>gcd(e, lambda) = 1</code>. The conventional
+choice is <code>65537</code>. The private exponent is its modular inverse:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>e * d = 1 (mod lambda)</span></span></code></pre></div></div></div><p>Using <code>phi(n)</code> instead of the Carmichael value <code>lambda</code> can also produce a
+correct inverse under the PKCS #1 conditions. A public key contains <code>(n, e)</code>.
+A private key normally retains <code>p</code>, <code>q</code>, <code>d</code>, and Chinese remainder theorem
+(CRT) values.</p><h2 id=private-operations-and-crt>Private Operations and CRT
+<a href=#private-operations-and-crt class=heading-anchor><span>#</span></a></h2><p>The public representative <code>m</code> and ciphertext representative <code>c</code> are related by
+the RSA primitives:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>c = m^e mod n
+</span></span><span style=display:flex><span>m = c^d mod n</span></span></code></pre></div></div></div><p>Private operations can compute modulo <code>p</code> and <code>q</code> separately, then recombine the
+results with CRT. That optimization is substantially faster, but a fault in one
+branch can expose a factor of <code>n</code>. Cryptographic libraries therefore combine
+CRT protections with implementation countermeasures such as RSA blinding and
+result verification.</p><p>Timing, cache, power, and fault behavior belong to the threat model whenever an
+attacker can submit chosen ciphertexts or signatures to the device. Constant
+time and side-channel resistance are implementation properties, not
+consequences of the RSA equations.</p><h2 id=security-assumptions-and-key-sizes>Security Assumptions and Key Sizes
+<a href=#security-assumptions-and-key-sizes class=heading-anchor><span>#</span></a></h2><p>Knowing <code>p</code> and <code>q</code> makes recovery of the private operation straightforward,
+so factoring the modulus is a sufficient break. No proof establishes that
+breaking every RSA-based scheme is exactly equivalent to factoring. Security
+arguments also depend on the RSA problem, the encoding scheme, the hash
+function, randomness, and the attack model.</p><p>Current NIST transition guidance accepts RSA moduli of at least 2,048 bits for
+112-bit classical security strength. A 3,072-bit modulus corresponds to about
+128-bit strength. Protocol or compliance requirements can demand a larger size
+or prohibit RSA for new uses. Larger keys increase CPU, bandwidth, and
+certificate size; they do not repair a weak padding scheme or compromised
+implementation.</p><p>RSA does not provide forward secrecy by itself. TLS 1.3 removed RSA key
+transport and establishes traffic secrets with ephemeral (EC)DHE. An RSA
+certificate can still authenticate a TLS 1.3 endpoint with an allowed
+RSA-PSS signature.</p><h2 id=oaep-encryption>OAEP Encryption
+<a href=#oaep-encryption class=heading-anchor><span>#</span></a></h2><p>RSAES-OAEP encodes a message with a hash, a mask-generation function, a label,
+and a random seed before applying the public RSA operation. For a modulus
+represented by <code>k</code> octets and a hash output of <code>hLen</code> octets, the plaintext
+limit is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>mLen &lt;= k - 2*hLen - 2</span></span></code></pre></div></div></div><p>OAEP is therefore intended for short values such as randomly generated
+symmetric keys, not bulk data. A hybrid protocol encapsulates or transports a
+content-encryption key and protects the actual payload with authenticated
+encryption. The complete hybrid construction must come from a protocol
+standard; RSAES-OAEP alone does not authenticate application data.</p><p>The OAEP parameters are part of the algorithm identifier. Both endpoints must
+agree on the hash, mask-generation hash, and label. A library default from one
+API may not match another API&rsquo;s default, so protocols must specify them.</p><h2 id=pss-signatures>PSS Signatures
+<a href=#pss-signatures class=heading-anchor><span>#</span></a></h2><p>RSASSA-PSS hashes the message, incorporates a salt, applies a mask-generation
+function, and encodes the result to the modulus width before the private RSA
+operation. Verification reverses the public operation and validates every
+field. The salt length, message hash, and mask-generation hash are explicit
+parameters.</p><p>New protocols should use PSS when RSA signatures are required. PKCS #1 v1.5
+encryption and signature encodings remain necessary in some legacy protocols,
+but compatibility is not a reason to select them for a new design. A verifier
+must implement the exact scheme identified by the protocol and reject malformed
+or out-of-range representatives.</p><h2 id=integer-asn1-and-pem-encodings>Integer, ASN.1, and PEM Encodings
+<a href=#integer-asn1-and-pem-encodings class=heading-anchor><span>#</span></a></h2><p>PKCS #1 defines <code>I2OSP</code> and <code>OS2IP</code> to convert between nonnegative integers and
+fixed-length, big-endian octet strings. Leading zero octets are significant
+when a scheme requires exactly <code>k</code> octets. ASN.1 DER INTEGER values are signed,
+so a positive RSA integer whose high bit is set receives a leading <code>00</code> octet.
+Confusing those rules causes truncated, negative, or wrong-width values.</p><p>Common containers have different structures:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Container</th><th>Contents</th></tr></thead><tbody><tr><td>PKCS #1 <code>RSAPublicKey</code></td><td>Modulus and public exponent</td></tr><tr><td>X.509 <code>SubjectPublicKeyInfo</code></td><td>Algorithm identifier plus encoded public key</td></tr><tr><td>PKCS #1 <code>RSAPrivateKey</code></td><td>Modulus, exponents, primes, and CRT parameters</td></tr><tr><td>PKCS #8 <code>PrivateKeyInfo</code> or <code>OneAsymmetricKey</code></td><td>Algorithm-tagged private key</td></tr><tr><td>X.509 certificate</td><td>Subject identity, issuer signature, extensions, and <code>SubjectPublicKeyInfo</code></td></tr></tbody></table></div></div><p>PEM adds a textual label and Base64 armor around a DER value. A label such as
+<code>PUBLIC KEY</code> and <code>RSA PUBLIC KEY</code> therefore identifies different ASN.1
+structures. Parse the expected container with a maintained library instead of
+extracting integers with ad hoc Base64 and byte slicing.</p><h2 id=reject-textbook-rsa-and-padding-oracles>Reject Textbook RSA and Padding Oracles
+<a href=#reject-textbook-rsa-and-padding-oracles class=heading-anchor><span>#</span></a></h2><p>Textbook RSA applies the modular exponentiation directly. It leaks plaintext
+equality, permits algebraic modification, and has no integrity check. Never use
+it for encryption or signatures, including examples promoted as &ldquo;signing by
+encrypting a hash with the private key.&rdquo;</p><p>Decryption must not reveal whether failure came from ciphertext range, OAEP
+structure, label hash, delimiter, or downstream plaintext parsing. Distinct
+errors, response times, retry behavior, or logs visible to an attacker can form
+a padding oracle. Use a library with oracle-resistant decoding, keep externally
+observable failure behavior uniform, and authenticate the enclosing protocol.
+Do not return partially decoded plaintext after any failure.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc8017>RFC 8017: PKCS #1 v2.2</a></li><li><a href=https://csrc.nist.gov/pubs/fips/186-5/final>FIPS 186-5: Digital Signature Standard</a></li><li><a href=https://csrc.nist.gov/pubs/sp/800/56/b/r2/final>NIST SP 800-56B Rev. 2: Pair-Wise Key-Establishment Schemes Using Integer Factorization Cryptography</a></li><li><a href=https://csrc.nist.gov/pubs/sp/800/131/a/r2/final>NIST SP 800-131A Rev. 2: Transitioning the Use of Cryptographic Algorithms and Key Lengths</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc8446>RFC 8446: TLS 1.3</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc7468>RFC 7468: Textual Encodings of PKIX, PKCS, and CMS Structures</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/rsa/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

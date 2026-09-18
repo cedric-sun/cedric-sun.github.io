@@ -1,0 +1,59 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring Bean Lifecycle and Prototype Scope</title></head><body><main><article><div class=article-header><h1>Spring Bean Lifecycle and Prototype Scope</h1><div class=aux>Last update: 2025-11-17 23:19:46 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/dependency-injection/>Dependency-Injection</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spring/>Spring</a></div></div><div class=article-content><p>Spring separates bean metadata from bean instances. A <code>BeanDefinition</code> describes
+how to create an object, while a <code>BeanFactory</code> applies that definition when the
+object is requested. An <code>ApplicationContext</code> adds coordinated startup,
+post-processing, events, resource loading, and shutdown.</p><h2 id=what-happens-during-context-refresh>What Happens During Context Refresh
+<a href=#what-happens-during-context-refresh class=heading-anchor><span>#</span></a></h2><p><code>AbstractApplicationContext.refresh()</code> prepares the environment and bean
+factory before application singletons become usable. The major stages are:</p><ol><li>Prepare or obtain the <code>BeanFactory</code> and load bean definitions.</li><li>Invoke <code>BeanFactoryPostProcessor</code>s, including configuration-class processing,
+while definitions can still be changed.</li><li>Discover and register <code>BeanPostProcessor</code>s.</li><li>Initialize context infrastructure such as message resolution, events, and
+context-specific resources.</li><li>Instantiate the remaining non-lazy singleton beans.</li><li>Publish the refreshed state and <code>ContextRefreshedEvent</code>.</li></ol><p>A <code>BeanFactoryPostProcessor</code> changes metadata. A <code>BeanPostProcessor</code> instead
+sees instances and can inject fields, invoke lifecycle annotations, or replace a
+bean with a proxy. Creating ordinary application beans from a factory
+post-processor is unsafe because it can instantiate them before all
+post-processors are registered.</p><h2 id=dependency-order-and-depends-on>Dependency Order and <code>depends-on</code>
+<a href=#dependency-order-and-depends-on class=heading-anchor><span>#</span></a></h2><p>The container creates a bean&rsquo;s constructor and property dependencies before the
+dependent bean. Constructor injection therefore expresses both a required
+relationship and its creation order:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReportService</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> ReportRepository repository;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReportService(ReportRepository repository) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>repository</span> <span style=color:#f92672>=</span> repository;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>@DependsOn("schemaInitializer")</code> or XML <code>depends-on</code> adds an order when no
+injection relationship exists, such as initialization of a shared external
+resource. For singleton beans it also reverses destruction order: dependent
+beans are destroyed before the beans on which they depend. <code>depends-on</code> should
+not replace an actual typed dependency because it hides what the class uses.</p><h2 id=instance-initialization>Instance Initialization
+<a href=#instance-initialization class=heading-anchor><span>#</span></a></h2><p>For a normal bean, Spring performs these operations:</p><ol><li>Instantiate the object, normally by invoking a constructor or factory method.</li><li>Resolve and inject properties and fields.</li><li>Invoke aware callbacks, including <code>BeanNameAware</code>, <code>BeanFactoryAware</code>, and
+<code>ApplicationContextAware</code>.</li><li>Invoke each <code>BeanPostProcessor</code> before initialization.</li><li>Invoke <code>@PostConstruct</code>, then <code>InitializingBean.afterPropertiesSet()</code>, then a
+configured custom init method.</li><li>Invoke each <code>BeanPostProcessor</code> after initialization.</li></ol><p>Spring infrastructure implements portions of the sequence through
+post-processors, so custom processors must honor ordering contracts. An
+after-initialization processor may return a proxy rather than the original
+object. Callers receive the ready, possibly advised object only after the full
+chain finishes.</p><p>Constructor injection is the safest place to establish required invariants.
+<code>@PostConstruct</code> is appropriate when initialization depends on injected
+properties or container services that are unavailable in the constructor.</p><h2 id=destruction-and-context-shutdown>Destruction and Context Shutdown
+<a href=#destruction-and-context-shutdown class=heading-anchor><span>#</span></a></h2><p>Closing a configurable context destroys managed singletons. For each bean,
+Spring invokes <code>@PreDestroy</code>, <code>DisposableBean.destroy()</code>, and a configured custom
+destroy method, subject to the adapter&rsquo;s duplicate-method checks. <code>SmartLifecycle</code>
+adds phased stop callbacks for components that need coordinated shutdown.</p><p>Applications should close manually created contexts, or register a shutdown
+hook with <code>registerShutdownHook()</code>. Spring Boot closes its application context
+as part of normal process shutdown. Abrupt process termination cannot guarantee
+callbacks, so durable correctness must not depend solely on them.</p><h2 id=prototype-ownership>Prototype Ownership
+<a href=#prototype-ownership class=heading-anchor><span>#</span></a></h2><p>Prototype scope means that each container request produces a new instance.
+When a prototype is injected directly into a singleton, resolution happens only
+while the singleton is created; the same prototype instance remains in that
+field. Use <code>ObjectProvider&lt;T></code>, Jakarta <code>Provider&lt;T></code>, method injection, or a
+scoped proxy when each operation needs a new instance.</p><p>Spring initializes a prototype completely and returns it to the caller, but it
+does not retain the instance or invoke destruction callbacks later. Ownership
+therefore transfers to the recipient. Code that obtains a prototype holding a
+file, socket, or executor must close it explicitly. A custom
+<code>BeanPostProcessor</code> can track such instances when centralized cleanup is
+required, but explicit resource ownership remains clearer.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html>Spring bean lifecycle callbacks</a></li><li><a href=https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html>Spring bean scopes</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/context/support/AbstractApplicationContext.html#refresh%28%29><code>AbstractApplicationContext.refresh()</code> Javadoc</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-bean-lifecycle/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

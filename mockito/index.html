@@ -1,0 +1,216 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Mockito without and with JUnit 5</title></head><body><main><article><div class=article-header><h1>Mockito without and with JUnit 5</h1><div class=aux>Last update: 2026-08-17 10:18:23 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/junit/>Junit</a>
+|
+<a href=/tags/mockito/>Mockito</a>
+|
+<a href=/tags/testing/>Testing</a></div></div><div class=article-content><p>Mockito creates test doubles for Java interfaces and classes. Its core API
+does not depend on JUnit: a program can create a mock, configure behavior,
+invoke code, and verify interactions from an ordinary <code>main</code> method. JUnit
+integration adds test discovery and automatic mock lifecycle management rather
+than basic mocking capability.</p><h2 id=minimal-maven-project-without-junit>Minimal Maven Project Without JUnit
+<a href=#minimal-maven-project-without-junit class=heading-anchor><span>#</span></a></h2><p>Put the demonstration under <code>src/test/java</code> because Mockito has test scope:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>mockito-hello/
+</span></span><span style=display:flex><span>├── pom.xml
+</span></span><span style=display:flex><span>└── src/test/java/com/example/MockitoHello.java</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;project</span> <span style=color:#a6e22e>xmlns=</span><span style=color:#e6db74>&#34;http://maven.apache.org/POM/4.0.0&#34;</span>
+</span></span><span style=display:flex><span>         <span style=color:#a6e22e>xmlns:xsi=</span><span style=color:#e6db74>&#34;http://www.w3.org/2001/XMLSchema-instance&#34;</span>
+</span></span><span style=display:flex><span>         <span style=color:#a6e22e>xsi:schemaLocation=</span><span style=color:#e6db74>&#34;http://maven.apache.org/POM/4.0.0
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                             https://maven.apache.org/xsd/maven-4.0.0.xsd&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;modelVersion&gt;</span>4.0.0<span style=color:#f92672>&lt;/modelVersion&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>com.example<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>mockito-hello<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>1.0-SNAPSHOT<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;properties&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;maven.compiler.release&gt;</span>17<span style=color:#f92672>&lt;/maven.compiler.release&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;mockito.version&gt;</span>5.23.0<span style=color:#f92672>&lt;/mockito.version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/properties&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.mockito<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>mockito-core<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>${mockito.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/project&gt;</span></span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>package</span> com.example;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.mock;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.verify;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.when;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>interface</span> <span style=color:#a6e22e>Greeter</span> {
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>greet</span>(String name);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>MockitoHello</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) {
+</span></span><span style=display:flex><span>        Greeter greeter <span style=color:#f92672>=</span> mock(Greeter.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>        when(greeter.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>)).<span style=color:#a6e22e>thenReturn</span>(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        String actual <span style=color:#f92672>=</span> greeter.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>);
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span><span style=color:#e6db74>&#34;Hello, Ada&#34;</span>.<span style=color:#a6e22e>equals</span>(actual)) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> AssertionError(<span style=color:#e6db74>&#34;unexpected result: &#34;</span> <span style=color:#f92672>+</span> actual);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        verify(greeter).<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Compile the test class and invoke it with the Maven Exec Plugin:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mvn test-compile <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  org.codehaus.mojo:exec-maven-plugin:3.6.1:java <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dexec.mainClass<span style=color:#f92672>=</span>com.example.MockitoHello <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -Dexec.classpathScope<span style=color:#f92672>=</span>test</span></span></code></pre></div></div></div><p>No test engine or <code>@Test</code> annotation participates. The process fails through
+<code>AssertionError</code> or Mockito&rsquo;s verification exception.</p><h2 id=mocks-and-stubbing>Mocks and Stubbing
+<a href=#mocks-and-stubbing class=heading-anchor><span>#</span></a></h2><p><code>mock(Greeter.class)</code> returns an object that records method calls. Unstubbed
+methods return Mockito defaults such as <code>null</code>, zero, <code>false</code>, or an empty
+supported collection.</p><p>Ordinary stubbing places the invocation inside <code>when</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>when(repository.<span style=color:#a6e22e>findById</span>(7L)).<span style=color:#a6e22e>thenReturn</span>(user);
+</span></span><span style=display:flex><span>when(repository.<span style=color:#a6e22e>findById</span>(<span style=color:#f92672>-</span>1L))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>thenThrow</span>(<span style=color:#66d9ef>new</span> IllegalArgumentException(<span style=color:#e6db74>&#34;negative ID&#34;</span>));
+</span></span><span style=display:flex><span>when(sequence.<span style=color:#a6e22e>next</span>()).<span style=color:#a6e22e>thenReturn</span>(10, 20, 30);</span></span></code></pre></div></div></div><p>Consecutive return values support stateful protocols, but a fake object can
+express complex state more clearly than a long chain of stubs.</p><p>The <code>do...</code> family handles void methods and cases where evaluating the method
+during setup would be unsafe:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>doNothing().<span style=color:#a6e22e>when</span>(queue).<span style=color:#a6e22e>acknowledge</span>(<span style=color:#e6db74>&#34;message-1&#34;</span>);
+</span></span><span style=display:flex><span>doThrow(<span style=color:#66d9ef>new</span> IOException(<span style=color:#e6db74>&#34;offline&#34;</span>)).<span style=color:#a6e22e>when</span>(client).<span style=color:#a6e22e>close</span>();
+</span></span><span style=display:flex><span>doAnswer(invocation <span style=color:#f92672>-&gt;</span> invocation.<span style=color:#a6e22e>getArgument</span>(0))
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>when</span>(normalizer).<span style=color:#a6e22e>normalize</span>(anyString());</span></span></code></pre></div></div></div><p>Available forms include <code>doReturn</code>, <code>doThrow</code>, <code>doAnswer</code>, <code>doNothing</code>, and
+<code>doCallRealMethod</code>.</p><h2 id=verification>Verification
+<a href=#verification class=heading-anchor><span>#</span></a></h2><p>Verification checks collaboration after the exercised code has completed:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>verify(repository).<span style=color:#a6e22e>save</span>(order);
+</span></span><span style=display:flex><span>verify(repository, times(2)).<span style=color:#a6e22e>findById</span>(7L);
+</span></span><span style=display:flex><span>verify(repository, never()).<span style=color:#a6e22e>delete</span>(any());
+</span></span><span style=display:flex><span>verifyNoInteractions(auditLog);
+</span></span><span style=display:flex><span>verifyNoMoreInteractions(repository);</span></span></code></pre></div></div></div><p><code>verify(mock)</code> means <code>times(1)</code>. Verify only interactions that form part of
+the unit&rsquo;s contract because checks against every implementation call make a
+test fail after behavior-preserving refactoring.</p><p><code>InOrder</code> verifies a required sequence across one or more mocks:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>InOrder order <span style=color:#f92672>=</span> inOrder(transaction, publisher);
+</span></span><span style=display:flex><span>order.<span style=color:#a6e22e>verify</span>(transaction).<span style=color:#a6e22e>commit</span>();
+</span></span><span style=display:flex><span>order.<span style=color:#a6e22e>verify</span>(publisher).<span style=color:#a6e22e>publish</span>(event);</span></span></code></pre></div></div></div><p>The example requires publication after commit; unrelated interactions do not
+need ordered verification.</p><h2 id=argument-matching-and-capture>Argument Matching and Capture
+<a href=#argument-matching-and-capture class=heading-anchor><span>#</span></a></h2><p>Mockito compares literal arguments with <code>equals</code>. Matchers relax or describe
+that comparison:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>when(catalog.<span style=color:#a6e22e>find</span>(eq(<span style=color:#e6db74>&#34;book&#34;</span>), anyInt())).<span style=color:#a6e22e>thenReturn</span>(results);
+</span></span><span style=display:flex><span>verify(catalog).<span style=color:#a6e22e>find</span>(eq(<span style=color:#e6db74>&#34;book&#34;</span>), intThat(limit <span style=color:#f92672>-&gt;</span> limit <span style=color:#f92672>&gt;</span> 0));</span></span></code></pre></div></div></div><p>If one argument uses a matcher, every argument in the same invocation must use
+a matcher. Wrap literals with <code>eq</code> rather than mixing matcher and literal
+forms.</p><p><code>ArgumentCaptor</code> inspects a value created by the unit under test:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ArgumentCaptor<span style=color:#f92672>&lt;</span>Email<span style=color:#f92672>&gt;</span> captor <span style=color:#f92672>=</span> ArgumentCaptor.<span style=color:#a6e22e>forClass</span>(Email.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>verify(sender).<span style=color:#a6e22e>send</span>(captor.<span style=color:#a6e22e>capture</span>());
+</span></span><span style=display:flex><span><span style=color:#66d9ef>assert</span> <span style=color:#e6db74>&#34;ada@example.com&#34;</span>.<span style=color:#a6e22e>equals</span>(captor.<span style=color:#a6e22e>getValue</span>().<span style=color:#a6e22e>recipient</span>());</span></span></code></pre></div></div></div><p>Capture during verification. Stubbing with captors hides the input condition
+and can produce confusing failures when the method is never called.</p><h2 id=answers-and-default-behavior>Answers and Default Behavior
+<a href=#answers-and-default-behavior class=heading-anchor><span>#</span></a></h2><p>An <code>Answer</code> computes a result from invocation metadata:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>when(cache.<span style=color:#a6e22e>compute</span>(anyString())).<span style=color:#a6e22e>thenAnswer</span>(invocation <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>    String key <span style=color:#f92672>=</span> invocation.<span style=color:#a6e22e>getArgument</span>(0);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> key.<span style=color:#a6e22e>toUpperCase</span>(Locale.<span style=color:#a6e22e>ROOT</span>);
+</span></span><span style=display:flex><span>});</span></span></code></pre></div></div></div><p>Pass a default answer to <code>mock</code> only when every unstubbed invocation needs
+special semantics:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Service service <span style=color:#f92672>=</span> mock(Service.<span style=color:#a6e22e>class</span>, invocation <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> AssertionError(<span style=color:#e6db74>&#34;unstubbed call: &#34;</span> <span style=color:#f92672>+</span> invocation.<span style=color:#a6e22e>getMethod</span>());
+</span></span><span style=display:flex><span>});</span></span></code></pre></div></div></div><p>A strict default can expose accidental calls, but it also replaces Mockito&rsquo;s
+standard defaults and therefore requires deliberate stubbing.</p><h2 id=spies-and-partial-mocks>Spies and Partial Mocks
+<a href=#spies-and-partial-mocks class=heading-anchor><span>#</span></a></h2><p>A spy invokes real methods unless a method is stubbed:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> names <span style=color:#f92672>=</span> spy(<span style=color:#66d9ef>new</span> ArrayList<span style=color:#f92672>&lt;&gt;</span>());
+</span></span><span style=display:flex><span>doReturn(100).<span style=color:#a6e22e>when</span>(names).<span style=color:#a6e22e>size</span>();</span></span></code></pre></div></div></div><p>Prefer <code>doReturn(...).when(spy)...</code> because
+<code>when(spy.method()).thenReturn(...)</code> calls the real method during setup. A spy
+copies the supplied object&rsquo;s state when created; it is not a continuously
+delegating wrapper around the original reference.</p><p>Partial mocking couples a test to implementation details. A narrower
+interface or extracted collaborator provides a stronger boundary when the
+production design can be changed.</p><h2 id=annotation-lifecycle>Annotation Lifecycle
+<a href=#annotation-lifecycle class=heading-anchor><span>#</span></a></h2><p>Mockito annotations reduce fixture declarations:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReportFixture</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Mock</span> ReportRepository repository;
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Spy</span> Formatter formatter <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Formatter();
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Captor</span> ArgumentCaptor<span style=color:#f92672>&lt;</span>Report<span style=color:#f92672>&gt;</span> reportCaptor;
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@InjectMocks</span> ReportService service;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Without a test-framework integration, initialize and close annotated mocks
+explicitly:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>var</span> fixture <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ReportFixture();
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (AutoCloseable mocks <span style=color:#f92672>=</span> MockitoAnnotations.<span style=color:#a6e22e>openMocks</span>(fixture)) {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// Exercise fixture.service.</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>MockitoAnnotations.initMocks</code> is deprecated because it closes the mock
+context immediately. Early closure breaks lifecycle-sensitive mock makers and
+scoped mocks. <code>@InjectMocks</code> performs constructor, setter, or field injection
+as a fixture convenience; it does not replace dependency-injection
+configuration.</p><p><code>MockitoSession</code> provides explicit lifecycle and strictness when a custom test
+harness needs more control:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>MockitoSession session <span style=color:#f92672>=</span> Mockito.<span style=color:#a6e22e>mockitoSession</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>initMocks</span>(fixture)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>strictness</span>(Strictness.<span style=color:#a6e22e>STRICT_STUBS</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>startMocking</span>();
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// Exercise the fixture.</span>
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>finally</span> {
+</span></span><span style=display:flex><span>    session.<span style=color:#a6e22e>finishMocking</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Strict stubs report unused stubbing and argument mismatches, thus revealing
+fixture setup that no longer matches exercised behavior.</p><h2 id=final-static-and-constructor-mocking>Final, Static, and Constructor Mocking
+<a href=#final-static-and-constructor-mocking class=heading-anchor><span>#</span></a></h2><p>Mockito 5 uses the inline mock maker by default, so <code>mockito-core</code> can mock
+final classes, final methods, and enums. Older Mockito releases may require
+the former <code>mockito-inline</code> artifact or an explicit mock-maker configuration.</p><p>Static and constructor mocks are thread-local scoped resources and must be
+closed:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>try</span> (MockedStatic<span style=color:#f92672>&lt;</span>ClockSource<span style=color:#f92672>&gt;</span> clock <span style=color:#f92672>=</span> mockStatic(ClockSource.<span style=color:#a6e22e>class</span>)) {
+</span></span><span style=display:flex><span>    clock.<span style=color:#a6e22e>when</span>(ClockSource::now).<span style=color:#a6e22e>thenReturn</span>(fixedInstant);
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// Exercise code that calls ClockSource.now().</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (MockedConstruction<span style=color:#f92672>&lt;</span>SocketClient<span style=color:#f92672>&gt;</span> clients <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>        mockConstruction(SocketClient.<span style=color:#a6e22e>class</span>)) {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// Exercise code that constructs SocketClient.</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Private and native methods cannot be mocked. JVM and mock-maker restrictions
+also apply to selected JDK types and methods. Static or construction mocking
+can provide a migration seam for legacy code, but dependency injection avoids
+global call-site coupling.</p><p>Modern JVMs restrict dynamic agent attachment. Builds that use Mockito&rsquo;s
+inline mock maker should follow Mockito&rsquo;s documented <code>-javaagent</code>
+configuration rather than depending on runtime self-attachment.</p><h2 id=junit-5-integration>JUnit 5 Integration
+<a href=#junit-5-integration class=heading-anchor><span>#</span></a></h2><p>JUnit Jupiter supplies discovery and lifecycle callbacks. Add the Jupiter
+integration artifact alongside JUnit:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.junit.jupiter<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>junit-jupiter<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>5.13.4<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.mockito<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>mockito-junit-jupiter<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>${mockito.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p><code>mockito-junit-jupiter</code> transitively includes <code>mockito-core</code>.
+<code>MockitoExtension</code> initializes annotation fields and parameters, applies
+strict-stub lifecycle handling, and closes mocks after each test:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.verify;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.when;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.extension.ExtendWith;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.InjectMocks;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.Mock;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.junit.jupiter.MockitoExtension;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@ExtendWith</span>(MockitoExtension.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingServiceTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Mock</span>
+</span></span><span style=display:flex><span>    GreetingRepository repository;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@InjectMocks</span>
+</span></span><span style=display:flex><span>    GreetingService service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>returnsTheStoredGreeting</span>() {
+</span></span><span style=display:flex><span>        when(repository.<span style=color:#a6e22e>findFor</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>)).<span style=color:#a6e22e>thenReturn</span>(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>, service.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>));
+</span></span><span style=display:flex><span>        verify(repository).<span style=color:#a6e22e>findFor</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Method parameters can also receive mocks:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>void</span> <span style=color:#a6e22e>retriesAfterFailure</span>(<span style=color:#a6e22e>@Mock</span> RemoteClient client) {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// The parameter mock exists only for this invocation.</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Prefer field mocks for collaborators shared by fixture setup and parameter
+mocks for dependencies local to one test.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html>Mockito API</a></li><li><a href=https://javadoc.io/doc/org.mockito/mockito-junit-jupiter/latest/org/mockito/junit/jupiter/MockitoExtension.html>Mockito JUnit Jupiter API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mockito/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

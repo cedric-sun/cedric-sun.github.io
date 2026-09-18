@@ -1,0 +1,82 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>x86 Architectural Registers</title></head><body><main><article><div class=article-header><h1>x86 Architectural Registers</h1><div class=aux>Last update: 2024-07-28 09:42:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/x86/>X86</a>
+|
+<a href=/tags/x86-64/>X86-64</a>
+|
+<a href=/tags/assembly/>Assembly</a></div></div><div class=article-content><p>x86 architectural registers hold programmer-visible integer, control, status,
+address-translation, debug, floating-point, and vector state. Width and
+availability depend on execution mode and enabled extensions. Calling
+conventions assign software roles to a subset of these registers but do not
+change their architectural behavior.</p><h2 id=general-purpose-registers-and-subregisters>General-Purpose Registers and Subregisters
+<a href=#general-purpose-registers-and-subregisters class=heading-anchor><span>#</span></a></h2><p>IA-32 exposes <code>EAX</code>, <code>EBX</code>, <code>ECX</code>, <code>EDX</code>, <code>ESI</code>, <code>EDI</code>, <code>EBP</code>, and <code>ESP</code>.
+x86-64 widens them to <code>RAX</code> through <code>RSP</code> and adds <code>R8</code> through <code>R15</code>.
+Subregisters name parts of the same architectural register:</p><ul><li><code>RAX</code> is 64 bits, <code>EAX</code> is its low 32 bits, <code>AX</code> is the low 16 bits, and
+<code>AL</code> and <code>AH</code> name low and high bytes of <code>AX</code>.</li><li>Writing a 32-bit destination in 64-bit mode clears the upper 32 bits.</li><li>Writing a 16-bit or 8-bit destination preserves the other bits.</li><li>A REX prefix makes <code>SPL</code>, <code>BPL</code>, <code>SIL</code>, and <code>DIL</code> available but prevents an
+instruction from encoding <code>AH</code>, <code>BH</code>, <code>CH</code>, or <code>DH</code>.</li></ul><p><code>RIP</code> is the 64-bit instruction pointer, while <code>EIP</code> is used by 32-bit code.
+Ordinary <code>MOV</code> cannot write it; branches, calls, returns, exceptions, and
+interrupt returns change control flow. <code>RSP</code> is the current stack pointer.</p><p>Register purpose at a function boundary comes from an ABI. System V AMD64 uses
+<code>RDI</code>, <code>RSI</code>, <code>RDX</code>, <code>RCX</code>, <code>R8</code>, and <code>R9</code> for initial integer arguments,
+whereas Microsoft x64 uses <code>RCX</code>, <code>RDX</code>, <code>R8</code>, and <code>R9</code>. <code>RBP</code> can serve as a
+frame pointer but may be available as a general register when the ABI and unwind
+information permit. A Linux syscall uses another register convention, so
+function-call and kernel-entry roles must not be conflated.</p><h2 id=rflags>RFLAGS
+<a href=#rflags class=heading-anchor><span>#</span></a></h2><p><code>RFLAGS</code> extends the older <code>EFLAGS</code> and <code>FLAGS</code> registers. Common arithmetic
+status bits are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Flag</th><th>Meaning</th></tr></thead><tbody><tr><td><code>CF</code></td><td>Unsigned carry or borrow</td></tr><tr><td><code>PF</code></td><td>Even parity of the low result byte</td></tr><tr><td><code>AF</code></td><td>Auxiliary carry for legacy decimal operations</td></tr><tr><td><code>ZF</code></td><td>Zero result</td></tr><tr><td><code>SF</code></td><td>Sign bit of the result</td></tr><tr><td><code>OF</code></td><td>Signed overflow</td></tr></tbody></table></div></div><p>Control and system bits include:</p><ul><li><code>DF</code>, which chooses incrementing or decrementing indexes for string
+instructions.</li><li><code>IF</code>, which controls delivery of maskable interrupts subject to privilege and
+virtualization rules.</li><li><code>TF</code>, which requests a debug trap after an instruction.</li><li><code>IOPL</code>, which participates in port-I/O and selected interrupt-control checks.</li><li><code>NT</code>, which records nested hardware-task state in legacy protected mode.</li><li><code>RF</code>, <code>VM</code>, <code>AC</code>, <code>VIF</code>, <code>VIP</code>, and <code>ID</code>, whose meanings depend on mode and
+enabled facilities.</li></ul><p>Instructions define which flags they write, preserve, or leave undefined.
+<code>PUSHF</code>/<code>POPF</code>, interrupt entry, and return operations also apply privilege
+restrictions; software cannot assume every visible bit can be changed at its
+current CPL.</p><h2 id=segment-registers-and-hidden-descriptor-caches>Segment Registers and Hidden Descriptor Caches
+<a href=#segment-registers-and-hidden-descriptor-caches class=heading-anchor><span>#</span></a></h2><p><code>CS</code>, <code>SS</code>, <code>DS</code>, <code>ES</code>, <code>FS</code>, and <code>GS</code> have a visible selector and hidden
+descriptor state. Loading a selector in protected mode fetches a descriptor and
+caches its base, limit, type, and access rights. Editing the descriptor table
+does not update an already loaded cache.</p><p>In 64-bit mode, normal address generation ignores the bases and limits of <code>CS</code>,
+<code>SS</code>, <code>DS</code>, and <code>ES</code>. <code>FS</code> and <code>GS</code> retain 64-bit bases set through model-specific
+registers or supported instructions, which operating systems use for
+thread-local and per-CPU data. Selector and descriptor rules still apply where
+the architecture specifies them.</p><p><code>GDTR</code> and <code>IDTR</code> hold a linear base and byte limit for the global descriptor
+table and interrupt descriptor table. <code>LDTR</code> and <code>TR</code> hold selectors plus cached
+descriptors for the local descriptor table and task-state segment. <code>LGDT</code>,
+<code>LIDT</code>, <code>LLDT</code>, and <code>LTR</code> establish those values under privilege checks.
+<a href=/x86-protected-mode/>x86 Protected Mode and Privilege</a> describes the table
+formats and transitions.</p><h2 id=control-and-system-registers>Control and System Registers
+<a href=#control-and-system-registers class=heading-anchor><span>#</span></a></h2><p>Control registers configure execution and address translation:</p><ul><li><code>CR0</code> includes protected-mode, paging, write-protect, caching, and selected
+numeric-state controls.</li><li><code>CR2</code> receives the linear address associated with a page fault.</li><li><code>CR3</code> selects the paging-structure root and can carry a process-context
+identifier when PCID is enabled.</li><li><code>CR4</code> enables architectural facilities such as PAE, global pages, OS-managed
+SIMD state, SMEP, SMAP, and protection keys when supported.</li><li><code>CR8</code> controls the task-priority threshold for external interrupts in 64-bit
+mode.</li></ul><p>Model-specific registers (MSRs) provide additional controls, including
+<code>EFER</code> for long-mode and no-execute enablement, system-call targets, <code>FS</code>/<code>GS</code>
+bases, memory types, and performance monitoring. The exact MSR set is
+model-dependent and must be discovered or selected from vendor documentation.
+<code>RDMSR</code> and <code>WRMSR</code> are privileged.</p><h2 id=debug-registers>Debug Registers
+<a href=#debug-registers class=heading-anchor><span>#</span></a></h2><p><code>DR0</code> through <code>DR3</code> hold linear breakpoint addresses. <code>DR7</code> enables breakpoints
+and selects execution, write, or data-access conditions with supported lengths.
+<code>DR6</code> reports why a debug exception occurred. Reserved encodings and general-
+detect behavior are architecture-specific, so a debugger or kernel must
+sanitize values before restoring untrusted debug state.</p><p>Software breakpoints instead replace an instruction byte with <code>INT3</code>. Hardware
+debug registers avoid changing code but provide only a small number of slots.
+Debug exceptions interact with single stepping, task switching, virtualization,
+and transactional execution.</p><h2 id=x87-mmx-simd-and-mask-registers>x87, MMX, SIMD, and Mask Registers
+<a href=#x87-mmx-simd-and-mask-registers class=heading-anchor><span>#</span></a></h2><p>The x87 floating-point unit exposes an eight-entry register stack plus control,
+status, tag, instruction-pointer, and data-pointer state. MMX aliases the low
+64-bit storage of the x87 registers, which is why legacy MMX code executes
+<code>EMMS</code> before returning to x87 operations.</p><p>SSE introduced <code>XMM</code> registers. AVX extends their low storage into <code>YMM</code>;
+AVX-512 extends it into <code>ZMM</code> and adds opmask registers <code>K0</code> through <code>K7</code>.
+Architecture and mode determine how many registers are visible. Writing a
+legacy SSE destination can preserve upper vector state, while VEX- and
+EVEX-encoded operations apply their specified upper-bit clearing behavior.
+Mixing forms can therefore create dependencies or transition penalties on
+selected processors.</p><p><code>MXCSR</code> controls SIMD floating-point rounding, exception masks, status, and
+denormal handling. Opmask registers govern per-lane AVX-512 merging or zeroing.
+Additional extensions can add tile or other state that is not represented by
+the original floating-point save formats.</p><h2 id=extended-state-management>Extended-State Management
+<a href=#extended-state-management class=heading-anchor><span>#</span></a></h2><p><code>FXSAVE</code> and <code>FXRSTOR</code> cover x87, MMX, SSE, and related control state. The XSAVE
+family uses <code>XCR0</code>, CPUID enumeration, and a component bitmap to manage an
+extensible state area. Supervisor components can use additional control and
+save mechanisms.</p><p>An operating system must enable only state components it can initialize, save,
+restore, and expose safely. User software checks both processor support and OS
+enablement before executing AVX or later instructions. Context-switch policy can
+save state eagerly or with supported optimizations, but the architectural state
+visible to each thread must remain isolated.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/x86-registers/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

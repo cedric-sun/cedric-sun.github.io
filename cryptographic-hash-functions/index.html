@@ -1,0 +1,136 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Cryptographic Hash Functions</title></head><body><main><article><div class=article-header><h1>Cryptographic Hash Functions</h1><div class=aux>Last update: 2024-02-07 23:45:50 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/cryptography/>Cryptography</a>
+|
+<a href=/tags/hashing/>Hashing</a></div></div><div class=article-content><p>Cryptographic hash functions reduce arbitrary byte strings to fixed-size
+digests. Protocols rely on specific resistance properties rather than on the
+mere act of hashing, because a fast unkeyed digest provides neither message
+authentication nor safe password storage.</p><h2 id=hash-functions>Hash Functions
+<a href=#hash-functions class=heading-anchor><span>#</span></a></h2><p>A hash function maps an arbitrarily large input domain to a finite output
+domain, often a fixed-length bit string:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>H: {0, 1}* -&gt; {0, 1}^n</span></span></code></pre></div></div></div><p>No security property follows from that definition. For example, <code>f(x) = 0</code> for
+every input is a hash function. It is unsuitable for a hash table because all
+entries occupy one bucket, although the result is poor performance rather than
+a cryptographic failure.</p><p>Cryptographic uses impose stronger requirements. A database should not retain a
+user&rsquo;s plaintext password merely because the database might be disclosed. Its
+stored password verifier must make an offline guessing attack expensive; a
+general-purpose hash alone does not achieve that goal. Similarly, a digest may
+detect accidental corruption, but an attacker who can replace the message can
+also replace its digest. A plain hash supplies neither origin authentication
+nor active-adversary integrity.</p><p>Because the input domain is larger than the digest domain, every
+fixed-length hash has collisions: distinct inputs with the same digest.
+Cryptography therefore asks whether an adversary can find a useful collision,
+or an input for a specified digest, with feasible resources.</p><h2 id=the-birthday-bound>The Birthday Bound
+<a href=#the-birthday-bound class=heading-anchor><span>#</span></a></h2><p>The birthday paradox has two equivalent presentations. In a group of randomly
+chosen people, the probability that two share a birthday exceeds 50% with only
+23 people. Conversely, if birthdays can be queried one person at a time, a
+surprisingly small number of queries gives a substantial chance of finding a
+matching pair. Once 366 people have been considered under a 365-day model, the
+pigeonhole principle guarantees a pair.</p><p>The second presentation is more useful for hashing. Hash inputs need not be
+drawn from a bounded population: an attacker can keep choosing fresh inputs
+and evaluating the public function. After <code>q</code> outputs have been sampled from
+an ideal hash with <code>N</code> uniformly likely output values, the probability of at
+least one repeated output is approximately</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>1 - exp(-q(q - 1) / (2N)).</span></span></code></pre></div></div></div><p>The approximation follows by considering the complementary event. The first
+output is unrestricted; the next must avoid one occupied value, the next two,
+and so on. Multiplying those probabilities gives a product that decreases
+approximately as the exponential above. A constant probability of a collision
+therefore requires on the order of <code>sqrt(N)</code> evaluations. For an <code>n</code>-bit
+digest, where <code>N = 2^n</code>, the generic collision cost is about <code>2^(n/2)</code>.</p><p>Uniform output distribution is an ideal-model assumption. Biases or structural
+weaknesses can make collisions easier, while a function such as <code>f(x) = 0</code>
+collides immediately. The birthday bound nonetheless describes an unavoidable
+limit for an ideal fixed-output hash; enlarging the input space cannot improve
+it. A birthday attack is simply this generic collision search, retaining
+previous digests until a duplicate appears.</p><p>For example, an ideal 32-bit hash reaches about a 1% collision probability
+after roughly 9,300 trials and about a 50% probability after roughly 77,000.
+Such a digest is inadequate where collision resistance matters. The birthday
+bound concerns <em>any pair</em> of inputs, not recovery of a particular input.</p><h2 id=cryptographic-hash-function-security-properties>Cryptographic Hash Function Security Properties
+<a href=#cryptographic-hash-function-security-properties class=heading-anchor><span>#</span></a></h2><p>A cryptographic hash function is an unkeyed hash intended to resist specified
+attacks. “Cryptographic hash function” is not one formal security game; its
+meaning depends on which properties a protocol requires. For a hash <code>H</code>, the
+preimage of a value <code>y</code> is any message <code>m</code> for which <code>H(m) = y</code>.</p><p>The following games differ in what the attacker receives and may choose:</p><ol><li><strong>Preimage resistance:</strong> given a target digest <code>y</code>, find any <code>m</code> such that
+<code>H(m) = y</code>.</li><li><strong>Second-preimage resistance:</strong> given a particular message <code>m1</code>, find a
+distinct <code>m2</code> such that <code>H(m1) = H(m2)</code>.</li><li><strong>Collision resistance:</strong> find any distinct pair <code>m1</code>, <code>m2</code> such that
+<code>H(m1) = H(m2)</code>.</li><li><strong>Chosen-prefix collision resistance:</strong> given two different prefixes
+<code>p1</code> and <code>p2</code>, find suffixes <code>s1</code> and <code>s2</code> such that
+<code>H(p1 || s1) = H(p2 || s2)</code>.</li></ol><p>A collision attack lets the attacker choose both messages, whereas a
+second-preimage game fixes one message. A preimage game fixes the digest
+instead. The games should not be collapsed into a universal ordering:
+properties can have formal implications under particular distributions and
+models, but weaknesses can be target-specific. A protocol must select the
+property that matches its attacker-controlled inputs.</p><p>For an ideal <code>n</code>-bit hash, generic preimage and second-preimage searches take
+about <code>2^n</code> work, while the birthday method finds a collision in about
+<code>2^(n/2)</code> work. Collision resistance means that no attack materially improves
+on that generic birthday cost, not that collisions do not exist.</p><p>Chosen-prefix collisions are more capable than a pair of unrelated colliding
+files. They let an attacker begin with two meaningful, different prefixes—for
+example, the headers and initial content of two document formats—and generate
+suffixes that yield the same digest. Practical chosen-prefix collisions against
+MD5 illustrated how a collision can be embedded in artifacts with different
+semantics, including forged certificate-related material. Such attacks made
+collision-sensitive uses of MD5 unacceptable.</p><p>Unkeyed hashes do not take secret keys. A construction that accepts a key is a
+message-authentication code, a keyed hash in some terminology, or another
+primitive; its security requirements must be assessed separately.</p><h2 id=hash-design-and-constructions>Hash Design and Constructions
+<a href=#hash-design-and-constructions class=heading-anchor><span>#</span></a></h2><p>An effective cryptographic design distributes small input changes widely across
+its output, an effect called the avalanche effect. Avalanche behavior is a
+useful diagnostic, but it neither proves preimage resistance, second-preimage
+resistance, nor collision resistance. Those properties concern an adversary&rsquo;s
+best algorithm.</p><p>Many iterative hashes begin with a compression function. Given a chaining
+value and one fixed-size message block, it produces a new chaining value of
+the same width:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>C: {0, 1}^n x {0, 1}^b -&gt; {0, 1}^n</span></span></code></pre></div></div></div><p>The word “compression” refers to the total input being longer than the
+output; it does not mean that the function is reversible. Security analyses
+seek appropriate one-way and collision-resistance properties for this
+component. Classical constructions can build compression functions from block
+ciphers, although modern standardized hash families use dedicated designs.</p><h2 id=merkledamgård-construction>Merkle–Damgård Construction
+<a href=#merkledamg%c3%a5rd-construction class=heading-anchor><span>#</span></a></h2><p>The Merkle–Damgård construction turns a fixed-input compression function into
+a variable-length hash. It starts from an initial chaining value, pads the
+message into blocks, and feeds each block with the current chaining value into
+the compression function. The final chaining value is the digest.</p><p>Merkle–Damgård strengthening appends an encoding of the original message
+length as part of padding. Subject to its conditions, a collision-resistant
+compression function then yields a collision-resistant variable-length hash:
+without strengthening, a collision in padded inputs can arise from ambiguous
+message boundaries. MD5, SHA-1, and SHA-2 use this broad construction; their
+compression functions and digest lengths determine their actual security.</p><p>Length encoding does <strong>not</strong> prevent the related length-extension property.
+For a conventional Merkle–Damgård hash, a digest of <code>m</code> exposes the chaining
+value after processing <code>m</code> and its padding. An attacker who knows the digest
+and the length of <code>m</code> can often compute a valid digest for
+<code>m || padding(m) || extension</code> without knowing <code>m</code>. The result matters when a
+system authenticates data as:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>SHA-256(secret || message)</span></span></code></pre></div></div></div><p>An attacker can extend <code>message</code> and calculate the corresponding digest if
+the secret length can be guessed. Do not use a bare Merkle–Damgård hash as a
+secret-prefix MAC. Use HMAC instead:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>HMAC(K, m) = H((K XOR opad) || H((K XOR ipad) || m))</span></span></code></pre></div></div></div><p>HMAC&rsquo;s nested keyed construction resists length extension and is suitable for
+message authentication when used with a current hash such as SHA-256. Protocols
+must still define key generation, truncation, message encoding, and key
+separation.</p><h2 id=domain-separation-and-salting>Domain Separation and Salting
+<a href=#domain-separation-and-salting class=heading-anchor><span>#</span></a></h2><p>One hash function often serves several roles within a protocol. Domain
+separation prevents values from one role from being accepted in another. A
+standardized construction may prepend a fixed function identifier, place a
+context string in a dedicated field, or derive independent keys for each role.
+The encoding must be unambiguous: concatenating variable-length values without
+lengths or a specified serialization can map different field sequences to the
+same byte string.</p><p>Use the domain-separation mechanism defined by the protocol or primitive.
+Changing a prefix or inventing a local encoding changes the protocol and
+requires separate analysis. SHA-3 functions, the customizable cSHAKE
+functions, and key-derivation protocols expose different separation
+mechanisms, so their inputs are not interchangeable.</p><p>A salt solves a different problem. Password verifiers use a unique random salt
+per credential so equal passwords do not produce equal stored values and an
+attacker cannot amortize one precomputed table across accounts. The salt is
+stored with the verifier and is not secret. It does not add password entropy,
+authenticate a message, or replace domain separation.</p><p>Password hashing must also impose configurable time and memory cost. Use
+Argon2id according to RFC 9106 where available; scrypt, bcrypt, or PBKDF2 may be
+required by platform and compliance constraints. Store the algorithm
+identifier, parameters, salt, and derived output so parameters can be upgraded
+after a successful login.</p><h2 id=selecting-hash-algorithms>Selecting Hash Algorithms
+<a href=#selecting-hash-algorithms class=heading-anchor><span>#</span></a></h2><p>Use a modern general-purpose hash such as SHA-256, SHA-512/256, SHA-3, or
+BLAKE2 according to the applicable standard, interoperability needs, and
+protocol. SHA-256 provides a 256-bit digest and an ideal generic collision work
+factor of 128 bits. SHA-512/256 is a distinct SHA-512-based algorithm with a
+256-bit output, not an informal truncation of SHA-512.</p><p>MD5 is broken for collision resistance and must not be selected for
+collision-sensitive security applications. SHA-1 has practical collision and
+chosen-prefix collision attacks and is likewise deprecated for digital
+signatures, certificates, and similar uses. Legacy verification may require
+recognizing these algorithms, but new designs must not create MD5 or SHA-1
+signatures. Migration needs an explicit algorithm identifier, an allowlist for
+newly generated data, a deadline for removing legacy verification, and
+protection against downgrade to the obsolete algorithm.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://csrc.nist.gov/pubs/fips/180-4/upd1/final>FIPS 180-4: Secure Hash Standard</a></li><li><a href=https://csrc.nist.gov/pubs/fips/202/final>FIPS 202: SHA-3 Standard</a></li><li><a href=https://csrc.nist.gov/pubs/sp/800/185/final>NIST SP 800-185: SHA-3 Derived Functions</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc2104>RFC 2104: HMAC</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc7693>RFC 7693: The BLAKE2 Cryptographic Hash and MAC</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc9106>RFC 9106: Argon2 Memory-Hard Function</a></li><li><a href=https://csrc.nist.gov/pubs/sp/800/131/a/r2/final>NIST SP 800-131A Rev. 2: Transitioning the Use of Cryptographic Algorithms and Key Lengths</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cryptographic-hash-functions/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

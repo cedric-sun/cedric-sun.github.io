@@ -1,0 +1,78 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Hugo Site Build Lifecycle</title></head><body><main><article><div class=article-header><h1>Hugo Site Build Lifecycle</h1><div class=aux>Last update: 2024-09-24 05:23:14 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/hugo/>Hugo</a>
+|
+<a href=/tags/go/>Go</a></div></div><div class=article-content><p>Hugo builds a site from configuration, mounted files, content metadata,
+templates, and resources. File placement is part of the data model because it
+determines page kind, bundle boundaries, and template lookup.</p><h2 id=select-the-build-configuration>Select the Build Configuration
+<a href=#select-the-build-configuration class=heading-anchor><span>#</span></a></h2><p>The <code>hugo</code> command performs a production build and writes to <code>public/</code> unless
+<code>--destination</code> changes the target. <code>hugo server</code> serves a development build
+and watches its dependencies:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>hugo --environment production
+</span></span><span style=display:flex><span>hugo server --environment development</span></span></code></pre></div></div></div><p>The environment defaults differ: <code>hugo</code> uses <code>production</code>, while <code>hugo server</code>
+uses <code>development</code>. <code>--environment</code> or <code>HUGO_ENVIRONMENT</code> selects an explicit
+environment. A project can use one configuration file such as <code>hugo.toml</code>, a
+comma-separated <code>--config</code> list, or layered files under <code>config/_default/</code> and
+<code>config/&lt;environment>/</code>. Later and more specific settings override earlier
+ones, so build diagnostics should record the command and environment rather
+than only the repository revision.</p><p>Module mounts are resolved before content collection. A mount can combine
+several source directories into the virtual <code>content</code>, <code>assets</code>, <code>static</code>, or
+<code>layouts</code> trees; inspecting only the physical <code>content/</code> directory can
+therefore miss build inputs.</p><h2 id=classify-pages-sections-taxonomies-and-resources>Classify Pages, Sections, Taxonomies, and Resources
+<a href=#classify-pages-sections-taxonomies-and-resources class=heading-anchor><span>#</span></a></h2><p>Hugo derives page kinds from filenames and directory structure:</p><ul><li><code>content/_index.md</code> supplies content and metadata for the home page.</li><li>A section directory can contain <code>_index.md</code>, which creates a branch bundle
+for that section.</li><li>A directory containing <code>index.md</code> is a leaf bundle. Markdown files below it
+are page resources rather than independent pages.</li><li>Other content files become regular pages within their containing section.</li><li>Configured taxonomies generate taxonomy and term pages from front matter.</li></ul><p>A branch bundle can contain child pages and sections. A leaf bundle represents
+one page plus its resources, such as images, data, or generated files:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>content/
+</span></span><span style=display:flex><span>  posts/
+</span></span><span style=display:flex><span>    _index.md
+</span></span><span style=display:flex><span>    canvas/
+</span></span><span style=display:flex><span>      index.md
+</span></span><span style=display:flex><span>      diagram.svg</span></span></code></pre></div></div></div><p>The page at <code>posts/canvas/</code> can resolve <code>diagram.svg</code> through
+<code>.Page.Resources</code>. Files under <code>static/</code> follow a different path: Hugo copies
+them to the destination without exposing them as processable page or global
+resources.</p><h2 id=construct-pages-from-front-matter-and-cascades>Construct Pages from Front Matter and Cascades
+<a href=#construct-pages-from-front-matter-and-cascades class=heading-anchor><span>#</span></a></h2><p>Front matter supplies fields such as <code>title</code>, <code>date</code>, <code>draft</code>, <code>outputs</code>,
+<code>layout</code>, <code>type</code>, taxonomies, and custom parameters. Hugo combines those values
+with defaults inferred from the path, language, site configuration, and Git
+metadata.</p><p>A <code>cascade</code> in site configuration or a branch bundle&rsquo;s <code>_index.md</code> provides
+front matter defaults to descendants:</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>cascade</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>type</span>: <span style=color:#ae81ff>docs</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>params</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>audience</span>: <span style=color:#ae81ff>developers</span></span></span></code></pre></div></div></div><p>Descendant front matter can override cascaded values. Cascades may also use
+target selectors for a path, page kind, environment, or language. Because the
+resulting page object reflects every applicable layer, a surprising <code>.Type</code> or
+<code>.Params</code> value should be traced through both the content file and its ancestor
+cascades.</p><p>Hugo also associates translations, aliases, page resources, taxonomy terms,
+and section ancestry during page construction. Templates consume the completed
+page graph rather than parsing files independently.</p><h2 id=transform-content-and-render-outputs>Transform Content and Render Outputs
+<a href=#transform-content-and-render-outputs class=heading-anchor><span>#</span></a></h2><p>The conceptual build path is:</p><ol><li>Load configuration, modules, data, translations, templates, and mounted
+files.</li><li>Build the page and resource graph, including sections and taxonomies.</li><li>Parse content, expand shortcodes, and invoke Markdown render hooks.</li><li>Render each enabled output format through the matching template.</li><li>Process requested assets and publish rendered and static files.</li></ol><p>Template evaluation can request content or asset transformations lazily, so
+these phases are dependencies rather than a promise about internal goroutine
+order. A shortcode runs while <code>.Content</code> is produced; the surrounding page
+template then places that result in an HTML, RSS, JSON, or other output.</p><p>Output formats are configured per site and page kind. A page can emit several
+files from the same content:</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>outputs</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>home</span>:
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>HTML</span>
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>RSS</span>
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>JSON</span></span></span></code></pre></div></div></div><p>Template lookup considers the page kind, type, section, layout, language, and
+output format. A format-specific template such as an HTML single-page layout
+does not automatically serve an RSS output. Run Hugo with template metrics or
+warnings when diagnosing an unexpected fallback instead of assuming one
+hard-coded filename.</p><h2 id=account-for-caches-and-development-builds>Account for Caches and Development Builds
+<a href=#account-for-caches-and-development-builds class=heading-anchor><span>#</span></a></h2><p>Hugo caches downloaded modules, remote resources, and processed assets. Asset
+fingerprints make valid cached results reusable, while template or source
+changes invalidate their dependents. Generated files under <code>resources/_gen/</code>
+can be committed or restored in CI when a project deliberately uses that
+cache, but they are derived artifacts rather than source content.</p><p><code>hugo server</code> keeps the dependency graph in memory, watches for changes, and
+uses fast render behavior to rebuild the pages needed for interactive
+development. It normally serves from memory instead of reproducing the exact
+files in <code>public/</code>. Use <code>--disableFastRender</code> when a complete development
+re-render is needed, and <code>--renderToDisk</code> only when inspecting server output on
+disk.</p><p>A clean production build remains the release check because development caches
+and incremental rendering can hide an undeclared dependency:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>hugo --gc --cleanDestinationDir --environment production</span></span></code></pre></div></div></div><p><code>--cleanDestinationDir</code> removes files in the destination that Hugo does not
+produce in the current build, while <code>--gc</code> removes unused cache entries.
+Neither option repairs incorrect content classification or template lookup;
+those follow from the project structure and configuration.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/hugo-site-build-lifecycle/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

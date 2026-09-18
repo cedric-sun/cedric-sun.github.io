@@ -1,0 +1,94 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>BIND 9 Authoritative and Recursive DNS</title></head><body><main><article><div class=article-header><h1>BIND 9 Authoritative and Recursive DNS</h1><div class=aux>Last update: 2026-01-15 18:06:05 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/bind/>Bind</a>
+|
+<a href=/tags/dns/>Dns</a>
+|
+<a href=/tags/networking/>Networking</a></div></div><div class=article-content><p>BIND 9 runs the <code>named</code> name server. Its configuration determines whether it
+answers authoritatively, offers recursion, transfers zones, or accepts dynamic
+updates. Treat those roles separately because an Internet-facing authoritative
+server should not become an open recursive resolver.</p><h2 id=server-configuration>Server Configuration
+<a href=#server-configuration class=heading-anchor><span>#</span></a></h2><p><code>named.conf</code> defines global options, access-control lists, zones, and logging.
+A minimal authoritative configuration restricts recursion and zone transfer:</p><div class=jose-wrapper><div class=jose-tools><span>named</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-named data-lang=named>acl trusted-recursors { 192.0.2.0/24; 2001:db8:1::/48; };
+
+options {
+    directory &#34;/var/named&#34;;
+    listen-on { any; };
+    listen-on-v6 { any; };
+    recursion no;
+    allow-transfer { none; };
+    minimal-responses yes;
+};
+
+zone &#34;example.net&#34; {
+    type primary;
+    file &#34;zones/example.net&#34;;
+    allow-transfer { 192.0.2.53; };
+};</code></pre></div></div><p>A recursive resolver needs <code>recursion yes</code> and an <code>allow-recursion</code> or
+<code>allow-query-cache</code> ACL limited to its clients. Never expose recursion to
+untrusted networks unless the deployment explicitly provides a public resolver
+with abuse controls.</p><p>ACLs can be reused by <code>allow-query</code>, <code>allow-recursion</code>, <code>allow-query-cache</code>,
+<code>allow-transfer</code>, and <code>match-clients</code>. BIND <code>view</code> statements present different
+zone and recursion policies according to source address, destination address, or
+TSIG identity:</p><div class=jose-wrapper><div class=jose-tools><span>named</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-named data-lang=named>view &#34;internal&#34; {
+    match-clients { trusted-recursors; };
+    recursion yes;
+    allow-recursion { trusted-recursors; };
+
+    zone &#34;example.net&#34; {
+        type primary;
+        file &#34;zones/internal/example.net&#34;;
+    };
+};
+
+view &#34;external&#34; {
+    match-clients { any; };
+    recursion no;
+
+    zone &#34;example.net&#34; {
+        type primary;
+        file &#34;zones/external/example.net&#34;;
+    };
+};</code></pre></div></div><p>When views are enabled, define each client-visible zone in the applicable view.
+Put the most specific <code>match-clients</code> rules first because BIND selects the first
+matching view.</p><h2 id=zone-files>Zone Files
+<a href=#zone-files class=heading-anchor><span>#</span></a></h2><p>Zone-file records follow:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>owner [TTL] [class] type rdata</span></span></code></pre></div></div></div><p><code>$ORIGIN</code> supplies a relative-name suffix; <code>$TTL</code> supplies a default TTL.
+An <code>@</code> owner denotes the current origin. The zone apex needs an SOA record and
+NS records. Names lacking a terminal dot are relative to <code>$ORIGIN</code>.</p><div class=jose-wrapper><div class=jose-tools><span>zone</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-zone data-lang=zone><span style=display:flex><span><span style=color:#a6e22e>$ORIGIN</span> example.net.
+</span></span><span style=display:flex><span><span style=color:#a6e22e>$TTL</span> <span style=color:#e6db74>3600</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@</span> <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>SOA</span> ns1.example.net. hostmaster.example.net. (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>2026080701</span> <span style=color:#e6db74>7200</span> <span style=color:#e6db74>900</span> <span style=color:#e6db74>1209600</span> <span style=color:#e6db74>300</span> )
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>NS</span> ns1.example.net.
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>NS</span> ns2.example.net.
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ns1</span> <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>A</span> <span style=color:#ae81ff>192.0.2.53</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>www</span> <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>A</span> <span style=color:#ae81ff>192.0.2.80</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>docs</span> <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>CNAME</span> <span style=color:#960050;background-color:#1e0010>www</span></span></span></code></pre></div></div></div><p>Increment the SOA serial for every published zone change. Secondary servers
+use the serial to decide whether a transfer is necessary. Configure transfers
+with an explicit ACL and authenticate them with TSIG when appropriate.</p><p>An <code>A</code> or <code>AAAA</code> record maps a name to an address. A <code>CNAME</code> makes its owner an
+alias and cannot coexist with ordinary data at that owner. Delegate a child zone
+with an NS RRset at the parent; include in-bailiwick A or AAAA glue in the
+parent when the delegated name servers reside below the delegated name:</p><div class=jose-wrapper><div class=jose-tools><span>zone</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-zone data-lang=zone><span style=display:flex><span><span style=color:#a6e22e>child</span>       <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>NS</span> <span style=color:#a6e22e>ns1.child</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ns1.child</span>   <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>A</span> <span style=color:#ae81ff>192.0.2.91</span></span></span></code></pre></div></div></div><h2 id=validation-and-operations>Validation and Operations
+<a href=#validation-and-operations class=heading-anchor><span>#</span></a></h2><p>Validate before reloading:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>named-checkconf /etc/named.conf
+</span></span><span style=display:flex><span>named-checkzone example.net /var/named/zones/example.net
+</span></span><span style=display:flex><span>rndc reload example.net
+</span></span><span style=display:flex><span>dig @127.0.0.1 www.example.net A +norecurse</span></span></code></pre></div></div></div><p>Use <code>rndc reconfig</code> after changing zone declarations and <code>rndc reload</code> after
+changing zone data. Query authoritative and recursive paths separately with
+<code>dig</code>, inspect the status flags and authority section, and test both UDP and TCP
+where firewall behavior differs.</p><p>DNSSEC adds signed RRsets, DNSKEY publication, and a DS chain from the parent.
+BIND can maintain signatures and keys through a <code>dnssec-policy</code>; key files,
+rollover state, parent DS updates, and clock synchronization then become
+operational dependencies. Validate signed answers with <code>dig +dnssec</code>, and test
+through a validating resolver rather than treating the presence of an RRSIG as
+proof of a valid chain.</p><p>Run <code>named</code> as its dedicated unprivileged service account and ensure the
+working directory, keys, journal files, and zone files have the required
+permissions. Use <code>named -g</code> for foreground diagnostic runs and use the service
+manager for normal operation. Bind privileged ports before dropping privileges,
+limit writable directories, and keep control-channel keys readable only by the
+service and authorized administrators.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://bind9.readthedocs.io/>BIND 9 Administrator Reference Manual</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1035>RFC 1035: Master File Format</a></li><li><a href=https://bind9.readthedocs.io/en/latest/dnssec-guide.html>BIND 9 DNSSEC Guide</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/bind-9-dns/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

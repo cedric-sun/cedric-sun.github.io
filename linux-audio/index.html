@@ -1,0 +1,116 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Audio Architecture</title></head><body><main><article><div class=article-header><h1>Linux Audio Architecture</h1><div class=aux>Last update: 2023-01-24 01:00:34 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/audio/>Audio</a></div></div><div class=article-content><p>Linux audio is a stack rather than one interchangeable API. ALSA exposes
+kernel sound devices and a user-space library. PulseAudio or PipeWire can then
+share those devices among applications, convert formats, mix streams, and
+apply desktop routing policy. Troubleshooting becomes deterministic when each
+layer is tested in signal-flow order.</p><h2 id=alsa-kernel-devices-and-libasound>ALSA: Kernel Devices and <code>libasound</code>
+<a href=#alsa-kernel-devices-and-libasound class=heading-anchor><span>#</span></a></h2><p>ALSA kernel drivers register sound cards and their logical devices. User space
+sees card, device, and subdevice identifiers through <code>/dev/snd</code>, while
+<code>/proc/asound</code> exposes diagnostic state. Four interfaces matter for desktop
+audio:</p><ul><li><strong>PCM devices</strong> transfer sampled playback or capture frames.</li><li><strong>Control devices</strong> expose mixer switches, gains, clocks, jack state, and
+other card-wide controls.</li><li><strong>Raw MIDI and sequencer devices</strong> carry MIDI data and scheduling.</li><li><strong>Timer devices</strong> provide timing facilities used by audio and MIDI clients.</li></ul><p>A PCM frame contains one sample for every channel at one time. Before
+streaming, a client negotiates access mode, sample format, channel count,
+sample rate, period size, and buffer size. The driver and hardware move through
+a ring buffer while the client reads or writes frames. If playback consumes
+data before the client supplies it, an underrun occurs; if capture overwrites
+unread frames, an overrun occurs. ALSA reports both as an XRUN, commonly
+<code>-EPIPE</code>, and <code>snd_pcm_recover()</code> can recover supported cases.</p><p><code>libasound</code> provides the <code>snd_pcm_*</code> and <code>snd_ctl_*</code> APIs plus a configuration
+and plugin layer. Device names have different semantics:</p><ul><li><code>hw:0,0</code> addresses a hardware PCM directly and accepts only parameters that
+the driver supports. Another direct opener may receive <code>EBUSY</code>.</li><li><code>plughw:0,0</code> inserts <code>libasound</code> format, rate, or channel conversion when
+required.</li><li><code>default</code> follows ALSA configuration and may resolve to a software mixer, a
+PulseAudio plugin, or a PipeWire plugin rather than physical hardware.</li></ul><p>Thus a successful <code>aplay -D hw:0,0</code> test proves the kernel/ALSA path but does
+not prove that the desktop server, its selected route, or an application&rsquo;s
+server client is correct.</p><p>Inspect ALSA without changing configuration:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>cat /proc/asound/cards
+</span></span><span style=display:flex><span>aplay -l
+</span></span><span style=display:flex><span>arecord -l
+</span></span><span style=display:flex><span>aplay -L
+</span></span><span style=display:flex><span>amixer -c <span style=color:#ae81ff>0</span></span></span></code></pre></div></div></div><p>Lowercase <code>-l</code> lists hardware devices; uppercase <code>-L</code> lists configured PCM
+names, including plugins. <code>alsamixer</code> exposes controls interactively. A muted
+hardware control can silence PulseAudio and PipeWire even when their software
+volumes are nonzero.</p><h2 id=pulseaudios-server-model>PulseAudio&rsquo;s Server Model
+<a href=#pulseaudios-server-model class=heading-anchor><span>#</span></a></h2><p>PulseAudio runs a server that owns one or more ALSA devices and accepts client
+streams through <code>libpulse</code> or compatibility plugins. Its terminology follows
+the server-facing direction:</p><ul><li>A <strong>sink</strong> consumes playback streams and normally writes to an output
+device.</li><li>A <strong>source</strong> produces capture streams and normally reads from an input
+device.</li><li>A <strong>sink input</strong> is an application&rsquo;s playback stream.</li><li>A <strong>source output</strong> is an application&rsquo;s recording stream.</li><li>A <strong>monitor source</strong> captures the audio being sent to a sink.</li></ul><p>The server negotiates client formats, resamples streams when rates differ,
+applies per-stream volume, mixes playback, and writes the resulting stream to
+ALSA. Capture follows the reverse path. Modules discover devices and provide
+features such as network audio, virtual devices, stream restoration, and
+policy integration.</p><p>PulseAudio is designed to run per user because routing, volume, Bluetooth
+authorization, and application streams belong to a login session. Depending
+on the distribution and PulseAudio version, a user systemd service/socket or
+libpulse autospawn starts it. A system-wide daemon is a specialized
+configuration with different security and device-access tradeoffs, not the
+desktop default.</p><p>Inspect the running server with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>pactl info
+</span></span><span style=display:flex><span>pactl list short cards
+</span></span><span style=display:flex><span>pactl list short sinks
+</span></span><span style=display:flex><span>pactl list short sources
+</span></span><span style=display:flex><span>pactl list short sink-inputs
+</span></span><span style=display:flex><span>pactl list short source-outputs</span></span></code></pre></div></div></div><p><code>pacat</code> can play or record through the PulseAudio protocol; its historical
+<code>pamon</code> name is an alias on installations that provide it. <code>pa-info</code> collects
+a broader report for a PulseAudio bug investigation.</p><h2 id=discovery-profiles-ports-and-defaults>Discovery, Profiles, Ports, and Defaults
+<a href=#discovery-profiles-ports-and-defaults class=heading-anchor><span>#</span></a></h2><p>A physical controller first appears as an ALSA card. PulseAudio&rsquo;s device
+discovery then represents it as a card with profiles and ports:</p><ul><li>A <strong>profile</strong> selects a card-wide mode, such as stereo output or duplex
+input/output. Hardware constraints can make profiles mutually exclusive.</li><li>A <strong>port</strong> represents a route within a profile, such as speakers,
+headphones, or a microphone jack.</li><li>A <strong>sink or source</strong> is the active streaming endpoint created by the selected
+profile.</li></ul><p>Selecting the right card is insufficient if its active profile disables
+capture or its active port points to a disconnected route. Use the detailed
+outputs of <code>pactl list cards</code>, <code>pactl list sinks</code>, and <code>pactl list sources</code> to
+inspect availability, profile, port, mute, volume, and sample specification.</p><p>PulseAudio calls its default device a fallback because saved per-stream policy
+can override it. A newly seen stream goes to the fallback sink or source, while
+<code>module-stream-restore</code> can return a known application stream to its previous
+device. Set fallbacks with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>pactl set-default-sink SINK_NAME
+</span></span><span style=display:flex><span>pactl set-default-source SOURCE_NAME</span></span></code></pre></div></div></div><p>Existing streams may need to be moved explicitly or reopened. A desktop
+control panel or <code>pavucontrol</code> updates the same server-side concepts and is
+often more convenient for moving a live stream.</p><h2 id=latency-resampling-and-mixing>Latency, Resampling, and Mixing
+<a href=#latency-resampling-and-mixing class=heading-anchor><span>#</span></a></h2><p>Latency accumulates across the complete path:</p><ol><li>The application queues frames.</li><li>A server buffer and scheduling quantum hold work for mixing.</li><li>A resampler or channel mixer may transform the stream.</li><li>ALSA periods and the hardware buffer hold additional frames.</li><li>Converters, Bluetooth codecs, or a network transport add device-specific
+delay.</li></ol><p>Smaller periods and buffers reduce latency but require the application and
+scheduler to wake more frequently. Missing a deadline causes an XRUN or server
+dropout. Larger buffers improve tolerance for scheduling jitter at the cost of
+interactive delay. Report latency together with sample rate because a buffer
+of <code>N</code> frames contributes <code>N / sample_rate</code> seconds.</p><p>Mixing requires a common format and rate. PulseAudio or PipeWire therefore
+resamples a stream when its rate does not match the graph or hardware rate.
+ALSA&rsquo;s <code>plug</code> plugin can also resample, so an unclear device path may perform
+conversion in more than one layer. For measurements, identify the negotiated
+format at the client, server, and ALSA endpoint instead of assuming the file&rsquo;s
+sample rate reached the DAC unchanged.</p><p>Direct ALSA access can avoid a desktop server&rsquo;s mixing stage, but it may take
+exclusive ownership and break other applications. Low latency depends on
+correct scheduling, period selection, and hardware behavior rather than on
+bypassing one named component alone.</p><h2 id=the-pipewire-boundary>The PipeWire Boundary
+<a href=#the-pipewire-boundary class=heading-anchor><span>#</span></a></h2><p>PipeWire can replace PulseAudio&rsquo;s desktop-server role without replacing ALSA.
+The PipeWire server uses <code>libasound</code> to expose ALSA devices as graph nodes;
+applications contribute nodes and ports, and links carry media between them.
+WirePlumber commonly supplies session policy: it monitors udev-backed ALSA
+devices, selects profiles and routes, chooses defaults, and creates links.</p><p>Compatibility services preserve existing APIs:</p><ul><li><code>pipewire-pulse</code> implements the PulseAudio protocol, so <code>libpulse</code>, <code>pactl</code>,
+and PulseAudio applications operate on PipeWire-managed objects.</li><li>ALSA and JACK compatibility plugins can redirect clients into PipeWire.</li><li>Native PipeWire clients use the PipeWire protocol directly.</li></ul><p>Consequently, successful <code>pactl info</code> does not prove that the
+<code>/usr/bin/pulseaudio</code> daemon is running. Check the reported server name and the
+active user units:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>systemctl --user status pipewire.service wireplumber.service pipewire-pulse.service
+</span></span><span style=display:flex><span>systemctl --user status pulseaudio.service pulseaudio.socket
+</span></span><span style=display:flex><span>wpctl status</span></span></code></pre></div></div></div><p>Only one PulseAudio-protocol server should own the session socket. On a
+PipeWire system, <code>wpctl status</code>, <code>wpctl inspect ID</code>, <code>pw-dump</code>, and <code>pw-top</code>
+show the native graph and scheduling state; <code>pactl</code> shows the compatibility
+view.</p><h2 id=troubleshoot-in-signal-flow-order>Troubleshoot in Signal-Flow Order
+<a href=#troubleshoot-in-signal-flow-order class=heading-anchor><span>#</span></a></h2><p>Start at the lowest failing boundary and avoid changing several layers at
+once:</p><ol><li><strong>Kernel discovery:</strong> Confirm the card in <code>/proc/asound/cards</code>, <code>aplay -l</code>,
+and <code>arecord -l</code>. Inspect boot-kernel messages for firmware, probe, USB, or
+HDMI errors.</li><li><strong>ALSA controls:</strong> Check mute, gain, and route controls with <code>amixer</code> or
+<code>alsamixer</code>. Test a known PCM only after stopping the server that owns it;
+otherwise <code>EBUSY</code> is expected rather than diagnostic.</li><li><strong>Server health:</strong> Determine whether PulseAudio or <code>pipewire-pulse</code> serves
+the session. Check user-unit logs and confirm that the server sees the ALSA
+card.</li><li><strong>Profile and route:</strong> Verify that the active profile creates the required
+sink or source and that its selected port is available.</li><li><strong>Stream routing:</strong> Confirm that a live sink input or source output exists,
+is not muted, and targets the intended device. Saved per-application routes
+can override the fallback.</li><li><strong>Format and timing:</strong> Compare negotiated rates, channels, buffer sizes, and
+XRUN counters. Use <code>pw-top</code> on PipeWire or verbose PulseAudio logs when
+dropouts correlate with scheduling load.</li><li><strong>Physical path:</strong> Test the cable, receiver, codec, microphone bias, and
+hardware volume after software has been shown to deliver frames to the
+endpoint.</li></ol><p>Capture commands and logs before editing configuration. Device names and IDs
+can change across boots, so persistent rules should match stable properties
+rather than a transient numeric card index.</p><h2 id=upstream-references>Upstream References
+<a href=#upstream-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.alsa-project.org/alsa-doc/alsa-lib/pcm.html>ALSA Library PCM Interface</a></li><li><a href=https://docs.kernel.org/sound/kernel-api/alsa-driver-api.html>Linux Kernel ALSA Driver API</a></li><li><a href=https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/>PulseAudio User Documentation</a></li><li><a href=https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/DefaultDevice/>PulseAudio Default Devices</a></li><li><a href=https://pipewire.pages.freedesktop.org/pipewire/page_overview.html>PipeWire Concepts</a></li><li><a href=https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/alsa.html>WirePlumber ALSA Configuration</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-audio/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

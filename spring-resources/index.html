@@ -1,0 +1,51 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring Resources</title></head><body><main><article><div class=article-header><h1>Spring Resources</h1><div class=aux>Last update: 2024-01-30 20:15:57 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/resources/>Resources</a>
+|
+<a href=/tags/spring/>Spring</a></div></div><div class=article-content><p><code>org.springframework.core.io.Resource</code> gives Spring APIs one handle for content
+that may reside in a file, classpath entry, URL, servlet context, byte array, or
+already-open stream. The abstraction describes access capabilities; it does not
+make every resource seekable, repeatable, writable, or backed by a file.</p><h2 id=the-resource-contract>The <code>Resource</code> Contract
+<a href=#the-resource-contract class=heading-anchor><span>#</span></a></h2><p><code>Resource</code> extends <code>InputStreamSource</code>. <code>getInputStream()</code> is the fundamental
+operation, while methods such as <code>exists()</code>, <code>isReadable()</code>, <code>isOpen()</code>,
+<code>isFile()</code>, <code>contentLength()</code>, <code>lastModified()</code>, and <code>getDescription()</code> expose
+capabilities or metadata.</p><p>Important implementations include:</p><ul><li><code>ClassPathResource</code> for class-loader or class-relative entries;</li><li><code>FileSystemResource</code> and <code>PathResource</code> for filesystem content;</li><li><code>UrlResource</code> for URLs supported by the JVM;</li><li><code>ServletContextResource</code> for web-application paths;</li><li><code>ByteArrayResource</code> for repeatable in-memory bytes; and</li><li><code>InputStreamResource</code> for an already-open, normally single-use stream.</li></ul><p>Callers own every stream returned by <code>getInputStream()</code> and must close it.
+<code>isOpen()</code> is especially important: an <code>InputStreamResource</code> wraps an open
+handle and cannot safely be read repeatedly, while file and byte-array resources
+can open a fresh stream for each call.</p><h2 id=loading-and-relative-resolution>Loading and Relative Resolution
+<a href=#loading-and-relative-resolution class=heading-anchor><span>#</span></a></h2><p><code>ResourceLoader.getResource(String)</code> converts a location into one resource.
+Every <code>ApplicationContext</code> is a resource loader. Prefixes select explicit
+semantics:</p><ul><li><code>classpath:com/example/report.html</code> selects a classpath resource.</li><li><code>file:/srv/app/report.html</code> selects a filesystem URL.</li><li><code>https://example.net/schema.json</code> selects a URL resource.</li></ul><p>An unprefixed location is context-relative. A
+<code>ClassPathXmlApplicationContext</code> interprets it as a classpath location,
+<code>FileSystemXmlApplicationContext</code> as a filesystem location, and a web
+application context as a servlet-context location. Library code should request
+a <code>Resource</code> or <code>ResourceLoader</code> rather than assume one default.</p><p><code>ResourcePatternResolver</code> extends loading to location patterns and multiple
+matches. <code>classpath*:</code> searches all matching classpath roots; Ant-style
+wildcards apply through pattern resolution, not through the single-resource
+<code>ResourceLoader</code> contract.</p><h2 id=injecting-resources>Injecting Resources
+<a href=#injecting-resources class=heading-anchor><span>#</span></a></h2><p>Spring can convert a location string to <code>Resource</code> using the surrounding
+application context as the loader:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReportRenderer</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> Resource template;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReportRenderer(<span style=color:#a6e22e>@Value</span>(<span style=color:#e6db74>&#34;${report.template:classpath:reports/daily.html}&#34;</span>)
+</span></span><span style=display:flex><span>                   Resource template) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>template</span> <span style=color:#f92672>=</span> template;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Constructor injection makes the dependency visible and lets a test supply a
+<code>ByteArrayResource</code>. Inject <code>ResourceLoader</code> when the location varies per
+operation, and inject <code>Resource[]</code> or a <code>ResourcePatternResolver</code> only when the
+application intentionally accepts multiple matches.</p><h2 id=existence-repeatability-and-writing>Existence, Repeatability, and Writing
+<a href=#existence-repeatability-and-writing class=heading-anchor><span>#</span></a></h2><p><code>exists()</code> is a probe, not a reservation; content can disappear before it is
+opened. Prefer opening the resource and handling the resulting <code>IOException</code>
+when correctness depends on access. Metadata operations can also require I/O,
+and a remote URL can be slow or unavailable.</p><p><code>WritableResource</code> adds <code>isWritable()</code> and <code>getOutputStream()</code>.
+<code>FileSystemResource</code> and <code>PathResource</code> implement it, while classpath resources
+inside a packaged JAR do not. Code that writes should require
+<code>WritableResource</code> rather than downcast based on a location string.</p><p>Repeatability depends on the implementation. A parser that needs two passes can
+buffer a one-shot resource into a <code>ByteArrayResource</code>, with an explicit size
+limit. APIs should document whether they open once, reopen, retain, or close
+streams so resource ownership remains unambiguous.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/core/resources.html>Spring resource abstraction</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/io/Resource.html><code>Resource</code> Javadoc</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/io/ResourceLoader.html><code>ResourceLoader</code> Javadoc</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-resources/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

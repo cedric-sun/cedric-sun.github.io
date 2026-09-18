@@ -1,0 +1,81 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring Conversion and Validation</title></head><body><main><article><div class=article-header><h1>Spring Conversion and Validation</h1><div class=aux>Last update: 2023-11-28 10:33:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/conversion/>Conversion</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/spring/>Spring</a>
+|
+<a href=/tags/validation/>Validation</a></div></div><div class=article-content><p>Spring treats conversion, presentation formatting, object binding, and
+validation as separate operations. A request parameter can therefore become a
+typed property and still produce structured errors without coupling the domain
+object to a web controller.</p><h2 id=conversion-and-formatting>Conversion and Formatting
+<a href=#conversion-and-formatting class=heading-anchor><span>#</span></a></h2><p><code>ConversionService</code> is the facade for type conversion. It can first answer
+whether a conversion is available and then convert by raw class or by
+<code>TypeDescriptor</code>, which preserves annotations and nested generic information.</p><p>The extension interfaces cover different requirements:</p><ul><li><code>Converter&lt;S, T></code> implements one strongly typed conversion.</li><li><code>ConverterFactory&lt;S, R></code> creates converters for a family of target subtypes,
+such as <code>String</code> to any enum type.</li><li><code>GenericConverter</code> declares sets of convertible source/target pairs and
+receives <code>TypeDescriptor</code> values for context-sensitive conversion.</li><li><code>ConditionalGenericConverter</code> can also decide whether it matches a particular
+source and target.</li></ul><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>StringToOrderId</span> <span style=color:#66d9ef>implements</span> Converter<span style=color:#f92672>&lt;</span>String, OrderId<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Override</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderId <span style=color:#a6e22e>convert</span>(String source) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> OrderId(UUID.<span style=color:#a6e22e>fromString</span>(source.<span style=color:#a6e22e>strip</span>()));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>Formatter&lt;T></code> belongs to the presentation layer. Its <code>Printer</code> and <code>Parser</code>
+operations use a <code>Locale</code>, which makes it suitable for numbers, dates, and
+human-facing text. Use a converter for context-free type changes and a formatter
+when textual representation depends on locale or UI policy. Register both
+through <code>FormatterRegistry</code>; <code>DefaultFormattingConversionService</code> implements
+both registry and conversion-service contracts.</p><h2 id=legacy-javabeans-property-editors>Legacy JavaBeans Property Editors
+<a href=#legacy-javabeans-property-editors class=heading-anchor><span>#</span></a></h2><p>Spring still supports <code>java.beans.PropertyEditor</code> for compatibility.
+<code>PropertyEditor</code> is stateful, works primarily through text and an internal
+value, and is not thread-safe. The container consequently creates editors per
+binding operation rather than sharing instances.</p><p>The JavaBeans convention looks for an editor named <code>TypeEditor</code> beside <code>Type</code>,
+and <code>PropertyEditorManager</code> also supports explicit registration and search
+paths. Spring adds <code>PropertyEditorRegistry</code> for type-wide or property-path
+registration and <code>PropertyEditorRegistrar</code> for reusable registration logic.
+<code>BeanWrapper</code> and <code>DataBinder</code> expose those registries.</p><p>New application conversion should use <code>ConversionService</code>; an editor remains
+appropriate when integrating a JavaBeans API that requires one. An HTTP message
+body is not generally decoded by a property editor: Spring MVC uses
+<code>HttpMessageConverter</code> for body formats such as JSON.</p><h2 id=binding-with-databinder>Binding With <code>DataBinder</code>
+<a href=#binding-with-databinder class=heading-anchor><span>#</span></a></h2><p><code>DataBinder</code> applies input property values to a target object. It resolves
+nested property paths, invokes conversion or property editors, records failures
+in a <code>BindingResult</code>, and can invoke validators.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>var</span> binder <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> DataBinder(command, <span style=color:#e6db74>&#34;order&#34;</span>);
+</span></span><span style=display:flex><span>binder.<span style=color:#a6e22e>setAllowedFields</span>(<span style=color:#e6db74>&#34;customerId&#34;</span>, <span style=color:#e6db74>&#34;quantity&#34;</span>);
+</span></span><span style=display:flex><span>binder.<span style=color:#a6e22e>setConversionService</span>(conversionService);
+</span></span><span style=display:flex><span>binder.<span style=color:#a6e22e>addValidators</span>(<span style=color:#66d9ef>new</span> OrderValidator());
+</span></span><span style=display:flex><span>binder.<span style=color:#a6e22e>bind</span>(propertyValues);
+</span></span><span style=display:flex><span>binder.<span style=color:#a6e22e>validate</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>BindingResult result <span style=color:#f92672>=</span> binder.<span style=color:#a6e22e>getBindingResult</span>();</span></span></code></pre></div></div></div><p>Binding untrusted input is a security boundary. Define allowed fields or use a
+dedicated command object rather than expose a broad domain object. A conversion
+failure becomes a field error instead of requiring an exception to escape the
+binding operation. Auto-growing nested paths and collections is configurable
+and should be bounded for attacker-controlled input.</p><h2 id=springs-validator-contract>Spring&rsquo;s <code>Validator</code> Contract
+<a href=#springs-validator-contract class=heading-anchor><span>#</span></a></h2><p>A Spring <code>Validator</code> declares whether it supports a class and reports failures
+through <code>Errors</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderValidator</span> <span style=color:#66d9ef>implements</span> Validator {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>boolean</span> <span style=color:#a6e22e>supports</span>(Class<span style=color:#f92672>&lt;?&gt;</span> type) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> OrderCommand.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>isAssignableFrom</span>(type);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>validate</span>(Object target, Errors errors) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> order <span style=color:#f92672>=</span> (OrderCommand) target;
+</span></span><span style=display:flex><span>        ValidationUtils.<span style=color:#a6e22e>rejectIfEmpty</span>(errors, <span style=color:#e6db74>&#34;customerId&#34;</span>, <span style=color:#e6db74>&#34;required&#34;</span>);
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (order.<span style=color:#a6e22e>quantity</span>() <span style=color:#f92672>&lt;=</span> 0) {
+</span></span><span style=display:flex><span>            errors.<span style=color:#a6e22e>rejectValue</span>(<span style=color:#e6db74>&#34;quantity&#34;</span>, <span style=color:#e6db74>&#34;positive&#34;</span>);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>Errors.pushNestedPath()</code> and <code>popNestedPath()</code> let a composite validator report
+child errors with correct paths. Error codes are logical identifiers; message
+resolution can later select localized text.</p><h2 id=jakarta-bean-validation>Jakarta Bean Validation
+<a href=#jakarta-bean-validation class=heading-anchor><span>#</span></a></h2><p>Spring 6 integrates with <code>jakarta.validation</code> Bean Validation 3.x.
+<code>LocalValidatorFactoryBean</code> bootstraps a provider such as Hibernate Validator
+and implements both Jakarta&rsquo;s <code>ValidatorFactory</code>/<code>Validator</code> access and Spring&rsquo;s
+<code>Validator</code> interface. It participates in Spring lifecycle management and closes
+the underlying factory on shutdown.</p><p>MVC binding can apply constraint annotations through <code>@Valid</code> or
+<code>@Validated</code>. Method validation applies constraints to method parameters and
+return values through Spring&rsquo;s method-validation infrastructure. Validation
+does not replace conversion: values must first be represented in the types on
+which constraints operate.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/core/validation/convert.html>Spring type conversion</a></li><li><a href=https://docs.spring.io/spring-framework/reference/core/validation/format.html>Spring field formatting</a></li><li><a href=https://docs.spring.io/spring-framework/reference/core/validation/validator.html>Spring validation and data binding</a></li><li><a href=https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html>Spring Bean Validation integration</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-conversion-and-validation/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

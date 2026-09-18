@@ -1,0 +1,56 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>PowerShell Splatting and Hashtable Values</title></head><body><main><article><div class=article-header><h1>PowerShell Splatting and Hashtable Values</h1><div class=aux>Last update: 2021-12-04 17:34:29 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/powershell/>Powershell</a>
+|
+<a href=/tags/windows/>Windows</a>
+|
+<a href=/tags/scripting/>Scripting</a></div></div><div class=article-content><p>PowerShell splatting passes a hashtable or array as named or positional arguments.
+It avoids repeating long parameter lists and keeps configuration separate from a
+command invocation.</p><h2 id=splatting-powershell-commands>Splatting PowerShell Commands
+<a href=#splatting-powershell-commands class=heading-anchor><span>#</span></a></h2><p>Prefix a hashtable variable with <code>@</code> at the call site:</p><div class=jose-wrapper><div class=jose-tools><span>powershell</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-powershell data-lang=powershell><span style=display:flex><span>$request = @{
+</span></span><span style=display:flex><span>    Uri         = <span style=color:#e6db74>&#39;https://api.example.test/items&#39;</span>
+</span></span><span style=display:flex><span>    Method      = <span style=color:#e6db74>&#39;Get&#39;</span>
+</span></span><span style=display:flex><span>    Headers     = @{ Accept = <span style=color:#e6db74>&#39;application/json&#39;</span> }
+</span></span><span style=display:flex><span>    TimeoutSec  = <span style=color:#ae81ff>30</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Invoke-RestMethod @request</span></span></code></pre></div></div></div><p>Hashtable keys must match parameter names, including supported aliases. Splatting
+does not expand arbitrary strings into shell syntax; PowerShell binds the resulting
+values as typed command arguments.</p><p>PowerShell 7.1 and later permit an explicitly written named parameter to override
+the same parameter in a splatted hashtable. Earlier PowerShell releases report
+duplicate binding instead, so cross-version scripts should update a copied
+hashtable before invocation:</p><div class=jose-wrapper><div class=jose-tools><span>powershell</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-powershell data-lang=powershell><span style=display:flex><span>$effective = $request.Clone()
+</span></span><span style=display:flex><span>$effective.TimeoutSec = <span style=color:#ae81ff>60</span>
+</span></span><span style=display:flex><span>Invoke-RestMethod @effective</span></span></code></pre></div></div></div><p>Arrays provide positional splatting:</p><div class=jose-wrapper><div class=jose-tools><span>powershell</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-powershell data-lang=powershell><span style=display:flex><span>$copyArgs = @(<span style=color:#e6db74>&#39;source.txt&#39;</span>, <span style=color:#e6db74>&#39;destination.txt&#39;</span>)
+</span></span><span style=display:flex><span>Copy-Item @copyArgs</span></span></code></pre></div></div></div><h2 id=external-programs-and-interpolation>External Programs and Interpolation
+<a href=#external-programs-and-interpolation class=heading-anchor><span>#</span></a></h2><p>Native executables receive strings rather than PowerShell parameter binding. A
+hashtable property in an interpolated string needs a subexpression:</p><div class=jose-wrapper><div class=jose-tools><span>powershell</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-powershell data-lang=powershell><span style=display:flex><span>$config = @{
+</span></span><span style=display:flex><span>    AppId     = <span style=color:#e6db74>&#39;example-id&#39;</span>
+</span></span><span style=display:flex><span>    GroupCode = <span style=color:#e6db74>&#39;workers&#39;</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>&amp; $connector `
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;--app-id=</span>$($config.AppId)<span style=color:#e6db74>&#34;</span> `
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;--group-code=</span>$($config.GroupCode)<span style=color:#e6db74>&#34;</span></span></span></code></pre></div></div></div><p><code>"--app-id=$config.AppId"</code> expands <code>$config</code> and leaves <code>.AppId</code> as literal text,
+which produces a value beginning with the hashtable&rsquo;s string representation.
+<code>$($config.AppId)</code> evaluates the member access before interpolation.</p><p>Build an argument array when an executable has optional flags:</p><div class=jose-wrapper><div class=jose-tools><span>powershell</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-powershell data-lang=powershell><span style=display:flex><span>$arguments = @(
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#39;--server-mode=http&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#39;--threads=10&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;--app-id=</span>$($config.AppId)<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>&amp; $connector @arguments
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> ($LASTEXITCODE <span style=color:#f92672>-ne</span> <span style=color:#ae81ff>0</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>throw</span> <span style=color:#e6db74>&#34;Connector failed with exit code </span>$LASTEXITCODE<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The array splat after the call operator supplies one argument per array element.
+Avoid constructing one command string and passing it to <code>Invoke-Expression</code>;
+argument arrays preserve boundaries and avoid an additional parsing step.</p><p>On Windows, PowerShell 7.3 changed native argument passing through
+<code>$PSNativeCommandArgumentPassing</code>; the <code>Standard</code>, <code>Windows</code>, and <code>Legacy</code> modes
+control how the engine constructs the native command line. Unix-like systems pass
+an argument vector, while Windows programs may apply their own command-line parser.
+Test empty strings, embedded quotes, and trailing backslashes against the supported
+PowerShell and executable versions rather than serializing a command by hand.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/powershell-splatting/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

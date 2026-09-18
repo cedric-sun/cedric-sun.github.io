@@ -1,0 +1,50 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Disabling IPv6</title></head><body><main><article><div class=article-header><h1>Disabling IPv6</h1><div class=aux>Last update: 2023-03-26 06:47:41 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/ipv6/>Ipv6</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/networking/>Networking</a></div></div><div class=article-content><p>Disabling IPv6 removes IPv6-only reachability and can break loopback,
+container, DNS, and application assumptions. Diagnose address selection and
+connectivity before treating it as the remedy for a timeout.</p><h2 id=diagnose-address-selection-first>Diagnose Address Selection First
+<a href=#diagnose-address-selection-first class=heading-anchor><span>#</span></a></h2><p>Name resolution can return both IPv6 and IPv4 addresses. A dual-stack client
+uses address-selection and connection-fallback logic; a failure can instead
+indicate DNS, a route, firewall policy, path MTU discovery, or a service bound
+only to IPv4.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>getent ahosts localhost
+</span></span><span style=display:flex><span>ip -6 address show
+</span></span><span style=display:flex><span>ip -6 route show
+</span></span><span style=display:flex><span>curl -6 --connect-timeout <span style=color:#ae81ff>5</span> https://example.com/</span></span></code></pre></div></div></div><p>Test the target and the service binding. A listener on <code>127.0.0.1</code> is not
+reachable through <code>::1</code>; configure the intended IPv4 and IPv6 listeners
+explicitly. Repairing the faulty path preserves dual-stack operation.</p><h2 id=disable-ipv6-at-boot>Disable IPv6 at Boot
+<a href=#disable-ipv6-at-boot class=heading-anchor><span>#</span></a></h2><p>The kernel command-line parameter <code>ipv6.disable=1</code> disables IPv6 functionality
+from boot. It prevents IPv6 addresses and IPv6 sockets; re-enabling it requires
+a reboot. Add it through the bootloader&rsquo;s persistent configuration, regenerate
+the deployed boot entry using the distribution&rsquo;s documented command, and
+reboot.</p><p>A GRUB configuration can contain:</p><div class=jose-wrapper><div class=jose-tools><span>properties</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-properties data-lang=properties><span style=display:flex><span><span style=color:#a6e22e>GRUB_CMDLINE_LINUX</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;ipv6.disable=1&#34;</span></span></span></code></pre></div></div></div><p>On Arch systems, regenerate the configuration after editing:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>sudo grub-mkconfig -o /boot/grub/grub.cfg</span></span></code></pre></div></div></div><p>The installed path and bootloader differ across systems. Verify <code>/proc/cmdline</code>
+after reboot rather than assuming an edited file was used. When the bootloader
+uses an initramfs or Unified Kernel Image, update its command line through the
+corresponding build process as well.</p><h2 id=control-ipv6-through-sysctl>Control IPv6 through <code>sysctl</code>
+<a href=#control-ipv6-through-sysctl class=heading-anchor><span>#</span></a></h2><p>The <code>disable_ipv6</code> sysctl disables addresses and IPv6 operation for an
+interface while the IPv6 kernel support remains loaded. Store persistent
+defaults in a sysctl configuration file:</p><div class=jose-wrapper><div class=jose-tools><span>conf</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-conf data-lang=conf># /etc/sysctl.d/99-disable-ipv6.conf
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1</code></pre></div></div><p>Apply the change with <code>sudo sysctl --system</code>, or reboot. <code>all</code> affects existing
+interfaces; <code>default</code> supplies the value for interfaces created later. Control
+a specific interface with <code>net.ipv6.conf.&lt;interface>.disable_ipv6</code>, for
+example:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>sudo sysctl -w net.ipv6.conf.wlan0.disable_ipv6<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span></span></span></code></pre></div></div></div><p>Network managers, containers, and VPN software can create interfaces after
+boot, which is why both settings matter. A later sysctl write can re-enable
+IPv6 under this method.</p><h2 id=verify-the-effective-state-and-consequences>Verify the Effective State and Consequences
+<a href=#verify-the-effective-state-and-consequences class=heading-anchor><span>#</span></a></h2><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>cat /proc/cmdline
+</span></span><span style=display:flex><span>cat /proc/sys/net/ipv6/conf/all/disable_ipv6
+</span></span><span style=display:flex><span>ip -6 address show
+</span></span><span style=display:flex><span>ss -lnt6</span></span></code></pre></div></div></div><p>With <code>ipv6.disable=1</code>, the IPv6 proc hierarchy may be absent and IPv6 sockets
+cannot be opened. With the sysctl method, a value of <code>1</code> confirms the selected
+interface behavior. Test the applications that matter after changing either
+setting: <code>localhost</code> resolution, services bound to <code>::1</code>, IPv6-only DNS
+records, container networks, VPNs, and monitoring agents can all depend on
+IPv6 support.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/disabling-ipv6/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

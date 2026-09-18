@@ -1,0 +1,68 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>glibc Source Internals and System-Call Wrappers</title></head><body><main><article><div class=article-header><h1>glibc Source Internals and System-Call Wrappers</h1><div class=aux>Last update: 2026-05-07 03:47:31 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/glibc/>Glibc</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/system-calls/>System-Calls</a>
+|
+<a href=/tags/source-code/>Source-Code</a></div></div><div class=article-content><p>glibc exposes C functions such as <code>read(2)</code> and <code>write(2)</code>, while Linux exposes
+architecture-specific system-call entry conventions. A wrapper bridges those layers:
+it accepts the public C ABI, follows the selected architecture&rsquo;s system-call ABI,
+translates kernel errors, and may implement POSIX thread-cancellation behavior.</p><p>Examples below describe the current upstream source tree. A released glibc can select
+different files or macro definitions, so source inspection must begin with the
+release and target triple being built.</p><h2 id=sysdeps><code>sysdeps/</code> Selection
+<a href=#sysdeps class=heading-anchor><span>#</span></a></h2><p>The <a href="https://sourceware.org/git/?p=glibc.git;a=tree;f=sysdeps;hb=HEAD"><code>sysdeps/</code> tree</a>
+holds implementations selected by operating system, CPU, ABI, word size, and
+features. Generic code is a fallback; a more specific directory can replace a file
+with the same relative name. For a Linux build, relevant paths include
+<code>sysdeps/unix/sysv/linux/</code>; an architecture may further supply Linux-specific entry
+code or an ABI-specific variant.</p><p>glibc&rsquo;s configure and build machinery constructs an ordered list of applicable
+system-dependency directories. Build rules search that list so that the selected
+implementation wins over a generic fallback. The layout is consequently not a
+taxonomy in which each file has exactly one dimension: an OS directory can depend on
+architecture headers, and an architecture directory can contain OS-independent
+code. Inspect <code>config.make</code>, the configured build directory, and the selected source
+paths rather than inferring behavior from one directory name.</p><h2 id=syscalls-list-and-make-syscalls-sh>Generated Thin Wrappers
+<a href=#syscalls-list-and-make-syscalls-sh class=heading-anchor><span>#</span></a></h2><p>Some thin assembly wrappers are generated from
+<a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/syscalls.list;hb=HEAD"><code>syscalls.list</code></a>.
+Each record names an output, a Linux syscall, an argument signature, a strong symbol,
+and optional weak or versioned names. The build invokes
+<a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/make-syscalls.sh;hb=HEAD"><code>make-syscalls.sh</code></a>,
+which:</p><ol><li>removes entries overridden by higher-priority <code>sysdeps</code> directories;</li><li>resolves the <code>SYS_</code> number through the target&rsquo;s <code>sysdep.h</code>;</li><li>derives arity and special argument handling from the signature; and</li><li>emits a rule using <code>syscall-template.S</code>, including aliases and compatibility
+symbols where the list requests them.</li></ol><p><code>syscalls.list</code> does not define every public function. A wrapper with validation,
+fallback logic, cancellation handling, time-width conversion, or another policy is
+often hand-written. <code>write</code> is one such hand-written C wrapper in current glibc
+<a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/write.c;hb=HEAD"><code>write.c</code></a>;
+it is therefore a useful contrast with the generated path.</p><h2 id=write><code>write</code> and Cancellation-Aware Dispatch
+<a href=#write class=heading-anchor><span>#</span></a></h2><p>Conceptually, the Linux <code>write</code> wrapper does the following:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>ssize_t</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>write</span>(<span style=color:#66d9ef>int</span> fd, <span style=color:#66d9ef>const</span> <span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>buffer, <span style=color:#66d9ef>size_t</span> count)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>cancellation_aware_syscall</span>(SYS_write, fd, buffer, count);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The actual source calls <code>SYSCALL_CANCEL (write, fd, buf, nbytes)</code>. That macro selects
+an inline system-call path when cancellation checking is unnecessary. Otherwise it
+temporarily changes the thread&rsquo;s cancellation type, issues the call, and restores
+the prior type. <code>write</code> is a POSIX cancellation point, so this boundary lets a
+pending cancellation be acted on without treating every internal system call as a
+cancellation point.</p><p>The macro dispatches by argument count before reaching the architecture&rsquo;s inline
+system-call primitive. On Linux, that primitive places the syscall number and
+arguments in registers prescribed by the target ABI, performs the architecture&rsquo;s
+system-call instruction, and receives the kernel return value. Neither the C
+function ABI nor the register sequence is universal: x86-64, i386, AArch64, and
+other ports use different registers and clobber rules.</p><p>The kernel returns an error in its low-level convention. The selected glibc support
+code recognizes the error range, stores a positive error number in thread-local
+<code>errno</code>, and makes a normal public wrapper return <code>-1</code>. Interfaces that intentionally
+expose a raw error value use distinct internal conventions. The
+<a href=https://sourceware.org/glibc/manual/latest/html_node/System-Calls.html>glibc manual&rsquo;s system-call section</a>
+documents the application-level contract; the source macros implement the
+architecture-specific boundary.</p><h2 id=aliases>Public Names, Hidden Definitions, and Aliases
+<a href=#aliases class=heading-anchor><span>#</span></a></h2><p>The <code>write.c</code> definition is named <code>__libc_write</code>, then its source declares internal
+visibility and aliases including <code>__write</code> and the public <code>write</code> name. This shape
+separates implementation identity from public ABI identity:</p><ul><li><code>libc_hidden_def</code> and <code>libc_hidden_weak</code> allow calls made inside libc to bind to a
+hidden definition when appropriate, avoiding an interposable public-symbol lookup.</li><li>A strong alias gives another internal name the same implementation.</li><li>A weak public alias permits a different definition to override it when the build
+or ABI requires that behavior.</li><li>Symbol-version machinery records which ABI version exports a public name and can
+retain compatibility entry points for old binaries.</li></ul><p><code>hidden</code> affects references within glibc; it does not erase the documented public
+symbol from the shared-library ABI. Examine the architecture&rsquo;s <code>libc.so</code> with
+<code>readelf --dyn-syms --version-info</code> and compare it with the source and release
+version scripts when diagnosing an unresolved symbol. An alias declaration alone is
+not sufficient evidence of the version a distributed library exports.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/glibc-syscall-wrappers/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

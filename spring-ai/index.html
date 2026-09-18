@@ -1,0 +1,473 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring AI</title></head><body><main><article><div class=article-header><h1>Spring AI</h1><div class=aux>Last update: 2023-03-20 03:44:33 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/spring/>Spring</a>
+|
+<a href=/tags/spring-boot/>Spring-Boot</a>
+|
+<a href=/tags/ai/>Ai</a>
+|
+<a href=/tags/llm/>Llm</a>
+|
+<a href=/tags/rag/>Rag</a></div></div><div class=article-content><p><a href=https://spring.io/projects/spring-ai>Spring AI</a> is a Spring project for
+building applications that use generative-AI models. It provides portable Java
+interfaces for model access and Spring Boot auto-configuration for model
+providers, vector stores, tool calling, conversation memory, retrieval
+augmented generation, observability, evaluation, and the Model Context
+Protocol.</p><p>Spring AI does not contain a language model. It connects an application to a
+remote or local model:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Spring application
+</span></span><span style=display:flex><span>  -&gt; Spring AI ChatClient / model API
+</span></span><span style=display:flex><span>  -&gt; provider SDK or HTTP API
+</span></span><span style=display:flex><span>  -&gt; OpenAI, Anthropic, Google, Amazon, Azure, Ollama, or another provider</span></span></code></pre></div></div></div><p>Its role is similar to Spring Data&rsquo;s role for databases: application code uses
+common concepts while provider adapters handle transport and provider-specific
+details. The abstraction reduces coupling, but providers are not identical.
+Model names, token limits, structured-output behavior, tool support, safety
+controls, and request options still vary.</p><p>This article uses Spring AI 2.0 APIs. Artifact names and properties changed
+during earlier milestone and 1.x releases, so examples copied from old articles
+may not compile unchanged.</p><h2 id=what-spring-ai-provides>What Spring AI Provides
+<a href=#what-spring-ai-provides class=heading-anchor><span>#</span></a></h2><p>The project includes:</p><ul><li><code>ChatModel</code> and <code>ChatClient</code> for synchronous and streaming conversations</li><li>Portable embedding, image, and other model APIs where providers support them</li><li>Mapping model output into Java objects</li><li>Tool calling from a model into application methods</li><li>An Advisor chain for reusable request and response behavior</li><li>Bounded conversation memory with pluggable repositories</li><li>A portable <code>VectorStore</code> API and metadata-filter expressions</li><li>Document readers, transformers, and writers for RAG ingestion</li><li>RAG Advisors for retrieval and prompt augmentation</li><li>Micrometer-based observations for model and vector-store operations</li><li>Evaluators for checking relevance and factual support</li><li>MCP clients and servers</li><li>Spring Boot starters and auto-configuration</li></ul><p>The low-level model APIs remain available when an application needs direct
+control. <code>ChatClient</code> is normally the more convenient application-facing API:
+it provides a fluent interface similar to <code>RestClient</code> and manages patterns
+such as Advisors, structured conversion, and automatic tool execution.</p><h2 id=start-a-project>Start a Project
+<a href=#start-a-project class=heading-anchor><span>#</span></a></h2><p>The easiest path is <a href=https://start.spring.io/>Spring Initializr</a>:</p><ol><li>Select a Spring Boot version compatible with the desired Spring AI release.</li><li>Add Spring Web or Spring Reactive Web according to the application.</li><li>Add one Spring AI model provider.</li><li>Add Actuator for production observability.</li><li>Add a vector-store integration only when the application needs retrieval.</li></ol><p>Spring Initializr keeps the Spring Boot and Spring AI dependency set compatible.
+For an existing Maven project, import the Spring AI BOM and add a model starter:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.ai<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>spring-ai-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>2.0.0<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.ai<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>spring-ai-starter-model-openai<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.boot<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>spring-boot-starter-web<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.boot<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>spring-boot-starter-actuator<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p>The Gradle equivalent is:</p><div class=jose-wrapper><div class=jose-tools><span>groovy</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-groovy data-lang=groovy><span style=display:flex><span>dependencies <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>    implementation <span style=color:#a6e22e>platform</span><span style=color:#f92672>(</span><span style=color:#e6db74>&#34;org.springframework.ai:spring-ai-bom:2.0.0&#34;</span><span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>    implementation <span style=color:#e6db74>&#34;org.springframework.ai:spring-ai-starter-model-openai&#34;</span>
+</span></span><span style=display:flex><span>    implementation <span style=color:#e6db74>&#34;org.springframework.boot:spring-boot-starter-web&#34;</span>
+</span></span><span style=display:flex><span>    implementation <span style=color:#e6db74>&#34;org.springframework.boot:spring-boot-starter-actuator&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>Do not specify versions on individual Spring AI modules when using the BOM.</p><p>Starter names identify the capability and provider. For example,
+<code>spring-ai-starter-model-openai</code> configures OpenAI model clients. Other
+providers have their own model starters, and vector databases have separate
+vector-store starters. Use the reference page for that provider rather than
+guessing an artifact name from an older release.</p><h2 id=configure-a-provider>Configure a Provider
+<a href=#configure-a-provider class=heading-anchor><span>#</span></a></h2><p>For OpenAI, the minimum configuration is an API key:</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>spring</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>ai</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>openai</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>api-key</span>: <span style=color:#ae81ff>${OPENAI_API_KEY}</span></span></span></code></pre></div></div></div><p>Set the secret outside source control:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>export OPENAI_API_KEY<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;...&#39;</span></span></span></code></pre></div></div></div><p>Select a model explicitly in each environment rather than depending forever on
+a starter&rsquo;s default:</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>spring</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>ai</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>openai</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>api-key</span>: <span style=color:#ae81ff>${OPENAI_API_KEY}</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>chat</span>:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>options</span>:
+</span></span><span style=display:flex><span>          <span style=color:#f92672>model</span>: <span style=color:#ae81ff>${CHAT_MODEL}</span>
+</span></span><span style=display:flex><span>          <span style=color:#f92672>temperature</span>: <span style=color:#ae81ff>0.2</span></span></span></code></pre></div></div></div><p>Model identifiers change independently of Spring AI. Injecting <code>CHAT_MODEL</code>
+through deployment configuration makes such changes visible and reversible.</p><p>Other providers use different property prefixes and authentication. A local
+Ollama deployment, for example, needs a reachable Ollama server and a locally
+available model rather than a cloud API key.</p><p>Never:</p><ul><li>commit an API key to <code>application.yml</code>;</li><li>accept a provider key from an untrusted request;</li><li>log authorization headers;</li><li>expose unrestricted model proxy endpoints; or</li><li>assume provider-side retention and training policies are the same.</li></ul><p>Use a secret manager, workload identity, or the platform&rsquo;s credential
+mechanism. Review what user and business data may leave the application before
+enabling a remote provider.</p><h2 id=make-the-first-chat-call>Make the First Chat Call
+<a href=#make-the-first-chat-call class=heading-anchor><span>#</span></a></h2><p>When one <code>ChatModel</code> is auto-configured, Spring Boot supplies a
+<code>ChatClient.Builder</code>. Build the client once as an application bean or service
+dependency:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.chat.client.ChatClient;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.stereotype.Service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Service</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>AssistantService</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> ChatClient chatClient;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>AssistantService</span>(ChatClient.<span style=color:#a6e22e>Builder</span> builder) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>chatClient</span> <span style=color:#f92672>=</span> builder
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>defaultSystem</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                You are a concise product-support assistant.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                State uncertainty instead of inventing an answer.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> String <span style=color:#a6e22e>answer</span>(String question) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>user</span>(question)
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>            .<span style=color:#a6e22e>content</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Expose it through an ordinary Spring MVC controller:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.PostMapping;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RequestBody;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RequestMapping;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RestController;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RestController</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RequestMapping</span>(<span style=color:#e6db74>&#34;/assistant&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>AssistantController</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> AssistantService assistant;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>AssistantController</span>(AssistantService assistant) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>assistant</span> <span style=color:#f92672>=</span> assistant;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@PostMapping</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> AnswerResponse <span style=color:#a6e22e>answer</span>(<span style=color:#a6e22e>@RequestBody</span> QuestionRequest request) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> AnswerResponse(assistant.<span style=color:#a6e22e>answer</span>(request.<span style=color:#a6e22e>question</span>()));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>QuestionRequest</span>(String question) {}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>AnswerResponse</span>(String answer) {}</span></span></code></pre></div></div></div><p>Validate request size and content as with any other API. A model call can be
+slow and expensive, so also apply authentication, authorization, rate limits,
+timeouts, concurrency limits, and cancellation.</p><h3 id=prompt-roles>Prompt Roles
+<a href=#prompt-roles class=heading-anchor><span>#</span></a></h3><p>A chat prompt can contain different message roles:</p><ul><li><strong>System:</strong> Application-level behavior and constraints</li><li><strong>User:</strong> The current user&rsquo;s request</li><li><strong>Assistant:</strong> Previous model responses</li><li><strong>Tool:</strong> Results returned from application tools</li></ul><p>Keep trusted instructions in system content. User input must remain user
+content; concatenating it into a system template gives untrusted text more
+authority and makes prompt injection easier.</p><p>Prompt templates can insert parameters:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String answer <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>system</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        Answer questions about {product}.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        If the supplied context is insufficient, say so.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(user <span style=color:#f92672>-&gt;</span> user
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>text</span>(<span style=color:#e6db74>&#34;Question: {question}&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>param</span>(<span style=color:#e6db74>&#34;question&#34;</span>, question))
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>content</span>();</span></span></code></pre></div></div></div><p>Template substitution is not a security boundary. Delimiters and instructions
+can improve model behavior, but they do not turn arbitrary text into trusted
+data.</p><h2 id=chatmodel-and-chatclient><code>ChatModel</code> and <code>ChatClient</code>
+<a href=#chatmodel-and-chatclient class=heading-anchor><span>#</span></a></h2><p><code>ChatModel</code> is the portable low-level interface:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatResponse response <span style=color:#f92672>=</span> chatModel.<span style=color:#a6e22e>call</span>(
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>new</span> Prompt(<span style=color:#e6db74>&#34;Explain transaction isolation&#34;</span>)
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>It accepts a <code>Prompt</code> and returns a <code>ChatResponse</code>, exposing generations,
+metadata, finish reasons, and usage information.</p><p><code>ChatClient</code> adds a fluent application API:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatClientResponse response <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(<span style=color:#e6db74>&#34;Explain transaction isolation&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>chatClientResponse</span>();</span></span></code></pre></div></div></div><p>Use <code>content()</code> when only text is needed. Use the richer response when the
+application needs metadata or Advisor context.</p><p>The core chat types have distinct responsibilities:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Type</th><th>Responsibility</th></tr></thead><tbody><tr><td><code>ChatClient</code></td><td>Application-facing fluent API that assembles requests, runs Advisors, and can manage tool-calling loops</td></tr><tr><td><code>ChatModel</code></td><td>Provider-facing model interface that sends a <code>Prompt</code> to an LLM and returns a <code>ChatResponse</code></td></tr><tr><td><code>ChatOptions</code></td><td>Per-request settings such as model, temperature, maximum output tokens, and provider-specific controls</td></tr><tr><td><code>Prompt</code></td><td>Complete model input: an ordered list of messages plus <code>ChatOptions</code></td></tr><tr><td><code>Message</code></td><td>One system, user, assistant, or tool-result entry with content and metadata</td></tr><tr><td><code>ChatResponse</code></td><td>Complete model result, including generations and response metadata</td></tr><tr><td><code>Generation</code></td><td>One candidate output, normally containing an <code>AssistantMessage</code></td></tr><tr><td><code>ChatMemory</code></td><td>Conversation storage keyed by conversation ID; an Advisor or application code must load it into a prompt</td></tr><tr><td><code>ToolCallback</code></td><td>Registered executable capability with a name, description, input schema, and invocation behavior</td></tr></tbody></table></div></div><p>The relationship is:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ChatClient
+</span></span><span style=display:flex><span>  -&gt; Prompt(messages + ChatOptions)
+</span></span><span style=display:flex><span>  -&gt; Advisor chain
+</span></span><span style=display:flex><span>  -&gt; ChatModel
+</span></span><span style=display:flex><span>  -&gt; provider API and LLM
+</span></span><span style=display:flex><span>  -&gt; ChatResponse</span></span></code></pre></div></div></div><p>Provider-neutral options cover common settings, while provider-specific option
+classes expose capabilities unavailable in the common interface. Depending on
+provider behavior, request options may include:</p><ul><li>model;</li><li>temperature;</li><li>maximum output tokens;</li><li>stop sequences;</li><li>response format;</li><li>tool definitions;</li><li>sampling controls; and</li><li>provider-specific safety or reasoning settings.</li></ul><p>Do not assume the same numeric option has identical semantics across models.
+Even two versions from one provider can behave differently.</p><h3 id=reading-the-fluent-call>Reading the Fluent Call
+<a href=#reading-the-fluent-call class=heading-anchor><span>#</span></a></h3><p>For this request:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatResponse response <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>advisors</span>(spec <span style=color:#f92672>-&gt;</span> spec.<span style=color:#a6e22e>param</span>(
+</span></span><span style=display:flex><span>        ChatMemory.<span style=color:#a6e22e>CONVERSATION_ID</span>,
+</span></span><span style=display:flex><span>        conversationId
+</span></span><span style=display:flex><span>    ))
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>messages</span>(<span style=color:#66d9ef>new</span> UserMessage(message))
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>options</span>(chatOptions)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>chatResponse</span>();</span></span></code></pre></div></div></div><ul><li><code>prompt()</code> starts a request specification and inherits client defaults.</li><li><code>advisors(...)</code> supplies request-scoped Advisor configuration, such as the
+conversation ID used by a memory Advisor.</li><li><code>messages(...)</code> adds the current messages.</li><li><code>options(...)</code> selects request-specific model settings.</li><li><code>call()</code> executes synchronously and blocks until the model and any automatic
+tool-calling loop complete or fail.</li><li><code>chatResponse()</code> extracts the completed Spring AI response; it does not make
+another provider call.</li></ul><p>Use <code>stream()</code> rather than <code>call()</code> when the caller should consume a reactive
+response as it arrives.</p><h3 id=streaming>Streaming
+<a href=#streaming class=heading-anchor><span>#</span></a></h3><p>Reactive applications can stream generated fragments:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> reactor.core.publisher.Flux;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> Flux<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>streamAnswer</span>(String question) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>user</span>(question)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>stream</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>content</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Streaming improves time to first output, not necessarily total completion time
+or cost. The application must handle:</p><ul><li>client disconnects and cancellation;</li><li>partial UTF-8 or Markdown constructs;</li><li>errors after output has begun;</li><li>backpressure;</li><li>moderation of partial content; and</li><li>the inability to replace already displayed text cleanly.</li></ul><p>Do not collect a stream into a large in-memory string merely to call an API
+designed for streaming.</p><h2 id=structured-output>Structured Output
+<a href=#structured-output class=heading-anchor><span>#</span></a></h2><p>Business code should not parse prose with regular expressions. <code>ChatClient</code>
+can map a response into a Java type:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>TicketTriage</span>(
+</span></span><span style=display:flex><span>    String category,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> priority,
+</span></span><span style=display:flex><span>    String explanation
+</span></span><span style=display:flex><span>) {}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>TicketTriage triage <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>system</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        Classify the support ticket.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        Priority must be an integer from 1 to 5.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(ticketText)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>entity</span>(TicketTriage.<span style=color:#a6e22e>class</span>);</span></span></code></pre></div></div></div><p>Spring AI derives a schema or format instructions and converts the response.
+When the model and provider support native structured output, Spring AI can use
+the provider&rsquo;s schema facility for stronger conformance.</p><p>Structured output is still untrusted input. Validate:</p><ul><li>required fields;</li><li>numeric ranges;</li><li>enum membership;</li><li>length limits;</li><li>cross-field invariants; and</li><li>whether the result is permitted to trigger an action.</li></ul><p>A valid JSON object can be factually wrong or maliciously influenced. Schema
+validation solves shape, not truth.</p><h2 id=tool-calling>Tool Calling
+<a href=#tool-calling class=heading-anchor><span>#</span></a></h2><p>Tool calling lets a model request that application code perform an operation.
+The model does not execute Java directly. It returns a structured tool request;
+Spring AI validates and invokes a registered callback, sends the result back to
+the model, and obtains the next response.</p><p>Define tools with annotations:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.math.BigDecimal;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.tool.annotation.Tool;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.tool.annotation.ToolParam;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.stereotype.Component;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderTools</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderService orders;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>OrderTools</span>(OrderService orders) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>orders</span> <span style=color:#f92672>=</span> orders;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Tool</span>(description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Look up the current status of an order&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderStatus <span style=color:#a6e22e>findOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Canonical order ID&#34;</span>) String orderId) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>status</span>(orderId);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Make the tool available to one request:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String answer <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(<span style=color:#e6db74>&#34;Where is order 8f27?&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>tools</span>(orderTools)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>content</span>();</span></span></code></pre></div></div></div><p>An annotated tool is an ordinary Java method. It does not become an HTTP
+endpoint, and the remote model never accesses the JVM. Spring AI discovers the
+method, derives a JSON schema from its signature and annotations, and wraps it
+as a <code>ToolCallback</code>.</p><p>Tools are not made available merely because <code>@Tool</code> appears on a method. They
+must be registered with a request or client. For example, callbacks can be
+discovered explicitly and installed as client defaults:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.support.ToolCallbacks;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.ai.tool.ToolCallback;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ToolCallback<span style=color:#f92672>[]</span> callbacks <span style=color:#f92672>=</span> ToolCallbacks.<span style=color:#a6e22e>from</span>(orderTools);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ChatClient toolClient <span style=color:#f92672>=</span> builder
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>defaultToolCallbacks</span>(callbacks)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p><code>ToolCallbacks.from(...)</code> uses reflection during callback construction to find
+annotated methods and inspect their parameter and return types. Tool selection
+does not use reflection: on each model request, Spring AI sends the registered
+tool names, descriptions, and input schemas to the provider. The external LLM
+may return a structured request such as:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;name&#34;</span>: <span style=color:#e6db74>&#34;findOrder&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;arguments&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;orderId&#34;</span>: <span style=color:#e6db74>&#34;8f27&#34;</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring AI matches the name to the local callback, converts the JSON arguments
+to Java values, invokes the method in the application JVM, serializes its
+result as a tool-result message, and sends that result to the model. The model
+then produces the user-facing answer. The caller normally invokes only the
+application&rsquo;s chat HTTP endpoint and does not call the tool method directly.</p><p>Startup is commonly when an application constructs callback objects and
+builds a <code>ChatClient</code>, but the model receives the available tool schemas on
+each relevant request. The model does not inspect the application or remember
+its tool catalog permanently.</p><p>Descriptions and parameter schemas tell the model when and how to request the
+tool. They are not authorization rules. The tool method must enforce the
+authenticated user&rsquo;s access independently:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>model asks for findOrder(&#34;8f27&#34;)
+</span></span><span style=display:flex><span>  -&gt; application validates identity and authorization
+</span></span><span style=display:flex><span>  -&gt; application calls OrderService
+</span></span><span style=display:flex><span>  -&gt; result returns to model</span></span></code></pre></div></div></div><p>Use request-scoped tools for privileged capabilities. Default tools are
+available to every request built from that <code>ChatClient</code>, which is dangerous for
+destructive or tenant-specific operations.</p><p>Separate read-only tools from actions. For actions such as refunds, account
+changes, messages, purchases, or deletion:</p><ol><li>Validate all arguments.</li><li>Recheck authorization in application code.</li><li>Make operations idempotent.</li><li>Require explicit user confirmation near execution.</li><li>Record an audit event.</li><li>Return a clear result instead of relying on the model to infer success.</li></ol><p>Calling <code>ChatModel</code> directly with tool definitions does not automatically
+execute returned tool calls. <code>ChatClient</code> installs the tool-calling Advisor for
+the automatic loop; lower-level users must control that loop themselves.</p><h3 id=tool-calling-versus-deterministic-control-flow>Tool Calling Versus Deterministic Control Flow
+<a href=#tool-calling-versus-deterministic-control-flow class=heading-anchor><span>#</span></a></h3><p>Tool calling normally adds model and network latency. A request that uses a
+tool usually needs:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>model call to select a tool
+</span></span><span style=display:flex><span>  -&gt; tool execution
+</span></span><span style=display:flex><span>  -&gt; model call to interpret the result</span></span></code></pre></div></div></div><p>Callback lookup and reflective method invocation are generally negligible
+compared with those provider round trips and with any remote service called by
+the tool.</p><p>Use ordinary Java routing when the request already has a stable typed contract
+and a known workflow. Model-selected tools are useful when a conversational
+request is ambiguous, can be phrased many ways, or may require a dynamic
+combination of capabilities. A robust design lets the model interpret or
+propose an action while deterministic code remains responsible for validation,
+authorization, transaction boundaries, retries, idempotency, and execution of
+high-value operations.</p><h2 id=advisors>Advisors
+<a href=#advisors class=heading-anchor><span>#</span></a></h2><p>Advisors encapsulate behavior that surrounds a model call. They can modify a
+request, block it, call the next Advisor, inspect the response, and share
+context. Common uses include:</p><ul><li>conversation memory;</li><li>RAG;</li><li>tool execution;</li><li>safety filters;</li><li>logging;</li><li>tenant context;</li><li>caching; and</li><li>custom policy enforcement.</li></ul><p>Configure default Advisors on a client:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatClient client <span style=color:#f92672>=</span> builder
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>defaultAdvisors</span>(firstAdvisor, secondAdvisor)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>Or add them to one request:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>client.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(question)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>advisors</span>(requestAdvisor)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>content</span>();</span></span></code></pre></div></div></div><p>Advisor order matters. Lower order values process the request first and the
+response last, so the chain behaves like nested middleware:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>request  -&gt; A -&gt; B -&gt; model
+</span></span><span style=display:flex><span>response &lt;- A &lt;- B &lt;- model</span></span></code></pre></div></div></div><p>An Advisor that records the final response may therefore need different order
+from one that validates the raw model response. Avoid Advisors with hidden
+network calls or ambiguous ordering; they make latency and failures difficult
+to reason about.</p><h2 id=conversation-memory>Conversation Memory
+<a href=#conversation-memory class=heading-anchor><span>#</span></a></h2><p>Language models do not remember previous HTTP requests by themselves. Chat
+memory selects previous messages and adds them to the next prompt.</p><p>Spring AI&rsquo;s <code>ChatMemory</code> abstraction supports bounded message history.
+<code>MessageWindowChatMemory</code> retains a configurable window and evicts old
+messages while preserving the current system message:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatMemory chatMemory <span style=color:#f92672>=</span> MessageWindowChatMemory.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>maxMessages</span>(20)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ChatClient client <span style=color:#f92672>=</span> builder
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>defaultAdvisors</span>(
+</span></span><span style=display:flex><span>        MessageChatMemoryAdvisor.<span style=color:#a6e22e>builder</span>(chatMemory).<span style=color:#a6e22e>build</span>()
+</span></span><span style=display:flex><span>    )
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>Every request using a memory Advisor must provide a conversation ID:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String answer <span style=color:#f92672>=</span> client.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(question)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>advisors</span>(advisor <span style=color:#f92672>-&gt;</span> advisor.<span style=color:#a6e22e>param</span>(
+</span></span><span style=display:flex><span>        ChatMemory.<span style=color:#a6e22e>CONVERSATION_ID</span>,
+</span></span><span style=display:flex><span>        conversationId
+</span></span><span style=display:flex><span>    ))
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>content</span>();</span></span></code></pre></div></div></div><p>There is no safe universal default conversation ID. Derive it from an
+authenticated tenant, user, and conversation, and verify ownership on every
+request. A caller-chosen ID without authorization can expose another user&rsquo;s
+history.</p><p>Memory repositories include in-memory and persistent implementations. In-memory
+storage is suitable for development but is lost on restart and is not shared
+among application replicas.</p><p>Chat memory is prompt context, not an authoritative business record. A bounded
+window forgets old content; a model can misinterpret remembered messages; and
+retaining conversations creates privacy and deletion obligations.</p><h2 id=embeddings-and-vector-stores>Embeddings and Vector Stores
+<a href=#embeddings-and-vector-stores class=heading-anchor><span>#</span></a></h2><p>An embedding model converts content into a numeric vector whose geometry
+represents semantic similarity:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>&#34;How do I reset my password?&#34;
+</span></span><span style=display:flex><span>  -&gt; embedding model
+</span></span><span style=display:flex><span>  -&gt; [0.013, -0.207, ...]</span></span></code></pre></div></div></div><p>A vector store keeps vectors together with source text and metadata. A query is
+embedded with the same compatible model, and nearest-neighbor search returns
+semantically related documents.</p><p>Spring AI&rsquo;s <code>EmbeddingModel</code> and <code>VectorStore</code> APIs hide common provider
+operations. Vector-store implementations exist for PostgreSQL/PGVector,
+Elasticsearch, OpenSearch, Redis, MongoDB Atlas, Neo4j, Cassandra, Milvus,
+Pinecone, Qdrant, Weaviate, and other systems.</p><p>Portability has limits:</p><ul><li>vector dimensions and distance functions must match the embedding model;</li><li>indexes and filtering capabilities vary;</li><li>metadata types differ;</li><li>hybrid text/vector search is provider-specific;</li><li>consistency and deletion semantics vary; and</li><li>changing embedding models normally requires re-embedding the corpus.</li></ul><p>Store the embedding model identifier and content version with each indexing
+generation. Do not mix incompatible vectors in one index.</p><h2 id=retrieval-augmented-generation>Retrieval Augmented Generation
+<a href=#retrieval-augmented-generation class=heading-anchor><span>#</span></a></h2><p>Retrieval augmented generation, or RAG, supplies selected application documents
+to a model at request time:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>documents
+</span></span><span style=display:flex><span>  -&gt; read
+</span></span><span style=display:flex><span>  -&gt; clean and split
+</span></span><span style=display:flex><span>  -&gt; embed
+</span></span><span style=display:flex><span>  -&gt; vector store
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>user question
+</span></span><span style=display:flex><span>  -&gt; embed
+</span></span><span style=display:flex><span>  -&gt; retrieve relevant chunks
+</span></span><span style=display:flex><span>  -&gt; add chunks to prompt
+</span></span><span style=display:flex><span>  -&gt; chat model
+</span></span><span style=display:flex><span>  -&gt; answer</span></span></code></pre></div></div></div><p>RAG does not train the model. It changes the context of one request.</p><h3 id=ingest-documents>Ingest Documents
+<a href=#ingest-documents class=heading-anchor><span>#</span></a></h3><p>Spring AI&rsquo;s ETL model uses:</p><ul><li><code>DocumentReader</code> to load source material;</li><li><code>DocumentTransformer</code> to clean or split it; and</li><li><code>DocumentWriter</code>, commonly a <code>VectorStore</code>, to persist it.</li></ul><p>A simplified ingestion flow is:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>List<span style=color:#f92672>&lt;</span>Document<span style=color:#f92672>&gt;</span> documents <span style=color:#f92672>=</span> documentReader.<span style=color:#a6e22e>get</span>();
+</span></span><span style=display:flex><span>List<span style=color:#f92672>&lt;</span>Document<span style=color:#f92672>&gt;</span> chunks <span style=color:#f92672>=</span> tokenTextSplitter.<span style=color:#a6e22e>apply</span>(documents);
+</span></span><span style=display:flex><span>vectorStore.<span style=color:#a6e22e>add</span>(chunks);</span></span></code></pre></div></div></div><p>Chunking controls retrieval quality. Chunks that are too large waste context
+and mix topics; chunks that are too small lose necessary context. Preserve
+metadata such as document ID, title, tenant, version, section, and access
+classification.</p><p>Ingestion must be repeatable. Define how updated sources replace old chunks,
+how deleted sources are removed, and how partial indexing failures are retried.</p><h3 id=retrieve-at-chat-time>Retrieve at Chat Time
+<a href=#retrieve-at-chat-time class=heading-anchor><span>#</span></a></h3><p>For straightforward vector-based question answering, add a
+<code>QuestionAnswerAdvisor</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatClient ragClient <span style=color:#f92672>=</span> builder
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>defaultAdvisors</span>(
+</span></span><span style=display:flex><span>        QuestionAnswerAdvisor.<span style=color:#a6e22e>builder</span>(vectorStore).<span style=color:#a6e22e>build</span>()
+</span></span><span style=display:flex><span>    )
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>The Advisor searches the store and augments the prompt with matching documents.
+More elaborate flows can use <code>RetrievalAugmentationAdvisor</code> to customize query
+rewriting, retrieval, joining, filtering, and context augmentation.</p><p>Always apply authorization filters during retrieval, before content reaches the
+model:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>tenant_id = authenticated tenant
+</span></span><span style=display:flex><span>AND visibility permits authenticated user
+</span></span><span style=display:flex><span>AND document version is active</span></span></code></pre></div></div></div><p>Asking the model to ignore unauthorized chunks is not access control.</p><p>RAG can still hallucinate. Require citations where appropriate, preserve source
+identifiers, return &ldquo;insufficient evidence&rdquo; when retrieval is weak, and measure
+retrieval recall separately from answer quality.</p><h2 id=model-context-protocol>Model Context Protocol
+<a href=#model-context-protocol class=heading-anchor><span>#</span></a></h2><p>The Model Context Protocol, or MCP, standardizes how AI applications discover
+and use external tools and resources. Spring AI supports both sides:</p><ul><li>an MCP client can consume capabilities from MCP servers;</li><li>an MCP server can expose Spring application capabilities to MCP clients.</li></ul><p>MCP is useful when tools should be shared across several AI applications or
+languages. Direct Spring AI tool callbacks are simpler when the capability
+exists only inside one application.</p><p>Treat an MCP server as a remote privileged API. Authenticate connections,
+authorize every operation, constrain filesystem and network access, validate
+tool arguments, and do not automatically trust a server merely because it
+speaks MCP.</p><h2 id=observability>Observability
+<a href=#observability class=heading-anchor><span>#</span></a></h2><p>Spring AI uses Spring&rsquo;s observability infrastructure and Micrometer observations
+around supported operations. With Actuator and an observability registry, an
+application can measure model calls, tool calls, embeddings, and vector-store
+operations.</p><p>Useful operational signals include:</p><ul><li>request count and error rate;</li><li>latency and time to first streamed token;</li><li>input and output token usage;</li><li>rate-limit responses and retries;</li><li>model and provider;</li><li>tool-call count, latency, and failures;</li><li>retrieval latency and result count; and</li><li>estimated monetary cost.</li></ul><p>Keep metric tags bounded. Never use prompt text, user IDs, conversation IDs, or
+tool arguments as metric tags.</p><p>Prompt and completion content is sensitive and high-cardinality. Spring AI does
+not make it safe merely by exposing an observation hook. Content logging should
+be disabled by default, tightly access-controlled when enabled, redacted, and
+subject to short retention.</p><p>Propagate trace context through model, tool, database, and vector-store calls so
+a slow user request can be investigated end to end. See
+<a href=https://example.org/micrometer/>Micrometer Application Observability</a> and
+<a href=https://example.org/spring-boot-actuator/>Spring Boot Actuator</a> for the underlying
+instrumentation and management model.</p><h2 id=error-handling-and-resilience>Error Handling and Resilience
+<a href=#error-handling-and-resilience class=heading-anchor><span>#</span></a></h2><p>Model APIs fail in ordinary distributed-system ways:</p><ul><li>timeouts and connection failures;</li><li>authentication errors;</li><li>rate limits;</li><li>provider outages;</li><li>unavailable models;</li><li>context-length rejection;</li><li>malformed structured output;</li><li>safety-policy rejection; and</li><li>successful responses with unusable content.</li></ul><p>Set an end-to-end deadline shorter than the caller&rsquo;s timeout. Retry only
+transient failures, with bounded exponential backoff and jitter. A retry can
+incur another charge and can repeat a tool side effect, so action tools must be
+idempotent.</p><p>Do not silently turn a model failure into an invented success response. Surface
+an explicit unavailable or incomplete result consistent with the application&rsquo;s
+API contract.</p><p>Fallback models are not transparent. A different model may have different tool,
+schema, safety, context-window, latency, and quality behavior. Test a fallback
+as a separate supported execution path.</p><p>Limit concurrent model calls. Blocking servlet requests can exhaust request
+threads when provider latency rises; reactive calls can still overwhelm
+provider quotas and downstream tools without explicit concurrency controls.</p><h2 id=testing-and-evaluation>Testing and Evaluation
+<a href=#testing-and-evaluation class=heading-anchor><span>#</span></a></h2><p>Traditional unit tests should cover deterministic code without contacting a
+provider:</p><ul><li>prompt construction;</li><li>validation;</li><li>authorization;</li><li>tool argument handling;</li><li>Advisor order;</li><li>metadata filters;</li><li>output conversion; and</li><li>failure mapping.</li></ul><p>Use fakes or controlled model implementations at application boundaries. Do not
+mock so deeply that the test only verifies a fluent call chain.</p><p>Provider integration tests should be a smaller, separately tagged suite because
+they are slower, cost money, require credentials, and can vary over time.</p><p>Exact string equality is usually the wrong assertion for generated prose.
+Instead test:</p><ul><li>required facts or fields;</li><li>schema validity;</li><li>forbidden content;</li><li>citation support;</li><li>tool selection;</li><li>groundedness against supplied documents;</li><li>latency and token budgets; and</li><li>quality over a versioned evaluation dataset.</li></ul><p>Spring AI supplies evaluators such as relevance and fact-checking evaluators.
+These can help at scale, but an LLM judge is also probabilistic and biased.
+Calibrate it against human-reviewed examples rather than treating it as ground
+truth.</p><p>Record the provider, model version, prompt version, tool set, retrieval
+configuration, and dataset version with evaluation results. Without them, a
+quality regression cannot be reproduced.</p><h2 id=production-architecture>Production Architecture
+<a href=#production-architecture class=heading-anchor><span>#</span></a></h2><p>Keep AI integration behind an application service rather than spreading
+<code>ChatClient</code> calls across controllers:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>HTTP or messaging adapter
+</span></span><span style=display:flex><span>  -&gt; application policy and authorization
+</span></span><span style=display:flex><span>  -&gt; AI service
+</span></span><span style=display:flex><span>       -&gt; prompt templates
+</span></span><span style=display:flex><span>       -&gt; Advisors
+</span></span><span style=display:flex><span>       -&gt; tools
+</span></span><span style=display:flex><span>       -&gt; retrieval
+</span></span><span style=display:flex><span>       -&gt; ChatClient
+</span></span><span style=display:flex><span>  -&gt; validated domain result</span></span></code></pre></div></div></div><p>This boundary makes it possible to:</p><ul><li>change providers;</li><li>enforce budgets;</li><li>version prompts;</li><li>add moderation;</li><li>test without network calls;</li><li>audit actions;</li><li>centralize timeouts and retries; and</li><li>prevent model text from becoming an implicit domain command.</li></ul><p>For high-value actions, use the model to propose a typed intent and let
+deterministic application code validate and execute it. The model should not be
+the final authority for permissions, money movement, deletion, legal decisions,
+or safety-critical behavior.</p><h3 id=prompt-injection>Prompt Injection
+<a href=#prompt-injection class=heading-anchor><span>#</span></a></h3><p>Any text read by the model can contain adversarial instructions:</p><ul><li>user messages;</li><li>web pages;</li><li>uploaded documents;</li><li>database content;</li><li>tool results; and</li><li>retrieved RAG chunks.</li></ul><p>Mitigations include:</p><ol><li>Keep authorization outside the model.</li><li>Expose only the minimum tools required for a request.</li><li>Separate data from trusted instructions.</li><li>Validate tool parameters and model output.</li><li>Filter retrieved documents by access policy.</li><li>Require confirmation for consequential actions.</li><li>Restrict outbound network and filesystem access.</li><li>Assume model-visible secrets can be disclosed.</li></ol><p>No system prompt can guarantee that an untrusted model input will be ignored.</p><h3 id=cost-control>Cost Control
+<a href=#cost-control class=heading-anchor><span>#</span></a></h3><p>Cost is affected by input tokens, output tokens, model choice, retries, RAG
+context, conversation history, tool loops, and evaluation calls.</p><p>Control it with:</p><ul><li>bounded input and output sizes;</li><li>bounded memory windows;</li><li>selective RAG chunks;</li><li>per-user and per-tenant quotas;</li><li>concurrency limits;</li><li>cached deterministic results where safe;</li><li>cheaper models for classification or evaluation;</li><li>alerts on token and monetary budgets; and</li><li>explicit limits on tool-call iterations.</li></ul><p>Measure actual usage rather than estimating from character count alone.</p><h2 id=an-onboarding-sequence>An Onboarding Sequence
+<a href=#an-onboarding-sequence class=heading-anchor><span>#</span></a></h2><p>A safe incremental adoption path is:</p><ol><li><strong>Plain chat:</strong> Configure one model and make one non-streaming call.</li><li><strong>Typed output:</strong> Map the answer to a validated Java record.</li><li><strong>Observability:</strong> Add latency, error, usage, and cost monitoring.</li><li><strong>Evaluation:</strong> Create a versioned set of representative inputs and expected
+properties.</li><li><strong>Read-only tools:</strong> Expose one narrowly authorized lookup.</li><li><strong>RAG:</strong> Ingest a small curated corpus with source metadata and access
+filters.</li><li><strong>Memory:</strong> Add bounded, tenant-isolated conversation state only if the
+product needs it.</li><li><strong>Actions:</strong> Add idempotency, confirmation, and auditing before enabling
+side effects.</li><li><strong>MCP:</strong> Introduce it when capabilities genuinely need to be shared outside
+the application.</li></ol><p>At every step, test provider failures, hostile input, cost limits, and data
+handling before adding another abstraction.</p><h2 id=common-mistakes>Common Mistakes
+<a href=#common-mistakes class=heading-anchor><span>#</span></a></h2><ol><li><strong>Using an outdated starter name.</strong> Match examples to the Spring AI release.</li><li><strong>Committing provider keys.</strong> Load credentials from a secret mechanism.</li><li><strong>Treating model output as trusted.</strong> Parse, validate, authorize, and audit.</li><li><strong>Giving every request every tool.</strong> Scope tools to the current operation.</li><li><strong>Using conversation IDs without ownership checks.</strong> This can leak chat
+history across users or tenants.</li><li><strong>Putting unauthorized documents into a RAG prompt.</strong> Filter before model
+access.</li><li><strong>Logging prompts by default.</strong> They may contain secrets and personal data.</li><li><strong>Retrying action tools blindly.</strong> A repeated call can repeat its side
+effect.</li><li><strong>Testing exact prose only.</strong> Evaluate structure, facts, safety, and task
+success.</li><li><strong>Assuming provider portability is perfect.</strong> Test every supported model
+path.</li><li><strong>Starting with autonomous actions.</strong> Begin with read-only, observable
+behavior.</li><li><strong>Calling the model from every layer.</strong> Centralize policy in an AI service.</li></ol><p>Spring AI gives Spring developers familiar dependency injection,
+auto-configuration, portable interfaces, middleware-style Advisors, and
+Micrometer observations around AI workloads. The difficult parts remain
+application concerns: defining trustworthy tools, protecting data, evaluating
+quality, controlling cost, and ensuring that probabilistic output cannot bypass
+deterministic business and security rules.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-ai/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

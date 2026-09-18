@@ -1,0 +1,95 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Docker Fundamentals</title></head><body><main><article><div class=article-header><h1>Docker Fundamentals</h1><div class=aux>Last update: 2022-01-28 15:44:22 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/containers/>Containers</a>
+|
+<a href=/tags/docker/>Docker</a></div></div><div class=article-content><p>Docker, the container system that still depends on your kernel, your CPU ISA, and its x86-64 <code>syscall</code>.
+An application that runs in a docker container is said to be containerized.</p><h2 id=component-overview>Component Overview
+<a href=#component-overview class=heading-anchor><span>#</span></a></h2><h3 id=docker-engine-dockerd>Docker Engine: <code>dockerd</code>
+<a href=#docker-engine-dockerd class=heading-anchor><span>#</span></a></h3><p><code>dockerd</code> is a CLI daemon program that manages installed containers on the local system.
+It is branded as <em>Docker Engine</em> or Docker CE (Community Edition), and is open-source and free.</p><p>The <code>dockerd</code> daemon listens on the UNIX domain socket <code>/var/run/docker.sock</code> for incoming clients.
+This socket file must be readable by the user who runs a docker client to establish the socket (to send HTTP request).
+If you installed the Docker Engine from your Linux distro&rsquo;s package manager, this socket file may be only readable by the <code>root</code> or
+a special user group dedicated to Docker, e.g. <code>docker</code>.
+You may choose to add yourself to that user group, or simply become <code>root</code> whenever using the <code>docker</code> client.
+Use <code>docker info</code> to check if the <code>dockerd</code> is running and the client has permissions.</p><p>The <code>dockerd</code> daemon exposes HTTP APIs for the management of containers, which can be used by any program.
+An official client program is the <code>docker</code> CLI program.</p><h3 id=docker-desktop>Docker Desktop
+<a href=#docker-desktop class=heading-anchor><span>#</span></a></h3><p>Docker Desktop is a proprietary GUI client program that talks to <code>dockerd</code> and perform housekeeping of containers.
+Using the Docker Desktop application is not mandatory.</p><h3 id=docker-compose>Docker Compose
+<a href=#docker-compose class=heading-anchor><span>#</span></a></h3><p><a href=https://docs.docker.com/compose/>https://docs.docker.com/compose/</a></p><p>Docker Compose is another CLI client that communicates with the <code>dockerd</code>. Its executable is <code>docker-compose</code>.
+It specifies properties of containers using a <code>docker-compose.yml</code> file rather than, typing <code>docker run</code> options all over the place.
+This is useful for setting up reoccurring services that are frequently used and/or have complex configurations.</p><h2 id=images>Images
+<a href=#images class=heading-anchor><span>#</span></a></h2><p>A docker image consists of layers of filesystem content where each layer adds some files to a previous layer.
+An image is said to be based on another image, if its first layer depends on all layers of another iamge.</p><p>An image has a human-readable name <code>REPOSITORY</code>, and a human-readable <code>TAG</code> (usually, but not mandatory, its version number).
+A SHA256 hash known as <code>IMAGE ID</code> uniquely identify an image.</p><p>To build your own image, create a <code>Dockerfile</code> with a simple syntax for defining the steps needed to create the image.
+<em>Each instruction in a Dockerfile creates a layer in the image.</em>
+When the Dockerfile is modified and the image needs to be rebuilt, only those layers which have changed are rebuilt.</p><p>For example, the <code>esolang/vim:latest</code> image contains 10 layers.</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># $ Docker Pull Esolang/vim</span>
+</span></span><span style=display:flex><span>Using default tag: latest
+</span></span><span style=display:flex><span>latest: Pulling from esolang/vim
+</span></span><span style=display:flex><span>4abcf2066143: Downloading  2.951MB/3.409MB
+</span></span><span style=display:flex><span>e7609a7fad9e: Download complete
+</span></span><span style=display:flex><span>a891a2921638: Download complete
+</span></span><span style=display:flex><span>6ea6322cdcb0: Download complete
+</span></span><span style=display:flex><span>729f825b6ae6: Download complete
+</span></span><span style=display:flex><span>e6cb43f5f474: Downloading  2.618MB/31.24MB
+</span></span><span style=display:flex><span>c12ed1c2e19b: Download complete
+</span></span><span style=display:flex><span>6928286dd6f6: Download complete
+</span></span><span style=display:flex><span>05de04103836: Download complete
+</span></span><span style=display:flex><span>b5a8264627eb: Download complete</span></span></code></pre></div></div></div><p>Docker doesn&rsquo;t store the <code>Dockerfile</code> in the built image, making it a little bit hard to inspect how an image is built.</p><p>This is because an image can also be created by running a container, making modifications and committing the result.
+In fact, one can think <code>Dockerfile</code> to be a script that automates this run-modification-commit process.</p><h3 id=minimal-images>Minimal Images
+<a href=#minimal-images class=heading-anchor><span>#</span></a></h3><p>Build a minimal docker image with no base image and no filesystem content (other than a minimal hello world executable):</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#75715e>; linux_syscall call_no, arg0, arg1, arg2, arg3, arg4, arg5
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>%</span><span style=color:#a6e22e>macro</span> <span style=color:#66d9ef>linux_syscall</span> <span style=color:#ae81ff>1</span>-<span style=color:#ae81ff>7</span> <span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rax</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rdi</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rsi</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>3</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rdx</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>4</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r10</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>5</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r8</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>6</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r9</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>7</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>syscall</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>%</span><span style=color:#a6e22e>endmacro</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>SECTION</span> <span style=color:#66d9ef>.data</span>
+</span></span><span style=display:flex><span>msg:    <span style=color:#a6e22e>db</span> <span style=color:#960050;background-color:#1e0010>`</span><span style=color:#66d9ef>hello</span> <span style=color:#66d9ef>world</span><span style=color:#960050;background-color:#1e0010>\</span><span style=color:#66d9ef>n</span><span style=color:#960050;background-color:#1e0010>`</span>
+</span></span><span style=display:flex><span>msglen: <span style=color:#a6e22e>equ</span> <span style=color:#66d9ef>$-msg</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>GLOBAL</span> <span style=color:#66d9ef>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>SECTION</span> <span style=color:#66d9ef>.text</span>
+</span></span><span style=display:flex><span>main:
+</span></span><span style=display:flex><span>    <span style=color:#75715e>; write to stdout a string
+</span></span></span><span style=display:flex><span>    <span style=color:#a6e22e>linux_syscall</span> <span style=color:#ae81ff>1</span>,<span style=color:#ae81ff>1</span>,<span style=color:#66d9ef>msg</span>,<span style=color:#66d9ef>msglen</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>; exit the process with code 42
+</span></span></span><span style=display:flex><span>    <span style=color:#a6e22e>linux_syscall</span> <span style=color:#ae81ff>0x3c</span>, <span style=color:#ae81ff>42</span></span></span></code></pre></div></div></div><p>build the executable with <code>make</code>:</p><div class=jose-wrapper><div class=jose-tools><span>Makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Makefile data-lang=Makefile><span style=display:flex><span><span style=color:#a6e22e>main</span><span style=color:#f92672>:</span> main.o
+</span></span><span style=display:flex><span>	<span style=color:#75715e># -N: don&#39;t align data segment on a new memory page, thus makes the executable as small as possible</span>
+</span></span><span style=display:flex><span>	ld -N -e manbaout -omain main.o
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>main.o</span><span style=color:#f92672>:</span> main.asm
+</span></span><span style=display:flex><span>	nasm -f elf64 -o main.o main.asm
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>clean</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>	rm *.o main
+</span></span></code></pre></div></div></div><p>Build an image with the following Dockerfile:</p><div class=jose-wrapper><div class=jose-tools><span>Dockerfile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Dockerfile data-lang=Dockerfile><span style=display:flex><span>FROM    scratch<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>ADD</span>     main    /</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker build -t foo .</span></span></code></pre></div></div></div><p>This gives us a docker image of only 904 bytes (reported by <code>docker image ls</code>) on my machine. Run a container from the image:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker run foo ./main</span></span></code></pre></div></div></div><h2 id=containers>Containers
+<a href=#containers class=heading-anchor><span>#</span></a></h2><p>A container is a running instance of an image. The lifecycle of a container starts from a <code>docker container create &lt;image></code> command, followed by a <code>docker start &lt;container></code>. <code>docker run &lt;image></code> is a shortcut that does both, plus download the image from your configured registry (default: the docker hub) if <code>&lt;image></code> is not presented locally. <code>docker run</code> always creates a brand new container from a given image and starts it.</p><p>To use an existing but inactive (exited or paused) container, use <code>docker start</code> again.</p><p>At any particular instant, a Docker container can be found in one of 6 possible states.</p><ol><li>created: intact, the container has never been started since its creation.</li><li>running: the ENTRYPOINT process is running (to be precise, a <code>wait(2)</code> on it blocks)</li><li>Restarting:</li><li>Exited(num): the ENTRYPOINT process exited with num.</li><li>Paused:</li><li>Dead:</li></ol><h2 id=dockerfile>Dockerfile
+<a href=#dockerfile class=heading-anchor><span>#</span></a></h2><p>Only 17 directive are defined for Dockerfile:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>name</th><th></th></tr></thead><tbody><tr><td>ADD</td><td>Add local or remote files and directories.</td></tr><tr><td>ARG</td><td>Use build-time variables.</td></tr><tr><td>CMD</td><td>Specify default commands.</td></tr><tr><td>COPY</td><td>Copy files and directories.</td></tr><tr><td>ENTRYPOINT</td><td>Specify default executable.</td></tr><tr><td>ENV</td><td>Set environment variables.</td></tr><tr><td>EXPOSE</td><td>Describe which ports your application is listening on.</td></tr><tr><td>FROM</td><td>Create a new build stage from a base image.</td></tr><tr><td>HEALTHCHECK</td><td>Check a container&rsquo;s health on startup.</td></tr><tr><td>LABEL</td><td>Add metadata to an image.</td></tr><tr><td>MAINTAINER</td><td>Specify the author of an image.</td></tr><tr><td>ONBUILD</td><td>Specify instructions for when the image is used in a build.</td></tr><tr><td>RUN</td><td>Execute build commands.</td></tr><tr><td>SHELL</td><td>Set the default shell of an image.</td></tr><tr><td>STOPSIGNAL</td><td>Specify the system call signal for exiting a container.</td></tr><tr><td>USER</td><td>Set user and group ID.</td></tr><tr><td>VOLUME</td><td>Create volume mounts.</td></tr><tr><td>WORKDIR</td><td>Change working directory.</td></tr></tbody></table></div></div><p>Only the instructions RUN, COPY, ADD create layers perpetuated in the resulting image.</p><p>Most instructions instruct how <code>docker image build</code> command should put a new layer the resulting static image, such that.</p><ul><li>An exception being the <code>RUN</code> command that execute an external command immediately at build-time.</li></ul><p>It&rsquo;s very important to distinguish an instruction that gets executed instantaneously when <code>docker image build</code> is running,
+and one that instructs how docker should behave after a container is instantiated from the created image.</p><h2 id=cli-cheatsheet>CLI Cheatsheet
+<a href=#cli-cheatsheet class=heading-anchor><span>#</span></a></h2><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># Show Active Container</span>
+</span></span><span style=display:flex><span>docker container ls
+</span></span><span style=display:flex><span><span style=color:#75715e># Show All Container Includes Dead One</span>
+</span></span><span style=display:flex><span>docker container ls -a
+</span></span><span style=display:flex><span><span style=color:#75715e># Stop Certain Containers</span>
+</span></span><span style=display:flex><span>docker stop &lt;cid1&gt; &lt;cid2&gt; ...
+</span></span><span style=display:flex><span><span style=color:#75715e># Stop All Active Containers</span>
+</span></span><span style=display:flex><span>docker stop <span style=color:#66d9ef>$(</span>docker container ls –aq<span style=color:#66d9ef>)</span></span></span></code></pre></div></div></div></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/docker-fundamentals/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

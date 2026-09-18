@@ -1,0 +1,44 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>JVM Garbage Collection</title></head><body><main><article><div class=article-header><h1>JVM Garbage Collection</h1><div class=aux>Last update: 2025-01-27 11:37:11 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/garbage-collection/>Garbage-Collection</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/jvm/>Jvm</a></div></div><div class=article-content><p>The JVM Specification requires automatic storage management but does not
+prescribe a collector or heap layout. Collector behavior is therefore a
+property of the deployed JVM, release, flags, heap size, and workload.</p><h2 id=reachability-and-memory-pools>Reachability and Memory Pools
+<a href=#reachability-and-memory-pools class=heading-anchor><span>#</span></a></h2><p>Tracing begins from GC roots, including live thread stacks and registers,
+static fields, JNI handles, and VM runtime structures. An object strongly
+reachable from a root remains live. Soft references may be cleared under
+memory pressure, weak references do not retain their referents, and phantom
+references support post-mortem coordination through <code>ReferenceQueue</code>. None is
+a substitute for deterministic resource cleanup; use try-with-resources and
+<code>Cleaner</code> only as a safety net. Finalization is deprecated for removal.</p><p>The Java heap stores objects and arrays. In HotSpot, metaspace, code cache,
+thread stacks, direct buffers, GC bookkeeping, and native libraries consume
+memory outside the heap. <code>-Xmx</code> bounds only the Java heap, so container limits
+must reserve native headroom. Pool names and accounting are collector and
+implementation dependent.</p><h2 id=generations-and-allocation>Generations and Allocation
+<a href=#generations-and-allocation class=heading-anchor><span>#</span></a></h2><p>Generational collectors exploit the fact that many allocations die quickly.
+New objects are allocated in young regions; survivors can move through survivor
+spaces and be promoted into old regions. To avoid scanning all old objects for
+each young collection, write barriers record old-to-young pointers in card
+tables or remembered sets. Allocation rate, live-set size, promotion rate, and
+available evacuation space predict pressure better than heap occupancy alone.</p><h2 id=hotspot-collector-trade-offs>HotSpot Collector Trade-Offs
+<a href=#hotspot-collector-trade-offs class=heading-anchor><span>#</span></a></h2><p>HotSpot offers collectors with different objectives:</p><ul><li><strong>Serial</strong> minimizes implementation overhead for small heaps.</li><li><strong>Parallel</strong> prioritizes throughput with parallel stop-the-world work.</li><li><strong>G1</strong> partitions the heap into regions and works toward pause-time goals
+while balancing concurrent and evacuation work.</li><li><strong>ZGC</strong> performs most marking and relocation concurrently to target low
+pauses at the cost of barriers and concurrent resource use.</li><li><strong>Shenandoah</strong>, when the selected distribution supplies it, also performs
+concurrent evacuation to reduce pause duration.</li></ul><p>Collector availability and defaults change by JDK vendor and release. Inspect
+the deployed runtime with <code>java -XX:+PrintCommandLineFlags -version</code> and its
+release documentation instead of encoding historical defaults into operations
+guidance.</p><p>All tracing collectors need coordination points. Root processing, remarking,
+and some evacuation work can stop application threads (STW). Concurrent phases
+reduce pause time but consume CPU and memory bandwidth, require barriers, and
+need free space for relocation. A lower pause target can therefore reduce
+throughput or fail under allocation pressure.</p><h2 id=evidence-led-tuning>Evidence-Led Tuning
+<a href=#evidence-led-tuning class=heading-anchor><span>#</span></a></h2><p>Enable unified logging and correlate it with application latency and resource
+metrics:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>java -Xlog:gc*,safepoint:file<span style=color:#f92672>=</span>gc.log:time,uptime,level,tags ...
+</span></span><span style=display:flex><span>java -XX:StartFlightRecording<span style=color:#f92672>=</span>filename<span style=color:#f92672>=</span>recording.jfr ...</span></span></code></pre></div></div></div><p>Use JFR allocation events, <code>jcmd</code>, heap dumps where retention is suspected,
+and CPU/container metrics to distinguish excessive allocation, a growing live
+set, fragmentation, and native-memory exhaustion. Tune in order:</p><ol><li>eliminate unintended retention and allocation hot spots;</li><li>size the heap for the measured live set and allocation bursts;</li><li>choose a collector for the measured latency and throughput objective;</li><li>change a small number of documented goals; then</li><li>repeat representative load measurement.</li></ol><p><code>System.gc()</code> is a request, not a correctness mechanism, and can introduce
+disruptive work. Application behavior must not depend on collection timing.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.5.3>JVMS §2.5.3, Heap</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html>JDK Unified Logging</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/jdk.jfr/jdk/jfr/package-summary.html>JDK Flight Recorder</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/gctuning/>OpenJDK G1 GC Tuning Guide</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/jvm-garbage-collection/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

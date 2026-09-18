@@ -1,0 +1,48 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java Concurrency and Executors</title></head><body><main><article><div class=article-header><h1>Java Concurrency and Executors</h1><div class=aux>Last update: 2021-10-21 19:20:35 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/concurrency/>Concurrency</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/jdk/>Jdk</a></div></div><div class=article-content><p><code>Executor</code> separates submitting a <code>Runnable</code> from deciding where it runs.
+<code>ExecutorService</code> adds lifecycle management and <code>submit</code>; <code>Callable&lt;V></code> can
+return a value or throw a checked exception, and <code>Future&lt;V></code> represents the
+eventual result. <code>Future.get()</code> establishes the required visibility of actions
+performed by the task before completion.</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Future<span style=color:#f92672>&lt;</span>Result<span style=color:#f92672>&gt;</span> future <span style=color:#f92672>=</span> pool.<span style=color:#a6e22e>submit</span>(() <span style=color:#f92672>-&gt;</span> compute(input));
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> future.<span style=color:#a6e22e>get</span>();
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>catch</span> (ExecutionException e) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> ServiceException(e.<span style=color:#a6e22e>getCause</span>());
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Use <code>synchronized</code>, <code>Lock</code>, atomics, concurrent collections, or message
+passing to establish happens-before relationships. An executor supplies
+scheduling, not automatic safety for mutable shared objects.</p><h2 id=aqs-and-synchronizers>AQS and Synchronizers
+<a href=#aqs-and-synchronizers class=heading-anchor><span>#</span></a></h2><p><code>AbstractQueuedSynchronizer</code> (AQS) is a framework for locks, semaphores,
+latches, and related synchronizers. A subclass maintains an atomic integer
+state and implements acquire/release attempts. On contention, AQS enqueues
+waiting threads in a FIFO-style synchronization queue and parks them with
+<code>LockSupport</code>; release unparks eligible successors. Conditions use associated
+condition queues and transfer waiters back to the synchronization queue when
+signalled. Queue order is not, by itself, a universal fairness guarantee.</p><h2 id=threadpoolexecutor-admission>ThreadPoolExecutor Admission
+<a href=#threadpoolexecutor-admission class=heading-anchor><span>#</span></a></h2><p><code>ThreadPoolExecutor</code> first creates workers up to <code>corePoolSize</code>; it then queues
+tasks; only when the queue rejects a task does it grow toward
+<code>maximumPoolSize</code>; after that it rejects. Consequently an unbounded
+<code>LinkedBlockingQueue</code> effectively prevents growth beyond core threads, while a
+<code>SynchronousQueue</code> creates workers aggressively until the maximum. Idle workers
+above the core size terminate after <code>keepAliveTime</code>; core threads may also time
+out when explicitly enabled.</p><p>Choose a bounded queue and size it from workload evidence, memory limits, and
+the downstream system&rsquo;s capacity. The worker factory controls names, daemon
+status, and uncaught-exception handling. <code>AbortPolicy</code> throws,
+<code>CallerRunsPolicy</code> applies backpressure by running on the submitter,
+<code>DiscardPolicy</code> drops work, and <code>DiscardOldestPolicy</code> removes queued work before
+retrying. Silent dropping is acceptable only when callers can tolerate it.</p><h2 id=lifecycle-cancellation-and-visibility>Lifecycle, Cancellation, and Visibility
+<a href=#lifecycle-cancellation-and-visibility class=heading-anchor><span>#</span></a></h2><p><code>cancel(true)</code> marks a <code>Future</code> cancelled and requests interruption if the task
+is running; interruption is cooperative, so blocking operations must propagate
+or restore the interrupted status and CPU-bound tasks must poll it. Cancellation
+does not roll back side effects.</p><p><code>shutdown()</code> rejects new tasks while allowing queued tasks to finish.
+<code>shutdownNow()</code> attempts to interrupt workers and returns tasks never begun.
+Call <code>awaitTermination</code> at application boundaries. <code>Executors</code> factory methods
+provide fixed, single-thread, scheduled, work-stealing, and virtual-thread
+executors in current JDKs, but explicit <code>ThreadPoolExecutor</code> construction makes
+queueing and rejection policy reviewable. Always close an <code>ExecutorService</code>
+when its lifetime is lexical.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ExecutorService.html>JDK <code>ExecutorService</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html>JDK <code>ThreadPoolExecutor</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/AbstractQueuedSynchronizer.html>JDK <code>AbstractQueuedSynchronizer</code> API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-concurrency-and-executors/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

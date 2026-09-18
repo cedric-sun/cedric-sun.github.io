@@ -1,0 +1,118 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>TypeScript Enums and Value Types</title></head><body><main><article><div class=article-header><h1>TypeScript Enums and Value Types</h1><div class=aux>Last update: 2021-02-20 06:14:56 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/typescript/>Typescript</a>
+|
+<a href=/tags/javascript/>Javascript</a></div></div><div class=article-content><p>A closed set can require a compile-time constraint, a runtime lookup object, a
+wire representation, or a domain object with validated behavior. TypeScript
+offers different representations because those requirements are not
+equivalent.</p><h2 id=separate-type-requirements-from-runtime-identity>Separate Type Requirements from Runtime Identity
+<a href=#separate-type-requirements-from-runtime-identity class=heading-anchor><span>#</span></a></h2><p>A type such as:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Status</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;pending&#34;</span> <span style=color:#f92672>|</span> <span style=color:#e6db74>&#34;running&#34;</span> <span style=color:#f92672>|</span> <span style=color:#e6db74>&#34;done&#34;</span>;</span></span></code></pre></div></div></div><p>exists only during type checking. JavaScript cannot enumerate <code>Status</code>, test
+whether an unknown string belongs to it, or attach metadata to it. Runtime code
+needs a corresponding value or validation function.</p><p>A native <code>enum</code>, by contrast, emits a JavaScript object and introduces an enum
+type. An <code>as const</code> table emits an ordinary object and derives types from it.
+A class emits a constructor and can enforce invariants. Choose according to
+which runtime identity the program actually needs.</p><h2 id=understand-native-enum-emission>Understand Native Enum Emission
+<a href=#understand-native-enum-emission class=heading-anchor><span>#</span></a></h2><p>Numeric enums assign numbers and emit forward and reverse mappings:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>enum</span> <span style=color:#a6e22e>StatusCode</span> {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Pending</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Running</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Done</span>,
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>console</span>.<span style=color:#a6e22e>log</span>(<span style=color:#a6e22e>StatusCode</span>.<span style=color:#a6e22e>Running</span>); <span style=color:#75715e>// 1
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>console</span>.<span style=color:#a6e22e>log</span>(<span style=color:#a6e22e>StatusCode</span>[<span style=color:#ae81ff>1</span>]);      <span style=color:#75715e>// &#34;Running&#34;
+</span></span></span></code></pre></div></div></div><p>The generated object supports both name-to-number and number-to-name lookup.
+String enums emit only name-to-value properties:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>enum</span> <span style=color:#a6e22e>Status</span> {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Pending</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;pending&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Running</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;running&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Done</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;done&#34;</span>,
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Since TypeScript 5.0, every enum member has a distinct member type, including
+members initialized from computed values. That allows narrowing and exhaustive
+switches, but it does not change the emitted object.</p><p><code>const enum</code> asks TypeScript to inline member values and erase the enum:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#66d9ef>enum</span> <span style=color:#a6e22e>Direction</span> {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Left</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Right</span>,
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Inlining can conflict with isolated-module transpilers and with libraries whose
+published declarations outlive the exact enum values used to compile a
+consumer. Avoid exporting ambient <code>const enum</code> declarations across package
+boundaries unless the entire toolchain and versioning policy are controlled.</p><h2 id=use-literal-unions-for-type-only-sets>Use Literal Unions for Type-Only Sets
+<a href=#use-literal-unions-for-type-only-sets class=heading-anchor><span>#</span></a></h2><p>Literal unions match JSON-shaped APIs without emitted enum machinery:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Status</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;pending&#34;</span> <span style=color:#f92672>|</span> <span style=color:#e6db74>&#34;running&#34;</span> <span style=color:#f92672>|</span> <span style=color:#e6db74>&#34;done&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>function</span> <span style=color:#a6e22e>label</span>(<span style=color:#a6e22e>status</span>: <span style=color:#66d9ef>Status</span>)<span style=color:#f92672>:</span> <span style=color:#66d9ef>string</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>switch</span> (<span style=color:#a6e22e>status</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>case</span> <span style=color:#e6db74>&#34;pending&#34;</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>return</span> <span style=color:#e6db74>&#34;Pending&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>case</span> <span style=color:#e6db74>&#34;running&#34;</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>return</span> <span style=color:#e6db74>&#34;Running&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>case</span> <span style=color:#e6db74>&#34;done&#34;</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>return</span> <span style=color:#e6db74>&#34;Done&#34;</span>;
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Control-flow analysis narrows <code>status</code> in each branch. A union can also
+discriminate variants that carry different data:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Payment</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>|</span> { <span style=color:#a6e22e>kind</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;card&#34;</span>; <span style=color:#a6e22e>brand</span>: <span style=color:#66d9ef>string</span>; <span style=color:#a6e22e>lastFour</span>: <span style=color:#66d9ef>string</span> }
+</span></span><span style=display:flex><span>  <span style=color:#f92672>|</span> { <span style=color:#a6e22e>kind</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;cash&#34;</span> }
+</span></span><span style=display:flex><span>  <span style=color:#f92672>|</span> { <span style=color:#a6e22e>kind</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;wire&#34;</span>; <span style=color:#a6e22e>iban</span>: <span style=color:#66d9ef>string</span> };</span></span></code></pre></div></div></div><p>After <code>payment.kind === "card"</code>, the compiler exposes <code>brand</code> and <code>lastFour</code>.
+The union checks code that already has a <code>Payment</code>; it does not validate an
+untrusted JSON value at runtime.</p><h2 id=derive-types-from-as-const-tables>Derive Types from <code>as const</code> Tables
+<a href=#derive-types-from-as-const-tables class=heading-anchor><span>#</span></a></h2><p>A value table keeps runtime validation and the compile-time union tied to one
+definition:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>Status</span> <span style=color:#f92672>=</span> {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Pending</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;pending&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Running</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;running&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Done</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;done&#34;</span>,
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>as</span> <span style=color:#66d9ef>const</span> <span style=color:#a6e22e>satisfies</span> <span style=color:#a6e22e>Record</span>&lt;<span style=color:#f92672>string</span>, <span style=color:#a6e22e>string</span>&gt;;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>StatusName</span> <span style=color:#f92672>=</span> <span style=color:#66d9ef>keyof</span> <span style=color:#66d9ef>typeof</span> <span style=color:#a6e22e>Status</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Status</span> <span style=color:#f92672>=</span> (<span style=color:#66d9ef>typeof</span> <span style=color:#a6e22e>Status</span>)[<span style=color:#a6e22e>StatusName</span>];
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>statuses</span>: <span style=color:#66d9ef>ReadonlySet</span>&lt;<span style=color:#f92672>string</span>&gt; <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> <span style=color:#a6e22e>Set</span>(Object.<span style=color:#a6e22e>values</span>(<span style=color:#a6e22e>Status</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>function</span> <span style=color:#a6e22e>isStatus</span>(<span style=color:#a6e22e>value</span>: <span style=color:#66d9ef>unknown</span>)<span style=color:#f92672>:</span> <span style=color:#a6e22e>value</span> <span style=color:#66d9ef>is</span> <span style=color:#a6e22e>Status</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>typeof</span> <span style=color:#a6e22e>value</span> <span style=color:#f92672>===</span> <span style=color:#e6db74>&#34;string&#34;</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>statuses</span>.<span style=color:#a6e22e>has</span>(<span style=color:#a6e22e>value</span>);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>as const</code> prevents the property values from widening to <code>string</code>.
+<code>satisfies</code> checks the table&rsquo;s shape without discarding those literal types.
+The read-only set intentionally accepts any string for lookup; the <code>typeof</code>
+check and set membership provide the runtime proof needed by the type
+predicate.</p><p>Use an array when order is primary:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>statuses</span> <span style=color:#f92672>=</span> [<span style=color:#e6db74>&#34;pending&#34;</span>, <span style=color:#e6db74>&#34;running&#34;</span>, <span style=color:#e6db74>&#34;done&#34;</span>] <span style=color:#66d9ef>as</span> <span style=color:#66d9ef>const</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Status</span> <span style=color:#f92672>=</span> (<span style=color:#66d9ef>typeof</span> <span style=color:#a6e22e>statuses</span>)[<span style=color:#66d9ef>number</span>];</span></span></code></pre></div></div></div><p>Use an object when stable symbolic keys, metadata lookup, or compatibility with
+existing member access is primary.</p><h2 id=model-validated-values-as-objects>Model Validated Values as Objects
+<a href=#model-validated-values-as-objects class=heading-anchor><span>#</span></a></h2><p>A value object represents a domain value whose invariant and behavior belong
+together. For example, a percentage is more than an arbitrary number:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Percentage</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>constructor</span>(<span style=color:#66d9ef>readonly</span> <span style=color:#a6e22e>value</span>: <span style=color:#66d9ef>number</span>) {}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>from</span>(<span style=color:#a6e22e>value</span>: <span style=color:#66d9ef>number</span>)<span style=color:#f92672>:</span> <span style=color:#a6e22e>Percentage</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>Number.isFinite(<span style=color:#a6e22e>value</span>) <span style=color:#f92672>||</span> <span style=color:#a6e22e>value</span> <span style=color:#f92672>&lt;</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>value</span> <span style=color:#f92672>&gt;</span> <span style=color:#ae81ff>100</span>) {
+</span></span><span style=display:flex><span>      <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> <span style=color:#a6e22e>RangeError</span>(<span style=color:#e6db74>&#34;percentage must be finite and between 0 and 100&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> <span style=color:#a6e22e>Percentage</span>(<span style=color:#a6e22e>value</span>);
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>asRatio</span>()<span style=color:#f92672>:</span> <span style=color:#66d9ef>number</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>value</span> <span style=color:#f92672>/</span> <span style=color:#ae81ff>100</span>;
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>equals</span>(<span style=color:#a6e22e>other</span>: <span style=color:#66d9ef>Percentage</span>)<span style=color:#f92672>:</span> <span style=color:#66d9ef>boolean</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>value</span> <span style=color:#f92672>===</span> <span style=color:#a6e22e>other</span>.<span style=color:#a6e22e>value</span>;
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>toJSON</span>()<span style=color:#f92672>:</span> <span style=color:#66d9ef>number</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>value</span>;
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The private constructor forces callers through validation. Methods name domain
+operations, and <code>toJSON</code> defines the boundary representation. Deserialization
+must call <code>Percentage.from</code> again because JSON parsing returns a number, not a
+class instance.</p><p>Do not use a class only to wrap a label. Allocation and conversion code are
+justified when the object protects an invariant, supplies behavior, or prevents
+mixing structurally similar primitives.</p><h2 id=design-serialization-boundaries-explicitly>Design Serialization Boundaries Explicitly
+<a href=#design-serialization-boundaries-explicitly class=heading-anchor><span>#</span></a></h2><p>Wire formats should use stable, documented strings or numbers rather than
+depending on TypeScript&rsquo;s emitted object shape. Numeric enum auto-increment
+values are fragile across reordered members; reverse mappings are an
+implementation detail, not a protocol.</p><p>At an input boundary:</p><ol><li>Parse the untrusted representation.</li><li>Validate membership or construct a value object.</li><li>Keep the validated type inside the application.</li><li>Convert deliberately when writing JSON, database values, or messages.</li></ol><p>Use a native enum when consumers need its emitted runtime identity and the
+toolchain accepts the output. Use a literal union for a type-only set, an
+<code>as const</code> table when code also needs runtime values, a discriminated union for
+variant-specific data, and a value object for validation plus behavior.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/typescript-enums-and-value-types/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

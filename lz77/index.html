@@ -1,0 +1,39 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>LZ77 Sliding-Window Compression</title></head><body><main><article><div class=article-header><h1>LZ77 Sliding-Window Compression</h1><div class=aux>Last update: 2024-08-03 21:49:43 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/compression/>Compression</a>
+|
+<a href=/tags/lz77/>Lz77</a></div></div><div class=article-content><p>LZ77 is a family of lossless compressors that replaces repeated input with
+references into a bounded history window. The original 1977 design used a
+sliding dictionary; practical formats choose their own token syntax, match
+finder, and entropy coder.</p><h2 id=literals-history-and-matches>Literals, History, and Matches
+<a href=#literals-history-and-matches class=heading-anchor><span>#</span></a></h2><p>At an input position, the encoder searches the previously emitted bytes for a
+matching prefix. It emits a literal when no useful match exists, or a
+back-reference containing at least a distance and a length. Some formats add a
+literal after every match; others emit a stream of independent literals and
+matches. The decoder copies <code>length</code> bytes from <code>distance</code> bytes before its
+current output position.</p><p>Copies may overlap their source. If the history ends in <code>a</code>, a match with
+distance 1 and length 5 produces <code>aaaaa</code>: each copied byte becomes the source
+for the next byte. A decoder must copy in forward byte order or use a loop with
+equivalent cascading semantics. Neither <code>memcpy</code> nor a snapshot-style
+<code>memmove</code> implements every valid overlapping match.</p><h2 id=match-search-and-parsing>Match Search and Parsing
+<a href=#match-search-and-parsing class=heading-anchor><span>#</span></a></h2><p>A larger window finds more distant repetition but consumes memory and requires
+more distance bits. Hash chains, binary trees, suffix structures, and bounded
+candidate searches trade compression ratio for CPU time.</p><p>A greedy parser chooses the longest match at the current position. A lazy
+parser first records a candidate, checks whether the next position has a better
+match, and emits a literal instead when that improves the total cost. Dynamic
+programming can search a larger parse space, but costs more CPU and memory.
+None of those encoder choices affect decoder correctness because the token
+stream is self-contained.</p><h2 id=bounds-and-defensive-decoding>Bounds and Defensive Decoding
+<a href=#bounds-and-defensive-decoding class=heading-anchor><span>#</span></a></h2><p>Every format defines its own minimum match length, maximum length, window size,
+and distance encoding. For example, DEFLATE permits distances up to 32 KiB and
+lengths up to 258 bytes. A decoder must reject a distance greater than the
+history already available, an invalid length or distance code, integer
+overflow while computing output positions, and output beyond the caller&rsquo;s
+limit. Resource limits should cover both total output and work, because a
+small input can expand into a very large output stream.</p><h2 id=deflate-and-related-formats>DEFLATE and Related Formats
+<a href=#deflate-and-related-formats class=heading-anchor><span>#</span></a></h2><p>DEFLATE entropy-codes literal/length and distance symbols with Huffman trees,
+then uses the LZ77 window for the referenced bytes. LZ4 uses a compact token
+format around the same copy operation, while Zstandard combines a windowed
+LZ match stage with different entropy coders. LZ78 and LZW instead maintain an
+explicit dictionary of phrases; their dictionary update rules must not be
+substituted for LZ77 history references.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li>J. Ziv and A. Lempel, “<a href=https://doi.org/10.1109/TIT.1977.1055714>A Universal Algorithm for Sequential Data Compression</a>,” <em>IEEE Transactions on Information Theory</em>, 1977.</li><li><a href=https://www.rfc-editor.org/rfc/rfc1951>RFC 1951: DEFLATE</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc7932>RFC 7932: Brotli Compressed Data Format</a>, for another windowed LZ design.</li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/lz77/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

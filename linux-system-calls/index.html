@@ -1,0 +1,70 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux System Calls</title></head><body><main><article><div class=article-header><h1>Linux System Calls</h1><div class=aux>Last update: 2024-07-15 08:53:17 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/kernel/>Kernel</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/system-calls/>System-Calls</a></div></div><div class=article-content><p>Linux system calls form an architecture-specific binary interface between a process
+and the kernel. Application code normally targets a C library API instead, because
+the library supplies types, feature-test macros, compatibility behavior, and the
+machine-specific entry sequence.</p><h2 id=library-api-and-kernel-abi>Library API and Kernel ABI
+<a href=#library-api-and-kernel-abi class=heading-anchor><span>#</span></a></h2><p>A source-level call such as <code>open(path, flags)</code> is not a promise to execute a kernel
+system call named <code>open</code>. glibc can implement it with <code>openat</code>, add cancellation
+checks, or select a time-width-compatible entry point. Functions such as
+<code>clock_gettime</code> can execute in the vDSO without entering the kernel. Conversely,
+Linux exposes system calls such as <code>gettid</code> for which older C libraries did not
+provide a wrapper.</p><p>The kernel ABI consists of:</p><ul><li>a system-call number for the process&rsquo;s architecture and ABI;</li><li>arguments represented in registers, and on some ABIs partly on the stack;</li><li>an entry instruction such as <code>syscall</code>, <code>int $0x80</code>, <code>svc</code>, or <code>ecall</code>; and</li><li>a raw return convention for success and errors.</li></ul><p><code>SYS_name</code> constants from <code>&lt;sys/syscall.h></code> identify numbers for the target build
+ABI. They are not stable across architectures: x86-64 <code>write</code> is 1, while i386
+<code>write</code> is 4. Compat and x32 processes can use yet another table on the same kernel.
+The kernel dispatches the number through that ABI&rsquo;s syscall table to an
+implementation commonly declared with a <code>SYSCALL_DEFINE*</code> macro.</p><h2 id=registers-results-and-errno>Registers, Results, and <code>errno</code>
+<a href=#registers-results-and-errno class=heading-anchor><span>#</span></a></h2><p>Two common Linux x86 entry ABIs illustrate the mapping:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>ABI</th><th>Entry</th><th>Number</th><th>Arguments 1–6</th><th>Result</th></tr></thead><tbody><tr><td>x86-64</td><td><code>syscall</code></td><td><code>rax</code></td><td><code>rdi</code>, <code>rsi</code>, <code>rdx</code>, <code>r10</code>, <code>r8</code>, <code>r9</code></td><td><code>rax</code></td></tr><tr><td>i386</td><td><code>int $0x80</code></td><td><code>eax</code></td><td><code>ebx</code>, <code>ecx</code>, <code>edx</code>, <code>esi</code>, <code>edi</code>, <code>ebp</code></td><td><code>eax</code></td></tr></tbody></table></div></div><p>The x86-64 instruction overwrites <code>rcx</code> and <code>r11</code>, which is why argument four uses
+<code>r10</code> rather than the C function ABI&rsquo;s <code>rcx</code>. Other architectures have different
+alignment and register-pair rules; for example, some 32-bit ABIs split and align
+64-bit arguments.</p><p>On x86, the kernel reports an error as a negative value from <code>-1</code> through <code>-4095</code>
+in the result register. A libc wrapper changes that raw result to <code>-1</code> and stores
+the positive error number in thread-local <code>errno</code>. Architectures with a separate
+error indicator are normalized by their libc wrappers. Code must therefore test a
+documented wrapper return value rather than read <code>errno</code> after a successful call.</p><h2 id=direct-use-of-syscall>Direct Use of <code>syscall</code>
+<a href=#direct-use-of-syscall class=heading-anchor><span>#</span></a></h2><p>glibc provides an indirect wrapper for an entry that has no normal wrapper:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>#define _GNU_SOURCE
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;sys/syscall.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;unistd.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>long</span> tid <span style=color:#f92672>=</span> <span style=color:#a6e22e>syscall</span>(SYS_gettid);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> (tid <span style=color:#f92672>==</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>/* errno describes the failure. */</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The prototype is <code>long syscall(long number, ...);</code>. The function performs the
+architecture entry sequence and translates kernel errors into <code>errno</code>, but its
+variadic arguments provide no type checking. Cast values to the exact ABI width and
+follow architecture-specific rules for split 64-bit arguments. A new call can also
+return <code>ENOSYS</code> when the running kernel does not implement its number.</p><p>Prefer a libc wrapper when one exists because direct use can bypass:</p><ul><li>structure and time-width compatibility implemented by libc;</li><li>wrapper-defined fallback to an older system call;</li><li>POSIX thread cancellation behavior; and</li><li>vDSO acceleration.</li></ul><p>Raw inline assembly adds register constraints, clobbers, memory ordering, and error
+translation to those hazards. It is justified only when implementing a C library or
+another ABI-level runtime.</p><h2 id=architecture-and-version-portability>Architecture and Version Portability
+<a href=#architecture-and-version-portability class=heading-anchor><span>#</span></a></h2><p>A kernel system call is Linux-specific unless a higher-level standard also defines
+the library behavior. Compile-time <code>SYS_name</code> availability only proves that headers
+describe an ABI; it does not prove that the running kernel implements the call.
+Probe by calling it and handling <code>ENOSYS</code>, then use a semantically correct fallback
+where one exists.</p><p>Do not copy numbers from another architecture or hard-code a host table into a
+cross-compiled program. Structures passed through the boundary also depend on the
+selected ABI&rsquo;s field widths, alignment, endianness, and UAPI definition. Seccomp and
+audit identify both an architecture token and a number for the same reason.</p><h2 id=restart-cancellation-tracing-and-seccomp>Restart, Cancellation, Tracing, and Seccomp
+<a href=#restart-cancellation-tracing-and-seccomp class=heading-anchor><span>#</span></a></h2><p>A signal can interrupt a blocking call. During return to userspace, the kernel uses
+internal <code>-ERESTART*</code> results to decide whether to reissue the call; userspace
+normally sees either a completed call or <code>-1</code>/<code>EINTR</code>. <code>SA_RESTART</code>, the particular
+system call, and whether data was already transferred determine the outcome. An
+application should retry <code>EINTR</code> only when the operation&rsquo;s API makes retry safe and
+must process a positive short result before retrying.</p><p>POSIX thread cancellation is a libc property, not a kernel syscall property. glibc
+wrappers for cancellation points coordinate cancellation around blocking operations;
+calling <code>syscall()</code> directly can bypass that coordination.</p><p><code>strace</code> and <code>ptrace</code> observe kernel entry and exit, arguments, and raw results.
+Calls satisfied entirely by the vDSO do not generate a syscall stop. Tracers can
+also alter numbers, arguments, or results, so traced behavior is not an independent
+security boundary.</p><p>Seccomp BPF evaluates the syscall architecture, number, and raw argument values
+before kernel execution. A robust allowlist checks the architecture token as well
+as the number because number spaces overlap. Filters cannot dereference pointer
+arguments, and libc upgrades can select a different underlying syscall than the one
+suggested by an API name. Seccomp therefore minimizes kernel attack surface but does
+not constitute a complete sandbox.</p><p>The upstream <a href=https://man7.org/linux/man-pages/man2/syscall.2.html><code>syscall(2)</code></a>
+page lists entry and register conventions, while the kernel
+<a href=https://docs.kernel.org/userspace-api/seccomp_filter.html>seccomp documentation</a>
+defines filtering semantics.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-system-calls/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

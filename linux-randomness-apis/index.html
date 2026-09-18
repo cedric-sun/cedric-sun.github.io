@@ -1,0 +1,86 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Randomness APIs</title></head><body><main><article><div class=article-header><h1>Linux Randomness APIs</h1><div class=aux>Last update: 2024-10-22 20:12:02 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/randomness/>Randomness</a>
+|
+<a href=/tags/security/>Security</a></div></div><div class=article-content><p>Randomness APIs serve two different contracts. Deterministic pseudo-random number
+generators are useful for repeatable tests and simulations. Security-sensitive
+keys, nonces, tokens, salts, and seeds require bytes from the kernel&rsquo;s
+cryptographically secure random number generator (CSPRNG).</p><h2 id=c-library-generators>C Library Generators
+<a href=#c-library-generators class=heading-anchor><span>#</span></a></h2><p><code>rand()</code> advances hidden process state and returns an integer from 0 through
+<code>RAND_MAX</code>. <code>srand(seed)</code> selects a repeatable sequence for a particular C library
+implementation; omitting it behaves as though the seed were 1. ISO C does not
+specify the algorithm or require the same sequence across implementations, so a
+test that needs cross-platform reproducibility should choose and record an explicit
+algorithm.</p><p><code>random()</code> and <code>srandom()</code> provide another deterministic family. glibc implements
+<code>random()</code> with additive-feedback state and allows callers to switch state arrays
+with <code>initstate()</code> and <code>setstate()</code>; <code>random_r()</code> makes that state explicit.
+<code>rand_r()</code> stores only an <code>unsigned int</code> of state and is obsolete in POSIX, so it is
+not a suitable design for independent high-quality streams.</p><p>The <code>drand48()</code> family specifies a 48-bit linear congruential recurrence:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>X(n + 1) = (0x5DEECE66D * X(n) + 0xB) mod 2^48</span></span></code></pre></div></div></div><p><code>drand48()</code> returns a <code>double</code> in <code>[0.0, 1.0)</code>, <code>lrand48()</code> returns a <code>long</code> in
+<code>[0, 2^31)</code>, and <code>mrand48()</code> returns a signed result in <code>[-2^31, 2^31)</code>.
+<code>erand48()</code>, <code>nrand48()</code>, and <code>jrand48()</code> use a caller-supplied three-element state;
+the <code>_r</code> interfaces use an explicit reentrant state structure.</p><p>Every family above is predictable after an attacker learns enough state or output.
+Seeding one with the current time, a PID, or one kernel-random value does not turn
+its subsequent output into a cryptographic generator.</p><h2 id=kernel-entropy-and-the-csprng>Kernel Entropy and the CSPRNG
+<a href=#kernel-entropy-and-the-csprng class=heading-anchor><span>#</span></a></h2><p>Linux mixes timing and device data into an input pool and conservatively credits
+unpredictable contributions during initialization. Once enough entropy has been
+credited, the kernel finalizes pool state into a CSPRNG key. Current upstream code
+uses a ChaCha-based fast-key-erasure generator and periodically refreshes its key
+from the pool. Applications consume CSPRNG output; they do not drain raw hardware
+noise one byte for each output byte.</p><p><code>getrandom(2)</code> is the primary Linux interface because it needs no pathname or file
+descriptor:</p><ul><li><code>getrandom(buf, len, 0)</code> waits until the CSPRNG is initialized.</li><li><code>GRND_NONBLOCK</code> returns <code>EAGAIN</code> instead of waiting during that early-boot state.</li><li>An initialized urandom-source request of at most 256 bytes returns the requested
+length and is not interrupted by a signal. Larger requests can return short or
+fail with <code>EINTR</code>.</li><li><code>getentropy(3)</code> is a libc interface limited to 256 bytes. It returns zero only
+after filling the entire buffer and otherwise returns <code>-1</code>.</li></ul><p><code>GRND_RANDOM</code> is a legacy compatibility flag, not a higher-security mode. Before
+Linux 5.6, random-source reads could block according to the entropy estimate.
+Current upstream <code>random.c</code> treats <code>/dev/random</code> like <code>getrandom(..., 0)</code> and blocks
+only until initialization; old kernels retain the old behavior. Portable new code
+should use flags 0.</p><h2 id=device-semantics-and-early-boot>Device Semantics and Early Boot
+<a href=#device-semantics-and-early-boot class=heading-anchor><span>#</span></a></h2><p><code>/dev/urandom</code> never waits for initialization. Current kernel source equates it with
+<code>GRND_INSECURE</code>, so an unusually early read can occur before the CSPRNG has a secure
+seed. <code>getrandom(..., 0)</code> avoids that race by waiting. After initialization,
+<code>/dev/urandom</code>, <code>/dev/random</code>, and ordinary <code>getrandom</code> output come from the kernel
+CSPRNG; waiting for an entropy counter to refill does not improve a generated key.</p><p>Since Linux 5.6, <code>/dev/random</code> no longer blocks after initialization and its
+<code>O_NONBLOCK</code> setting matters only while initialization is incomplete. The historical
+distinction still matters when software must run on older kernels. Writes to either
+device mix data into the pool but do not credit entropy unless a privileged
+random-device ioctl explicitly does so.</p><h2 id=secure-key-generation>Secure Key Generation
+<a href=#secure-key-generation class=heading-anchor><span>#</span></a></h2><p>Always check errors and lengths. A loop remains correct if the buffer later grows
+beyond the small-request guarantee:</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;errno.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;stddef.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;sys/random.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>int</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>random_bytes</span>(<span style=color:#66d9ef>void</span> <span style=color:#f92672>*</span>buffer, <span style=color:#66d9ef>size_t</span> length)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>char</span> <span style=color:#f92672>*</span>p <span style=color:#f92672>=</span> buffer;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>while</span> (length <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span>) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>ssize_t</span> n <span style=color:#f92672>=</span> <span style=color:#a6e22e>getrandom</span>(p, length, <span style=color:#ae81ff>0</span>);
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (n <span style=color:#f92672>&gt;</span> <span style=color:#ae81ff>0</span>) {
+</span></span><span style=display:flex><span>            p <span style=color:#f92672>+=</span> (<span style=color:#66d9ef>size_t</span>)n;
+</span></span><span style=display:flex><span>            length <span style=color:#f92672>-=</span> (<span style=color:#66d9ef>size_t</span>)n;
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>continue</span>;
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (n <span style=color:#f92672>&lt;</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> errno <span style=color:#f92672>==</span> EINTR)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>continue</span>;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>0</span>;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>char</span> key[<span style=color:#ae81ff>32</span>];
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>random_bytes</span>(key, <span style=color:#66d9ef>sizeof</span> key) <span style=color:#f92672>&lt;</span> <span style=color:#ae81ff>0</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>/* Abort key creation; never continue with an unfilled key. */</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Generate key bytes directly rather than feeding them through <code>rand()</code>. For an
+unbiased integer below a bound, use rejection sampling; <code>value % bound</code> is biased
+unless the source range is an exact multiple of the bound. Secret lifetime, secure
+erasure, nonce uniqueness, and file permissions remain separate responsibilities
+after generation.</p><p>The upstream <a href=https://man7.org/linux/man-pages/man2/getrandom.2.html><code>getrandom(2)</code></a>
+and <a href=https://man7.org/linux/man-pages/man4/random.4.html><code>random(4)</code></a> pages define
+the userspace ABI. Current implementation details and post-5.6 device equivalence
+are documented in the kernel
+<a href=https://github.com/torvalds/linux/blob/master/drivers/char/random.c><code>drivers/char/random.c</code></a>
+source.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-randomness-apis/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

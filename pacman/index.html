@@ -1,0 +1,53 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>pacman</title></head><body><main><article><div class=article-header><h1>pacman</h1><div class=aux>Last update: 2021-02-02 07:14:22 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/arch-linux/>Arch-Linux</a>
+|
+<a href=/tags/packages/>Packages</a>
+|
+<a href=/tags/pacman/>Pacman</a></div></div><div class=article-content><p><code>pacman</code> manages installed package records and configured Arch repositories.
+The local database records installed versions, reasons, files, and ownership;
+sync databases describe repository packages. Keep those views coherent by
+refreshing and upgrading in one transaction.</p><h2 id=inspect-the-local-database>Inspect the Local Database
+<a href=#inspect-the-local-database class=heading-anchor><span>#</span></a></h2><p>Use <code>-Q</code> for installed-package queries:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>pacman -Qs <span style=color:#e6db74>&#39;^bash$&#39;</span>
+</span></span><span style=display:flex><span>pacman -Qi bash
+</span></span><span style=display:flex><span>pacman -Ql bash
+</span></span><span style=display:flex><span>pacman -Qo /usr/bin/pacman
+</span></span><span style=display:flex><span>pacman -Qk</span></span></code></pre></div></div></div><p><code>-Ql</code> lists files supplied by an installed package, <code>-Qo</code> finds the owner of
+an existing path, and <code>-Qk</code> checks tracked files. <code>pacman -F</code> instead searches
+the repository file database; populate it first with <code>sudo pacman -Fy</code>.</p><p>Package installation reasons affect orphan detection. Inspect or change one
+deliberately:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>pacman -Qi package-name
+</span></span><span style=display:flex><span>sudo pacman -D --asexplicit package-name
+</span></span><span style=display:flex><span>sudo pacman -D --asdeps package-name</span></span></code></pre></div></div></div><h2 id=synchronize-and-upgrade-safely>Synchronize and Upgrade Safely
+<a href=#synchronize-and-upgrade-safely class=heading-anchor><span>#</span></a></h2><p>Search and inspect configured repositories with <code>-Ss</code> and <code>-Si</code>. A normal
+system update is:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>sudo pacman -Syu</span></span></code></pre></div></div></div><p><code>-y</code> refreshes sync databases and <code>-u</code> upgrades the installed system against
+that same repository state. Do not perform partial upgrades such as
+<code>pacman -Sy package-name</code>: refreshed metadata can require dependencies newer
+than the installed system. Read Arch news and resolve configuration-file
+instructions before confirming a large transaction.</p><p>Install a repository package with <code>sudo pacman -S package-name</code>. Install a
+locally built or cached archive with <code>sudo pacman -U file.pkg.tar.zst</code>; pacman
+still resolves needed dependencies from configured repositories.</p><h2 id=remove-packages-and-orphans-deliberately>Remove Packages and Orphans Deliberately
+<a href=#remove-packages-and-orphans-deliberately class=heading-anchor><span>#</span></a></h2><p><code>pacman -R package-name</code> removes the target. <code>-Rs</code> also removes dependencies
+made unneeded by that target; <code>-Rns</code> additionally removes retained backup
+files. Review the proposed removal list before accepting it, because recursive
+removal can remove dependency packages that another local workflow still
+expects even when pacman&rsquo;s dependency graph no longer requires them.</p><p>List potential orphans before removing them:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>pacman -Qdt
+</span></span><span style=display:flex><span>pacman -Qtdq</span></span></code></pre></div></div></div><p>Only remove names after reviewing the list. An empty <code>pacman -Qtdq</code> result is
+not an error to work around with an unguarded command substitution.</p><h2 id=preserve-recovery-options>Preserve Recovery Options
+<a href=#preserve-recovery-options class=heading-anchor><span>#</span></a></h2><p>The default cache directory is <code>/var/cache/pacman/pkg</code>. Retain
+recent versions; <code>paccache</code> from <code>pacman-contrib</code> can prune older entries while
+keeping a selected count. A controlled downgrade uses a compatible cached
+archive:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>sudo pacman -U /var/cache/pacman/pkg/package-old.pkg.tar.zst</span></span></code></pre></div></div></div><p>Downgrading a library may require matching dependent packages. Inspect
+dependency constraints and plan a coherent transaction rather than replacing
+files under <code>/usr</code>, which bypasses pacman&rsquo;s database, hooks, and ownership
+model. For interrupted or damaged installations, consult <code>/var/log/pacman.log</code>,
+reinstall affected packages with pacman, and restore files from a verified
+backup where necessary.</p><h2 id=keep-signature-verification-enabled>Keep Signature Verification Enabled
+<a href=#keep-signature-verification-enabled class=heading-anchor><span>#</span></a></h2><p>Repository and package signatures protect the supply chain. Fix expired,
+missing, or revoked trust through <code>archlinux-keyring</code>, <code>pacman-key</code>, system
+time, and documented mirror configuration; do not disable signature checks to
+complete an update. Signature errors are evidence that must be understood
+before packages are installed.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/pacman/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

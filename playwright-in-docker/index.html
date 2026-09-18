@@ -1,0 +1,265 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Browser Platform, Graphics, and Playwright in Docker</title></head><body><main><article><div class=article-header><h1>Browser Platform, Graphics, and Playwright in Docker</h1><div class=aux>Last update: 2022-08-21 22:50:08 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/browser/>Browser</a>
+|
+<a href=/tags/css/>Css</a>
+|
+<a href=/tags/docker/>Docker</a>
+|
+<a href=/tags/graphics/>Graphics</a>
+|
+<a href=/tags/playwright/>Playwright</a>
+|
+<a href=/tags/web/>Web</a></div></div><div class=article-content><p>Browser automation succeeds when tests model document loading, layout,
+networking, and rendering rather than treating a page as a static string.</p><h2 id=measure-the-browser-and-dom>Measure the Browser and DOM
+<a href=#measure-the-browser-and-dom class=heading-anchor><span>#</span></a></h2><p>Browser dimensions answer different questions:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>API</th><th>Measurement</th></tr></thead><tbody><tr><td><code>window.innerWidth</code> and <code>innerHeight</code></td><td>Layout viewport, including a rendered scrollbar</td></tr><tr><td><code>window.outerWidth</code> and <code>outerHeight</code></td><td>Browser window bounds</td></tr><tr><td><code>screen.width</code> and <code>screen.height</code></td><td>Screen dimensions in CSS pixels</td></tr><tr><td><code>screen.availWidth</code> and <code>availHeight</code></td><td>Screen space excluding reserved operating-system areas</td></tr><tr><td><code>element.clientWidth</code> and <code>clientHeight</code></td><td>Content box plus padding, excluding border and scrollbar</td></tr><tr><td><code>element.scrollWidth</code> and <code>scrollHeight</code></td><td>Scrollable content extent</td></tr><tr><td><code>element.offsetWidth</code> and <code>offsetHeight</code></td><td>Border-box dimensions, rounded to integer pixels</td></tr><tr><td><code>element.getBoundingClientRect()</code></td><td>Border-box geometry in viewport coordinates, retaining fractions</td></tr></tbody></table></div></div><p><code>clientWidth</code> is zero for an inline element without a layout box. On the root
+element, it describes the layout viewport without a classic scrollbar. Avoid
+mixing viewport coordinates from <code>getBoundingClientRect()</code> with document
+coordinates without adding the scroll offset.</p><h2 id=use-valid-html-structure-and-resource-hints>Use Valid HTML Structure and Resource Hints
+<a href=#use-valid-html-structure-and-resource-hints class=heading-anchor><span>#</span></a></h2><p><code>&lt;link></code> expresses a relationship to an external resource. Its <code>rel</code> attribute
+is a space-separated set of standardized link types:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>link</span> <span style=color:#a6e22e>rel</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;stylesheet&#34;</span> <span style=color:#a6e22e>href</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/site.css&#34;</span>&gt;
+</span></span><span style=display:flex><span>&lt;<span style=color:#f92672>link</span> <span style=color:#a6e22e>rel</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;preconnect&#34;</span> <span style=color:#a6e22e>href</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;https://fonts.gstatic.com&#34;</span> <span style=color:#a6e22e>crossorigin</span>&gt;
+</span></span><span style=display:flex><span>&lt;<span style=color:#f92672>link</span> <span style=color:#a6e22e>rel</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;icon&#34;</span> <span style=color:#a6e22e>href</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/favicon.svg&#34;</span> <span style=color:#a6e22e>type</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;image/svg+xml&#34;</span>&gt;</span></span></code></pre></div></div></div><p><code>preconnect</code> opens transport connections early; use it only for origins that
+the page will contact. It does not download a stylesheet, font, or script.</p><p><code>&lt;meta></code> supplies document metadata such as charset, viewport, description,
+and HTTP-equivalent directives. Put <code>&lt;meta charset="utf-8"></code> early in the
+head so the parser can decode following bytes correctly.</p><p><code>&lt;noscript></code> provides fallback content when scripting is disabled or
+unsupported. Its parsing behavior depends on whether it appears in <code>head</code> or
+<code>body</code>, so test generated markup in an HTML validator and browser.</p><p><code>&lt;p></code> elements cannot contain another paragraph. The HTML parser closes the
+outer paragraph before the inner one, changing the DOM from the source text.
+Template code should construct siblings or a semantic container instead:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>div</span> <span style=color:#a6e22e>class</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;notice&#34;</span>&gt;
+</span></span><span style=display:flex><span>  &lt;<span style=color:#f92672>p</span>&gt;First paragraph.&lt;/<span style=color:#f92672>p</span>&gt;
+</span></span><span style=display:flex><span>  &lt;<span style=color:#f92672>p</span>&gt;Second paragraph.&lt;/<span style=color:#f92672>p</span>&gt;
+</span></span><span style=display:flex><span>&lt;/<span style=color:#f92672>div</span>&gt;</span></span></code></pre></div></div></div><h2 id=model-script-loading-and-module-dependencies>Model Script Loading and Module Dependencies
+<a href=#model-script-loading-and-module-dependencies class=heading-anchor><span>#</span></a></h2><p>A classic script without <code>async</code> or <code>defer</code> blocks HTML parsing while the
+browser fetches and executes it. Script placement therefore determines which
+nodes and globals are available:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/jquery.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;
+</span></span><span style=display:flex><span>&lt;<span style=color:#f92672>script</span> <span style=color:#a6e22e>src</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/plugin-that-needs-jquery.js&#34;</span>&gt;&lt;/<span style=color:#f92672>script</span>&gt;</span></span></code></pre></div></div></div><p>The order is required because the second script uses the global created by the
+first. Moving a dependent script before its provider raises a reference error.</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Form</th><th>Parser Blocking</th><th>Execution Order</th><th>DOM Availability</th></tr></thead><tbody><tr><td>Classic script</td><td>Yes</td><td>Document order</td><td>Nodes parsed before the tag</td></tr><tr><td><code>defer</code></td><td>Fetch is non-blocking</td><td>Document order after parsing</td><td>Full parsed document</td></tr><tr><td><code>async</code></td><td>Fetch is non-blocking</td><td>First completed first</td><td>Not tied to parsing completion</td></tr><tr><td><code>type="module"</code></td><td>Fetch is non-blocking</td><td>Module dependency order</td><td>Deferred by default</td></tr></tbody></table></div></div><p><code>defer</code> suits ordered application scripts. <code>async</code> suits independent scripts
+such as analytics that cannot rely on document position or each other.
+Modules are deferred by default, resolve <code>import</code> dependencies, have their own
+scope, and execute only once per module URL. Use <code>DOMContentLoaded</code> when
+classic code must run after parsing, and use <code>load</code> only when images,
+stylesheets, and subframes are also relevant.</p><p>Dynamically appended scripts are asynchronous by default. Set
+<code>script.async = false</code> before insertion only when a loader deliberately
+serializes classic scripts. Prefer native ES modules and explicit <code>import</code>
+dependencies over a custom loader whenever deployment constraints permit it.</p><h2 id=design-responsive-css-from-constraints>Design Responsive CSS from Constraints
+<a href=#design-responsive-css-from-constraints class=heading-anchor><span>#</span></a></h2><p>The CSS box model has content, padding, border, and margin. <code>box-sizing</code>
+changes whether declared width and height include padding and border:</p><div class=jose-wrapper><div class=jose-tools><span>css</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-css data-lang=css><span style=display:flex><span><span style=color:#f92672>*,</span> <span style=color:#f92672>*</span>::<span style=color:#a6e22e>before</span><span style=color:#f92672>,</span> <span style=color:#f92672>*</span>::<span style=color:#a6e22e>after</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>box-sizing</span>: <span style=color:#66d9ef>border-box</span>;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>With <code>border-box</code>, <code>width: 20rem</code> is the border-box width. With the initial
+<code>content-box</code>, padding and border add to the rendered width. A universal
+border-box rule makes component dimensions composable.</p><p>Flexbox lays out a one-dimensional sequence. Grid lays out explicit rows and
+columns. Use flex for a toolbar or a linear content flow; use grid when items
+must align across both axes:</p><div class=jose-wrapper><div class=jose-tools><span>css</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-css data-lang=css><span style=display:flex><span>.<span style=color:#a6e22e>cards</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>display</span>: <span style=color:#66d9ef>grid</span>;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>grid-template-columns</span>: <span style=color:#a6e22e>repeat</span>(<span style=color:#66d9ef>auto</span><span style=color:#f92672>-</span>fit, <span style=color:#a6e22e>minmax</span>(<span style=color:#a6e22e>min</span>(<span style=color:#ae81ff>18</span><span style=color:#66d9ef>rem</span>, <span style=color:#ae81ff>100</span><span style=color:#66d9ef>%</span>), <span style=color:#ae81ff>1</span>fr));
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>gap</span>: <span style=color:#ae81ff>1</span><span style=color:#66d9ef>rem</span>;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The <code>minmax</code> expression preserves readable columns while allowing a single
+column on a narrow viewport. <code>gap</code> belongs to the layout container and avoids
+margin-collapsing or first/last-child exceptions.</p><p>Media queries select rules from environment features:</p><div class=jose-wrapper><div class=jose-tools><span>css</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-css data-lang=css><span style=display:flex><span>@<span style=color:#66d9ef>media</span> <span style=color:#f92672>(</span><span style=color:#f92672>width</span> <span style=color:#f92672>&gt;=</span> <span style=color:#f92672>48rem</span><span style=color:#f92672>)</span> {
+</span></span><span style=display:flex><span>  .<span style=color:#a6e22e>sidebar-layout</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>grid-template-columns</span>: <span style=color:#a6e22e>minmax</span>(<span style=color:#ae81ff>16</span><span style=color:#66d9ef>rem</span>, <span style=color:#ae81ff>1</span>fr) <span style=color:#a6e22e>minmax</span>(<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>3</span>fr);
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>@<span style=color:#66d9ef>media</span> <span style=color:#f92672>(</span><span style=color:#f92672>prefers-reduced-motion</span><span style=color:#f92672>:</span> <span style=color:#f92672>reduce</span><span style=color:#f92672>)</span> {
+</span></span><span style=display:flex><span>  <span style=color:#f92672>*</span> { <span style=color:#66d9ef>animation-duration</span>: <span style=color:#ae81ff>1</span><span style=color:#66d9ef>ms</span>; <span style=color:#66d9ef>transition-duration</span>: <span style=color:#ae81ff>1</span><span style=color:#66d9ef>ms</span>; }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Use a viewport breakpoint when the viewport changes the design&rsquo;s available
+space. A container query is a better fit when a reusable component can appear
+in different-width regions of the same page.</p><p>CSS lengths have different reference boxes. <code>rem</code> refers to the root font
+size, <code>em</code> refers to the current font size, percentages depend on the property,
+and <code>vw</code> or <code>vh</code> refer to viewport dimensions. Preserve non-Latin glyph
+coverage in a font stack when the content requires it:</p><div class=jose-wrapper><div class=jose-tools><span>css</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-css data-lang=css><span style=display:flex><span>.<span style=color:#a6e22e>cjk-sample</span>::<span style=color:#a6e22e>before</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>content</span>: <span style=color:#e6db74>&#34;漢&#34;</span>;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>font-family</span>: <span style=color:#e6db74>&#34;Noto Sans CJK SC&#34;</span>, <span style=color:#66d9ef>sans-serif</span>;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The glyph is a font-coverage test, not prose content.</p><h2 id=respect-user-color-preferences>Respect User Color Preferences
+<a href=#respect-user-color-preferences class=heading-anchor><span>#</span></a></h2><p>Declare support for both color schemes, then define semantic color variables:</p><div class=jose-wrapper><div class=jose-tools><span>css</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-css data-lang=css><span style=display:flex><span>:<span style=color:#a6e22e>root</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>color-scheme</span>: light dark;
+</span></span><span style=display:flex><span>  --surface: Canvas;
+</span></span><span style=display:flex><span>  --text: CanvasText;
+</span></span><span style=display:flex><span>  --accent: <span style=color:#ae81ff>#2867c8</span>;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>@<span style=color:#66d9ef>media</span> <span style=color:#f92672>(</span><span style=color:#f92672>prefers-color-scheme</span><span style=color:#f92672>:</span> <span style=color:#f92672>dark</span><span style=color:#f92672>)</span> {
+</span></span><span style=display:flex><span>  :<span style=color:#a6e22e>root</span> { --accent: <span style=color:#ae81ff>#8ab4f8</span>; }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>prefers-color-scheme</code> reflects an operating-system or user-agent preference.
+An application-controlled theme selector can override variables by setting an
+attribute on the root element, but it should retain a clear precedence rule
+between saved preference, explicit user choice, and system preference.</p><p>An embedded SVG or iframe is a separate document. Parent-document CSS custom
+properties do not cross that boundary; the embedded resource needs its own
+styles or a deliberate messaging and theming mechanism.</p><h2 id=load-fonts-with-predictable-fallbacks>Load Fonts with Predictable Fallbacks
+<a href=#load-fonts-with-predictable-fallbacks class=heading-anchor><span>#</span></a></h2><p>A typeface family contains related faces such as regular, italic, bold, and
+bold italic. A glyph is the visible representation of a character. The browser
+selects a font per character by walking <code>font-family</code>:</p><div class=jose-wrapper><div class=jose-tools><span>css</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-css data-lang=css><span style=display:flex><span><span style=color:#f92672>body</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>font-family</span>: <span style=color:#e6db74>&#34;Example Sans&#34;</span>, system-ui, <span style=color:#66d9ef>sans-serif</span>;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>When a face lacks a glyph, fallback can come from a later family. Quoted family
+names are necessary when a name contains spaces.</p><p><code>@font-face</code> associates a family name with a downloadable resource:</p><div class=jose-wrapper><div class=jose-tools><span>css</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-css data-lang=css><span style=display:flex><span>@<span style=color:#66d9ef>font-face</span> {
+</span></span><span style=display:flex><span>  <span style=color:#f92672>font-family</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;Example Sans&#34;</span><span style=color:#f92672>;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>src</span><span style=color:#f92672>:</span> <span style=color:#f92672>url</span><span style=color:#f92672>(</span><span style=color:#e6db74>&#34;/fonts/example-sans.woff2&#34;</span><span style=color:#f92672>)</span> <span style=color:#f92672>format</span><span style=color:#f92672>(</span><span style=color:#e6db74>&#34;woff2&#34;</span><span style=color:#f92672>);</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>font-style</span><span style=color:#f92672>:</span> <span style=color:#f92672>normal</span><span style=color:#f92672>;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>font-weight</span><span style=color:#f92672>:</span> <span style=color:#f92672>400</span> <span style=color:#f92672>700</span><span style=color:#f92672>;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>font-display</span><span style=color:#f92672>:</span> <span style=color:#f92672>swap</span><span style=color:#f92672>;</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>WOFF2 is a compressed web-font container for OpenType font data. A variable
+font can expose axes such as <code>wght</code>, <code>wdth</code>, <code>opsz</code>, and <code>ital</code>; restrict the
+declared ranges to the faces the site ships. <code>font-display: swap</code> exposes
+fallback text while the web font loads, so choose a fallback with compatible
+metrics or use font metric overrides to reduce layout shift.</p><p><code>window.queryLocalFonts()</code> requires permission and has limited browser support.
+Do not make a site&rsquo;s rendering depend on enumerating local fonts.</p><h2 id=scale-canvas-correctly>Scale Canvas Correctly
+<a href=#scale-canvas-correctly class=heading-anchor><span>#</span></a></h2><p>The <code>width</code> and <code>height</code> HTML attributes set a canvas drawing buffer in device
+pixels. CSS <code>width</code> and <code>height</code> set its display box. If a 400×800 drawing
+buffer is displayed at a different CSS size, the browser scales the bitmap.</p><p>For sharp high-density rendering, size the backing store from the CSS box and
+device pixel ratio:</p><div class=jose-wrapper><div class=jose-tools><span>js</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-js data-lang=js><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>rect</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>canvas</span>.<span style=color:#a6e22e>getBoundingClientRect</span>();
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>scale</span> <span style=color:#f92672>=</span> window.<span style=color:#a6e22e>devicePixelRatio</span>;
+</span></span><span style=display:flex><span><span style=color:#a6e22e>canvas</span>.<span style=color:#a6e22e>width</span> <span style=color:#f92672>=</span> Math.<span style=color:#a6e22e>round</span>(<span style=color:#a6e22e>rect</span>.<span style=color:#a6e22e>width</span> <span style=color:#f92672>*</span> <span style=color:#a6e22e>scale</span>);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>canvas</span>.<span style=color:#a6e22e>height</span> <span style=color:#f92672>=</span> Math.<span style=color:#a6e22e>round</span>(<span style=color:#a6e22e>rect</span>.<span style=color:#a6e22e>height</span> <span style=color:#f92672>*</span> <span style=color:#a6e22e>scale</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>context</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>canvas</span>.<span style=color:#a6e22e>getContext</span>(<span style=color:#e6db74>&#34;2d&#34;</span>);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>context</span>.<span style=color:#a6e22e>setTransform</span>(<span style=color:#a6e22e>scale</span>, <span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>0</span>, <span style=color:#a6e22e>scale</span>, <span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>0</span>);</span></span></code></pre></div></div></div><p>Reset the transform before drawing after a resize. Cap the scale on a large
+canvas when memory use would become excessive.</p><h2 id=track-css-specifications-and-icons>Track CSS Specifications and Icons
+<a href=#track-css-specifications-and-icons class=heading-anchor><span>#</span></a></h2><p>CSS is a family of modules, not one monolithic release. CSS snapshots describe
+a coherent set of mature modules at a point in time; individual modules then
+advance independently. Check the module&rsquo;s feature status and browser support
+instead of inferring support from a named CSS level.</p><p>Icons have separate accessibility, styling, and loading trade-offs:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Form</th><th>Strength</th><th>Limitation</th></tr></thead><tbody><tr><td>Icon font</td><td>Inherits <code>color</code> and text sizing</td><td>Monochrome glyph constraints and font loading</td></tr><tr><td>Unicode character</td><td>No extra asset</td><td>Semantics and appearance vary by font and platform</td></tr><tr><td>Inline SVG</td><td>Accessible structure and per-part styling</td><td>Increases HTML or component complexity</td></tr><tr><td>External SVG or raster image</td><td>Cacheable independent asset</td><td>Styling internal details requires explicit design</td></tr></tbody></table></div></div><p>Use an accessible name for an icon-only control:</p><div class=jose-wrapper><div class=jose-tools><span>html</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-html data-lang=html><span style=display:flex><span>&lt;<span style=color:#f92672>button</span> <span style=color:#a6e22e>type</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;button&#34;</span> <span style=color:#a6e22e>aria-label</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;Search&#34;</span>&gt;
+</span></span><span style=display:flex><span>  &lt;<span style=color:#f92672>svg</span> <span style=color:#a6e22e>aria-hidden</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;true&#34;</span> <span style=color:#a6e22e>viewBox</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;0 0 24 24&#34;</span>&gt;...&lt;/<span style=color:#f92672>svg</span>&gt;
+</span></span><span style=display:flex><span>&lt;/<span style=color:#f92672>button</span>&gt;</span></span></code></pre></div></div></div><p><code>aria-hidden="true"</code> belongs on decorative SVG only when the button supplies
+an accessible name through text or <code>aria-label</code>.</p><h2 id=deliver-video-over-http>Deliver Video over HTTP
+<a href=#deliver-video-over-http class=heading-anchor><span>#</span></a></h2><p>Browsers request byte ranges for seekable media:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#a6e22e>GET</span> /movie.mp4 <span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span>
+</span></span><span style=display:flex><span>Range<span style=color:#f92672>:</span> <span style=color:#ae81ff>bytes=32243712-32955076</span>
+</span></span><span style=display:flex><span>If-Range<span style=color:#f92672>:</span> <span style=color:#ae81ff>&#34;entity-tag&#34;</span></span></span></code></pre></div></div></div><p>A compliant range response has status <code>206 Partial Content</code> and a
+<code>Content-Range</code> header. Serve <code>Accept-Ranges: bytes</code>, stable validators, and
+the correct media type. A server that ignores a range can return <code>200</code>, but
+seeking becomes expensive because the client may need the entire file.</p><p>MPEG-DASH splits presentation into media segments described by an MPD
+manifest. The client selects representations with different bit rates or
+resolutions and changes segment selection as bandwidth changes. Segments need
+keyframe boundaries compatible with switching; encoding one long GOP across a
+segment boundary impairs independent decoding.</p><p>HLS follows the same adaptive-segment principle with a playlist format. The
+browser support surface differs, so select a player and packaging format based
+on target platforms rather than assuming a <code>&lt;video src></code> can consume every
+manifest.</p><h2 id=model-enumerated-values-in-typescript>Model Enumerated Values in TypeScript
+<a href=#model-enumerated-values-in-typescript class=heading-anchor><span>#</span></a></h2><p>An API parameter that accepts one of a fixed set of values does not require a
+numeric TypeScript <code>enum</code>. A string-literal union preserves wire values:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Status</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;queued&#34;</span> <span style=color:#f92672>|</span> <span style=color:#e6db74>&#34;running&#34;</span> <span style=color:#f92672>|</span> <span style=color:#e6db74>&#34;failed&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>function</span> <span style=color:#a6e22e>retry</span>(<span style=color:#a6e22e>status</span>: <span style=color:#66d9ef>Status</span>)<span style=color:#f92672>:</span> <span style=color:#66d9ef>boolean</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>status</span> <span style=color:#f92672>===</span> <span style=color:#e6db74>&#34;failed&#34;</span>;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>When runtime iteration and one source of truth are needed, use a constant
+object:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>Status</span> <span style=color:#f92672>=</span> {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>queued</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;queued&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>running</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;running&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>failed</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;failed&#34;</span>,
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>as</span> <span style=color:#66d9ef>const</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Status</span> <span style=color:#f92672>=</span> <span style=color:#66d9ef>typeof</span> <span style=color:#a6e22e>Status</span>[<span style=color:#66d9ef>keyof</span> <span style=color:#66d9ef>typeof</span> <span style=color:#a6e22e>Status</span>];</span></span></code></pre></div></div></div><p>Numeric enums can be suitable for a protocol that specifies numeric values,
+but their reverse mappings and emitted JavaScript are not free. Model richer
+predefined values as objects with a discriminant and explicit behavior rather
+than forcing business logic into enum members.</p><h2 id=explain-download-and-inline-browser-behavior>Explain Download and Inline Browser Behavior
+<a href=#explain-download-and-inline-browser-behavior class=heading-anchor><span>#</span></a></h2><p>An HTTP response can ask a browser to download content:</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>Content-Type: application/pdf
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>Content-Disposition: attachment; filename=&#34;guide.pdf&#34;</span></span></span></code></pre></div></div></div><p><code>attachment</code> requests download behavior, while <code>inline</code> allows display in a
+capable viewer. The browser, user preference, content type, sandbox policy,
+and security headers can affect the final action. <code>X-Content-Type-Options: nosniff</code> prevents type sniffing and makes a correct <code>Content-Type</code> important.
+Test downloads through browser automation rather than assuming a response
+header gives identical UI behavior across browsers.</p><h2 id=render-a-frame-through-the-gpu-pipeline>Render a Frame Through the GPU Pipeline
+<a href=#render-a-frame-through-the-gpu-pipeline class=heading-anchor><span>#</span></a></h2><p>An application submits buffers, textures, shader programs, and draw commands
+through an API such as WebGL, WebGPU, Vulkan, Metal, or Direct3D. Driver and
+GPU work then follow a conceptual pipeline:</p><ol><li>A vertex shader transforms each vertex and produces varying attributes.</li><li>Primitive assembly groups vertices into lines, triangles, or points.</li><li>Clipping removes or splits geometry outside clip space.</li><li>Rasterization generates fragments that cover sample positions.</li><li>A fragment shader computes per-fragment outputs.</li><li>Depth, stencil, and blending operations combine outputs with the
+framebuffer.</li></ol><p>Clip-space coordinates are compared against homogeneous clip bounds before
+the perspective divide. Triangles crossing a clip plane are split, so a
+fragment shader never receives coverage outside the visible clipped primitive.</p><p>The GPU interface moves data across a CPU-GPU boundary. Keep static geometry
+in device-resident buffers, update dynamic data with bounded allocations, and
+avoid synchronous readbacks because they force CPU and GPU progress to meet.</p><h2 id=position-cameras-and-shade-geometry>Position Cameras and Shade Geometry
+<a href=#position-cameras-and-shade-geometry class=heading-anchor><span>#</span></a></h2><p>A camera transforms world coordinates to view coordinates, then projects them
+to clip space. A perspective camera maps distant objects to smaller screen
+regions; an orthographic camera preserves parallel lines and apparent size
+across depth. A camera at <code>(0, 0, 0)</code> with identity orientation looks along
+negative Z in the common Three.js convention, with positive Y as up.</p><p>Lambertian diffuse lighting models a matte surface:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>diffuse = albedo × lightColor × max(dot(normal, lightDirection), 0)</span></span></code></pre></div></div></div><p>The dot product encodes the cosine between surface normal and light direction.
+Blinn-Phong adds an empirical specular term using the halfway vector between
+the light and view directions. Both models need normals transformed correctly:
+for non-uniform scaling, use the inverse-transpose of the model-view matrix.</p><p>Three.js cameras and materials expose these concepts at a higher level. Set a
+camera position, call <code>camera.lookAt(target)</code>, update its projection matrix
+after changing aspect ratio, and render after scene updates. Do not assume
+default camera orientation fits a custom coordinate system.</p><h2 id=compose-transparency-and-color>Compose Transparency and Color
+<a href=#compose-transparency-and-color class=heading-anchor><span>#</span></a></h2><p>Standard source-over alpha compositing combines source and destination:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>out.rgb = source.rgb × source.a + destination.rgb × (1 - source.a)
+</span></span><span style=display:flex><span>out.a   = source.a + destination.a × (1 - source.a)</span></span></code></pre></div></div></div><p>The equation assumes premultiplied source RGB. Straight-alpha assets require
+the renderer&rsquo;s expected conversion or blend factors. Blend in linear-light
+space, not gamma-encoded sRGB, because arithmetic on encoded values produces
+incorrect darkening and gradients.</p><p>Human color perception starts with cone responses to overlapping wavelength
+ranges. A color space maps numerical coordinates to a defined reference
+system; a coordinate without its space is ambiguous. sRGB defines primaries,
+a white point, a transfer function, and encoding conventions. Convert sRGB to
+linear values before lighting or interpolation, then encode for display.</p><p>HSL and HSV are convenient editing coordinates, not perceptually uniform
+spaces. Equal numeric steps in hue, saturation, or lightness do not produce
+equal perceived steps. For a gradient with physically meaningful blending,
+interpolate linear RGB. For a gradient designed around perceived lightness,
+consider a perceptual space such as OKLab and convert back to the target
+gamut, clipping or mapping out-of-gamut colors deliberately.</p><p>Magenta is a perceptual color created by simultaneous long- and short-wave
+cone response without a single spectral wavelength. Additive mixtures do not
+average into one wavelength; the visual system interprets their combined cone
+signals.</p><h2 id=run-playwright-in-a-container>Run Playwright in a Container
+<a href=#run-playwright-in-a-container class=heading-anchor><span>#</span></a></h2><p>Playwright needs browser binaries and their operating-system libraries. Pin
+the official image tag to the <code>@playwright/test</code> version in the project:</p><div class=jose-wrapper><div class=jose-tools><span>dockerfile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-dockerfile data-lang=dockerfile><span style=display:flex><span><span style=color:#66d9ef>FROM</span> <span style=color:#e6db74>mcr.microsoft.com/playwright:v1.58.2-noble</span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>WORKDIR</span> <span style=color:#e6db74>/work</span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>COPY</span> package.json package-lock.json ./<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>RUN</span> npm ci<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>COPY</span> . .<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>RUN</span> chown -R pwuser:pwuser /work<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>USER</span> <span style=color:#e6db74>pwuser</span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>CMD</span> [<span style=color:#e6db74>&#34;npx&#34;</span>, <span style=color:#e6db74>&#34;playwright&#34;</span>, <span style=color:#e6db74>&#34;test&#34;</span>]</span></span></code></pre></div></div></div><p>The official image includes supported browsers and dependencies. Update the
+image and package versions together. Build and run with an init process:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker build -t example-playwright-tests .
+</span></span><span style=display:flex><span>docker run --rm --init --ipc<span style=color:#f92672>=</span>host example-playwright-tests</span></span></code></pre></div></div></div><p><code>--init</code> reaps browser child processes. Chromium benefits from a larger shared
+memory area under <code>--ipc=host</code>; use it only in a trusted environment. A custom
+Node base image must install both browser dependencies and the selected
+browser during the image build:</p><div class=jose-wrapper><div class=jose-tools><span>dockerfile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-dockerfile data-lang=dockerfile><span style=display:flex><span><span style=color:#66d9ef>FROM</span> <span style=color:#e6db74>node:22-bookworm</span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>WORKDIR</span> <span style=color:#e6db74>/work</span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>COPY</span> package.json package-lock.json ./<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>RUN</span> npm ci <span style=color:#f92672>&amp;&amp;</span> npx playwright install --with-deps chromium<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>COPY</span> . .<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>CMD</span> [<span style=color:#e6db74>&#34;npx&#34;</span>, <span style=color:#e6db74>&#34;playwright&#34;</span>, <span style=color:#e6db74>&#34;test&#34;</span>]</span></span></code></pre></div></div></div><p>Do not download browsers at every container startup. Persist reports, traces,
+screenshots, and videos as CI artifacts because failures often depend on the
+test environment.</p><h2 id=automate-virtualized-lists-without-infinite-loops>Automate Virtualized Lists Without Infinite Loops
+<a href=#automate-virtualized-lists-without-infinite-loops class=heading-anchor><span>#</span></a></h2><p>A virtualized list creates nodes for visible items and uses a spacer to
+represent the full scroll range. An item absent from the DOM may still exist
+in the dataset, so a locator must drive scrolling and wait for a render turn.</p><p>Bound the search and detect lack of progress:</p><div class=jose-wrapper><div class=jose-tools><span>ts</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-ts data-lang=ts><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>scroller</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>page</span>.<span style=color:#a6e22e>locator</span>(<span style=color:#e6db74>&#39;ul[role=&#34;listbox&#34;] &gt; div&#39;</span>);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>option</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>page</span>.<span style=color:#a6e22e>getByRole</span>(<span style=color:#e6db74>&#34;option&#34;</span>, { <span style=color:#a6e22e>name</span>: <span style=color:#66d9ef>targetAddress</span>, <span style=color:#a6e22e>exact</span>: <span style=color:#66d9ef>true</span> });
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>let</span> <span style=color:#a6e22e>attempts</span> <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>attempts</span> <span style=color:#f92672>&lt;</span> <span style=color:#ae81ff>500</span>; <span style=color:#a6e22e>attempts</span> <span style=color:#f92672>+=</span> <span style=color:#ae81ff>1</span>) {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>if</span> (<span style=color:#66d9ef>await</span> <span style=color:#a6e22e>option</span>.<span style=color:#a6e22e>count</span>()) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>await</span> <span style=color:#a6e22e>option</span>.<span style=color:#a6e22e>click</span>();
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>break</span>;
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>const</span> <span style=color:#a6e22e>moved</span> <span style=color:#f92672>=</span> <span style=color:#66d9ef>await</span> <span style=color:#a6e22e>scroller</span>.<span style=color:#a6e22e>evaluate</span>((<span style=color:#a6e22e>element</span>) <span style=color:#f92672>=&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>const</span> <span style=color:#a6e22e>before</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>element</span>.<span style=color:#a6e22e>scrollTop</span>;
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>element</span>.<span style=color:#a6e22e>scrollBy</span>(<span style=color:#ae81ff>0</span>, Math.<span style=color:#a6e22e>max</span>(<span style=color:#ae81ff>1</span>, <span style=color:#a6e22e>element</span>.<span style=color:#a6e22e>clientHeight</span> <span style=color:#f92672>*</span> <span style=color:#ae81ff>0.8</span>));
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>element</span>.<span style=color:#a6e22e>scrollTop</span> <span style=color:#f92672>!==</span> <span style=color:#a6e22e>before</span>;
+</span></span><span style=display:flex><span>  });
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span><span style=color:#a6e22e>moved</span>) <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> Error(<span style=color:#e6db74>`Option not found: </span><span style=color:#e6db74>${</span><span style=color:#a6e22e>targetAddress</span><span style=color:#e6db74>}</span><span style=color:#e6db74>`</span>);
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>await</span> <span style=color:#a6e22e>page</span>.<span style=color:#a6e22e>waitForTimeout</span>(<span style=color:#ae81ff>0</span>);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>waitForTimeout(0)</code> yields to the browser event loop, allowing a scroll
+listener or framework render to update the virtualized nodes. A production
+test should prefer the application&rsquo;s data API or a semantic search control
+when it exists; pixel-like scrolling is a fallback for behavior that must be
+tested through the rendered interface.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/playwright-in-docker/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>
