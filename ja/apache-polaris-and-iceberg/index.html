@@ -1,0 +1,236 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Apache Polaris と Apache Iceberg</title></head><body><main><article><div class=article-header><h1>Apache Polaris と Apache Iceberg</h1><div class=aux>最終更新: 2026-07-22 11:58:00 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/apache-polaris/>Apache Polaris</a>
+|
+<a href=/ja/tags/apache-iceberg/>Apache Iceberg</a>
+|
+<a href=/ja/tags/data-lakehouse/>Data Lakehouse</a>
+|
+<a href=/ja/tags/spark/>Spark</a>
+|
+<a href=/ja/tags/data-platforms/>Data Platforms</a></div></div><div class="translation-notice machine-translated"><a href=/apache-polaris-and-iceberg/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Apache Polaris は Apache Iceberg テーブル向けのカタログサービスです。Apache Iceberg
+は、大規模な分析データセット向けのオープンテーブル形式です。どちらのプロジェクトも
+汎用計算エンジンではありません。</p><ul><li>Polaris はテーブルを識別し、アクセスを管理し、現在の Iceberg メタデータへの変更を調整します。</li><li>Iceberg は、テーブルの状態、スナップショット、マニフェスト、データファイル、削除ファイルがどのように構成されるかを定義します。</li><li>Spark、Flink、Trino、その他のエンジンが計算を計画し、実行します。</li><li>HDFS またはオブジェクトストレージが Iceberg のメタデータとテーブルデータファイルを保持します。</li></ul><p>これらの責務を分離することで、よくある分類上の誤りを防げます。
+Polaris は Spark の代替ではありません。Spark デプロイメントは Polaris を
+Iceberg カタログとして使用できます。</p><h2 id=各コンポーネントをスタック内に配置する>各コンポーネントをスタック内に配置する
+<a href=#%e5%90%84%e3%82%b3%e3%83%b3%e3%83%9d%e3%83%bc%e3%83%8d%e3%83%b3%e3%83%88%e3%82%92%e3%82%b9%e3%82%bf%e3%83%83%e3%82%af%e5%86%85%e3%81%ab%e9%85%8d%e7%bd%ae%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>一般的なデプロイメントには、4 つの明確に分離されたレイヤーがあります。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>SQL client, notebook, scheduler, or application
+</span></span><span style=display:flex><span>                         |
+</span></span><span style=display:flex><span>                         v
+</span></span><span style=display:flex><span>Compute engine: Spark, Flink, Trino, or another Iceberg client
+</span></span><span style=display:flex><span>             |                              |
+</span></span><span style=display:flex><span>             | Iceberg REST requests        | file I/O
+</span></span><span style=display:flex><span>             v                              v
+</span></span><span style=display:flex><span>Apache Polaris                         Object storage or HDFS
+</span></span><span style=display:flex><span>             |                              |
+</span></span><span style=display:flex><span>             | current metadata pointer     | Iceberg metadata,
+</span></span><span style=display:flex><span>             `----------------------------&gt; | manifests, and data files</span></span></code></pre></div></div></div><p>コントロールパスとデータパスは分離されています。</p><ol><li>エンジンは Polaris に名前空間とテーブルの解決を要求します。</li><li>Polaris は、現在の Iceberg テーブルメタデータを読み込むために必要な情報を返します。</li><li>エンジンはストレージからメタデータ、マニフェスト、データファイルを読み取ります。</li><li>エンジンはスキャン、結合、集計、書き込みを実行します。</li><li>書き込み時、エンジンは Polaris に新しいテーブルメタデータバージョンのアトミックなコミットを要求します。</li></ol><p>テーブルの行が Polaris を経由することはありません。したがって、Polaris を追加しても
+計算能力は増えず、それだけで遅いクエリが高速になることもありません。</p><h2 id=iceberg-が追加するものを理解する>Iceberg が追加するものを理解する
+<a href=#iceberg-%e3%81%8c%e8%bf%bd%e5%8a%a0%e3%81%99%e3%82%8b%e3%82%82%e3%81%ae%e3%82%92%e7%90%86%e8%a7%a3%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Parquet、ORC、Avro は個々のファイルを記述します。しかし、特定の時点でどのファイルが
+テーブルを構成するかは定義しません。Iceberg はテーブルレベルの状態を追加します。</p><p>Iceberg テーブルは、メタデータツリーとして表現されます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Catalog entry
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    v
+</span></span><span style=display:flex><span>Current table metadata JSON
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    +--&gt; schemas, partition specifications, properties
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    `--&gt; snapshots
+</span></span><span style=display:flex><span>           |
+</span></span><span style=display:flex><span>           v
+</span></span><span style=display:flex><span>      manifest list
+</span></span><span style=display:flex><span>           |
+</span></span><span style=display:flex><span>           v
+</span></span><span style=display:flex><span>        manifests
+</span></span><span style=display:flex><span>           |
+</span></span><span style=display:flex><span>           +--&gt; data files
+</span></span><span style=display:flex><span>           `--&gt; delete files</span></span></code></pre></div></div></div><p>コミットされた各スナップショットは、完全で一貫性のあるテーブル状態を記述します。古い
+スナップショットを読み込んだリーダーは、ライターが新しいスナップショットを準備して
+コミットしている間も、そのスナップショットを使い続けられます。</p><p>このモデルは、Parquet ファイルのディレクトリだけでは得られない次の機能を提供します。</p><ul><li>アトミックなテーブル変更</li><li>スナップショット分離とタイムトラベル</li><li>安定したフィールド識別子に基づくスキーマ進化</li><li>隠しパーティショニングとパーティション仕様の進化</li><li>スキャン計画のためのファイルレベル統計</li><li>それをサポートするテーブル形式バージョンにおける行レベル削除および更新の表現</li><li>ライター間の楽観的同時実行制御</li></ul><p>Iceberg は通常、データファイルとメタデータファイルを不変として扱います。書き込みでは
+新しいファイルを生成し、その後カタログの現在のメタデータポインターを置き換えようとします。
+新しいファイルは、コミットが成功した後にのみまとめて可視化されます。</p><h2 id=polaris-が追加するものを理解する>Polaris が追加するものを理解する
+<a href=#polaris-%e3%81%8c%e8%bf%bd%e5%8a%a0%e3%81%99%e3%82%8b%e3%82%82%e3%81%ae%e3%82%92%e7%90%86%e8%a7%a3%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Iceberg は、論理テーブル名を現在のメタデータに対応付け、コミットを調整するために
+カタログを必要とします。Apache Polaris は、Iceberg REST Catalog API を通じてその
+カタログを提供します。</p><p>Polaris は、次のような事項を担当します。</p><ul><li>カタログ、名前空間、テーブル識別子</li><li>現在の Iceberg テーブルメタデータへの権威あるポインター</li><li>アトミックなコミットチェックと競合検出</li><li>認証とカタログ認可</li><li>ストレージ認証情報との統合</li><li>複数のエンジンで使用できる標準 REST インターフェース</li></ul><p>REST インターフェースが重要なのは、各計算エンジンがすべてのカタログバックエンドを
+個別に実装するのではなく、1 つの Iceberg REST クライアントを実装できるためです。
+役割は Hive Metastore Thrift API に似ていますが、テーブルモデルとトランザクションモデルは異なります。</p><p>Polaris は次のことを行いません。</p><ul><li>SQL を実行する</li><li>YARN アプリケーションをスケジュールする</li><li>Spark executor を実行する</li><li>サービスデータベースにテーブル行を保存する</li><li>Parquet、ORC、Avro を置き換える</li><li>任意のファイルを自動的に Iceberg テーブルに変換する</li></ul><h2 id=polaris-と-hive-metastore-を比較する>Polaris と Hive Metastore を比較する
+<a href=#polaris-%e3%81%a8-hive-metastore-%e3%82%92%e6%af%94%e8%bc%83%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Polaris と Hive Metastore はどちらもカタログサービスですが、同じメタデータモデルの
+置き換え可能な実装として扱うべきではありません。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Concern</th><th>Hive Metastore</th><th>Polaris with Iceberg</th></tr></thead><tbody><tr><td>Primary API</td><td>HMS Thrift API</td><td>Iceberg REST Catalog API</td></tr><tr><td>Table state</td><td>Table, partition, and storage-descriptor records</td><td>Pointer to Iceberg&rsquo;s current table metadata</td></tr><tr><td>File tracking</td><td>Commonly inferred from table and partition locations</td><td>Explicitly tracked through snapshots and manifests</td></tr><tr><td>Partitioning</td><td>Partition columns and catalog partition records</td><td>Hidden transforms stored in Iceberg metadata</td></tr><tr><td>Commit model</td><td>Depends on Hive table and transaction type</td><td>Optimistic Iceberg metadata commits</td></tr><tr><td>Multi-engine use</td><td>Engines implement HMS-compatible clients</td><td>Engines implement the Iceberg REST protocol</td></tr></tbody></table></div></div><p>Hive の専門家にとって、次の近似が役立ちます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>HMS       = catalog plus Hive-oriented table and partition metadata
+</span></span><span style=display:flex><span>Polaris   = catalog and commit coordinator for Iceberg metadata
+</span></span><span style=display:flex><span>Iceberg   = table state that HMS-style tables traditionally lack</span></span></code></pre></div></div></div><p>この近似は API 互換性を主張するものではありません。テーブルを HMS から Polaris に
+移行するには、Thrift URI を REST URI に変更するのではなく、Iceberg 対応の移行または
+登録手順が必要です。</p><h2 id=polaris-と-spark-を比較する>Polaris と Spark を比較する
+<a href=#polaris-%e3%81%a8-spark-%e3%82%92%e6%af%94%e8%bc%83%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Spark と Polaris は異なるレイヤーに属します。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Capability</th><th>Apache Polaris</th><th>Apache Spark</th></tr></thead><tbody><tr><td>Resolve table names</td><td>Yes</td><td>Through a configured catalog</td></tr><tr><td>Coordinate Iceberg commits</td><td>Yes</td><td>Produces a commit and submits it</td></tr><tr><td>Execute SQL</td><td>No</td><td>Yes</td></tr><tr><td>Run distributed transformations</td><td>No</td><td>Yes</td></tr><tr><td>Schedule tasks and executors</td><td>No</td><td>Yes</td></tr><tr><td>Read and write data files</td><td>Normally no</td><td>Yes</td></tr><tr><td>Provide streaming or machine-learning APIs</td><td>No</td><td>Yes</td></tr></tbody></table></div></div><p>通常の関係は次のとおりです。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Spark driver
+</span></span><span style=display:flex><span>   |---- load and commit table metadata ----&gt; Polaris
+</span></span><span style=display:flex><span>   |
+</span></span><span style=display:flex><span>   `---- schedule tasks --------------------&gt; Spark executors
+</span></span><span style=display:flex><span>                                                   |
+</span></span><span style=display:flex><span>                                                   `--&gt; Iceberg files in storage</span></span></code></pre></div></div></div><p>ドライバーは Iceberg クライアントを使用して Polaris と通信します。Executor は、計画
+された Iceberg スキャンまたは書き込みによって選択されたファイルを読み書きします。
+Polaris は executor のデータパスには入りません。</p><h2 id=計算エンジンを統合する>計算エンジンを統合する
+<a href=#%e8%a8%88%e7%ae%97%e3%82%a8%e3%83%b3%e3%82%b8%e3%83%b3%e3%82%92%e7%b5%b1%e5%90%88%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>各エンジンには、3 つの独立した接続が必要です。</p><ol><li>Polaris REST エンドポイントへのネットワークおよび認証経路</li><li>Iceberg REST API で warehouse と呼ばれる Polaris カタログ識別子</li><li>オブジェクトストレージまたは HDFS 上の Iceberg ファイルにアクセスするためのサポート対象の方法</li></ol><p>以下の例は、完全な本番構成ではなく、重要な統合境界を示しています。プロパティ名と
+サポートされる Iceberg 機能は、エンジンのリリースによって変わります。エンジン、
+コネクター、Iceberg、Polaris の各バージョンには、相互にサポートされる組み合わせを
+使用してください。</p><h3 id=apache-doris-を統合する>Apache Doris™ を統合する
+<a href=#apache-doris-%e3%82%92%e7%b5%b1%e5%90%88%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>Apache Doris 3.1 以降では、Polaris を Iceberg REST カタログとして構成できます。
+Doris は OAuth 2.0 認証情報を使用して Polaris トークンを取得し、Polaris に一時的な
+オブジェクトストレージ認証情報を要求できます。</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>CATALOG</span> polaris_vended PROPERTIES (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;type&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;iceberg&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;warehouse&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;analytics_catalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.catalog.type&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;rest&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.uri&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;https://polaris.example.com/api/catalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.security.type&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;oauth2&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.oauth2.credential&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;&lt;client-id&gt;:&lt;client-secret&gt;&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.oauth2.server-uri&#39;</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#39;https://polaris.example.com/api/catalog/v1/oauth/tokens&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.oauth2.scope&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;PRINCIPAL_ROLE:doris_role&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;iceberg.rest.vended-credentials-enabled&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;true&#39;</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Doris フロントエンドは Polaris を通じて Iceberg オブジェクトを解決し、Doris の
+バックエンドまたは計算ノードはストレージから選択されたデータファイルを読み取ります。
+Polaris プリンシパルには必要なカタログ権限だけを付与し、適切な範囲の認証情報を発行
+できるストレージロールを Polaris カタログに構成してください。</p><p>認証情報の発行を無効にする場合、Doris は独自のストレージ認証情報を必要とします。
+これによりストレージ認可の経路は変わりますが、Polaris カタログの経路は変わりません。
+あるアイデンティティがテーブルメタデータを読み込めても、データファイルへのアクセス
+または作成権限を持たない可能性があるため、読み取りと書き込みは別々にテストしてください。</p><h3 id=apache-flink-を統合する>Apache Flink® を統合する
+<a href=#apache-flink-%e3%82%92%e7%b5%b1%e5%90%88%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>Flink は Iceberg コネクターを使用し、Polaris を Iceberg REST カタログとして登録します。
+代表的な Flink SQL カタログ定義は次のとおりです。</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>CATALOG</span> polaris <span style=color:#66d9ef>WITH</span> (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;type&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;iceberg&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;catalog-impl&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;org.apache.iceberg.rest.RESTCatalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;uri&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;https://polaris.example.com/api/catalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;warehouse&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;analytics_catalog&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;credential&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;&lt;client-id&gt;:&lt;client-secret&gt;&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#39;scope&#39;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;PRINCIPAL_ROLE:flink_role&#39;</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Flink ディストリビューションには、対象の Flink リリースと互換性のある Iceberg Flink
+ランタイムに加えて、ストレージバックエンドに必要なファイル I/O 依存関係を含める
+必要があります。REST レスポンスに発行された認証情報が含まれている場合でも、カタログ
+認証とストレージ認証は分離されています。</p><p>ストリーミング書き込みでは、Iceberg シンクがチェックポイントを正常にコミットした
+場合にのみファイルが可視になります。したがって、ストレージにファイルが存在していても、
+最新レコードが現在の Iceberg スナップショットにまだ含まれていない場合があります。
+ファイル作成をテーブル可視化の証拠とみなすのではなく、Flink のチェックポイントと
+Iceberg のコミットを併せて監視してください。</p><h3 id=apache-spark-を統合する>Apache Spark™ を統合する
+<a href=#apache-spark-%e3%82%92%e7%b5%b1%e5%90%88%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>Spark は、バックエンドに REST カタログを持つ Iceberg <code>SparkCatalog</code> を構成します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>spark.sql.catalog.polaris=org.apache.iceberg.spark.SparkCatalog
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.type=rest
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.uri=https://polaris.example.com/api/catalog
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.warehouse=analytics_catalog
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.credential=&lt;client-id&gt;:&lt;client-secret&gt;
+</span></span><span style=display:flex><span>spark.sql.catalog.polaris.scope=PRINCIPAL_ROLE:spark_role</span></span></code></pre></div></div></div><p><code>polaris.sales.orders</code> のような複数部分の名前でカタログを使用します。Spark ドライバーは
+Polaris を通じてメタデータを読み込み、コミットします。Executor は Iceberg ファイルを
+直接読み書きします。Spark ディストリビューションには、Spark および Scala のバージョン
+向けにビルドされた Iceberg ランタイム成果物が必要です。</p><p>基本的な読み取りと書き込みを超えるプロシージャや行レベルコマンドには、Spark の
+Iceberg SQL 拡張機能が必要になる場合があります。サポート状況はテーブルの Iceberg
+形式バージョンにも依存します。Polaris がコミットを受け付けても、その Spark バージョン
+が書き込んだ機能を他のすべてのエンジンが解釈できるとは限りません。</p><h3 id=dremio-oss-を統合する>Dremio® OSS を統合する
+<a href=#dremio-oss-%e3%82%92%e7%b5%b1%e5%90%88%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>Dremio OSS は現在、Polaris へのサポート対象の直接接続に必要な Iceberg REST Catalog
+ソースを公開していません。Dremio OSS に Iceberg リーダーが存在することから REST
+カタログがサポートされると想定しないでください。また、Enterprise 専用ソースを OSS
+統合として文書化しないでください。</p><p>Dremio Enterprise エディションは、Polaris エンドポイントと発行された認証情報を
+使用できる <strong>Iceberg REST Catalog Source</strong> を提供します。この構成は OSS エディション
+には移植できません。完全なオープンソースデプロイメントでは、Spark、Flink、Trino、
+Doris、またはサポート対象の StarRocks リリースなど、Polaris 互換のエンジンを使用するか、
+将来の Dremio OSS リリースでこのソースが明示的に追加されたことを確認してから、その
+前提で設計してください。</p><h3 id=starrocks-を統合する>StarRocks を統合する
+<a href=#starrocks-%e3%82%92%e7%b5%b1%e5%90%88%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>StarRocks は、外部 Iceberg カタログの REST バックエンドとして Polaris を構成します。</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>EXTERNAL</span> <span style=color:#66d9ef>CATALOG</span> polaris
+</span></span><span style=display:flex><span>PROPERTIES (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;type&#34;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;iceberg&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.type&#34;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;rest&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.uri&#34;</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;https://polaris.example.com/api/catalog&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.warehouse&#34;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;analytics_catalog&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.security&#34;</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;oauth2&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.oauth2.credential&#34;</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;&lt;client-id&gt;:&lt;client-secret&gt;&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;iceberg.catalog.oauth2.scope&#34;</span> <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;PRINCIPAL_ROLE:starrocks_role&#34;</span>
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>StarRocks のフロントエンドおよびバックエンドまたは計算ノードは、それぞれの役割に
+必要なカタログサービスとストレージサービスに到達できなければなりません。ストレージ
+認証情報のプロパティは、S3、S3 互換サービス、Azure、GCS、HDFS のいずれを使用するか
+によって異なります。REST カタログの認証情報発行はリリースに依存します。現在の
+StarRocks ドキュメントでは、バージョン 4.0 から利用可能とされています。</p><p>Iceberg v2 の削除ファイル、新しい形式バージョン、書き込み、保守操作を有効にする前に、
+StarRocks のサポートマトリックスを確認してください。基本的な Parquet ベースのテーブル
+をクエリできても、別のエンジンがコミットするすべてのスナップショット機能をサポート
+していることにはなりません。</p><h3 id=trino-を統合する>Trino を統合する
+<a href=#trino-%e3%82%92%e7%b5%b1%e5%90%88%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>Trino は Iceberg コネクターで <code>rest</code> をカタログタイプとして使用します。カタログ
+プロパティファイルには、次のような設定を含めます。</p><div class=jose-wrapper><div class=jose-tools><span>properties</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-properties data-lang=properties><span style=display:flex><span><span style=color:#a6e22e>connector.name</span><span style=color:#f92672>=</span><span style=color:#e6db74>iceberg</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.catalog.type</span><span style=color:#f92672>=</span><span style=color:#e6db74>rest</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.rest-catalog.uri</span><span style=color:#f92672>=</span><span style=color:#e6db74>https://polaris.example.com/api/catalog</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.rest-catalog.warehouse</span><span style=color:#f92672>=</span><span style=color:#e6db74>analytics_catalog</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.rest-catalog.security</span><span style=color:#f92672>=</span><span style=color:#e6db74>OAUTH2</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>iceberg.rest-catalog.vended-credentials-enabled</span><span style=color:#f92672>=</span><span style=color:#e6db74>true</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>fs.s3.enabled</span><span style=color:#f92672>=</span><span style=color:#e6db74>true</span></span></span></code></pre></div></div></div><p>サポートされる OAuth 認証情報、デプロイメントで必要な Polaris realm ヘッダー、
+ストレージ固有のプロパティは、保護されたシークレットおよび構成機構を通じて追加して
+ください。実際のクライアントシークレットを、全ユーザーが読み取り可能なカタログ
+プロパティファイルに直接記述しないでください。</p><p>Trino のコーディネーターは計画とコミット中に Polaris と通信し、ワーカーは Iceberg
+ファイルを読み書きします。Trino は Iceberg の保守プロシージャも公開しますが、
+その可用性とセマンティクスはコネクターのリリースによって異なります。独立した保守
+ジョブが競合する保持ポリシーを使用しないよう、スナップショットの期限切れ処理、
+孤立ファイルの削除、データファイルの最適化をエンジン間で調整してください。</p><h2 id=iceberg-の読み取りを追跡する>Iceberg の読み取りを追跡する
+<a href=#iceberg-%e3%81%ae%e8%aa%ad%e3%81%bf%e5%8f%96%e3%82%8a%e3%82%92%e8%bf%bd%e8%b7%a1%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Spark SQL を通じて発行されたクエリを考えます。</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> customer_id, <span style=color:#66d9ef>SUM</span>(amount)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> lake.sales.orders
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> order_date <span style=color:#f92672>&gt;=</span> DATE <span style=color:#e6db74>&#39;2026-08-01&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>GROUP</span> <span style=color:#66d9ef>BY</span> customer_id;</span></span></code></pre></div></div></div><p>簡略化した読み取りは次のように進みます。</p><ol><li>Spark は構成済み Polaris カタログを通じて <code>lake.sales.orders</code> を解決します。</li><li>Spark はテーブルの現在の Iceberg メタデータを読み込み、スナップショットを選択します。</li><li>Iceberg はパーティション情報とマニフェスト統計に対してクエリ述語を評価します。</li><li>Spark は一致する可能性があるデータファイルと削除ファイルだけを対象にタスクを計画します。</li><li>Executor はストレージからそれらのファイルを直接読み取ります。</li><li>Spark は集計を実行し、結果を返します。</li></ol><p>Polaris は名前解決と認可に参加します。Iceberg はスナップショットとファイル計画モデルを
+提供します。Spark は SQL セマンティクス、オプティマイザー、スケジューラー、ランタイムを提供します。</p><h2 id=iceberg-の書き込みを追跡する>Iceberg の書き込みを追跡する
+<a href=#iceberg-%e3%81%ae%e6%9b%b8%e3%81%8d%e8%be%bc%e3%81%bf%e3%82%92%e8%bf%bd%e8%b7%a1%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>追加処理はコミット境界を示します。</p><ol><li>エンジンは Polaris から現在の Iceberg テーブルメタデータを読み込みます。</li><li>分散タスクは新しいデータファイルをストレージに書き込みます。</li><li>エンジンは新しいマニフェスト、マニフェストリスト、テーブルメタデータを書き込みます。</li><li>エンジンは、ベースバージョンがまだ最新であることを条件として、古いメタデータポインターを新しいものに置き換えるよう Polaris に要求します。</li><li>Polaris はポインターをアトミックにコミットするか、古い更新を拒否します。</li><li>競合時には、Iceberg クライアントが新しい現在状態に対して安全に再試行できるか判断します。</li></ol><p>コミット失敗前に書き込まれたファイルは、テーブルディレクトリに存在するだけではテーブルの
+一部になりません。後続の有効な操作で参照されるか、クリーンアップで削除されるまでは、
+孤立ファイルです。</p><p>したがって、アプリケーションは Iceberg テーブルの場所に直接書き込み、ファイルが出現する
+ことを期待してはなりません。可視性を制御するのはディレクトリ一覧ではなく、コミット済みの
+Iceberg メタデータです。</p><h2 id=lakehouse-というラベルを説明する>Lakehouse というラベルを説明する
+<a href=#lakehouse-%e3%81%a8%e3%81%84%e3%81%86%e3%83%a9%e3%83%99%e3%83%ab%e3%82%92%e8%aa%ac%e6%98%8e%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p><em>Lakehouse</em> という用語は、次の 2 つの特性を組み合わせたものです。</p><ul><li><strong>Lake:</strong> テーブルデータは HDFS またはオブジェクトストレージに残り、一般にオープンなファイル形式で保存され、複数のエンジンからアクセスできます。</li><li><strong>Warehouse:</strong> テーブルレイヤーがスキーマ、トランザクション、スナップショット、ガバナンス、予測可能な SQL 動作を提供します。</li></ul><p>このスタックでは、このラベルは Polaris 単体ではなく、アーキテクチャ全体に適用されます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Lake storage
+</span></span><span style=display:flex><span>    + Iceberg table semantics
+</span></span><span style=display:flex><span>    + Polaris catalog and governance
+</span></span><span style=display:flex><span>    + SQL compute engines
+</span></span><span style=display:flex><span>    = an open lakehouse architecture</span></span></code></pre></div></div></div><p>Polaris はカタログ相互運用性とガバナンスに貢献します。Iceberg はレイクストレージ上に
+ウェアハウスに似たテーブルセマンティクスを提供します。計算エンジンが実際の分析処理を提供します。</p><h2 id=名前空間とストレージパスを分離する>名前空間とストレージパスを分離する
+<a href=#%e5%90%8d%e5%89%8d%e7%a9%ba%e9%96%93%e3%81%a8%e3%82%b9%e3%83%88%e3%83%ac%e3%83%bc%e3%82%b8%e3%83%91%e3%82%b9%e3%82%92%e5%88%86%e9%9b%a2%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p><code>sales.orders</code> のような論理識別子はファイルシステムパスではありません。Polaris はその
+識別子を Iceberg メタデータに解決し、そのメタデータが最終的にストレージ内のファイルを参照します。</p><p>この分離により、管理者は次のことを実現できます。</p><ul><li>ユーザーにストレージレイアウトを公開せずに論理編成を変更する</li><li>カタログおよび名前空間の境界でアクセスを強制する</li><li>カタログまたは名前空間ごとに異なるストレージ場所を使用する</li><li>複数のエンジンに同じテーブルの一貫したビューを提供する</li></ul><p>ストレージ権限も依然として重要です。カタログ認可でテーブル操作を許可していても、
+エンジンが参照オブジェクトを読み取る権限を持たない場合があります。逆に、ユーザーが
+制限のないバケット認証情報を受け取ると、直接のストレージアクセスによってカタログ
+ポリシーを回避できる場合があります。</p><h2 id=認証とストレージアクセスを一体で設計する>認証とストレージアクセスを一体で設計する
+<a href=#%e8%aa%8d%e8%a8%bc%e3%81%a8%e3%82%b9%e3%83%88%e3%83%ac%e3%83%bc%e3%82%b8%e3%82%a2%e3%82%af%e3%82%bb%e3%82%b9%e3%82%92%e4%b8%80%e4%bd%93%e3%81%a7%e8%a8%ad%e8%a8%88%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>安全なリクエストは、少なくとも 2 つの認可境界を通過します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>User or workload
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    | authenticate and authorize catalog operation
+</span></span><span style=display:flex><span>    v
+</span></span><span style=display:flex><span>Polaris
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Compute engine
+</span></span><span style=display:flex><span>    |
+</span></span><span style=display:flex><span>    | authorize object reads and writes
+</span></span><span style=display:flex><span>    v
+</span></span><span style=display:flex><span>Object storage or HDFS</span></span></code></pre></div></div></div><p>デプロイメントでは、固定のエンジン認証情報またはサポートされる認証情報発行設計を
+使用できます。認証情報の発行では、広範で長期間有効なストレージ認証情報を配布する代わりに、
+認証済みクライアントへ範囲を限定した一時的なストレージアクセスを提供します。正確な動作は
+Polaris のリリース、ストレージバックエンド、エンジン統合によって異なります。</p><p>カタログポリシーとストレージポリシーは一致していなければなりません。コントロール
+プレーンの拒否とデータプレーンの拒否を両方テストしてください。</p><ul><li>プリンシパルはカタログと名前空間を発見できるか</li><li>テーブルを読み込みまたは変更できるか</li><li>エンジンは既存のメタデータとデータファイルを読み取れるか</li><li>ライターはファイルを作成し、カタログコミットを完了できるか</li><li>操作後も認証情報で無関係なプレフィックスにアクセスできるか</li></ul><p>TLS、シークレットストレージ、認証情報のローテーション、監査記録、クロック同期は、
+引き続きデプロイメントの責任です。</p><h2 id=カタログをコントロールプレーンサービスとして運用する>カタログをコントロールプレーンサービスとして運用する
+<a href=#%e3%82%ab%e3%82%bf%e3%83%ad%e3%82%b0%e3%82%92%e3%82%b3%e3%83%b3%e3%83%88%e3%83%ad%e3%83%bc%e3%83%ab%e3%83%97%e3%83%ac%e3%83%bc%e3%83%b3%e3%82%b5%e3%83%bc%e3%83%93%e3%82%b9%e3%81%a8%e3%81%97%e3%81%a6%e9%81%8b%e7%94%a8%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Polaris はクエリのデータパス外にありますが、その可用性はテーブルの検出とコミットに
+影響します。耐久性のあるコントロールプレーンインフラストラクチャとして運用してください。</p><ul><li>サポートされる高可用性トポロジーを実行する</li><li>永続状態を保護し、バックアップする</li><li>リクエストレイテンシ、エラー率、認証失敗、コミット競合を監視する</li><li>カタログと権限の変更について監査記録を保持する</li><li>サポートされる Iceberg API に基づいてサーバーとクライアントのアップグレードを調整する</li><li>ストレージファイルだけでカタログオブジェクトやポリシーをすべて復元できるとは仮定せず、復元をテストする</li></ul><p>ストレージについては、書き込み失敗による残骸、期限切れスナップショット、小さなファイル、
+過大なマニフェスト、削除ファイルの蓄積を別途監視してください。これらは Iceberg テーブル
+保守の問題であり、Polaris がテーブルデータをスキャンまたは書き換えるべきだという証拠ではありません。</p><h2 id=よくある誤解を避ける>よくある誤解を避ける
+<a href=#%e3%82%88%e3%81%8f%e3%81%82%e3%82%8b%e8%aa%a4%e8%a7%a3%e3%82%92%e9%81%bf%e3%81%91%e3%82%8b class=heading-anchor><span>#</span></a></h2><h3 id=polaris-は計算エンジンではない>Polaris は計算エンジンではない
+<a href=#polaris-%e3%81%af%e8%a8%88%e7%ae%97%e3%82%a8%e3%83%b3%e3%82%b8%e3%83%b3%e3%81%a7%e3%81%af%e3%81%aa%e3%81%84 class=heading-anchor><span>#</span></a></h3><p>Polaris は Spark、Flink、Trino と競合しません。これらのエンジンが Polaris を使用します。</p><h3 id=iceberg-はファイル形式ではない>Iceberg はファイル形式ではない
+<a href=#iceberg-%e3%81%af%e3%83%95%e3%82%a1%e3%82%a4%e3%83%ab%e5%bd%a2%e5%bc%8f%e3%81%a7%e3%81%af%e3%81%aa%e3%81%84 class=heading-anchor><span>#</span></a></h3><p>Iceberg はテーブル形式です。データファイルには通常、Parquet、ORC、Avro が使用されます。</p><h3 id=カタログはテーブルのメタデータツリー全体ではない>カタログはテーブルのメタデータツリー全体ではない
+<a href=#%e3%82%ab%e3%82%bf%e3%83%ad%e3%82%b0%e3%81%af%e3%83%86%e3%83%bc%e3%83%96%e3%83%ab%e3%81%ae%e3%83%a1%e3%82%bf%e3%83%87%e3%83%bc%e3%82%bf%e3%83%84%e3%83%aa%e3%83%bc%e5%85%a8%e4%bd%93%e3%81%a7%e3%81%af%e3%81%aa%e3%81%84 class=heading-anchor><span>#</span></a></h3><p>Polaris はカタログ状態と現在のテーブルメタデータ参照を管理します。Iceberg のメタデータ
+ファイルとマニフェストは通常、HDFS またはオブジェクトストレージでテーブルデータと一緒に保存されます。</p><h3 id=オブジェクトストアのファイルは自動的にテーブル行にはならない>オブジェクトストアのファイルは自動的にテーブル行にはならない
+<a href=#%e3%82%aa%e3%83%96%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88%e3%82%b9%e3%83%88%e3%82%a2%e3%81%ae%e3%83%95%e3%82%a1%e3%82%a4%e3%83%ab%e3%81%af%e8%87%aa%e5%8b%95%e7%9a%84%e3%81%ab%e3%83%86%e3%83%bc%e3%83%96%e3%83%ab%e8%a1%8c%e3%81%ab%e3%81%af%e3%81%aa%e3%82%89%e3%81%aa%e3%81%84 class=heading-anchor><span>#</span></a></h3><p>コミット済み Iceberg スナップショットから参照されるファイルだけがテーブルに属します。
+ディレクトリに存在するだけでは不十分です。</p><h3 id=rest-互換性は同一の-sql-を保証しない>REST 互換性は同一の SQL を保証しない
+<a href=#rest-%e4%ba%92%e6%8f%9b%e6%80%a7%e3%81%af%e5%90%8c%e4%b8%80%e3%81%ae-sql-%e3%82%92%e4%bf%9d%e8%a8%bc%e3%81%97%e3%81%aa%e3%81%84 class=heading-anchor><span>#</span></a></h3><p>2 つのエンジンは Polaris カタログと同じ Iceberg テーブルを共有できますが、SQL 構文、
+型処理、サポートされる Iceberg 機能、書き込みセマンティクス、認可統合は異なる可能性があります。
+対象のエンジン、コネクター、Iceberg 形式バージョン、Polaris リリースの組み合わせを確認してください。</p><h2 id=コンポーネントを意図的に選択する>コンポーネントを意図的に選択する
+<a href=#%e3%82%b3%e3%83%b3%e3%83%9d%e3%83%bc%e3%83%8d%e3%83%b3%e3%83%88%e3%82%92%e6%84%8f%e5%9b%b3%e7%9a%84%e3%81%ab%e9%81%b8%e6%8a%9e%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>複数の Iceberg 対応エンジンで共有する、ベンダー中立の REST カタログと中央の認可境界が
+必要な場合、Polaris は有用です。Iceberg テーブルが存在しない環境や、既存カタログが
+相互運用性、ガバナンス、運用要件をすでに満たしている場合、Polaris の有用性は低くなります。</p><p>各レイヤーを独立して評価してください。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Decision</th><th>Questions</th></tr></thead><tbody><tr><td>Compute engine</td><td>Which SQL, batch, streaming, or ML workloads must run?</td></tr><tr><td>Catalog</td><td>Which engines support its API, and how are privileges managed?</td></tr><tr><td>Table format</td><td>Which Iceberg versions and features can every writer handle?</td></tr><tr><td>File format</td><td>Which types, compression codecs, and readers are required?</td></tr><tr><td>Storage</td><td>What consistency, latency, lifecycle, and credential model applies?</td></tr></tbody></table></div></div><p>単一のコンポーネントだけでスタックがレイクハウスになるわけではありません。カタログ、
+テーブル形式、エンジン、ストレージが、コミット、セキュリティ、サポート対象機能について
+合意すると、アーキテクチャは機能します。</p><h2 id=公式リファレンス>公式リファレンス
+<a href=#%e5%85%ac%e5%bc%8f%e3%83%aa%e3%83%95%e3%82%a1%e3%83%ac%e3%83%b3%e3%82%b9 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://polaris.apache.org/>Apache Polaris</a></li><li><a href=https://iceberg.apache.org/docs/latest/>Apache Iceberg documentation</a></li><li><a href=https://iceberg.apache.org/spec/>Iceberg table specification</a></li><li><a href=https://iceberg.apache.org/rest-catalog-spec/>Iceberg REST Catalog specification</a></li><li><a href=https://doris.apache.org/docs/3.x/lakehouse/best-practices/doris-polaris/>Apache Doris and Polaris integration</a></li><li><a href=https://polaris.apache.org/guides/flink/>Apache Polaris and Flink guide</a></li><li><a href=https://polaris.apache.org/guides/spark/>Apache Polaris and Spark guide</a></li><li><a href=https://docs.dremio.com/current/data-sources/lakehouse-catalogs/iceberg-rest-catalog/>Dremio Iceberg REST Catalog documentation</a></li><li><a href=https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/>StarRocks Iceberg catalog documentation</a></li><li><a href=https://polaris.apache.org/guides/trino/>Apache Polaris and Trino guide</a></li><li><a href=https://trino.io/docs/current/connector/iceberg.html>Trino Iceberg connector documentation</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/apache-polaris-and-iceberg/ class=language-option data-lang=en>English
+</a><a href=/ja/apache-polaris-and-iceberg/ class=language-option data-lang=ja>日本語</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

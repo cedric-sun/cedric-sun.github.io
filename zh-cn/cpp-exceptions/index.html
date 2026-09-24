@@ -1,0 +1,71 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>C++ 异常与异常安全</title></head><body><main><article><div class=article-header><h1>C++ 异常与异常安全</h1><div class=aux>最后更新: 2024-05-28 17:55:25 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/c-plus-plus/>C-Plus-Plus</a>
+|
+<a href=/zh-cn/tags/language/>Language</a></div></div><div class="translation-notice machine-translated"><a href=/cpp-exceptions/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>异常将失败操作的报告与将其传播到能够响应的边界分离。
+异常把控制权转移给匹配的处理器；控制向外传播时，C++ 会按构造的逆序销毁所有退出作用域中已完全构造的自动对象。
+资源获取即初始化（RAII）因此使正常清理路径和异常清理路径相同。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>void</span> <span style=color:#a6e22e>load_configuration</span>(std<span style=color:#f92672>::</span>filesystem<span style=color:#f92672>::</span>path path) {
+</span></span><span style=display:flex><span>    std<span style=color:#f92672>::</span>ifstream input{path};             <span style=color:#75715e>// Closed during unwinding.
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>input) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>throw</span> std<span style=color:#f92672>::</span>runtime_error{<span style=color:#e6db74>&#34;cannot open configuration&#34;</span>};
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// Parsing may throw; input still closes.
+</span></span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>    load_configuration(<span style=color:#e6db74>&#34;app.conf&#34;</span>);
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>catch</span> (<span style=color:#66d9ef>const</span> std<span style=color:#f92672>::</span>exception<span style=color:#f92672>&amp;</span> error) {
+</span></span><span style=display:flex><span>    report(error.what());
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>按值抛出异常对象，并通过 <code>const</code> 引用捕获多态异常类型。
+按值捕获基类异常会切割派生对象。<code>catch (...)</code> 只能位于能够恢复不变量、转换错误或有意终止的边界；
+不得在状态已损坏时静默继续。</p><h2 id=展开和-raii>展开和 RAII
+<a href=#%e5%b1%95%e5%bc%80%e5%92%8c-raii class=heading-anchor><span>#</span></a></h2><p>抛出异常的构造函数不会产生完成的对象，但其已完全构造的基类和成员子对象仍会运行析构函数。
+析构函数不能在另一个异常活动期间让异常逸出，因为这会调用 <code>std::terminate</code>。
+因此析构函数、智能指针删除器和回滚保护器都应不抛出异常。
+清理可能失败时，应暴露一个在销毁前报告失败的显式操作。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Transaction</span> {
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>explicit</span> Transaction(Database<span style=color:#f92672>&amp;</span> db) <span style=color:#f92672>:</span> db_{db} { db_.begin(); }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>commit</span>() {
+</span></span><span style=display:flex><span>        db_.commit();
+</span></span><span style=display:flex><span>        committed_ <span style=color:#f92672>=</span> true;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>~</span>Transaction() <span style=color:#66d9ef>noexcept</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>committed_) {
+</span></span><span style=display:flex><span>            db_.rollback_noexcept();
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    Database<span style=color:#f92672>&amp;</span> db_;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>bool</span> committed_ <span style=color:#f92672>=</span> false;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>析构函数只尝试回滚；<code>commit()</code> 仍是可能报告错误的操作。
+每个公共操作都必须定义失败后保留的状态。</p><h2 id=异常安全保证>异常安全保证
+<a href=#%e5%bc%82%e5%b8%b8%e5%ae%89%e5%85%a8%e4%bf%9d%e8%af%81 class=heading-anchor><span>#</span></a></h2><p>操作可以声明以下保证之一：</p><ol><li><strong>不抛出保证：</strong> 不传播异常。</li><li><strong>强保证：</strong> 如果失败，可观察状态不变。</li><li><strong>基本保证：</strong> 不变量成立且资源不泄漏，但状态可能改变。</li></ol><p>不能仅因为类型使用 RAII，就推断其保证超过基本保证。
+RAII 防止泄漏，但不会恢复被覆盖的值或外部副作用。
+对于可能抛出的修改操作，应记录其保证。</p><h3 id=提交回滚和不变量>提交、回滚和不变量
+<a href=#%e6%8f%90%e4%ba%a4%e5%9b%9e%e6%bb%9a%e5%92%8c%e4%b8%8d%e5%8f%98%e9%87%8f class=heading-anchor><span>#</span></a></h3><p>强保证遵循准备-提交结构：在替换状态中执行可能抛出的工作，然后执行不抛出的提交。
+提交通常是 <code>swap</code>、指针替换或数据库事务提交。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>void</span> Account<span style=color:#f92672>::</span>replace_limits(Limits requested) {
+</span></span><span style=display:flex><span>    requested.validate();                  <span style=color:#75715e>// May throw; `limits_` is unchanged.
+</span></span></span><span style=display:flex><span>    limits_.swap(requested);               <span style=color:#75715e>// Commit must not throw.
+</span></span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>当替换状态成本过高或外部操作无法撤销时，应采用基本保证。
+定义调用方在每次失败后都能依赖的不变量，例如“对象仍可使用且余额非负”。
+外部系统没有事务或补偿操作时，不要声称不可逆副作用已经回滚。</p><h2 id=noexcept-是终止契约><code>noexcept</code> 是终止契约
+<a href=#noexcept-%e6%98%af%e7%bb%88%e6%ad%a2%e5%a5%91%e7%ba%a6 class=heading-anchor><span>#</span></a></h2><p><code>noexcept</code> 会在某些场景改变函数类型，并承诺逸出函数的异常会导致 <code>std::terminate</code>。
+它不会抑制异常，也不会按定义让函数体更快。
+当终止是预期响应且每个被调用操作都符合该契约时，才标记函数为 <code>noexcept</code>。</p><p>除非另行声明，析构函数隐式不抛出。只有当调用方能在非展开路径捕获析构异常时，
+显式将析构函数设为 <code>noexcept(false)</code> 才合适；如果另一个异常已经在传播，这仍不安全。</p><p><code>noexcept</code> 也会影响标准库策略。例如 <code>std::vector</code> 重新分配时，
+如果元素移动构造函数不抛出，它可以移动元素并保持强保证。
+如果移动可能抛出而复制可用，实现可以改为复制。
+如果移动可能抛出且复制不可用，vector 可能无法为该次重新分配提供强保证。
+这是容器特定的后果，不是虚假标记操作为 <code>noexcept</code> 的理由。</p><h2 id=设计异常边界>设计异常边界
+<a href=#%e8%ae%be%e8%ae%a1%e5%bc%82%e5%b8%b8%e8%be%b9%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>保持普通代码对异常中立：使用拥有对象获取资源，在本地维护不变量，
+并让失败到达了解恢复策略的层。需要目标错误模型时，在进程、请求、线程或外部函数边界转换异常。
+绝不允许 C++ 异常跨越不允许异常的接口。</p><p>异常不是验证的替代品。在修改前验证前置条件；当失败属于正常的局部控制流时，
+使用 C++23 <code>std::expected</code> 等返回值；当调用方需要非局部传播且清理可靠时使用异常。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cpp-exceptions/ class=language-option data-lang=en>English
+</a><a href=/ja/cpp-exceptions/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cpp-exceptions/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cpp-exceptions/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

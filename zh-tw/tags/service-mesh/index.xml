@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Service-Mesh on cesun.life</title><link>https://example.org/zh-tw/tags/service-mesh/</link><description>Recent content in Service-Mesh on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Fri, 28 Apr 2023 08:11:31 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/service-mesh/index.xml" rel="self" type="application/rss+xml"/><item><title>Istio</title><link>https://example.org/zh-tw/istio/</link><pubDate>Fri, 28 Apr 2023 08:11:31 +0800</pubDate><guid>https://example.org/zh-tw/istio/</guid><description>&lt;p&gt;Istio 透過 Envoy 代理程式與控制平面設定，對工作負載套用流量政策、身分識別、遙測與安全性政策。只有當這些橫切需求足以合理化額外的營運面時，才應採用 Istio。&lt;/p&gt;
+&lt;h2 id="資料平面與控制平面"&gt;
+ 資料平面與控制平面
+ &lt;a href="#%e8%b3%87%e6%96%99%e5%b9%b3%e9%9d%a2%e8%88%87%e6%8e%a7%e5%88%b6%e5%b9%b3%e9%9d%a2" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;資料平面由 Envoy sidecar，或由每個節點上的 ztunnel 與選用的 waypoint 代理程式組成的 ambient 部署構成。&lt;code&gt;istiod&lt;/code&gt; 透過 xDS 計算並分發服務探索、憑證與流量設定。工作負載路徑會依據所選模式擷取入站與出站流量；繞過該路徑的流量無法由網格政策管理。Ambient 模式與 sidecar 的 L4/L7 強制執行位置不同，因此遷移時必須驗證每項政策的執行位置。&lt;/p&gt;
+&lt;h2 id="流量管理"&gt;
+ 流量管理
+ &lt;a href="#%e6%b5%81%e9%87%8f%e7%ae%a1%e7%90%86" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;Gateway&lt;/code&gt; 與 &lt;code&gt;VirtualService&lt;/code&gt; 資源定義入口監聽器與路由規則。&lt;code&gt;DestinationRule&lt;/code&gt; 定義目的地的子集、負載平衡、連線與 TLS 政策。使用 &lt;code&gt;version&lt;/code&gt; 等穩定標籤進行路由，並確保子集使用的標籤存在於工作負載上。&lt;/p&gt;
+&lt;p&gt;加權路由可以將測得比例的流量從穩定子集轉移至金絲雀版本。標頭或身分識別比對可以先將測試流量導向目標。每項變更都必須以代理程式設定收斂與工作負載健康狀態為條件；路由權重無法補償缺少的端點或錯誤的子集選取器。&lt;/p&gt;
+&lt;p&gt;重試、逾時、斷路器與故障注入會改變失敗行為。依呼叫端的截止時間設定預算；不受限制的重試政策可能放大過載，並重複執行不可等冪的工作。&lt;/p&gt;
+&lt;h2 id="身分識別與安全性"&gt;
+ 身分識別與安全性
+ &lt;a href="#%e8%ba%ab%e5%88%86%e8%ad%98%e5%88%a5%e8%88%87%e5%ae%89%e5%85%a8%e6%80%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Istio 根據 Kubernetes 服務帳戶簽發工作負載身分識別，並可在代理程式之間使用相互 TLS。確認每個必要的工作負載都參與網格後，使用 &lt;code&gt;AuthorizationPolicy&lt;/code&gt; 強制執行授權。遷移初期僅為找出未受管理的流量而使用 permissive 模式，接著依照明確的遷移計畫轉為 strict 相互 TLS。&lt;/p&gt;
+&lt;p&gt;使用 &lt;code&gt;PeerAuthentication&lt;/code&gt; 設定 mTLS 狀態；在需要時使用 &lt;code&gt;RequestAuthentication&lt;/code&gt; 驗證終端使用者 JWT，並使用 &lt;code&gt;AuthorizationPolicy&lt;/code&gt; 做出存取決策。工作負載身分識別不能取代針對租戶或業務權限的應用程式授權。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;istiod&lt;/code&gt; 會充當憑證授權單位或與外部 CA 整合，接著在短效期工作負載憑證到期前輪替憑證。監控憑證簽發、根憑證轉換、信任網域設定與時鐘偏差。在根憑證輪替期間，應先分發重疊的信任關係，再替換葉憑證，讓舊工作負載與新工作負載可以彼此驗證。&lt;/p&gt;
+&lt;h2 id="營運"&gt;
+ 營運
+ &lt;a href="#%e7%87%9f%e9%81%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;有意識地管理網格控制平面與資料平面的版本，在推出前檢視分析器輸出，並監控代理程式資源使用量、憑證到期時間與設定收斂狀態。使用 &lt;code&gt;istioctl proxy-status&lt;/code&gt; 與 &lt;code&gt;istioctl proxy-config&lt;/code&gt; 診斷代理程式實際收到的內容，而不要依賴原本預期套用的 YAML。&lt;/p&gt;</description></item></channel></rss>

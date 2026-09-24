@@ -1,0 +1,1380 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Kernel Build System</title></head><body><main><article><div class=article-header><h1>Linux Kernel Build System</h1><div class=aux>Last update: 2026-02-04 03:53:53 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/kbuild/>Kbuild</a>
+|
+<a href=/tags/kernel/>Kernel</a>
+|
+<a href=/tags/linux/>Linux</a>
+|
+<a href=/tags/makefiles/>Makefiles</a></div></div><div class=article-content><p>The Linux kernel uses GNU Make and Kbuild to configure, compile, link, and install the
+kernel and its modules. A normal build starts with a configuration target and then
+builds the default target:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>make defconfig
+</span></span><span style=display:flex><span>make -j<span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span>nproc<span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span></span></span></code></pre></div></div></div><p>The principal result is <code>vmlinux</code>, an ELF executable. Architectures may additionally
+produce bootable wrappers such as <code>bzImage</code>, <code>zImage</code>, or <code>vmlinuz</code>. Loadable modules
+are ELF relocatable objects linked into <code>.ko</code> files.</p><h2 id=source-and-output-trees>Source and Output Trees
+<a href=#source-and-output-trees class=heading-anchor><span>#</span></a></h2><p>An in-tree build has identical <code>srctree</code> and <code>objtree</code>. An out-of-tree build keeps
+generated files separate:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mkdir build
+</span></span><span style=display:flex><span>make O<span style=color:#f92672>=</span>build defconfig
+</span></span><span style=display:flex><span>make -C build -j<span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span>nproc<span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span></span></span></code></pre></div></div></div><p><code>make clean</code> removes most generated files while retaining enough support for external
+modules. <code>make mrproper</code> also removes configuration and generated headers, and
+<code>make distclean</code> additionally removes editor backup and patch files.</p><h2 id=configuration>Configuration
+<a href=#configuration class=heading-anchor><span>#</span></a></h2><p><code>make *config</code> targets build and run a Kconfig front end, such as <code>conf</code> for
+<code>oldconfig</code> or <code>mconf</code> for <code>menuconfig</code>. Kconfig files distributed through the source
+tree define the option hierarchy. The selected values are written to <code>.config</code> and
+then transformed into <code>include/config/auto.conf</code>,
+<code>include/generated/autoconf.h</code>, and per-symbol files under <code>include/config/</code>.</p><p>The root Makefile determines <code>SUBARCH</code> from the host, accepts <code>ARCH</code> for a target
+architecture, and derives <code>SRCARCH</code> for source directories. Cross-compiles normally
+specify at least <code>ARCH</code> and a toolchain prefix or compiler.</p><h2 id=makefile-layers>Makefile Layers
+<a href=#makefile-layers class=heading-anchor><span>#</span></a></h2><p>The root <code>Makefile</code> is the entry point. It includes architecture Makefiles and utility
+snippets such as <code>scripts/Kbuild.include</code>, <code>scripts/Makefile.compiler</code>, and
+configuration-dependent <code>scripts/Makefile.*</code> fragments. These snippets define shared
+functions, compiler flags, and rules rather than each subsystem&rsquo;s object list.</p><p>Each source directory supplies a <code>Makefile</code> or, where necessary, a <code>Kbuild</code> file.
+<code>Kbuild</code> takes precedence. These files normally declare inputs rather than duplicate
+generic rules:</p><ul><li><code>obj-y</code> adds objects or subdirectories built into <code>vmlinux</code>.</li><li><code>obj-m</code> adds loadable-module inputs.</li><li><code>lib-y</code> and <code>lib-m</code> contribute archive members.</li><li><code>always-y</code> names targets that should always be built.</li><li><code>hostprogs</code> names tools built for the build host.</li></ul><p>An object-list entry can name <code>foo.o</code> or <code>foo/</code>; the trailing slash requests recursive
+descent into that subdirectory. Configuration-controlled forms such as
+<code>obj-$(CONFIG_FOO) += foo.o</code> select an input when a symbol is <code>y</code> or <code>m</code>.</p><h2 id=subdirectory-builds>Subdirectory Builds
+<a href=#subdirectory-builds class=heading-anchor><span>#</span></a></h2><p>The root build invokes a directory through:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#66d9ef>$(</span>MAKE<span style=color:#66d9ef>)</span> $(build)<span style=color:#f92672>=</span>path/to/directory
+</span></span></code></pre></div></div></div><p><code>build</code> expands to <code>-f scripts/Makefile.build obj</code>, so this starts a sub-make using
+<code>scripts/Makefile.build</code> while passing the target directory as <code>obj</code>. That Makefile
+loads the directory&rsquo;s <code>Kbuild</code> or <code>Makefile</code>, then <code>scripts/Makefile.lib</code>, which
+normalizes the declared variables and supplies generic compilation and archive rules.
+This division lets subsystem Makefiles focus on selecting sources. It also keeps
+dependencies local: a directory invokes a sub-make rather than reaching directly into
+another directory&rsquo;s outputs.</p><p><code>scripts/Makefile.host</code> supplies rules for host tools. The <code>hostprogs-always-y</code>
+shortcut adds host programs to the always-built set; a host program with no
+<code>foo-objs</code>, <code>foo-cxxobjs</code>, or Rust object list is compiled from its conventional
+single source.</p><h2 id=commands-and-incremental-dependencies>Commands and Incremental Dependencies
+<a href=#commands-and-incremental-dependencies class=heading-anchor><span>#</span></a></h2><p>Kbuild names reusable recipes with <code>cmd_&lt;name></code> and concise quiet output with
+<code>quiet_cmd_&lt;name></code>. For example, <code>$(call cmd,foo)</code> runs <code>cmd_foo</code> and selects the
+quiet or verbose log according to <code>V=</code>.</p><p>The <code>if_changed</code>, <code>if_changed_dep</code>, and <code>if_changed_rule</code> helpers run a recipe when a
+prerequisite is newer, the command line has changed, or a target is missing.
+<code>if_changed_dep</code> additionally processes compiler dependency information. Generated
+hidden <code>.cmd</code> files record the saved command and dependencies for outputs such as
+objects, archives, generated headers, modules, and <code>vmlinux</code>. This makes a changed
+compiler option or Kconfig symbol a valid reason to rebuild an affected target, not
+just a changed source timestamp.</p><h2 id=link-and-installation-results>Link and Installation Results
+<a href=#link-and-installation-results class=heading-anchor><span>#</span></a></h2><p>Directory objects are gathered into <code>built-in.a</code> archives for the built-in kernel or
+into module inputs. The final link creates <code>vmlinux</code>; architecture-specific rules may
+then wrap, compress, sign, or package it. Module post-processing resolves exported
+symbols, emits metadata, and produces <code>.ko</code> files. <code>make modules_install</code> installs
+modules and runs the installation rules, while architecture-specific install targets
+place the kernel image where the boot environment expects it.</p><h2 id=migrated-reference-material>Migrated Reference Material
+<a href=#migrated-reference-material class=heading-anchor><span>#</span></a></h2><p>This article analyzes the building process of the Linux kernel, including the implementation of <code>Makefile</code>s. Various build-time generated files and build techniques are discussed.</p><p>It is well-known that the Linux kernel should be built by <code>make *config</code> followed by a <code>make</code> call without a goal.
+The <code>make *config</code> command does nothing more than invoke a wizard program, which may include compiling that wizard program first.
+It&rsquo;s the wizard program&rsquo;s responsibility to properly generate a <code>.config</code> file which holds the user&rsquo;s choice on the kernel building configs.</p><p>The wizard program usually reads various <code>Kconfig</code> files in the source tree to determine what kernel build options are devised by the kernel developer, and in what structure these options should be displayed to an end user.
+The <code>Kconfig</code> system won&rsquo;t be discussed as a part of a kernel&rsquo;s build here.
+See <a href=/linux-kconfig/>this article</a> for an intro to the syntax of a <code>Kconfig</code> file and the rules of writing one.</p><p>Before a build, it&rsquo;s recommended to invoke 1 of the 3 clean targets:</p><ul><li><code>clean</code>: Remove most generated files but keep the config and enough build support to build external modules</li><li><code>mrproper</code> (more proper): Remove all generated files + config + various backup files</li><li><code>distclean</code> (clean for distribution): <code>mrproper</code> + remove editor backup and patch files</li></ul><h3 id=out-of-source-build>Out-of-source Build
+<a href=#out-of-source-build class=heading-anchor><span>#</span></a></h3><p>Linux supports out-of-source build by an <code>O=dir</code> make CLI argument:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>cd linux-6.8.2
+</span></span><span style=display:flex><span>mkdir build
+</span></span><span style=display:flex><span>make O<span style=color:#f92672>=</span>build defconfig
+</span></span><span style=display:flex><span>cd build
+</span></span><span style=display:flex><span>make -j12</span></span></code></pre></div></div></div><p>In the Makefile, the source directory is referred to by the <code>$(srctree)</code> variable while the build directory is the <code>$(objtree)</code>.
+If the <code>O=dir</code> argument is not used, both will be the same.</p><p>A kernel build is initiated by calling a plain <code>make</code> on the build directory.
+This <code>Makefile</code>-based system also must support future repetitive invocation of <code>make</code> by detecting modifications and building only the necessary parts. The <code>make</code> interface is also versatile and assumes jobs of different nature (clean, generate configs, build modules, build the vmlinux), bringing complexity to the implementation of <code>Makefile</code>s.</p><p>We will be exploring how the <code>Makefile</code> pieces are put together to achieve this.</p><h2 id=overview>Overview
+<a href=#overview class=heading-anchor><span>#</span></a></h2><p>The Makefile-based build system of Linux consists of 4 types of file:</p><ol><li><p>The root <code>Makefile</code>. It is the entrance of make execution.</p></li><li><p><code>scripts/Kbuild.include</code> and <code>scripts/Makefile.*</code></p><p>These are auxillary <code>Makefile</code> snippets that implement utilities and variables used by othe <code>Makefile</code>s, instead of defining build rules for the kernel.</p></li><li><p>The <code>Makefile</code>s in each directory of source tree, including <code>scripts/Makefile</code>.</p><p>These files append string values to certain well-known variables, including <code>obj-y</code>, <code>obj-m</code>, etc., rather than introducing new Makefile rules.</p></li><li><p>Build time generated <code>.&lt;output_filename>.cmd</code> and <code>.&lt;output_filename>.d</code> in build tree, both being Makefile snipppets.</p><p>They contain only Makefile rules (i.e. dependency) for <code>&lt;output_filename></code>.</p></li></ol><h2 id=the-root-makefile>The Root Makefile
+<a href=#the-root-makefile class=heading-anchor><span>#</span></a></h2><p>A lot about the mechanics can be learned by inspecting the root <code>Makefile</code>, the very first file a <code>make</code> process parses and executes.</p><p>The following pseudo-code briefly describes the root Makefile:</p><div class=jose-wrapper><div class=jose-tools><span>go</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>make_single</span>(<span style=color:#a6e22e>target</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>include</span> <span style=color:#e6db74>`scripts/Kbuild.include`</span> <span style=color:#66d9ef>for</span> <span style=color:#a6e22e>utils</span> <span style=color:#a6e22e>functions</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>load</span> <span style=color:#a6e22e>ARCH</span> <span style=color:#a6e22e>SRCARCH</span> <span style=color:#a6e22e>etc</span>. <span style=color:#a6e22e>variables</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>set</span> <span style=color:#a6e22e>compilerinclude</span> <span style=color:#a6e22e>path</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>load</span> <span style=color:#a6e22e>include</span> <span style=color:#960050;background-color:#1e0010>$</span>(<span style=color:#a6e22e>srctree</span>)<span style=color:#f92672>/</span><span style=color:#a6e22e>scripts</span><span style=color:#f92672>/</span><span style=color:#a6e22e>Makefile</span>.<span style=color:#a6e22e>compiler</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>target</span> <span style=color:#a6e22e>matches</span> <span style=color:#960050;background-color:#1e0010>&#39;</span><span style=color:#f92672>*</span><span style=color:#a6e22e>config</span><span style=color:#960050;background-color:#1e0010>&#39;</span>) {
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// if this is a config build (i.e. we are generating .config)</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>make</span> <span style=color:#f92672>-</span><span style=color:#a6e22e>f</span> <span style=color:#e6db74>`scripts/Kconfig/Makefile`</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>config</span>
+</span></span><span style=display:flex><span>    } <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// non config build includes</span>
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// 1. the actual vmlinuz or modules</span>
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// 2. arch-specific targets</span>
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// 3. clean</span>
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// 4.</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>load</span> <span style=color:#a6e22e>include</span><span style=color:#f92672>/</span><span style=color:#a6e22e>config</span><span style=color:#f92672>/</span><span style=color:#a6e22e>auto</span>.<span style=color:#a6e22e>conf</span> (.<span style=color:#a6e22e>config</span> <span style=color:#a6e22e>as</span> <span style=color:#a6e22e>Makefile</span> <span style=color:#a6e22e>variables</span>)
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>load</span> <span style=color:#960050;background-color:#1e0010>$</span>(<span style=color:#a6e22e>srctree</span>)<span style=color:#f92672>/</span><span style=color:#a6e22e>arch</span><span style=color:#f92672>/</span><span style=color:#960050;background-color:#1e0010>$</span>(<span style=color:#a6e22e>SRCARCH</span>)<span style=color:#f92672>/</span><span style=color:#a6e22e>Makefile</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>load</span> <span style=color:#a6e22e>include</span><span style=color:#f92672>/</span><span style=color:#a6e22e>config</span><span style=color:#f92672>/</span><span style=color:#a6e22e>auto</span>.<span style=color:#a6e22e>conf</span>.<span style=color:#a6e22e>cmd</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>compiler</span> <span style=color:#a6e22e>flag</span> <span style=color:#a6e22e>adjustment</span>, <span style=color:#a6e22e>depending</span> <span style=color:#a6e22e>on</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#e6db74>`make M=...`</span> <span style=color:#a6e22e>or</span> <span style=color:#e6db74>`make KBUILD_EXTMOD=...`</span> <span style=color:#a6e22e>set</span>) {
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>`__all: modules`</span>: <span style=color:#66d9ef>default</span> <span style=color:#a6e22e>goal</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>to</span> <span style=color:#a6e22e>build</span> <span style=color:#e6db74>`modules`</span>
+</span></span><span style=display:flex><span>        } <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>`__all: all`</span>: <span style=color:#66d9ef>default</span> <span style=color:#a6e22e>goal</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>to</span> <span style=color:#a6e22e>build</span> <span style=color:#e6db74>`modules`</span>
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> make(<span style=color:#a6e22e>targets</span>, <span style=color:#a6e22e>need</span><span style=color:#f92672>-</span><span style=color:#a6e22e>submake</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>need</span><span style=color:#f92672>-</span><span style=color:#a6e22e>submake</span> = <span style=color:#ae81ff>1</span>) {
+</span></span><span style=display:flex><span>        make(<span style=color:#a6e22e>targets</span>, <span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span>;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> <span style=color:#a6e22e>each</span> (<span style=color:#a6e22e>target</span> <span style=color:#a6e22e>in</span> <span style=color:#a6e22e>targets</span>)
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>make_single</span>(<span style=color:#a6e22e>target</span>)
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><h2 id=scriptskbuildinclude-and-scriptsmakefile-makefile-utility-snippets><code>scripts/Kbuild.include</code> and <code>scripts/Makefile.*</code>: Makefile utility snippets
+<a href=#scriptskbuildinclude-and-scriptsmakefile-makefile-utility-snippets class=heading-anchor><span>#</span></a></h2><p>Used by</p><ul><li><code>$(MAKE) $(asm-generic)=&lt;dir></code></li><li><code>$(MAKE) $(build)=&lt;dir></code></li><li><code>$(MAKE) $(clean)=&lt;dir></code></li><li><code>$(MAKE) $(dtbinst)=&lt;dir></code></li><li><code>$(MAKE) $(hdr-inst)=&lt;dir></code></li></ul><p>respectively as sub-make target.</p><p>Included by root Makefile if certain config option is turned on:</p><div class=jose-wrapper><div class=jose-tools><span>Makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Makefile data-lang=Makefile><span style=display:flex><span><span style=color:#75715e># Include Additional Makefiles When Needed
+</span></span></span><span style=display:flex><span>include-y			<span style=color:#f92672>:=</span> scripts/Makefile.extrawarn
+</span></span><span style=display:flex><span>include-$(CONFIG_DEBUG_INFO)	<span style=color:#f92672>+=</span> scripts/Makefile.debug
+</span></span><span style=display:flex><span>include-$(CONFIG_DEBUG_INFO_BTF)<span style=color:#f92672>+=</span> scripts/Makefile.btf
+</span></span><span style=display:flex><span>include-$(CONFIG_KASAN)		<span style=color:#f92672>+=</span> scripts/Makefile.kasan
+</span></span><span style=display:flex><span>include-$(CONFIG_KCSAN)		<span style=color:#f92672>+=</span> scripts/Makefile.kcsan
+</span></span><span style=display:flex><span>include-$(CONFIG_KMSAN)		<span style=color:#f92672>+=</span> scripts/Makefile.kmsan
+</span></span><span style=display:flex><span>include-$(CONFIG_UBSAN)		<span style=color:#f92672>+=</span> scripts/Makefile.ubsan
+</span></span><span style=display:flex><span>include-$(CONFIG_KCOV)		<span style=color:#f92672>+=</span> scripts/Makefile.kcov
+</span></span><span style=display:flex><span>include-$(CONFIG_RANDSTRUCT)	<span style=color:#f92672>+=</span> scripts/Makefile.randstruct
+</span></span><span style=display:flex><span>include-$(CONFIG_GCC_PLUGINS)	<span style=color:#f92672>+=</span> scripts/Makefile.gcc-plugins
+</span></span></code></pre></div></div></div><p>Included by the root Makefile if this make invocation will require a compiler:</p><div class=jose-wrapper><div class=jose-tools><span>Makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Makefile data-lang=Makefile><span style=display:flex><span><span style=color:#75715e># Include This Also for Config Targets Because Some Architectures Need
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Cc-cross-prefix to Determine CROSS_COMPILE.
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifdef</span> <span style=color:#960050;background-color:#1e0010>need-compiler</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Makefile.compiler</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span></span></span></code></pre></div></div></div><p>Included by root Makefile if <code>CC</code> is clang:</p><div class=jose-wrapper><div class=jose-tools><span>Makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Makefile data-lang=Makefile><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifneq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>findstring clang,<span style=color:#66d9ef>$(</span>CC_VERSION_TEXT<span style=color:#66d9ef>))</span><span style=color:#960050;background-color:#1e0010>,)</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Makefile.clang</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span></span></span></code></pre></div></div></div><p>Included by arch-specific Makefile if these 2 functions are needed.</p><div class=jose-wrapper><div class=jose-tools><span>find</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-find data-lang=find>./arch/arm/Makefile:308:include $(srctree)/scripts/Makefile.defconf
+./arch/powerpc/Makefile:258:include $(srctree)/scripts/Makefile.defconf
+./arch/riscv/Makefile:192:	$(Q)$(MAKE) -f $(srctree)/Makefile defconfig 32-bit.config
+./arch/arm64/Makefile:205:include $(srctree)/scripts/Makefile.defconf</code></pre></div></div><p>Used by rules in root <code>Makefile</code> as sub-make Makefile.</p><div class=jose-wrapper><div class=jose-tools><span>Makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Makefile data-lang=Makefile><span style=display:flex><span><span style=color:#a6e22e>modules_install</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>Q<span style=color:#66d9ef>)$(</span>MAKE<span style=color:#66d9ef>)</span> -f <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span>/scripts/Makefile.modinst <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    sign-only<span style=color:#f92672>=</span><span style=color:#66d9ef>$(if</span> <span style=color:#66d9ef>$(</span>filter modules_install,<span style=color:#66d9ef>$(</span>MAKECMDGOALS<span style=color:#66d9ef>))</span>,,y<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>modules</span><span style=color:#f92672>:</span> modpost
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifneq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>KBUILD_MODPOST_NOFINAL<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,1)</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>$(</span>Q<span style=color:#66d9ef>)$(</span>MAKE<span style=color:#66d9ef>)</span> <span style=color:#960050;background-color:#1e0010>-f</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Makefile.modfinal</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>single_modules</span><span style=color:#f92672>:</span> <span style=color:#66d9ef>$(</span>single-no-ko<span style=color:#66d9ef>)</span> modules_prepare
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>$(</span>Q<span style=color:#66d9ef>)</span><span style=color:#f92672>{</span> <span style=color:#66d9ef>$(</span>foreach m, <span style=color:#66d9ef>$(</span>single-ko<span style=color:#66d9ef>)</span>, echo <span style=color:#66d9ef>$(</span>extmod_prefix<span style=color:#66d9ef>)$(</span>m:%.ko<span style=color:#f92672>=</span>%.o<span style=color:#66d9ef>)</span>;<span style=color:#66d9ef>)</span> <span style=color:#f92672>}</span> &gt; <span style=color:#66d9ef>$(</span>MODORDER<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>$(</span>Q<span style=color:#66d9ef>)$(</span>MAKE<span style=color:#66d9ef>)</span> -f <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span>/scripts/Makefile.modpost
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifneq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>KBUILD_MODPOST_NOFINAL<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,1)</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>$(</span>Q<span style=color:#66d9ef>)$(</span>MAKE<span style=color:#66d9ef>)</span> <span style=color:#960050;background-color:#1e0010>-f</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Makefile.modfinal</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>$(</span>Q<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>rm</span> <span style=color:#960050;background-color:#1e0010>-f</span> <span style=color:#66d9ef>$(</span>MODORDER<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>PHONY <span style=color:#f92672>+=</span> modpost
+</span></span><span style=display:flex><span><span style=color:#a6e22e>modpost</span><span style=color:#f92672>:</span> <span style=color:#66d9ef>$(</span>if <span style=color:#66d9ef>$(</span>single-build<span style=color:#66d9ef>)</span>,, <span style=color:#66d9ef>$(</span>if <span style=color:#66d9ef>$(</span>KBUILD_BUILTIN<span style=color:#66d9ef>)</span>, vmlinux.o<span style=color:#66d9ef>))</span> \
+</span></span><span style=display:flex><span>	 <span style=color:#66d9ef>$(</span>if <span style=color:#66d9ef>$(</span>KBUILD_MODULES<span style=color:#66d9ef>)</span>, modules_check<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>$(</span>Q<span style=color:#66d9ef>)$(</span>MAKE<span style=color:#66d9ef>)</span> -f <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span>/scripts/Makefile.modpost
+</span></span></code></pre></div></div></div><ul><li><code>obj-y</code>: collected from</li><li><code>obj-m</code>: collected from subdirectory&rsquo;s</li></ul><p><code>scripts/Kbuild.include</code> is included by many other Makefiles to provide utility functions.
+This section discusses the most commonly used ones.</p><h3 id=cmd-print-and-execute-commands><code>cmd</code>: print and execute commands
+<a href=#cmd-print-and-execute-commands class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e># $(call Cmd, foo):
+</span></span></span><span style=display:flex><span><span style=color:#75715e># # With Echo Supressed:
+</span></span></span><span style=display:flex><span><span style=color:#75715e># if `cmd_foo` exist,
+</span></span></span><span style=display:flex><span><span style=color:#75715e># print either `quiet_cmd_foo` or `cmd_foo` value as string
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Trap Interrupt
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Call Cmd_foo
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Else
+</span></span></span><span style=display:flex><span><span style=color:#75715e># No-op
+</span></span></span><span style=display:flex><span>cmd <span style=color:#f92672>=</span> @<span style=color:#66d9ef>$(if</span> <span style=color:#66d9ef>$(</span>cmd_<span style=color:#66d9ef>$(</span>1<span style=color:#66d9ef>))</span>,set -e; <span style=color:#66d9ef>$($(</span>quiet<span style=color:#66d9ef>)</span>log_print<span style=color:#66d9ef>)</span> <span style=color:#66d9ef>$(</span>delete-on-interrupt<span style=color:#66d9ef>)</span> <span style=color:#66d9ef>$(</span>cmd_<span style=color:#66d9ef>$(</span>1<span style=color:#66d9ef>))</span>,:<span style=color:#66d9ef>)</span>
+</span></span></code></pre></div></div></div><p>The <code>cmd</code> function should be used when you want to call certain Makefile functions and print to the terminal a message.
+It will respect the <code>make V=[1|2]</code> argument and determine whether to print verbose messages.
+You see prettified one-line messages during a kernel build thanks to this function, e.g.:</p><div class=jose-wrapper><div class=jose-tools><button>Copy</button></div><div class=jose-inner><pre tabindex=0><code>  LDS     scripts/module.lds
+  HOSTCC  usr/gen_init_cpio
+  CC      init/main.o
+  CC      certs/system_keyring.o
+  CC      ipc/compat.o
+  CC      mm/filemap.o
+  AS      arch/x86/entry/entry.o
+  CC      fs/open.o
+  AR      arch/x86/virt/vmx/built-in.a</code></pre></div></div><p>To write an operation that fits into this framework, define 2 variables:</p><ol><li>a <code>cmd_xxx</code> that holds the actual shell script; and</li><li>a <code>quiet_cmd_xxx</code> varaible contains a short message</li></ol><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span>quiet_cmd_makefile <span style=color:#f92672>=</span> GEN     Makefile
+</span></span><span style=display:flex><span>      cmd_makefile <span style=color:#f92672>=</span> <span style=color:#f92672>{</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>	echo <span style=color:#e6db74>&#34;\# Automatically generated by </span><span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#e6db74>/Makefile: don&#39;t edit&#34;</span>; <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>	echo <span style=color:#e6db74>&#34;include </span><span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#e6db74>/Makefile&#34;</span>; <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>	<span style=color:#f92672>}</span> &gt; Makefile
+</span></span></code></pre></div></div></div><p>Invoke your operation, whose output adapts to the required verbosity, by:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#66d9ef>$(</span>call cmd,makefile<span style=color:#66d9ef>)</span></span></span></code></pre></div></div></div><h3 id=kbuild-file><code>kbuild-file</code>: get the path to the Makefile or Kbuild file under <code>$(src)</code>
+<a href=#kbuild-file class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e>### # The Path to Kbuild or Makefile. Kbuild Has Precedence over Makefile.
+</span></span></span><span style=display:flex><span>kbuild-dir <span style=color:#f92672>=</span> <span style=color:#66d9ef>$(if</span> <span style=color:#66d9ef>$(</span>filter /%,<span style=color:#66d9ef>$(</span>src<span style=color:#66d9ef>))</span>,<span style=color:#66d9ef>$(</span>src<span style=color:#66d9ef>)</span>,<span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span>/<span style=color:#66d9ef>$(</span>src<span style=color:#66d9ef>))</span>
+</span></span><span style=display:flex><span>kbuild-file <span style=color:#f92672>=</span> <span style=color:#66d9ef>$(</span>or <span style=color:#66d9ef>$(</span>wildcard <span style=color:#66d9ef>$(</span>kbuild-dir<span style=color:#66d9ef>)</span>/Kbuild<span style=color:#66d9ef>)</span>,<span style=color:#66d9ef>$(</span>kbuild-dir<span style=color:#66d9ef>)</span>/Makefile<span style=color:#66d9ef>)</span>
+</span></span></code></pre></div></div></div><p>The caller must define an <code>src</code> variable before calling <code>kbuild-file</code>, which must be a directory name without the trailing slash.</p><p>For example:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e># Snippet from: scripts/Makefile.build
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Obj Is an Export-ed Variable to This Submake
+</span></span></span><span style=display:flex><span>src <span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>obj<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Later ...
+</span></span></span><span style=display:flex><span><span style=color:#75715e># include `$(obj)/Kbuild` or `$(obj)/Makefile`
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>kbuild-file<span style=color:#66d9ef>)</span></span></span></code></pre></div></div></div><ul><li><code>kbuild-file</code> expands to the absolute path to the Kbuild file, or if absent, the Makefile, under <code>src</code>.</li><li><code>kbuild-dir</code> is a helper macro never used independently.</li></ul><p>Use these macros, instead of hardcoding <code>$(src)/Makefile</code>, for compatibility.
+Historically Makefile pieces shattered in each directory have the file name <code>Kbuild</code>.
+Almost all of them have been renamed to <code>Makefile</code> by the time of this writing, but some old device drivers may be still using <code>Kbuild</code>.</p><h3 id=util-build><code>$(build)</code>: standard way of invoking sub-make
+<a href=#util-build class=heading-anchor><span>#</span></a></h3><p><code>$(Q)$(MAKE) $(build)=&lt;dir></code> is the recommended way to invoke make in a subdirectory.
+(<code>$(Q)</code> expands to <code>@</code> or empty, determining whether to echo the recipe.)</p><p>You will see recipes like the following one pervasively in Makefiles:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#a6e22e>%config</span><span style=color:#f92672>:</span> outputmakefile scripts_basic FORCE
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>$(</span>Q<span style=color:#66d9ef>)$(</span>MAKE<span style=color:#66d9ef>)</span> <span style=color:#66d9ef>$(</span>build<span style=color:#66d9ef>)</span><span style=color:#f92672>=</span>scripts/kconfig $@
+</span></span></code></pre></div></div></div><p><code>build</code> is defined as:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e>### # Shorthand for $(Q)$(MAKE) -F scripts/Makefile.build obj=
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Usage:
+</span></span></span><span style=display:flex><span><span style=color:#75715e># $(Q)$(MAKE) $(build)=dir
+</span></span></span><span style=display:flex><span>build <span style=color:#f92672>:=</span> -f <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span>/scripts/Makefile.build obj
+</span></span></code></pre></div></div></div><p>That is, without changing the current working directory, <code>$(MAKE) $(build)=dir some-target</code> uses <code>scripts/Makefile.build</code> as the Makefile, and
+executes its <code>some-target</code> goal with an <code>obj=dir</code> argument, where <code>dir</code> must be a directory name without the trailing slash.
+Most often, executing the default goal is desired, so <code>some-target</code> is omitted.</p><p>The <code>scripts/Makefile.build</code> sorely exist to support</p><p>There are 2 other shortcuts that work similarly:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e>### # Shorthand for $(Q)$(MAKE) -F scripts/Makefile.dtbinst obj=
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Usage:
+</span></span></span><span style=display:flex><span><span style=color:#75715e># $(Q)$(MAKE) $(dtbinst)=dir
+</span></span></span><span style=display:flex><span>dtbinst <span style=color:#f92672>:=</span> -f <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span>/scripts/Makefile.dtbinst obj
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>### # Shorthand for $(Q)$(MAKE) -F scripts/Makefile.clean obj=
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Usage:
+</span></span></span><span style=display:flex><span><span style=color:#75715e># $(Q)$(MAKE) $(clean)=dir
+</span></span></span><span style=display:flex><span>clean <span style=color:#f92672>:=</span> -f <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span>/scripts/Makefile.clean obj
+</span></span></code></pre></div></div></div><p>The way <code>scripts/Makefile.build</code> works is rather intriguing, see <a href=/linux-kernel-build-system/#makefile-build>below</a> for details.</p><h3 id=if_changed_><code>if_changed_*</code>:
+<a href=#if_changed_ class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e>### # If_changed      - Execute Command If Any Prerequisite Is Newer Than
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Target, or Command Line Has Changed
+</span></span></span><span style=display:flex><span><span style=color:#75715e># If_changed_dep  - as If_changed, but Uses Fixdep to Reveal Dependencies
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Including Used Config Symbols
+</span></span></span><span style=display:flex><span><span style=color:#75715e># If_changed_rule - as If_changed but Execute Rule Instead
+</span></span></span><span style=display:flex><span><span style=color:#75715e># See Documentation/kbuild/makefiles.rst for More Info
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Usage: $(call if_changed_rule,foo)
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Will Check If $(cmd_foo) or Any of the Prerequisites Changed,
+</span></span></span><span style=display:flex><span><span style=color:#75715e># And If So Will Execute $(rule_foo).
+</span></span></span><span style=display:flex><span>if_changed_rule <span style=color:#f92672>=</span> <span style=color:#66d9ef>$(if</span> <span style=color:#66d9ef>$(if</span>-changed-cond<span style=color:#66d9ef>)</span>,<span style=color:#66d9ef>$(</span>rule_<span style=color:#66d9ef>$(</span>1<span style=color:#66d9ef>))</span>,@:<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Execute the Command and Also Postprocess Generated .D Dependencies File.
+</span></span></span><span style=display:flex><span>if_changed_dep <span style=color:#f92672>=</span> <span style=color:#66d9ef>$(if</span> <span style=color:#66d9ef>$(if</span>-changed-cond<span style=color:#66d9ef>)</span>,<span style=color:#66d9ef>$(</span>cmd_and_fixdep<span style=color:#66d9ef>)</span>,@:<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>if-changed-cond <span style=color:#f92672>=</span> <span style=color:#66d9ef>$(</span>newer-prereqs<span style=color:#66d9ef>)$(</span>cmd-check<span style=color:#66d9ef>)$(</span>check-FORCE<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Find Any Prerequisites That Are Newer Than Target or That Do Not Exist.
+</span></span></span><span style=display:flex><span><span style=color:#75715e># PHONY Targets Skipped in Both Cases.
+</span></span></span><span style=display:flex><span><span style=color:#75715e># If There Is No Prerequisite Other Than Phony Targets, $(newer-prereqs) Becomes
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Empty Even If the Target Does Not Exist. Cmd-check Saves This Corner Case.
+</span></span></span><span style=display:flex><span>newer-prereqs <span style=color:#f92672>=</span> <span style=color:#66d9ef>$(</span>filter-out <span style=color:#66d9ef>$(</span>PHONY<span style=color:#66d9ef>)</span>,$?<span style=color:#66d9ef>)</span>
+</span></span></code></pre></div></div></div><h2 id=makefile-build><code>scripts/Makefile.build</code>: the module builder
+<a href=#makefile-build class=heading-anchor><span>#</span></a></h2><p>The purpose of <code>scripts/Makefile.build</code> is to make life easier for kernel module maintainers, such that only variable definition, and no rule, needs to be defined in a module-specific Makefile (rules can be added for documented behavior, see below).</p><p>When building a kernel subdirectory, the recommended <code>$(MAKE) $(build)=dir</code> syntax always runs a sub-make with the Makefile <code>scripts/Makefile.build</code>
+(via the <code>-f</code> option, see <a href=/linux-kernel-build-system/#util-build><code>build</code></a> for detail).</p><p>Among other scripting, this file includes the <code>$(kbuild-file)</code> (i.e. the <code>Makefile</code> in the <code>dir</code> as given in <code>$(build)=dir</code>, see <a href=/linux-kernel-build-system/#kbuild-file>kbuild-file</a> for detail), and load a <code>scripts/Makefile.lib</code> to normalize the variables defined in the <code>$(kbuild-file)</code>:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e># scripts/Makefile.build
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Init Variables, Load Util Functions, Load Compiler Setups ...
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>kbuild-file<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Makefile.lib</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Do Not Include Hostprogs Rules Unless Needed.
+</span></span></span><span style=display:flex><span><span style=color:#75715e># $(sort ...) Is Used Here to Remove Duplicated Words and Excessive Spaces.
+</span></span></span><span style=display:flex><span>hostprogs <span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>sort <span style=color:#66d9ef>$(</span>hostprogs<span style=color:#66d9ef>))</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifneq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>hostprogs<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,)</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Makefile.host</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span></span></span></code></pre></div></div></div><p>With this <code>Makefile.build</code> infrastrucutre, a classic module Makefile nowonly contains variable definitions. This example is from <code>kernel/time/Makefile</code>:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e># SPDX-License-Identifier: GPL-2.0
+</span></span></span><span style=display:flex><span>obj-y <span style=color:#f92672>+=</span> time.o timer.o hrtimer.o
+</span></span><span style=display:flex><span>obj-y <span style=color:#f92672>+=</span> timekeeping.o ntp.o clocksource.o jiffies.o timer_list.o
+</span></span><span style=display:flex><span>obj-y <span style=color:#f92672>+=</span> timeconv.o timecounter.o alarmtimer.o
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifeq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>CONFIG_POSIX_TIMERS<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,y)</span>
+</span></span><span style=display:flex><span> obj-y <span style=color:#f92672>+=</span> posix-timers.o posix-cpu-timers.o posix-clock.o itimer.o
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>else</span>
+</span></span><span style=display:flex><span> obj-y <span style=color:#f92672>+=</span> posix-stubs.o
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>obj-$(CONFIG_GENERIC_CLOCKEVENTS)		<span style=color:#f92672>+=</span> clockevents.o tick-common.o
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifeq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>CONFIG_GENERIC_CLOCKEVENTS_BROADCAST<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,y)</span>
+</span></span><span style=display:flex><span> obj-y						<span style=color:#f92672>+=</span> tick-broadcast.o
+</span></span><span style=display:flex><span> obj-<span style=color:#66d9ef>$(</span>CONFIG_TICK_ONESHOT<span style=color:#66d9ef>)</span>			+<span style=color:#f92672>=</span> tick-broadcast-hrtimer.o
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span>obj-$(CONFIG_GENERIC_SCHED_CLOCK)		<span style=color:#f92672>+=</span> sched_clock.o
+</span></span><span style=display:flex><span>obj-$(CONFIG_TICK_ONESHOT)			<span style=color:#f92672>+=</span> tick-oneshot.o tick-sched.o
+</span></span><span style=display:flex><span>obj-$(CONFIG_LEGACY_TIMER_TICK)			<span style=color:#f92672>+=</span> tick-legacy.o
+</span></span><span style=display:flex><span>obj-$(CONFIG_HAVE_GENERIC_VDSO)			<span style=color:#f92672>+=</span> vsyscall.o
+</span></span><span style=display:flex><span>obj-$(CONFIG_DEBUG_FS)				<span style=color:#f92672>+=</span> timekeeping_debug.o
+</span></span><span style=display:flex><span>obj-$(CONFIG_TEST_UDELAY)			<span style=color:#f92672>+=</span> test_udelay.o
+</span></span><span style=display:flex><span>obj-$(CONFIG_TIME_NS)				<span style=color:#f92672>+=</span> namespace.o
+</span></span><span style=display:flex><span>obj-$(CONFIG_TEST_CLOCKSOURCE_WATCHDOG)		<span style=color:#f92672>+=</span> clocksource-wdtest.o
+</span></span><span style=display:flex><span>obj-$(CONFIG_TIME_KUNIT_TEST)			<span style=color:#f92672>+=</span> time_test.o
+</span></span></code></pre></div></div></div><p>The whole purpose of <code>scripts/Makefile.build</code> is to make life</p><p>With all this trouble, <code>scripts/Makefile.build</code>, which powers the <code>$(build)=dir</code> pattern, makes writing a kernel module Makefile much easier.</p><p>it defines the value of the received <code>$(obj)/</code> as its default goal; which depends on
+also note that <code>$(obj)/</code> is listed as PHONY, so the target is simply a goal, and doesn&rsquo;t represent the existing directory of the same name:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e># scripts/Makefile.build
+</span></span></span><span style=display:flex><span>PHONY <span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>obj<span style=color:#66d9ef>)</span>/
+</span></span><span style=display:flex><span><span style=color:#a6e22e>$(obj)/</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Later ...
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>$(obj)/</span><span style=color:#f92672>:</span> <span style=color:#66d9ef>$(</span>if <span style=color:#66d9ef>$(</span>KBUILD_BUILTIN<span style=color:#66d9ef>)</span>, <span style=color:#66d9ef>$(</span>targets-for-builtin<span style=color:#66d9ef>))</span> \
+</span></span><span style=display:flex><span>	 <span style=color:#66d9ef>$(</span>if <span style=color:#66d9ef>$(</span>KBUILD_MODULES<span style=color:#66d9ef>)</span>, <span style=color:#66d9ef>$(</span>targets-for-modules<span style=color:#66d9ef>))</span> \
+</span></span><span style=display:flex><span>	 <span style=color:#66d9ef>$(</span>subdir-ym<span style=color:#66d9ef>)</span> <span style=color:#66d9ef>$(</span>always-y<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>	@:
+</span></span></code></pre></div></div></div><p>and:</p><h2 id=critical-variables>Critical Variables
+<a href=#critical-variables class=heading-anchor><span>#</span></a></h2><ul><li>hostprogs</li><li>need-config: whether the following execution requires loading <code>.config</code> configs as Makefile variables.</li></ul><h2 id=cmd-files-file-specific-dependency><code>*.cmd</code> files: file-specific dependency
+<a href=#cmd-files-file-specific-dependency class=heading-anchor><span>#</span></a></h2><p>For almost all files generated during a build, there is a companion <code>.cmd</code> files also generate at build time.</p><ul><li>ELF binaries, including
+- <code>foo.o</code> and <code>.foo.o.cmd</code>
+- .vdso64.so.cmd
+- <code>.built-in.a.cmd</code></li><li><code>.modules.order.cmd</code></li><li><code>.unistd_64.h.cmd</code>
+./.vmlinux.cmd</li><li><code>.x86_pkg_temp_thermal.ko.cmd</code></li><li>.x86_pkg_temp_thermal.mod.cmd</li><li>.lexer.lex.c.cmd</li><li><code>include/config/auto.conf</code> and ``include/config/auto.conf.cmd`</li><li></li></ul><p>For a <code>foo/bar/zoo</code>, its companion <code>foo/bar/.zoo.cmd</code> file is a Makefile snippet that defines the following variable:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#a6e22e>savecmd_&lt;path&gt; </span><span style=color:#f92672>:</span>=
+</span></span><span style=display:flex><span><span style=color:#a6e22e>source_&lt;path&gt; </span><span style=color:#f92672>:</span>=
+</span></span><span style=display:flex><span><span style=color:#a6e22e>deps_&lt;path&gt; </span><span style=color:#f92672>:</span>=
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>&lt;path&gt;</span><span style=color:#f92672>:</span> <span style=color:#66d9ef>$(</span>deps_&lt;path&gt;<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Mark the Dependencies of Dependencies to Be Empty,
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Since We Compute the Transitive Closure Already for Make
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>$(deps_&lt;path&gt;)</span><span style=color:#f92672>:</span></span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span>savedcmd_vmlinux <span style=color:#f92672>:=</span> ../scripts/link-vmlinux.sh <span style=color:#e6db74>&#34;ld&#34;</span> <span style=color:#e6db74>&#34;-m elf_x86_64 -z noexecstack --no-warn-rwx-segments&#34;</span> <span style=color:#e6db74>&#34;--emit-relocs --discard-none -z max-page-size=0x200000 --build-id=sha1 --orphan-handling=error&#34;</span>;  make -f ../arch/x86/Makefile.postlink vmlinux
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>source_vmlinux <span style=color:#f92672>:=</span> ../scripts/link-vmlinux.sh
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>deps_vmlinux <span style=color:#f92672>:=</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/LTO_CLANG<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/X86_KERNEL_IBT<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/MODULES<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/VMLINUX_MAP<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/CPU_BIG_ENDIAN<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/KALLSYMS_ALL<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/KALLSYMS_ABSOLUTE_PERCPU<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/KALLSYMS_BASE_RELATIVE<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/SHELL<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/DEBUG_INFO_BTF<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/KALLSYMS<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/BPF<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>$(</span>wildcard include/config/BUILDTIME_TABLE_SORT<span style=color:#66d9ef>)</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>vmlinux</span><span style=color:#f92672>:</span> <span style=color:#66d9ef>$(</span>deps_vmlinux<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>$(deps_vmlinux)</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>source_foo/bar/zoo </span><span style=color:#f92672>:</span>= ../kernel/pid.c
+</span></span><span style=display:flex><span><span style=color:#a6e22e>deps_foo/bar/zoo </span><span style=color:#f92672>:</span>=</span></span></code></pre></div></div></div><hr><h2 id=make-invocation>Make Invocation
+<a href=#make-invocation class=heading-anchor><span>#</span></a></h2><p>The kernel supports multiple flavor of <code>make</code> invocation:</p><ul><li><p><code>make</code></p><pre><code> make without goal
+</code></pre></li><li><p><code>make [O=&lt;dir>] *config</code></p><pre><code> This creates
+
+ triggers `config-build := 1`
+</code></pre></li><li><p>`make</p></li></ul><p>Some build-optimization files pervasively exist in the</p><ol><li><p>the config process</p><pre><code>By invoking one of the `make *config` goal,
+
+- build a CLI prompt-based `conf` ELF executable or ncurses-based `mconf` in `scripts/kconfig/`;
+- end up with
+       - `.config` file
+       - `include/config/auto.conf`
+       - `include/config/*`
+       - `include/generated/autoconf.h`
+</code></pre></li></ol><p>The kernel uses <a href=/>sub-make</a>. Whether sub-make is a good practice is debatable.</p><pre><code>   logics of submake division of the linux kernel (which is also an pretty common and reasonable one):
+   All sub-Makefile only modify / depends on the files in its own directory (and sub-directories that is not managed by a sub-Makefile).
+   If some file depends on a file in another subMake directory to be up-to-date, a $`(Make)` calls should be invoked rather than
+   typing literal depend on that file (in the dependency list).
+</code></pre><h2 id=makefile-distribution>Makefile Distribution
+<a href=#makefile-distribution class=heading-anchor><span>#</span></a></h2><h2 id=build-switch-macros>Build Switch Macros
+<a href=#build-switch-macros class=heading-anchor><span>#</span></a></h2><ul><li><code>__KERNEL__</code></li><li><code>__ASSEMBLY__</code></li></ul><h2 id=kconfig-tree>Kconfig Tree
+<a href=#kconfig-tree class=heading-anchor><span>#</span></a></h2><h2 id=makefile-analysis>Makefile Analysis
+<a href=#makefile-analysis class=heading-anchor><span>#</span></a></h2><h3 id=subarch-arch-and-srcarch><code>SUBARCH</code>, <code>ARCH</code>, and <code>SRCARCH</code>
+<a href=#subarch-arch-and-srcarch class=heading-anchor><span>#</span></a></h3><p>Some variables are first setup in the <code>Makefile</code> at the very beginning of a <code>make</code> build.
+They are passed to <code>Kconfig</code> and <code>Kbuild</code> such that the generation of kernel config wizard works properly.</p><p><code>SUBARCH</code> by the shell script in the <code>scripts/subarch.include</code>:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e># Root Makefile:
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Include $(srctree)/scripts/subarch.include
+</span></span></span><span style=display:flex><span><span style=color:#75715e># SUBARCH Tells the Usermode Build What the Underlying Arch Is.  That Is Set
+</span></span></span><span style=display:flex><span><span style=color:#75715e># First, and If a Usermode Build Is Happening, the &#34;ARCH=um&#34; on the Command
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Line Overrides the Setting of ARCH Below.  If a Native Build Is Happening,
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Then ARCH Is Assigned, Getting Whatever Value It Gets Normally, And
+</span></span></span><span style=display:flex><span><span style=color:#75715e># SUBARCH Is Subsequently Ignored.
+</span></span></span><span style=display:flex><span>SUBARCH <span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>				  -e s/sun4u/sparc64/ <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>				  -e s/arm.*/arm/ -e s/sa110/arm/ <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>				  -e s/s390x/s390/ <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>				  -e s/ppc.*/powerpc/ -e s/mips.*/mips/ <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>				  -e s/sh<span style=color:#f92672>[</span>234<span style=color:#f92672>]</span>.*/sh/ -e s/aarch64.*/arm64/ <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>				  -e s/riscv.*/riscv/ -e s/loongarch.*/loongarch/<span style=color:#f92672>)</span>
+</span></span></code></pre></div></div></div><p>The <code>ARCH</code> variable defaults to <code>$(SUBARCH)</code> if not explicitly given on the CLI as <code>make ARCH=...</code>:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span>ARCH		<span style=color:#f92672>?=</span> <span style=color:#66d9ef>$(</span>SUBARCH<span style=color:#66d9ef>)</span>
+</span></span></code></pre></div></div></div><p>Using an explicit <code>make ARCH=...</code> is mandatory if you are cross-compiling the kernel for a different CPU architecture.</p><p><code>SRCARCH</code> is derived from <code>ARCH</code> and is precisely one of the subdirectory names in <code>arch/</code>:</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span>SRCARCH 	<span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Additional ARCH Settings for X86
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifeq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,i386)</span>
+</span></span><span style=display:flex><span>        SRCARCH <span style=color:#f92672>:=</span> x86
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifeq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,x86_64)</span>
+</span></span><span style=display:flex><span>        SRCARCH <span style=color:#f92672>:=</span> x86
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Additional ARCH Settings for Sparc
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifeq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,sparc32)</span>
+</span></span><span style=display:flex><span>       SRCARCH <span style=color:#f92672>:=</span> sparc
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifeq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,sparc64)</span>
+</span></span><span style=display:flex><span>       SRCARCH <span style=color:#f92672>:=</span> sparc
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Additional ARCH Settings for Parisc
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifeq</span> <span style=color:#960050;background-color:#1e0010>(</span><span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>,parisc64)</span>
+</span></span><span style=display:flex><span>       SRCARCH <span style=color:#f92672>:=</span> parisc
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span></span></span></code></pre></div></div></div><p><code>SRCARCH</code> is used whenever architecture-dependent sources need to be referenced in the <code>Makefile</code>s or <code>Kconfig</code> files:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># arch/Kconfig</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Note: arch/$(SRCARCH)/Kconfig Needs to Be Included First So That It Can</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Override the Default Values in This File.</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Source &#34;arch/$(SRCARCH)/Kconfig&#34;</span></span></span></code></pre></div></div></div><h2 id=generated-content>Generated Content
+<a href=#generated-content class=heading-anchor><span>#</span></a></h2><p>The following ordinary files are generated during a kernel build (<code>.o</code> and <code>.name.*.cmd</code> are ignored):</p><ul><li><p><code>*.cmd</code>:</p><pre><code> These are Makefile snippets. For `foo.bar`, there (usually) exists a `.foo.bar.cmd` containing a single rule
+ that describes `foo.bar`'s dependency.
+
+
+ usually they are hidden files (i.e. file name start with a dot), with the exception of `include/auto.conf.cmd`.
+
+ not all .c and .h files has companion .cmd files. This is documented behavior
+</code></pre></li><li><p><code>*.d</code> files:</p></li></ul><p>Module directory has the commmon files:</p><ul><li><p><code>built-in.a</code>:</p></li><li><p><code>modules.order</code>:</p></li><li><p><code>include/config/*</code></p><pre><code> This directory contains
+ - `auto.conf.cmd`:
+ - `auto.conf`: in the same syntax as the `.config`
+ - `kernel.release`:
+ - empty files (around 1700 of them) with file name be kernel config options, 1 for each option whose value is `y` or `m`
+</code></pre></li></ul><p>2 directories are generated at build time, holding important headers:</p><ul><li><code>$(objtree)/include/generated</code></li><li><code>$(objtree)/arch/x86/include/generated</code></li></ul><p>A build will also create the directory <code>include/config</code> holding:</p><ul><li><p>include/config/kernel.release</p></li><li><p>include/config/auto.conf.cmd</p></li><li><p>include/config/auto.conf</p></li><li><p>One empty file for each configs whose file name is &mldr;</p></li><li><p><code>include/generated</code></p></li><li><p><code>arch/&lt;arch>/include/generated</code></p></li></ul><h2 id=implementation-details>Implementation Details
+<a href=#implementation-details class=heading-anchor><span>#</span></a></h2><p>After ignoring modules directory with only <code>build-in.a</code> and <code>modules.order</code>, we will end up with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>./
+</span></span><span style=display:flex><span>├── arch/
+</span></span><span style=display:flex><span>│   ├── x86/
+</span></span><span style=display:flex><span>│   │   ├── boot/
+</span></span><span style=display:flex><span>│   │   │   ├── bzImage
+</span></span><span style=display:flex><span>│   │   │   ├── compressed/
+</span></span><span style=display:flex><span>│   │   │   │   ├── drivers/
+</span></span><span style=display:flex><span>│   │   │   │   │   └── firmware/
+</span></span><span style=display:flex><span>│   │   │   │   │       └── efi/
+</span></span><span style=display:flex><span>│   │   │   │   │           └── libstub/
+</span></span><span style=display:flex><span>│   │   │   │   ├── mkpiggy*
+</span></span><span style=display:flex><span>│   │   │   │   ├── piggy.S
+</span></span><span style=display:flex><span>│   │   │   │   ├── vmlinux*
+</span></span><span style=display:flex><span>│   │   │   │   ├── vmlinux.bin*
+</span></span><span style=display:flex><span>│   │   │   │   ├── vmlinux.bin.gz
+</span></span><span style=display:flex><span>│   │   │   │   ├── vmlinux.lds
+</span></span><span style=display:flex><span>│   │   │   │   └── vmlinux.relocs
+</span></span><span style=display:flex><span>│   │   │   ├── cpustr.h
+</span></span><span style=display:flex><span>│   │   │   ├── mkcpustr*
+</span></span><span style=display:flex><span>│   │   │   ├── setup.bin*
+</span></span><span style=display:flex><span>│   │   │   ├── setup.elf*
+</span></span><span style=display:flex><span>│   │   │   ├── tools/
+</span></span><span style=display:flex><span>│   │   │   │   ├── build*
+</span></span><span style=display:flex><span>│   │   │   ├── vmlinux.bin
+</span></span><span style=display:flex><span>│   │   │   ├── voffset.h
+</span></span><span style=display:flex><span>│   │   │   ├── zoffset.h
+</span></span><span style=display:flex><span>│   │   ├── crypto/
+</span></span><span style=display:flex><span>│   │   ├── entry/
+</span></span><span style=display:flex><span>│   │   │   ├── syscalls/
+</span></span><span style=display:flex><span>│   │   │   ├── vdso/
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso2c*
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso32/
+</span></span><span style=display:flex><span>│   │   │   │   │   ├── vdso32.lds
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso32.so*
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso32.so.dbg*
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso64.so*
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso64.so.dbg*
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso-image-32.c
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso-image-64.c
+</span></span><span style=display:flex><span>│   │   │   │   ├── vdso.lds
+</span></span><span style=display:flex><span>│   │   │   └── vsyscall/
+</span></span><span style=display:flex><span>│   │   ├── events/
+</span></span><span style=display:flex><span>│   │   │   ├── amd/
+</span></span><span style=display:flex><span>│   │   │   ├── intel/
+</span></span><span style=display:flex><span>│   │   │   └── zhaoxin/
+</span></span><span style=display:flex><span>│   │   ├── ia32/
+</span></span><span style=display:flex><span>│   │   ├── include/
+</span></span><span style=display:flex><span>│   │   │   └── generated/
+</span></span><span style=display:flex><span>│   │   │       ├── asm/
+</span></span><span style=display:flex><span>│   │   │       │   ├── early_ioremap.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── irq_regs.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── kmap_size.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── local64.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── mcs_spinlock.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── mmiowb.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── module.lds.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── orc_hash.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── rwonce.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── syscalls_32.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── syscalls_64.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── unaligned.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── unistd_32_ia32.h
+</span></span><span style=display:flex><span>│   │   │       │   ├── unistd_64_x32.h
+</span></span><span style=display:flex><span>│   │   │       └── uapi/
+</span></span><span style=display:flex><span>│   │   │           └── asm/
+</span></span><span style=display:flex><span>│   │   │               ├── bpf_perf_event.h
+</span></span><span style=display:flex><span>│   │   │               ├── errno.h
+</span></span><span style=display:flex><span>│   │   │               ├── fcntl.h
+</span></span><span style=display:flex><span>│   │   │               ├── ioctl.h
+</span></span><span style=display:flex><span>│   │   │               ├── ioctls.h
+</span></span><span style=display:flex><span>│   │   │               ├── ipcbuf.h
+</span></span><span style=display:flex><span>│   │   │               ├── param.h
+</span></span><span style=display:flex><span>│   │   │               ├── poll.h
+</span></span><span style=display:flex><span>│   │   │               ├── resource.h
+</span></span><span style=display:flex><span>│   │   │               ├── socket.h
+</span></span><span style=display:flex><span>│   │   │               ├── sockios.h
+</span></span><span style=display:flex><span>│   │   │               ├── termbits.h
+</span></span><span style=display:flex><span>│   │   │               ├── termios.h
+</span></span><span style=display:flex><span>│   │   │               ├── types.h
+</span></span><span style=display:flex><span>│   │   │               ├── unistd_32.h
+</span></span><span style=display:flex><span>│   │   │               ├── unistd_64.h
+</span></span><span style=display:flex><span>│   │   │               ├── unistd_x32.h
+</span></span><span style=display:flex><span>│   │   ├── kernel/
+</span></span><span style=display:flex><span>│   │   │   ├── acpi/
+</span></span><span style=display:flex><span>│   │   │   ├── apic/
+</span></span><span style=display:flex><span>│   │   │   ├── asm-offsets.s
+</span></span><span style=display:flex><span>│   │   │   ├── cpu/
+</span></span><span style=display:flex><span>│   │   │   │   ├── capflags.c
+</span></span><span style=display:flex><span>│   │   │   │   ├── mce/
+</span></span><span style=display:flex><span>│   │   │   │   ├── microcode/
+</span></span><span style=display:flex><span>│   │   │   │   ├── mtrr/
+</span></span><span style=display:flex><span>│   │   │   ├── fpu/
+</span></span><span style=display:flex><span>│   │   │   ├── kprobes/
+</span></span><span style=display:flex><span>│   │   │   ├── vmlinux.lds
+</span></span><span style=display:flex><span>│   │   ├── lib/
+</span></span><span style=display:flex><span>│   │   │   ├── inat-tables.c
+</span></span><span style=display:flex><span>│   │   │   ├── lib.a
+</span></span><span style=display:flex><span>│   │   ├── mm/
+</span></span><span style=display:flex><span>│   │   │   ├── pat/
+</span></span><span style=display:flex><span>│   │   ├── net/
+</span></span><span style=display:flex><span>│   │   ├── pci/
+</span></span><span style=display:flex><span>│   │   ├── platform/
+</span></span><span style=display:flex><span>│   │   │   ├── atom/
+</span></span><span style=display:flex><span>│   │   │   ├── ce4100/
+</span></span><span style=display:flex><span>│   │   │   ├── efi/
+</span></span><span style=display:flex><span>│   │   │   ├── geode/
+</span></span><span style=display:flex><span>│   │   │   ├── intel/
+</span></span><span style=display:flex><span>│   │   │   ├── intel-mid/
+</span></span><span style=display:flex><span>│   │   │   ├── intel-quark/
+</span></span><span style=display:flex><span>│   │   │   ├── iris/
+</span></span><span style=display:flex><span>│   │   │   ├── olpc/
+</span></span><span style=display:flex><span>│   │   │   ├── scx200/
+</span></span><span style=display:flex><span>│   │   │   ├── ts5500/
+</span></span><span style=display:flex><span>│   │   │   └── uv/
+</span></span><span style=display:flex><span>│   │   ├── power/
+</span></span><span style=display:flex><span>│   │   ├── realmode/
+</span></span><span style=display:flex><span>│   │   │   ├── rm/
+</span></span><span style=display:flex><span>│   │   │   │   ├── pasyms.h
+</span></span><span style=display:flex><span>│   │   │   │   ├── realmode.bin*
+</span></span><span style=display:flex><span>│   │   │   │   ├── realmode.elf*
+</span></span><span style=display:flex><span>│   │   │   │   ├── realmode.lds
+</span></span><span style=display:flex><span>│   │   │   │   ├── realmode.relocs
+</span></span><span style=display:flex><span>│   │   ├── tools/
+</span></span><span style=display:flex><span>│   │   │   ├── relocs*
+</span></span><span style=display:flex><span>│   │   └── virt/
+</span></span><span style=display:flex><span>│   │       └── vmx/
+</span></span><span style=display:flex><span>│   └── x86_64/
+</span></span><span style=display:flex><span>│       └── boot/
+</span></span><span style=display:flex><span>│           └── bzImage -&gt; ../../x86/boot/bzImage
+</span></span><span style=display:flex><span>├── block/
+</span></span><span style=display:flex><span>│   └── partitions/
+</span></span><span style=display:flex><span>├── certs/
+</span></span><span style=display:flex><span>│   ├── extract-cert*
+</span></span><span style=display:flex><span>│   ├── signing_key.x509
+</span></span><span style=display:flex><span>│   ├── x509_certificate_list
+</span></span><span style=display:flex><span>├── .checked-atomic-arch-fallback.h
+</span></span><span style=display:flex><span>├── .checked-atomic-instrumented.h
+</span></span><span style=display:flex><span>├── .checked-atomic-long.h
+</span></span><span style=display:flex><span>├── .config
+</span></span><span style=display:flex><span>├── crypto/
+</span></span><span style=display:flex><span>│   ├── asymmetric_keys/
+</span></span><span style=display:flex><span>│   │   ├── pkcs7.asn1.c
+</span></span><span style=display:flex><span>│   │   ├── pkcs7.asn1.h
+</span></span><span style=display:flex><span>│   │   ├── x509_akid.asn1.c
+</span></span><span style=display:flex><span>│   │   ├── x509_akid.asn1.h
+</span></span><span style=display:flex><span>│   │   ├── x509.asn1.c
+</span></span><span style=display:flex><span>│   │   ├── x509.asn1.h
+</span></span><span style=display:flex><span>│   ├── rsaprivkey.asn1.c
+</span></span><span style=display:flex><span>│   ├── rsaprivkey.asn1.h
+</span></span><span style=display:flex><span>│   ├── rsapubkey.asn1.c
+</span></span><span style=display:flex><span>│   ├── rsapubkey.asn1.h
+</span></span><span style=display:flex><span>├── drivers/
+</span></span><span style=display:flex><span>│   ├── acpi/
+</span></span><span style=display:flex><span>│   │   ├── acpica/
+</span></span><span style=display:flex><span>│   │   ├── dptf/
+</span></span><span style=display:flex><span>│   │   ├── numa/
+</span></span><span style=display:flex><span>│   │   ├── pmic/
+</span></span><span style=display:flex><span>│   │   └── x86/
+</span></span><span style=display:flex><span>│   ├── amba/
+</span></span><span style=display:flex><span>│   ├── android/
+</span></span><span style=display:flex><span>│   ├── ata/
+</span></span><span style=display:flex><span>│   ├── auxdisplay/
+</span></span><span style=display:flex><span>│   ├── base/
+</span></span><span style=display:flex><span>│   │   ├── firmware_loader/
+</span></span><span style=display:flex><span>│   │   │   ├── builtin/
+</span></span><span style=display:flex><span>│   │   ├── power/
+</span></span><span style=display:flex><span>│   │   ├── regmap/
+</span></span><span style=display:flex><span>│   │   ├── test/
+</span></span><span style=display:flex><span>│   ├── block/
+</span></span><span style=display:flex><span>│   ├── bus/
+</span></span><span style=display:flex><span>│   │   ├── mhi/
+</span></span><span style=display:flex><span>│   ├── cache/
+</span></span><span style=display:flex><span>│   ├── cdrom/
+</span></span><span style=display:flex><span>│   ├── char/
+</span></span><span style=display:flex><span>│   │   ├── agp/
+</span></span><span style=display:flex><span>│   │   ├── hw_random/
+</span></span><span style=display:flex><span>│   │   ├── ipmi/
+</span></span><span style=display:flex><span>│   ├── clk/
+</span></span><span style=display:flex><span>│   │   ├── actions/
+</span></span><span style=display:flex><span>│   │   ├── analogbits/
+</span></span><span style=display:flex><span>│   │   ├── bcm/
+</span></span><span style=display:flex><span>│   │   ├── imgtec/
+</span></span><span style=display:flex><span>│   │   ├── imx/
+</span></span><span style=display:flex><span>│   │   ├── ingenic/
+</span></span><span style=display:flex><span>│   │   ├── mediatek/
+</span></span><span style=display:flex><span>│   │   ├── microchip/
+</span></span><span style=display:flex><span>│   │   ├── mstar/
+</span></span><span style=display:flex><span>│   │   ├── mvebu/
+</span></span><span style=display:flex><span>│   │   ├── ralink/
+</span></span><span style=display:flex><span>│   │   ├── renesas/
+</span></span><span style=display:flex><span>│   │   ├── socfpga/
+</span></span><span style=display:flex><span>│   │   ├── sprd/
+</span></span><span style=display:flex><span>│   │   ├── starfive/
+</span></span><span style=display:flex><span>│   │   ├── sunxi-ng/
+</span></span><span style=display:flex><span>│   │   ├── ti/
+</span></span><span style=display:flex><span>│   │   ├── versatile/
+</span></span><span style=display:flex><span>│   │   └── xilinx/
+</span></span><span style=display:flex><span>│   ├── clocksource/
+</span></span><span style=display:flex><span>│   ├── connector/
+</span></span><span style=display:flex><span>│   ├── cpufreq/
+</span></span><span style=display:flex><span>│   ├── cpuidle/
+</span></span><span style=display:flex><span>│   │   ├── governors/
+</span></span><span style=display:flex><span>│   ├── crypto/
+</span></span><span style=display:flex><span>│   │   ├── hisilicon/
+</span></span><span style=display:flex><span>│   │   ├── intel/
+</span></span><span style=display:flex><span>│   │   │   ├── ixp4xx/
+</span></span><span style=display:flex><span>│   │   │   ├── keembay/
+</span></span><span style=display:flex><span>│   │   ├── starfive/
+</span></span><span style=display:flex><span>│   │   ├── stm32/
+</span></span><span style=display:flex><span>│   │   └── xilinx/
+</span></span><span style=display:flex><span>│   ├── cxl/
+</span></span><span style=display:flex><span>│   │   ├── core/
+</span></span><span style=display:flex><span>│   ├── dax/
+</span></span><span style=display:flex><span>│   │   ├── hmem/
+</span></span><span style=display:flex><span>│   ├── dma/
+</span></span><span style=display:flex><span>│   │   ├── dw/
+</span></span><span style=display:flex><span>│   │   ├── hsu/
+</span></span><span style=display:flex><span>│   │   ├── idxd/
+</span></span><span style=display:flex><span>│   │   ├── mediatek/
+</span></span><span style=display:flex><span>│   │   ├── qcom/
+</span></span><span style=display:flex><span>│   │   ├── ti/
+</span></span><span style=display:flex><span>│   │   └── xilinx/
+</span></span><span style=display:flex><span>│   ├── dma-buf/
+</span></span><span style=display:flex><span>│   ├── firewire/
+</span></span><span style=display:flex><span>│   ├── firmware/
+</span></span><span style=display:flex><span>│   │   ├── arm_ffa/
+</span></span><span style=display:flex><span>│   │   ├── arm_scmi/
+</span></span><span style=display:flex><span>│   │   ├── broadcom/
+</span></span><span style=display:flex><span>│   │   ├── cirrus/
+</span></span><span style=display:flex><span>│   │   ├── efi/
+</span></span><span style=display:flex><span>│   │   │   ├── libstub/
+</span></span><span style=display:flex><span>│   │   │   │   ├── lib.a
+</span></span><span style=display:flex><span>│   │   ├── imx/
+</span></span><span style=display:flex><span>│   │   ├── meson/
+</span></span><span style=display:flex><span>│   │   ├── microchip/
+</span></span><span style=display:flex><span>│   │   ├── psci/
+</span></span><span style=display:flex><span>│   │   ├── qcom/
+</span></span><span style=display:flex><span>│   │   ├── smccc/
+</span></span><span style=display:flex><span>│   │   ├── tegra/
+</span></span><span style=display:flex><span>│   │   └── xilinx/
+</span></span><span style=display:flex><span>│   ├── gpu/
+</span></span><span style=display:flex><span>│   │   ├── drm/
+</span></span><span style=display:flex><span>│   │   │   ├── arm/
+</span></span><span style=display:flex><span>│   │   │   ├── bridge/
+</span></span><span style=display:flex><span>│   │   │   │   ├── analogix/
+</span></span><span style=display:flex><span>│   │   │   │   ├── cadence/
+</span></span><span style=display:flex><span>│   │   │   │   ├── imx/
+</span></span><span style=display:flex><span>│   │   │   │   └── synopsys/
+</span></span><span style=display:flex><span>│   │   │   ├── display/
+</span></span><span style=display:flex><span>│   │   │   ├── gud/
+</span></span><span style=display:flex><span>│   │   │   ├── hisilicon/
+</span></span><span style=display:flex><span>│   │   │   ├── i2c/
+</span></span><span style=display:flex><span>│   │   │   ├── i915/
+</span></span><span style=display:flex><span>│   │   │   │   ├── display/
+</span></span><span style=display:flex><span>│   │   │   │   ├── gem/
+</span></span><span style=display:flex><span>│   │   │   │   ├── gt/
+</span></span><span style=display:flex><span>│   │   │   │   │   └── uc/
+</span></span><span style=display:flex><span>│   │   │   │   ├── pxp/
+</span></span><span style=display:flex><span>│   │   │   │   ├── soc/
+</span></span><span style=display:flex><span>│   │   │   ├── imx/
+</span></span><span style=display:flex><span>│   │   │   ├── mxsfb/
+</span></span><span style=display:flex><span>│   │   │   ├── omapdrm/
+</span></span><span style=display:flex><span>│   │   │   ├── panel/
+</span></span><span style=display:flex><span>│   │   │   ├── renesas/
+</span></span><span style=display:flex><span>│   │   │   │   └── rcar-du/
+</span></span><span style=display:flex><span>│   │   │   ├── solomon/
+</span></span><span style=display:flex><span>│   │   │   ├── tests/
+</span></span><span style=display:flex><span>│   │   │   ├── tilcdc/
+</span></span><span style=display:flex><span>│   │   │   ├── tiny/
+</span></span><span style=display:flex><span>│   │   │   ├── ttm/
+</span></span><span style=display:flex><span>│   │   │   ├── virtio/
+</span></span><span style=display:flex><span>│   │   │   └── xlnx/
+</span></span><span style=display:flex><span>│   │   ├── host1x/
+</span></span><span style=display:flex><span>│   │   └── vga/
+</span></span><span style=display:flex><span>│   ├── hid/
+</span></span><span style=display:flex><span>│   │   └── usbhid/
+</span></span><span style=display:flex><span>│   ├── hwmon/
+</span></span><span style=display:flex><span>│   ├── hwtracing/
+</span></span><span style=display:flex><span>│   │   └── intel_th/
+</span></span><span style=display:flex><span>│   ├── i2c/
+</span></span><span style=display:flex><span>│   │   ├── algos/
+</span></span><span style=display:flex><span>│   │   ├── busses/
+</span></span><span style=display:flex><span>│   │   └── muxes/
+</span></span><span style=display:flex><span>│   ├── i3c/
+</span></span><span style=display:flex><span>│   ├── idle/
+</span></span><span style=display:flex><span>│   ├── input/
+</span></span><span style=display:flex><span>│   │   ├── joystick/
+</span></span><span style=display:flex><span>│   │   ├── keyboard/
+</span></span><span style=display:flex><span>│   │   ├── misc/
+</span></span><span style=display:flex><span>│   │   ├── mouse/
+</span></span><span style=display:flex><span>│   │   ├── serio/
+</span></span><span style=display:flex><span>│   │   ├── tablet/
+</span></span><span style=display:flex><span>│   │   ├── touchscreen/
+</span></span><span style=display:flex><span>│   ├── iommu/
+</span></span><span style=display:flex><span>│   │   ├── amd/
+</span></span><span style=display:flex><span>│   │   ├── arm/
+</span></span><span style=display:flex><span>│   │   │   ├── arm-smmu/
+</span></span><span style=display:flex><span>│   │   │   ├── arm-smmu-v3/
+</span></span><span style=display:flex><span>│   │   ├── intel/
+</span></span><span style=display:flex><span>│   │   ├── iommufd/
+</span></span><span style=display:flex><span>│   ├── irqchip/
+</span></span><span style=display:flex><span>│   ├── leds/
+</span></span><span style=display:flex><span>│   │   ├── blink/
+</span></span><span style=display:flex><span>│   │   ├── simple/
+</span></span><span style=display:flex><span>│   │   └── trigger/
+</span></span><span style=display:flex><span>│   ├── macintosh/
+</span></span><span style=display:flex><span>│   ├── mailbox/
+</span></span><span style=display:flex><span>│   ├── md/
+</span></span><span style=display:flex><span>│   ├── media/
+</span></span><span style=display:flex><span>│   │   ├── common/
+</span></span><span style=display:flex><span>│   │   │   ├── b2c2/
+</span></span><span style=display:flex><span>│   │   │   ├── saa7146/
+</span></span><span style=display:flex><span>│   │   │   ├── siano/
+</span></span><span style=display:flex><span>│   │   │   ├── v4l2-tpg/
+</span></span><span style=display:flex><span>│   │   │   └── videobuf2/
+</span></span><span style=display:flex><span>│   │   ├── firewire/
+</span></span><span style=display:flex><span>│   │   ├── i2c/
+</span></span><span style=display:flex><span>│   │   ├── mmc/
+</span></span><span style=display:flex><span>│   │   │   └── siano/
+</span></span><span style=display:flex><span>│   │   ├── pci/
+</span></span><span style=display:flex><span>│   │   │   ├── b2c2/
+</span></span><span style=display:flex><span>│   │   │   ├── ddbridge/
+</span></span><span style=display:flex><span>│   │   │   ├── dm1105/
+</span></span><span style=display:flex><span>│   │   │   ├── intel/
+</span></span><span style=display:flex><span>│   │   │   │   ├── ipu3/
+</span></span><span style=display:flex><span>│   │   │   │   ├── ivsc/
+</span></span><span style=display:flex><span>│   │   │   ├── mantis/
+</span></span><span style=display:flex><span>│   │   │   ├── netup_unidvb/
+</span></span><span style=display:flex><span>│   │   │   ├── ngene/
+</span></span><span style=display:flex><span>│   │   │   ├── pluto2/
+</span></span><span style=display:flex><span>│   │   │   ├── pt1/
+</span></span><span style=display:flex><span>│   │   │   ├── pt3/
+</span></span><span style=display:flex><span>│   │   │   ├── saa7146/
+</span></span><span style=display:flex><span>│   │   │   ├── smipcie/
+</span></span><span style=display:flex><span>│   │   │   └── ttpci/
+</span></span><span style=display:flex><span>│   │   ├── platform/
+</span></span><span style=display:flex><span>│   │   │   ├── allegro-dvt/
+</span></span><span style=display:flex><span>│   │   │   ├── amlogic/
+</span></span><span style=display:flex><span>│   │   │   │   ├── meson-ge2d/
+</span></span><span style=display:flex><span>│   │   │   ├── amphion/
+</span></span><span style=display:flex><span>│   │   │   ├── aspeed/
+</span></span><span style=display:flex><span>│   │   │   ├── atmel/
+</span></span><span style=display:flex><span>│   │   │   ├── cadence/
+</span></span><span style=display:flex><span>│   │   │   ├── chips-media/
+</span></span><span style=display:flex><span>│   │   │   │   ├── coda/
+</span></span><span style=display:flex><span>│   │   │   │   └── wave5/
+</span></span><span style=display:flex><span>│   │   │   ├── intel/
+</span></span><span style=display:flex><span>│   │   │   ├── marvell/
+</span></span><span style=display:flex><span>│   │   │   ├── mediatek/
+</span></span><span style=display:flex><span>│   │   │   │   ├── jpeg/
+</span></span><span style=display:flex><span>│   │   │   │   ├── mdp/
+</span></span><span style=display:flex><span>│   │   │   │   ├── mdp3/
+</span></span><span style=display:flex><span>│   │   │   │   ├── vcodec/
+</span></span><span style=display:flex><span>│   │   │   │   │   ├── common/
+</span></span><span style=display:flex><span>│   │   │   │   │   ├── decoder/
+</span></span><span style=display:flex><span>│   │   │   │   │   ├── encoder/
+</span></span><span style=display:flex><span>│   │   │   │   └── vpu/
+</span></span><span style=display:flex><span>│   │   │   ├── microchip/
+</span></span><span style=display:flex><span>│   │   │   ├── nuvoton/
+</span></span><span style=display:flex><span>│   │   │   ├── nvidia/
+</span></span><span style=display:flex><span>│   │   │   │   └── tegra-vde/
+</span></span><span style=display:flex><span>│   │   │   ├── nxp/
+</span></span><span style=display:flex><span>│   │   │   │   ├── dw100/
+</span></span><span style=display:flex><span>│   │   │   │   ├── imx8-isi/
+</span></span><span style=display:flex><span>│   │   │   │   ├── imx-jpeg/
+</span></span><span style=display:flex><span>│   │   │   ├── qcom/
+</span></span><span style=display:flex><span>│   │   │   │   ├── camss/
+</span></span><span style=display:flex><span>│   │   │   │   └── venus/
+</span></span><span style=display:flex><span>│   │   │   ├── renesas/
+</span></span><span style=display:flex><span>│   │   │   │   ├── rcar-vin/
+</span></span><span style=display:flex><span>│   │   │   │   ├── rzg2l-cru/
+</span></span><span style=display:flex><span>│   │   │   │   └── vsp1/
+</span></span><span style=display:flex><span>│   │   │   ├── rockchip/
+</span></span><span style=display:flex><span>│   │   │   │   ├── rga/
+</span></span><span style=display:flex><span>│   │   │   │   └── rkisp1/
+</span></span><span style=display:flex><span>│   │   │   ├── samsung/
+</span></span><span style=display:flex><span>│   │   │   │   ├── exynos4-is/
+</span></span><span style=display:flex><span>│   │   │   │   ├── exynos-gsc/
+</span></span><span style=display:flex><span>│   │   │   │   ├── s3c-camif/
+</span></span><span style=display:flex><span>│   │   │   │   ├── s5p-g2d/
+</span></span><span style=display:flex><span>│   │   │   │   ├── s5p-jpeg/
+</span></span><span style=display:flex><span>│   │   │   │   └── s5p-mfc/
+</span></span><span style=display:flex><span>│   │   │   ├── st/
+</span></span><span style=display:flex><span>│   │   │   │   ├── sti/
+</span></span><span style=display:flex><span>│   │   │   │   │   ├── bdisp/
+</span></span><span style=display:flex><span>│   │   │   │   │   ├── c8sectpfe/
+</span></span><span style=display:flex><span>│   │   │   │   │   ├── delta/
+</span></span><span style=display:flex><span>│   │   │   │   │   └── hva/
+</span></span><span style=display:flex><span>│   │   │   │   └── stm32/
+</span></span><span style=display:flex><span>│   │   │   ├── sunxi/
+</span></span><span style=display:flex><span>│   │   │   │   ├── sun4i-csi/
+</span></span><span style=display:flex><span>│   │   │   │   ├── sun6i-csi/
+</span></span><span style=display:flex><span>│   │   │   │   ├── sun6i-mipi-csi2/
+</span></span><span style=display:flex><span>│   │   │   │   ├── sun8i-a83t-mipi-csi2/
+</span></span><span style=display:flex><span>│   │   │   │   ├── sun8i-di/
+</span></span><span style=display:flex><span>│   │   │   │   └── sun8i-rotate/
+</span></span><span style=display:flex><span>│   │   │   ├── ti/
+</span></span><span style=display:flex><span>│   │   │   │   ├── am437x/
+</span></span><span style=display:flex><span>│   │   │   │   ├── cal/
+</span></span><span style=display:flex><span>│   │   │   │   ├── davinci/
+</span></span><span style=display:flex><span>│   │   │   │   ├── j721e-csi2rx/
+</span></span><span style=display:flex><span>│   │   │   │   ├── omap/
+</span></span><span style=display:flex><span>│   │   │   │   ├── omap3isp/
+</span></span><span style=display:flex><span>│   │   │   │   └── vpe/
+</span></span><span style=display:flex><span>│   │   │   ├── verisilicon/
+</span></span><span style=display:flex><span>│   │   │   ├── via/
+</span></span><span style=display:flex><span>│   │   │   └── xilinx/
+</span></span><span style=display:flex><span>│   │   ├── rc/
+</span></span><span style=display:flex><span>│   │   │   ├── keymaps/
+</span></span><span style=display:flex><span>│   │   ├── spi/
+</span></span><span style=display:flex><span>│   │   ├── test-drivers/
+</span></span><span style=display:flex><span>│   │   ├── tuners/
+</span></span><span style=display:flex><span>│   │   └── usb/
+</span></span><span style=display:flex><span>│   │       ├── b2c2/
+</span></span><span style=display:flex><span>│   │       ├── dvb-usb/
+</span></span><span style=display:flex><span>│   │       ├── dvb-usb-v2/
+</span></span><span style=display:flex><span>│   │       ├── s2255/
+</span></span><span style=display:flex><span>│   │       ├── siano/
+</span></span><span style=display:flex><span>│   │       ├── ttusb-budget/
+</span></span><span style=display:flex><span>│   │       └── ttusb-dec/
+</span></span><span style=display:flex><span>│   ├── mfd/
+</span></span><span style=display:flex><span>│   ├── misc/
+</span></span><span style=display:flex><span>│   │   ├── cardreader/
+</span></span><span style=display:flex><span>│   │   ├── cb710/
+</span></span><span style=display:flex><span>│   │   ├── eeprom/
+</span></span><span style=display:flex><span>│   │   ├── lis3lv02d/
+</span></span><span style=display:flex><span>│   │   ├── mei/
+</span></span><span style=display:flex><span>│   │   └── ti-st/
+</span></span><span style=display:flex><span>│   ├── mmc/
+</span></span><span style=display:flex><span>│   ├── net/
+</span></span><span style=display:flex><span>│   │   ├── ethernet/
+</span></span><span style=display:flex><span>│   │   │   ├── 3com/
+</span></span><span style=display:flex><span>│   │   │   ├── 8390/
+</span></span><span style=display:flex><span>│   │   │   ├── adaptec/
+</span></span><span style=display:flex><span>│   │   │   ├── agere/
+</span></span><span style=display:flex><span>│   │   │   ├── alacritech/
+</span></span><span style=display:flex><span>│   │   │   ├── alteon/
+</span></span><span style=display:flex><span>│   │   │   ├── amazon/
+</span></span><span style=display:flex><span>│   │   │   ├── amd/
+</span></span><span style=display:flex><span>│   │   │   ├── aquantia/
+</span></span><span style=display:flex><span>│   │   │   ├── arc/
+</span></span><span style=display:flex><span>│   │   │   ├── asix/
+</span></span><span style=display:flex><span>│   │   │   ├── atheros/
+</span></span><span style=display:flex><span>│   │   │   ├── broadcom/
+</span></span><span style=display:flex><span>│   │   │   ├── brocade/
+</span></span><span style=display:flex><span>│   │   │   ├── cadence/
+</span></span><span style=display:flex><span>│   │   │   ├── cavium/
+</span></span><span style=display:flex><span>│   │   │   │   ├── common/
+</span></span><span style=display:flex><span>│   │   │   │   ├── liquidio/
+</span></span><span style=display:flex><span>│   │   │   │   ├── octeon/
+</span></span><span style=display:flex><span>│   │   │   │   └── thunder/
+</span></span><span style=display:flex><span>│   │   │   ├── chelsio/
+</span></span><span style=display:flex><span>│   │   │   ├── cisco/
+</span></span><span style=display:flex><span>│   │   │   ├── cortina/
+</span></span><span style=display:flex><span>│   │   │   ├── dec/
+</span></span><span style=display:flex><span>│   │   │   │   └── tulip/
+</span></span><span style=display:flex><span>│   │   │   ├── dlink/
+</span></span><span style=display:flex><span>│   │   │   ├── emulex/
+</span></span><span style=display:flex><span>│   │   │   ├── engleder/
+</span></span><span style=display:flex><span>│   │   │   ├── ezchip/
+</span></span><span style=display:flex><span>│   │   │   ├── fujitsu/
+</span></span><span style=display:flex><span>│   │   │   ├── fungible/
+</span></span><span style=display:flex><span>│   │   │   ├── google/
+</span></span><span style=display:flex><span>│   │   │   ├── huawei/
+</span></span><span style=display:flex><span>│   │   │   ├── i825xx/
+</span></span><span style=display:flex><span>│   │   │   ├── intel/
+</span></span><span style=display:flex><span>│   │   │   │   ├── e1000/
+</span></span><span style=display:flex><span>│   │   │   │   ├── e1000e/
+</span></span><span style=display:flex><span>│   │   │   ├── litex/
+</span></span><span style=display:flex><span>│   │   │   ├── marvell/
+</span></span><span style=display:flex><span>│   │   │   │   ├── octeon_ep/
+</span></span><span style=display:flex><span>│   │   │   │   ├── octeontx2/
+</span></span><span style=display:flex><span>│   │   │   │   ├── prestera/
+</span></span><span style=display:flex><span>│   │   │   ├── mellanox/
+</span></span><span style=display:flex><span>│   │   │   ├── micrel/
+</span></span><span style=display:flex><span>│   │   │   ├── microchip/
+</span></span><span style=display:flex><span>│   │   │   ├── microsoft/
+</span></span><span style=display:flex><span>│   │   │   ├── mscc/
+</span></span><span style=display:flex><span>│   │   │   ├── myricom/
+</span></span><span style=display:flex><span>│   │   │   ├── natsemi/
+</span></span><span style=display:flex><span>│   │   │   ├── neterion/
+</span></span><span style=display:flex><span>│   │   │   ├── netronome/
+</span></span><span style=display:flex><span>│   │   │   ├── ni/
+</span></span><span style=display:flex><span>│   │   │   ├── nvidia/
+</span></span><span style=display:flex><span>│   │   │   ├── oki-semi/
+</span></span><span style=display:flex><span>│   │   │   ├── packetengines/
+</span></span><span style=display:flex><span>│   │   │   ├── pensando/
+</span></span><span style=display:flex><span>│   │   │   ├── qlogic/
+</span></span><span style=display:flex><span>│   │   │   ├── qualcomm/
+</span></span><span style=display:flex><span>│   │   │   │   ├── emac/
+</span></span><span style=display:flex><span>│   │   │   ├── rdc/
+</span></span><span style=display:flex><span>│   │   │   ├── realtek/
+</span></span><span style=display:flex><span>│   │   │   ├── renesas/
+</span></span><span style=display:flex><span>│   │   │   ├── rocker/
+</span></span><span style=display:flex><span>│   │   │   ├── samsung/
+</span></span><span style=display:flex><span>│   │   │   ├── seeq/
+</span></span><span style=display:flex><span>│   │   │   ├── sfc/
+</span></span><span style=display:flex><span>│   │   │   ├── silan/
+</span></span><span style=display:flex><span>│   │   │   ├── sis/
+</span></span><span style=display:flex><span>│   │   │   ├── smsc/
+</span></span><span style=display:flex><span>│   │   │   ├── socionext/
+</span></span><span style=display:flex><span>│   │   │   ├── stmicro/
+</span></span><span style=display:flex><span>│   │   │   ├── sun/
+</span></span><span style=display:flex><span>│   │   │   ├── synopsys/
+</span></span><span style=display:flex><span>│   │   │   ├── tehuti/
+</span></span><span style=display:flex><span>│   │   │   ├── ti/
+</span></span><span style=display:flex><span>│   │   │   ├── vertexcom/
+</span></span><span style=display:flex><span>│   │   │   ├── via/
+</span></span><span style=display:flex><span>│   │   │   ├── wangxun/
+</span></span><span style=display:flex><span>│   │   │   ├── wiznet/
+</span></span><span style=display:flex><span>│   │   │   ├── xilinx/
+</span></span><span style=display:flex><span>│   │   │   └── xircom/
+</span></span><span style=display:flex><span>│   │   ├── mdio/
+</span></span><span style=display:flex><span>│   │   ├── pcs/
+</span></span><span style=display:flex><span>│   │   ├── phy/
+</span></span><span style=display:flex><span>│   │   ├── pse-pd/
+</span></span><span style=display:flex><span>│   │   ├── usb/
+</span></span><span style=display:flex><span>│   │   └── wireless/
+</span></span><span style=display:flex><span>│   │       ├── admtek/
+</span></span><span style=display:flex><span>│   │       ├── ath/
+</span></span><span style=display:flex><span>│   │       ├── atmel/
+</span></span><span style=display:flex><span>│   │       ├── broadcom/
+</span></span><span style=display:flex><span>│   │       ├── intel/
+</span></span><span style=display:flex><span>│   │       ├── intersil/
+</span></span><span style=display:flex><span>│   │       ├── marvell/
+</span></span><span style=display:flex><span>│   │       ├── mediatek/
+</span></span><span style=display:flex><span>│   │       ├── microchip/
+</span></span><span style=display:flex><span>│   │       ├── purelifi/
+</span></span><span style=display:flex><span>│   │       ├── quantenna/
+</span></span><span style=display:flex><span>│   │       ├── ralink/
+</span></span><span style=display:flex><span>│   │       ├── realtek/
+</span></span><span style=display:flex><span>│   │       ├── rsi/
+</span></span><span style=display:flex><span>│   │       ├── silabs/
+</span></span><span style=display:flex><span>│   │       ├── st/
+</span></span><span style=display:flex><span>│   │       ├── ti/
+</span></span><span style=display:flex><span>│   │       ├── virtual/
+</span></span><span style=display:flex><span>│   │       └── zydas/
+</span></span><span style=display:flex><span>│   ├── nfc/
+</span></span><span style=display:flex><span>│   ├── nvme/
+</span></span><span style=display:flex><span>│   │   ├── common/
+</span></span><span style=display:flex><span>│   │   ├── host/
+</span></span><span style=display:flex><span>│   │   └── target/
+</span></span><span style=display:flex><span>│   ├── nvmem/
+</span></span><span style=display:flex><span>│   │   ├── layouts/
+</span></span><span style=display:flex><span>│   ├── pci/
+</span></span><span style=display:flex><span>│   │   ├── controller/
+</span></span><span style=display:flex><span>│   │   │   ├── dwc/
+</span></span><span style=display:flex><span>│   │   │   ├── mobiveil/
+</span></span><span style=display:flex><span>│   │   ├── hotplug/
+</span></span><span style=display:flex><span>│   │   ├── msi/
+</span></span><span style=display:flex><span>│   │   ├── pcie/
+</span></span><span style=display:flex><span>│   │   ├── switch/
+</span></span><span style=display:flex><span>│   ├── pcmcia/
+</span></span><span style=display:flex><span>│   ├── perf/
+</span></span><span style=display:flex><span>│   ├── platform/
+</span></span><span style=display:flex><span>│   │   ├── surface/
+</span></span><span style=display:flex><span>│   │   └── x86/
+</span></span><span style=display:flex><span>│   │       ├── amd/
+</span></span><span style=display:flex><span>│   │       ├── intel/
+</span></span><span style=display:flex><span>│   ├── pnp/
+</span></span><span style=display:flex><span>│   │   ├── pnpacpi/
+</span></span><span style=display:flex><span>│   ├── power/
+</span></span><span style=display:flex><span>│   │   └── supply/
+</span></span><span style=display:flex><span>│   ├── pps/
+</span></span><span style=display:flex><span>│   │   ├── clients/
+</span></span><span style=display:flex><span>│   │   ├── generators/
+</span></span><span style=display:flex><span>│   ├── ptp/
+</span></span><span style=display:flex><span>│   ├── pwm/
+</span></span><span style=display:flex><span>│   ├── rtc/
+</span></span><span style=display:flex><span>│   ├── scsi/
+</span></span><span style=display:flex><span>│   │   ├── pcmcia/
+</span></span><span style=display:flex><span>│   │   ├── scsi_devinfo_tbl.c
+</span></span><span style=display:flex><span>│   ├── soc/
+</span></span><span style=display:flex><span>│   │   ├── amlogic/
+</span></span><span style=display:flex><span>│   │   ├── apple/
+</span></span><span style=display:flex><span>│   │   ├── aspeed/
+</span></span><span style=display:flex><span>│   │   ├── bcm/
+</span></span><span style=display:flex><span>│   │   ├── fsl/
+</span></span><span style=display:flex><span>│   │   ├── fujitsu/
+</span></span><span style=display:flex><span>│   │   ├── hisilicon/
+</span></span><span style=display:flex><span>│   │   ├── imx/
+</span></span><span style=display:flex><span>│   │   ├── ixp4xx/
+</span></span><span style=display:flex><span>│   │   ├── loongson/
+</span></span><span style=display:flex><span>│   │   ├── mediatek/
+</span></span><span style=display:flex><span>│   │   ├── microchip/
+</span></span><span style=display:flex><span>│   │   ├── nuvoton/
+</span></span><span style=display:flex><span>│   │   ├── pxa/
+</span></span><span style=display:flex><span>│   │   ├── qcom/
+</span></span><span style=display:flex><span>│   │   ├── renesas/
+</span></span><span style=display:flex><span>│   │   ├── rockchip/
+</span></span><span style=display:flex><span>│   │   ├── sunxi/
+</span></span><span style=display:flex><span>│   │   ├── ti/
+</span></span><span style=display:flex><span>│   │   └── xilinx/
+</span></span><span style=display:flex><span>│   ├── thermal/
+</span></span><span style=display:flex><span>│   │   ├── broadcom/
+</span></span><span style=display:flex><span>│   │   ├── intel/
+</span></span><span style=display:flex><span>│   │   │   ├── x86_pkg_temp_thermal.ko
+</span></span><span style=display:flex><span>│   │   │   ├── x86_pkg_temp_thermal.mod
+</span></span><span style=display:flex><span>│   │   │   ├── x86_pkg_temp_thermal.mod.c
+</span></span><span style=display:flex><span>│   │   ├── mediatek/
+</span></span><span style=display:flex><span>│   │   ├── qcom/
+</span></span><span style=display:flex><span>│   │   ├── samsung/
+</span></span><span style=display:flex><span>│   │   ├── st/
+</span></span><span style=display:flex><span>│   │   ├── tegra/
+</span></span><span style=display:flex><span>│   ├── tty/
+</span></span><span style=display:flex><span>│   │   ├── hvc/
+</span></span><span style=display:flex><span>│   │   ├── ipwireless/
+</span></span><span style=display:flex><span>│   │   ├── serial/
+</span></span><span style=display:flex><span>│   │   │   ├── 8250/
+</span></span><span style=display:flex><span>│   │   └── vt/
+</span></span><span style=display:flex><span>│   │       ├── conmakehash*
+</span></span><span style=display:flex><span>│   │       ├── consolemap_deftbl.c
+</span></span><span style=display:flex><span>│   │       ├── defkeymap.c
+</span></span><span style=display:flex><span>│   ├── ufs/
+</span></span><span style=display:flex><span>│   ├── usb/
+</span></span><span style=display:flex><span>│   │   ├── class/
+</span></span><span style=display:flex><span>│   │   ├── common/
+</span></span><span style=display:flex><span>│   │   ├── core/
+</span></span><span style=display:flex><span>│   │   ├── early/
+</span></span><span style=display:flex><span>│   │   ├── host/
+</span></span><span style=display:flex><span>│   │   ├── misc/
+</span></span><span style=display:flex><span>│   │   ├── mon/
+</span></span><span style=display:flex><span>│   │   ├── phy/
+</span></span><span style=display:flex><span>│   │   └── storage/
+</span></span><span style=display:flex><span>│   ├── video/
+</span></span><span style=display:flex><span>│   │   ├── backlight/
+</span></span><span style=display:flex><span>│   │   ├── console/
+</span></span><span style=display:flex><span>│   │   ├── fbdev/
+</span></span><span style=display:flex><span>│   │   │   ├── core/
+</span></span><span style=display:flex><span>│   │   │   ├── omap/
+</span></span><span style=display:flex><span>│   │   │   └── omap2/
+</span></span><span style=display:flex><span>│   │   │       └── omapfb/
+</span></span><span style=display:flex><span>│   │   │           ├── displays/
+</span></span><span style=display:flex><span>│   │   │           ├── dss/
+</span></span><span style=display:flex><span>│   ├── virtio/
+</span></span><span style=display:flex><span>│   └── watchdog/
+</span></span><span style=display:flex><span>├── fs/
+</span></span><span style=display:flex><span>│   ├── 9p/
+</span></span><span style=display:flex><span>│   ├── autofs/
+</span></span><span style=display:flex><span>│   ├── debugfs/
+</span></span><span style=display:flex><span>│   ├── devpts/
+</span></span><span style=display:flex><span>│   ├── efivarfs/
+</span></span><span style=display:flex><span>│   │   ├── efivarfs.ko
+</span></span><span style=display:flex><span>│   │   ├── efivarfs.mod
+</span></span><span style=display:flex><span>│   │   ├── efivarfs.mod.c
+</span></span><span style=display:flex><span>│   ├── exportfs/
+</span></span><span style=display:flex><span>│   ├── ext4/
+</span></span><span style=display:flex><span>│   ├── fat/
+</span></span><span style=display:flex><span>│   ├── hostfs/
+</span></span><span style=display:flex><span>│   ├── hugetlbfs/
+</span></span><span style=display:flex><span>│   ├── iomap/
+</span></span><span style=display:flex><span>│   ├── isofs/
+</span></span><span style=display:flex><span>│   ├── jbd2/
+</span></span><span style=display:flex><span>│   ├── kernfs/
+</span></span><span style=display:flex><span>│   ├── lockd/
+</span></span><span style=display:flex><span>│   ├── netfs/
+</span></span><span style=display:flex><span>│   ├── nfs/
+</span></span><span style=display:flex><span>│   ├── nfs_common/
+</span></span><span style=display:flex><span>│   ├── nls/
+</span></span><span style=display:flex><span>│   ├── notify/
+</span></span><span style=display:flex><span>│   │   ├── dnotify/
+</span></span><span style=display:flex><span>│   │   ├── fanotify/
+</span></span><span style=display:flex><span>│   │   ├── inotify/
+</span></span><span style=display:flex><span>│   ├── proc/
+</span></span><span style=display:flex><span>│   ├── quota/
+</span></span><span style=display:flex><span>│   ├── ramfs/
+</span></span><span style=display:flex><span>│   ├── sysfs/
+</span></span><span style=display:flex><span>│   ├── tracefs/
+</span></span><span style=display:flex><span>│   ├── unicode/
+</span></span><span style=display:flex><span>├── .gitignore
+</span></span><span style=display:flex><span>├── include/
+</span></span><span style=display:flex><span>│   ├── config/     <span style=color:#75715e>#</span>
+</span></span><span style=display:flex><span>│   └── generated/
+</span></span><span style=display:flex><span>│       ├── asm-offsets.h
+</span></span><span style=display:flex><span>│       ├── autoconf.h
+</span></span><span style=display:flex><span>│       ├── bounds.h
+</span></span><span style=display:flex><span>│       ├── compile.h
+</span></span><span style=display:flex><span>│       ├── rustc_cfg
+</span></span><span style=display:flex><span>│       ├── timeconst.h
+</span></span><span style=display:flex><span>│       ├── uapi/
+</span></span><span style=display:flex><span>│       │   └── linux/
+</span></span><span style=display:flex><span>│       │       └── version.h
+</span></span><span style=display:flex><span>│       ├── utsrelease.h
+</span></span><span style=display:flex><span>│       └── utsversion.h
+</span></span><span style=display:flex><span>├── init/
+</span></span><span style=display:flex><span>│   ├── utsversion-tmp.h
+</span></span><span style=display:flex><span>├── io_uring/
+</span></span><span style=display:flex><span>├── ipc/
+</span></span><span style=display:flex><span>├── kernel/
+</span></span><span style=display:flex><span>│   ├── bounds.s
+</span></span><span style=display:flex><span>│   ├── bpf/
+</span></span><span style=display:flex><span>│   ├── cgroup/
+</span></span><span style=display:flex><span>│   ├── dma/
+</span></span><span style=display:flex><span>│   ├── entry/
+</span></span><span style=display:flex><span>│   ├── events/
+</span></span><span style=display:flex><span>│   ├── futex/
+</span></span><span style=display:flex><span>│   ├── irq/
+</span></span><span style=display:flex><span>│   ├── livepatch/
+</span></span><span style=display:flex><span>│   ├── locking/
+</span></span><span style=display:flex><span>│   ├── module/
+</span></span><span style=display:flex><span>│   ├── power/
+</span></span><span style=display:flex><span>│   ├── printk/
+</span></span><span style=display:flex><span>│   ├── rcu/
+</span></span><span style=display:flex><span>│   ├── sched/
+</span></span><span style=display:flex><span>│   ├── time/
+</span></span><span style=display:flex><span>│   ├── trace/
+</span></span><span style=display:flex><span>├── lib/
+</span></span><span style=display:flex><span>│   ├── crc32table.h
+</span></span><span style=display:flex><span>│   ├── crypto/
+</span></span><span style=display:flex><span>│   │   ├── mpi/
+</span></span><span style=display:flex><span>│   ├── dim/
+</span></span><span style=display:flex><span>│   ├── fonts/
+</span></span><span style=display:flex><span>│   ├── gen_crc32table*
+</span></span><span style=display:flex><span>│   ├── lib.a
+</span></span><span style=display:flex><span>│   ├── lz4/
+</span></span><span style=display:flex><span>│   ├── lzo/
+</span></span><span style=display:flex><span>│   ├── math/
+</span></span><span style=display:flex><span>│   ├── oid_registry_data.c
+</span></span><span style=display:flex><span>│   ├── test_fortify/
+</span></span><span style=display:flex><span>│   ├── xz/
+</span></span><span style=display:flex><span>│   ├── zlib_deflate/
+</span></span><span style=display:flex><span>│   ├── zlib_inflate/
+</span></span><span style=display:flex><span>│   └── zstd/
+</span></span><span style=display:flex><span>│       ├── common/
+</span></span><span style=display:flex><span>│       ├── decompress/
+</span></span><span style=display:flex><span>├── Makefile
+</span></span><span style=display:flex><span>├── mm/
+</span></span><span style=display:flex><span>├── modules.builtin
+</span></span><span style=display:flex><span>├── modules.builtin.modinfo
+</span></span><span style=display:flex><span>├── Module.symvers
+</span></span><span style=display:flex><span>├── net/
+</span></span><span style=display:flex><span>│   ├── 802/
+</span></span><span style=display:flex><span>│   ├── 9p/
+</span></span><span style=display:flex><span>│   ├── bpf/
+</span></span><span style=display:flex><span>│   ├── core/
+</span></span><span style=display:flex><span>│   ├── dns_resolver/
+</span></span><span style=display:flex><span>│   ├── dsa/
+</span></span><span style=display:flex><span>│   ├── ethernet/
+</span></span><span style=display:flex><span>│   ├── ethtool/
+</span></span><span style=display:flex><span>│   ├── handshake/
+</span></span><span style=display:flex><span>│   ├── ipv4/
+</span></span><span style=display:flex><span>│   │   ├── netfilter/
+</span></span><span style=display:flex><span>│   │   │   ├── iptable_nat.ko
+</span></span><span style=display:flex><span>│   │   │   ├── iptable_nat.mod
+</span></span><span style=display:flex><span>│   │   │   ├── iptable_nat.mod.c
+</span></span><span style=display:flex><span>│   ├── ipv6/
+</span></span><span style=display:flex><span>│   │   ├── netfilter/
+</span></span><span style=display:flex><span>│   ├── mac80211/
+</span></span><span style=display:flex><span>│   │   ├── tests/
+</span></span><span style=display:flex><span>│   ├── netfilter/
+</span></span><span style=display:flex><span>│   │   ├── nf_log_syslog.ko
+</span></span><span style=display:flex><span>│   │   ├── nf_log_syslog.mod
+</span></span><span style=display:flex><span>│   │   ├── nf_log_syslog.mod.c
+</span></span><span style=display:flex><span>│   │   ├── xt_addrtype.ko
+</span></span><span style=display:flex><span>│   │   ├── xt_addrtype.mod
+</span></span><span style=display:flex><span>│   │   ├── xt_addrtype.mod.c
+</span></span><span style=display:flex><span>│   │   ├── xt_LOG.ko
+</span></span><span style=display:flex><span>│   │   ├── xt_LOG.mod
+</span></span><span style=display:flex><span>│   │   ├── xt_LOG.mod.c
+</span></span><span style=display:flex><span>│   │   ├── xt_mark.ko
+</span></span><span style=display:flex><span>│   │   ├── xt_mark.mod
+</span></span><span style=display:flex><span>│   │   ├── xt_mark.mod.c
+</span></span><span style=display:flex><span>│   │   ├── xt_MASQUERADE.ko
+</span></span><span style=display:flex><span>│   │   ├── xt_MASQUERADE.mod
+</span></span><span style=display:flex><span>│   │   ├── xt_MASQUERADE.mod.c
+</span></span><span style=display:flex><span>│   │   ├── xt_nat.ko
+</span></span><span style=display:flex><span>│   │   ├── xt_nat.mod
+</span></span><span style=display:flex><span>│   │   ├── xt_nat.mod.c
+</span></span><span style=display:flex><span>│   ├── netlabel/
+</span></span><span style=display:flex><span>│   ├── netlink/
+</span></span><span style=display:flex><span>│   ├── packet/
+</span></span><span style=display:flex><span>│   ├── rfkill/
+</span></span><span style=display:flex><span>│   ├── sched/
+</span></span><span style=display:flex><span>│   ├── sunrpc/
+</span></span><span style=display:flex><span>│   │   ├── auth_gss/
+</span></span><span style=display:flex><span>│   ├── unix/
+</span></span><span style=display:flex><span>│   ├── wireless/
+</span></span><span style=display:flex><span>│   │   ├── shipped-certs.c
+</span></span><span style=display:flex><span>│   │   ├── tests/
+</span></span><span style=display:flex><span>│   └── xfrm/
+</span></span><span style=display:flex><span>├── scripts/
+</span></span><span style=display:flex><span>│   ├── asn1_compiler*
+</span></span><span style=display:flex><span>│   ├── basic/
+</span></span><span style=display:flex><span>│   │   ├── fixdep*
+</span></span><span style=display:flex><span>│   ├── gcc-plugins/
+</span></span><span style=display:flex><span>│   ├── kallsyms*
+</span></span><span style=display:flex><span>│   ├── kconfig/
+</span></span><span style=display:flex><span>│   │   ├── conf*
+</span></span><span style=display:flex><span>│   │   ├── lexer.lex.c
+</span></span><span style=display:flex><span>│   │   ├── lxdialog/
+</span></span><span style=display:flex><span>│   │   ├── mconf*
+</span></span><span style=display:flex><span>│   │   ├── mconf-bin
+</span></span><span style=display:flex><span>│   │   ├── mconf-cflags
+</span></span><span style=display:flex><span>│   │   ├── mconf-libs
+</span></span><span style=display:flex><span>│   │   ├── parser.tab.c
+</span></span><span style=display:flex><span>│   │   ├── parser.tab.h
+</span></span><span style=display:flex><span>│   ├── mod/
+</span></span><span style=display:flex><span>│   │   ├── devicetable-offsets.h
+</span></span><span style=display:flex><span>│   │   ├── devicetable-offsets.s
+</span></span><span style=display:flex><span>│   │   ├── elfconfig.h
+</span></span><span style=display:flex><span>│   │   ├── mk_elfconfig*
+</span></span><span style=display:flex><span>│   │   ├── modpost*
+</span></span><span style=display:flex><span>│   ├── module.lds
+</span></span><span style=display:flex><span>│   ├── selinux/
+</span></span><span style=display:flex><span>│   │   ├── genheaders/
+</span></span><span style=display:flex><span>│   │   │   ├── genheaders*
+</span></span><span style=display:flex><span>│   │   └── mdp/
+</span></span><span style=display:flex><span>│   │       ├── mdp*
+</span></span><span style=display:flex><span>│   ├── sorttable*
+</span></span><span style=display:flex><span>├── security/
+</span></span><span style=display:flex><span>│   ├── integrity/
+</span></span><span style=display:flex><span>│   ├── keys/
+</span></span><span style=display:flex><span>│   └── selinux/
+</span></span><span style=display:flex><span>│       ├── av_permissions.h
+</span></span><span style=display:flex><span>│       ├── flask.h
+</span></span><span style=display:flex><span>│       ├── ss/
+</span></span><span style=display:flex><span>├── sound/
+</span></span><span style=display:flex><span>│   ├── arm/
+</span></span><span style=display:flex><span>│   ├── atmel/
+</span></span><span style=display:flex><span>│   ├── core/
+</span></span><span style=display:flex><span>│   │   ├── seq/
+</span></span><span style=display:flex><span>│   ├── drivers/
+</span></span><span style=display:flex><span>│   │   ├── mpu401/
+</span></span><span style=display:flex><span>│   │   ├── opl3/
+</span></span><span style=display:flex><span>│   │   ├── opl4/
+</span></span><span style=display:flex><span>│   │   ├── pcsp/
+</span></span><span style=display:flex><span>│   │   └── vx/
+</span></span><span style=display:flex><span>│   ├── firewire/
+</span></span><span style=display:flex><span>│   ├── hda/
+</span></span><span style=display:flex><span>│   ├── i2c/
+</span></span><span style=display:flex><span>│   │   └── other/
+</span></span><span style=display:flex><span>│   ├── isa/
+</span></span><span style=display:flex><span>│   │   ├── ad1816a/
+</span></span><span style=display:flex><span>│   │   ├── ad1848/
+</span></span><span style=display:flex><span>│   │   ├── cs423x/
+</span></span><span style=display:flex><span>│   │   ├── es1688/
+</span></span><span style=display:flex><span>│   │   ├── galaxy/
+</span></span><span style=display:flex><span>│   │   ├── gus/
+</span></span><span style=display:flex><span>│   │   ├── msnd/
+</span></span><span style=display:flex><span>│   │   ├── opti9xx/
+</span></span><span style=display:flex><span>│   │   ├── sb/
+</span></span><span style=display:flex><span>│   │   ├── wavefront/
+</span></span><span style=display:flex><span>│   │   └── wss/
+</span></span><span style=display:flex><span>│   ├── mips/
+</span></span><span style=display:flex><span>│   ├── parisc/
+</span></span><span style=display:flex><span>│   ├── pci/
+</span></span><span style=display:flex><span>│   │   ├── ac97/
+</span></span><span style=display:flex><span>│   │   ├── ali5451/
+</span></span><span style=display:flex><span>│   │   ├── asihpi/
+</span></span><span style=display:flex><span>│   │   ├── au88x0/
+</span></span><span style=display:flex><span>│   │   ├── aw2/
+</span></span><span style=display:flex><span>│   │   ├── ca0106/
+</span></span><span style=display:flex><span>│   │   ├── cs46xx/
+</span></span><span style=display:flex><span>│   │   ├── cs5535audio/
+</span></span><span style=display:flex><span>│   │   ├── ctxfi/
+</span></span><span style=display:flex><span>│   │   ├── echoaudio/
+</span></span><span style=display:flex><span>│   │   ├── emu10k1/
+</span></span><span style=display:flex><span>│   │   ├── hda/
+</span></span><span style=display:flex><span>│   │   ├── ice1712/
+</span></span><span style=display:flex><span>│   │   ├── korg1212/
+</span></span><span style=display:flex><span>│   │   ├── lola/
+</span></span><span style=display:flex><span>│   │   ├── lx6464es/
+</span></span><span style=display:flex><span>│   │   ├── mixart/
+</span></span><span style=display:flex><span>│   │   ├── nm256/
+</span></span><span style=display:flex><span>│   │   ├── oxygen/
+</span></span><span style=display:flex><span>│   │   ├── pcxhr/
+</span></span><span style=display:flex><span>│   │   ├── riptide/
+</span></span><span style=display:flex><span>│   │   ├── rme9652/
+</span></span><span style=display:flex><span>│   │   ├── trident/
+</span></span><span style=display:flex><span>│   │   ├── vx222/
+</span></span><span style=display:flex><span>│   │   └── ymfpci/
+</span></span><span style=display:flex><span>│   ├── pcmcia/
+</span></span><span style=display:flex><span>│   │   ├── pdaudiocf/
+</span></span><span style=display:flex><span>│   │   └── vx/
+</span></span><span style=display:flex><span>│   ├── ppc/
+</span></span><span style=display:flex><span>│   ├── sh/
+</span></span><span style=display:flex><span>│   ├── soc/
+</span></span><span style=display:flex><span>│   ├── sparc/
+</span></span><span style=display:flex><span>│   ├── spi/
+</span></span><span style=display:flex><span>│   ├── synth/
+</span></span><span style=display:flex><span>│   │   ├── emux/
+</span></span><span style=display:flex><span>│   ├── usb/
+</span></span><span style=display:flex><span>│   │   ├── 6fire/
+</span></span><span style=display:flex><span>│   │   ├── bcd2000/
+</span></span><span style=display:flex><span>│   │   ├── caiaq/
+</span></span><span style=display:flex><span>│   │   ├── hiface/
+</span></span><span style=display:flex><span>│   │   ├── misc/
+</span></span><span style=display:flex><span>│   │   └── usx2y/
+</span></span><span style=display:flex><span>│   ├── virtio/
+</span></span><span style=display:flex><span>│   ├── x86/
+</span></span><span style=display:flex><span>│   └── xen/
+</span></span><span style=display:flex><span>├── source -&gt; ../
+</span></span><span style=display:flex><span>├── System.map
+</span></span><span style=display:flex><span>├── t
+</span></span><span style=display:flex><span>├── .tmp_vmlinux.kallsyms1*
+</span></span><span style=display:flex><span>├── .tmp_vmlinux.kallsyms1.S
+</span></span><span style=display:flex><span>├── .tmp_vmlinux.kallsyms1.syms
+</span></span><span style=display:flex><span>├── .tmp_vmlinux.kallsyms2*
+</span></span><span style=display:flex><span>├── .tmp_vmlinux.kallsyms2.S
+</span></span><span style=display:flex><span>├── .tmp_vmlinux.kallsyms2.syms
+</span></span><span style=display:flex><span>├── tools/
+</span></span><span style=display:flex><span>│   └── objtool/
+</span></span><span style=display:flex><span>│       ├── arch/
+</span></span><span style=display:flex><span>│       │   └── x86/
+</span></span><span style=display:flex><span>│       │       ├── lib/
+</span></span><span style=display:flex><span>│       │       │   └── inat-tables.c
+</span></span><span style=display:flex><span>│       ├── fixdep*
+</span></span><span style=display:flex><span>│       ├── libsubcmd/
+</span></span><span style=display:flex><span>│       │   ├── include/
+</span></span><span style=display:flex><span>│       │   │   └── subcmd/
+</span></span><span style=display:flex><span>│       │   │       ├── exec-cmd.h
+</span></span><span style=display:flex><span>│       │   │       ├── help.h
+</span></span><span style=display:flex><span>│       │   │       ├── pager.h
+</span></span><span style=display:flex><span>│       │   │       ├── parse-options.h
+</span></span><span style=display:flex><span>│       │   │       └── run-command.h
+</span></span><span style=display:flex><span>│       │   ├── libsubcmd.a
+</span></span><span style=display:flex><span>│       ├── objtool*
+</span></span><span style=display:flex><span>├── tt
+</span></span><span style=display:flex><span>├── usr/
+</span></span><span style=display:flex><span>│   ├── gen_init_cpio*
+</span></span><span style=display:flex><span>│   ├── initramfs_data.cpio
+</span></span><span style=display:flex><span>│   ├── initramfs_inc_data
+</span></span><span style=display:flex><span>├── .version
+</span></span><span style=display:flex><span>├── virt/
+</span></span><span style=display:flex><span>│   ├── lib/
+</span></span><span style=display:flex><span>├── vmlinux*
+</span></span><span style=display:flex><span>├── vmlinux.a
+</span></span><span style=display:flex><span>├── .vmlinux.export.c</span></span></code></pre></div></div></div><h2 id=misc>Misc
+<a href=#misc class=heading-anchor><span>#</span></a></h2><p>all include from root makefile</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Kbuild.include</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/subarch.include</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Makefile.clang</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/scripts/Makefile.compiler</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/arch/</span><span style=color:#66d9ef>$(</span>SRCARCH<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/Makefile</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>ifdef</span> <span style=color:#960050;background-color:#1e0010>need-config</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#960050;background-color:#1e0010>include/config/auto.conf</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>endif</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/arch/</span><span style=color:#66d9ef>$(</span>SRCARCH<span style=color:#66d9ef>)</span><span style=color:#960050;background-color:#1e0010>/Makefile</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#960050;background-color:#1e0010>include/config/auto.conf.cmd</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>include</span> <span style=color:#66d9ef>$(</span>addprefix <span style=color:#66d9ef>$(</span>srctree<span style=color:#66d9ef>)</span>/, <span style=color:#66d9ef>$(</span>include-y<span style=color:#66d9ef>))</span></span></span></code></pre></div></div></div><h3 id=techniques-ensure-a-file-has-been-generated>Techniques: Ensure a File Has Been Generated
+<a href=#techniques-ensure-a-file-has-been-generated class=heading-anchor><span>#</span></a></h3><p>file-name target with no dependency is considered always up-to-date, unless that file doesn&rsquo;t exist (i.e. effectively becomes a PHONY):</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span><span style=color:#75715e># $(KCONFIG_CONFIG) defaults to `.config`.
+</span></span></span><span style=display:flex><span><span style=color:#75715e># Whenever make finds that the `.config` file doesn&#39;t exist thus the recipe needs to be executed, it&#39;s a problem
+</span></span></span><span style=display:flex><span><span style=color:#a6e22e>$(KCONFIG_CONFIG)</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>	@echo &gt;&amp;<span style=color:#ae81ff>2</span> <span style=color:#e6db74>&#39;***&#39;</span>
+</span></span><span style=display:flex><span>	@echo &gt;&amp;<span style=color:#ae81ff>2</span> <span style=color:#e6db74>&#39;*** Configuration file &#34;$@&#34; not found!&#39;</span>
+</span></span><span style=display:flex><span>	@echo &gt;&amp;<span style=color:#ae81ff>2</span> <span style=color:#e6db74>&#39;***&#39;</span>
+</span></span><span style=display:flex><span>	@echo &gt;&amp;<span style=color:#ae81ff>2</span> <span style=color:#e6db74>&#39;*** Please run some configurator (e.g. &#34;make oldconfig&#34; or&#39;</span>
+</span></span><span style=display:flex><span>	@echo &gt;&amp;<span style=color:#ae81ff>2</span> <span style=color:#e6db74>&#39;*** &#34;make menuconfig&#34; or &#34;make xconfig&#34;).&#39;</span>
+</span></span><span style=display:flex><span>	@echo &gt;&amp;<span style=color:#ae81ff>2</span> <span style=color:#e6db74>&#39;***&#39;</span>
+</span></span><span style=display:flex><span>	@/bin/false
+</span></span></code></pre></div></div></div></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-kernel-build-system/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

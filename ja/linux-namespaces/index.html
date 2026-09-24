@@ -1,0 +1,85 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux 名前空間</title></head><body><main><article><div class=article-header><h1>Linux 名前空間</h1><div class=aux>最終更新: 2021-11-21 04:00:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/kernel/>Kernel</a>
+|
+<a href=/ja/tags/linux/>Linux</a>
+|
+<a href=/ja/tags/namespaces/>Namespaces</a></div></div><div class="translation-notice machine-translated"><a href=/linux-namespaces/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>名前空間は、本来グローバルである名前とリソースのビューを分割します。
+各タスクは、サポートされる各タイプについて1つの名前空間インスタンスを持ち、
+同じインスタンスに属するタスクは、そのインスタンス固有の同じリソースを認識します。
+名前空間だけでは、CPU、メモリ、I/Oの消費量は制限されません。これらのリソース制御は
+cgroupが提供します。</p><p>Linuxは8種類の名前空間を公開しています。Time名前空間はLinux 5.6で追加され、
+それ以外のタイプは同リリースより前から存在します。名前空間フラグのバージョン固有の
+正確な定義は、
+<a href=https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/sched.h><code>include/uapi/linux/sched.h</code></a>
+にあります。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Type</th><th>Creation flag</th><th>Isolated resource</th></tr></thead><tbody><tr><td>Cgroup</td><td><code>CLONE_NEWCGROUP</code></td><td>Cgroupルートのビュー</td></tr><tr><td>IPC</td><td><code>CLONE_NEWIPC</code></td><td>System V IPCオブジェクトとPOSIXメッセージキュー</td></tr><tr><td>Network</td><td><code>CLONE_NEWNET</code></td><td>ネットワークデバイス、プロトコルスタック、ルーティングテーブル、ファイアウォール状態、ポート空間</td></tr><tr><td>Mount</td><td><code>CLONE_NEWNS</code></td><td>マウントテーブルとマウント伝播関係</td></tr><tr><td>PID</td><td><code>CLONE_NEWPID</code></td><td>プロセスID番号空間とPID 1のセマンティクス</td></tr><tr><td>Time</td><td><code>CLONE_NEWTIME</code></td><td>monotonic clockとboot-time clockのオフセット</td></tr><tr><td>User</td><td><code>CLONE_NEWUSER</code></td><td>ユーザーID・グループIDのマッピング、資格情報、スコープ付きケイパビリティ</td></tr><tr><td>UTS</td><td><code>CLONE_NEWUTS</code></td><td>ホスト名とNISドメイン名</td></tr></tbody></table></div></div><p>初期システムは各タイプのインスタンスを1つずつ持って開始します。名前空間の識別子は、
+移植可能でグローバルに意味を持つ32ビットIDではありません。代わりに、
+<code>/proc/PID/ns</code> は <code>net:[4026531840]</code> のようなシンボリックリンクとして名前空間の
+ハンドルを公開します。この番号は、名前空間ファイルシステムにおける、そのカーネル
+オブジェクトのinodeを識別します。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>ls -l /proc/self/ns
+</span></span><span style=display:flex><span>lsns
+</span></span><span style=display:flex><span>readlink /proc/self/ns/net</span></span></code></pre></div></div></div><h2 id=名前空間の作成と参加>名前空間の作成と参加
+<a href=#%e5%90%8d%e5%89%8d%e7%a9%ba%e9%96%93%e3%81%ae%e4%bd%9c%e6%88%90%e3%81%a8%e5%8f%82%e5%8a%a0 class=heading-anchor><span>#</span></a></h2><p><code>clone(2)</code> と <code>clone3(2)</code> に1つ以上の <code>CLONE_NEW*</code> フラグを渡すと、新しい名前空間内に
+子を作成します。<code>unshare(2)</code> は、各名前空間タイプの規則に従い、呼び出し元のタスクに
+新しく作成された名前空間を使用させます。PID名前空間とTime名前空間のunshareは、その後
+作成される子にだけ影響し、呼び出し元は現在のPID名前空間またはTime名前空間に残ります。
+<code>setns(2)</code> は、オープン済みのファイルディスクリプターが参照する名前空間に参加します。
+<code>unshare(1)</code> と <code>nsenter(1)</code> は、実験や管理に便利なフロントエンドです。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># New user, mount, and PID namespaces; the child becomes PID 1 in its PID namespace.</span>
+</span></span><span style=display:flex><span>unshare --user --map-root-user --mount --pid --fork --mount-proc sh
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Join the mount namespace of an existing process.</span>
+</span></span><span style=display:flex><span>sudo nsenter --target <span style=color:#e6db74>&#34;</span>$PID<span style=color:#e6db74>&#34;</span> --mount sh</span></span></code></pre></div></div></div><p>名前空間の操作は互換的に扱えるものではありません。</p><ul><li>新しいPID名前空間は、その後に作成される子に影響します。タスク自身を別のPID名前空間へ
+移動させることはできません。そこへ <code>setns()</code> すると、以後の子がその名前空間で可視になります。</li><li>新しいマウント名前空間は、最初に呼び出し元のマウントテーブルをコピーします。共有マウント
+伝播によって名前空間間でマウントが転送される可能性があるため、コンテナのセットアップでは、
+ファイルシステムをマウントする前に、関連するツリーをprivateまたはslaveにすることが一般的です。</li><li>ネットワーク名前空間は、起動する必要があるloopbackデバイスを備えた状態で開始します。
+これに接続する一般的な方法は、vethエンドポイントを名前空間内へ移動することです。</li><li>User名前空間の作成には、他の名前空間タイプとは異なる資格情報とマッピングの規則があります。
+<code>setns()</code> が成功したからといって、ホストの特権が付与されるとは限りません。</li></ul><p>カーネルは関連するUser名前空間でケイパビリティを確認し、安全でない遷移を拒否します。
+正確なエラー条件は名前空間タイプとカーネルリリースによって異なるため、呼び出し元は
+システムコールのマニュアルページと対象カーネルのソースを使用してください。</p><h2 id=ハンドルとライフタイム>ハンドルとライフタイム
+<a href=#%e3%83%8f%e3%83%b3%e3%83%89%e3%83%ab%e3%81%a8%e3%83%a9%e3%82%a4%e3%83%95%e3%82%bf%e3%82%a4%e3%83%a0 class=heading-anchor><span>#</span></a></h2><p><code>/proc/PID/ns/&lt;type></code> は、名前空間ファイルディスクリプターとしてオープンできます。
+タスクまたは名前空間ファイルディスクリプターが参照している間、名前空間は存続します。
+このエントリのbind mountも参照を保持するため、最後のプロセスが終了した後も、監督プロセスが
+名前空間を保持できます。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>sudo mkdir -p /run/netns/demo
+</span></span><span style=display:flex><span>sudo touch /run/netns/demo
+</span></span><span style=display:flex><span>sudo mount --bind /proc/<span style=color:#e6db74>&#34;</span>$PID<span style=color:#e6db74>&#34;</span>/ns/net /run/netns/demo
+</span></span><span style=display:flex><span>ip netns exec demo ip link</span></span></code></pre></div></div></div><p>不要になったbind mountはアンマウントする必要があります。名前空間ハンドルは権限を伴う
+オブジェクトとして扱ってください。<code>/proc/PID/ns</code> へのアクセスは、<code>/proc</code> の可視性と
+ptrace形式のアクセスチェックの対象です。また、継承されたディスクリプターによって、受領者が
+<code>setns()</code> を呼び出せる場合があります。</p><h2 id=user名前空間とidマッピング>User名前空間とIDマッピング
+<a href=#user%e5%90%8d%e5%89%8d%e7%a9%ba%e9%96%93%e3%81%a8id%e3%83%9e%e3%83%83%e3%83%94%e3%83%b3%e3%82%b0 class=heading-anchor><span>#</span></a></h2><p>User名前空間は、名前空間内の連続したID範囲を、親User名前空間のIDへマッピングします。
+作成者は <code>--map-root-user</code> によって、名前空間内の有効UID 0を取得できることがありますが、
+そのIDが、マッピングされていないホストIDやグローバルなホストリソースに対する特権を
+自動的に持つわけではありません。</p><p>非特権セットアップでは、監督プロセスが通常、<code>uid_map</code> に書き込んだ後、<code>setgroups</code> に
+<code>deny</code> を書き込み、その後で <code>gid_map</code> に書き込みます。この順序により、マッピングされて
+いないグループへの遷移を通じてプロセスがグループベースのアクセスを得ることを防ぎます。
+マッピング規則は意図的に制限されており、委譲された範囲と <code>newuidmap</code>・<code>newgidmap</code>
+ヘルパーが、呼び出し元が直接書き込めないマッピングを処理します。</p><p>ケイパビリティはUser名前空間を基準に評価されます。子User名前空間内で
+<code>CAP_SYS_ADMIN</code> を持つプロセスは、その名前空間によって管理される操作、たとえば
+マウント名前空間の設定を実行できます。しかし、初期User名前空間ではそのケイパビリティを
+持ちません。祖先名前空間が所有するカーネルオブジェクト、デバイスアクセス、LSMポリシーは、
+依然としてセキュリティ境界を構成します。</p><h2 id=コンテナの構成>コンテナの構成
+<a href=#%e3%82%b3%e3%83%b3%e3%83%86%e3%83%8a%e3%81%ae%e6%a7%8b%e6%88%90 class=heading-anchor><span>#</span></a></h2><p>コンテナは、単一の名前空間ではなく、複数の分離機構を組み合わせたものです。実用的な
+セットアップ順序の一例を示します。</p><ol><li>User名前空間を作成し、意図したUID/GIDマッピングを設定します。後続のセットアップに
+必要な、名前空間にスコープされたケイパビリティが提供されるためです。</li><li>マウント名前空間を作成し、伝播を明示的に変更して、ファイルシステムビューを構築します。</li><li>PID名前空間を作成し、意図したinitプロセスをforkし、マウント名前空間から新しい
+<code>/proc</code> をマウントします。これにより、プロセス情報がPIDビューと一致します。</li><li>必要に応じてNetwork、IPC、UTS、Time、cgroup名前空間を作成または参加し、特権を持つ
+ホスト側マネージャーからネットワークリンクを設定します。</li><li>実行前にワークロードをホスト管理のcgroupへ配置し、検査と終了処理のために名前空間
+ファイルディスクリプターを保持します。</li></ol><p>PID 1には、孤立した子をreapし、特殊なシグナル動作を持つため、明示的な処理が必要です。
+PID名前空間を作成するだけの最小限のコンテナコマンドでは、ゾンビが残ったり、終了シグナルが
+無視されたりする可能性があります。そのためランタイムには、init/reaperまたは同等の
+スーパービジョン機構が必要です。</p><p>マウント名前空間はファイルシステムのマウント可視性を制御します。一方、<code>chroot(2)</code> は
+パス名解決だけを変更します。意図しないマウントの公開や受信を避けるには、両者を慎重な
+マウント伝播設定と組み合わせる必要があります。</p><h2 id=cgroupとcgroup名前空間>CgroupとCgroup名前空間
+<a href=#cgroup%e3%81%a8cgroup%e5%90%8d%e5%89%8d%e7%a9%ba%e9%96%93 class=heading-anchor><span>#</span></a></h2><p>Cgroup名前空間は、タスクのcgroupルートへのパスを仮想化します。これにより、タスクが
+<code>/proc/PID/cgroup</code> や、その名前空間にマウントされたcgroupファイルシステムから読み取る
+内容が変わり、内部ワークロードが祖先のパスを発見することを防ぎます。独立したcgroup
+階層を作成するものではなく、ホストのCPU、メモリ、I/O、PIDの制限を弱めるものでもありません。</p><p>完全な名前空間ABIの説明については、対象リリースの
+<a href=https://man7.org/linux/man-pages/man7/namespaces.7.html><code>namespaces(7)</code> マニュアルページ</a>
+と、対象リリースの
+<a href=https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/kernel/nsproxy.c>カーネルソース</a>
+を併せて参照してください。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-namespaces/ class=language-option data-lang=en>English
+</a><a href=/ja/linux-namespaces/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/linux-namespaces/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/linux-namespaces/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

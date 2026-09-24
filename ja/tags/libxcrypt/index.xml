@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Libxcrypt on cesun.life</title><link>https://example.org/ja/tags/libxcrypt/</link><description>Recent content in Libxcrypt on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Fri, 08 Aug 2025 11:46:18 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/libxcrypt/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux におけるパスワードハッシュ</title><link>https://example.org/ja/password-hashing-on-linux/</link><pubDate>Fri, 08 Aug 2025 11:46:18 +0800</pubDate><guid>https://example.org/ja/password-hashing-on-linux/</guid><description>&lt;p&gt;パスワードの保存には、暗号化ではなく一方向のパスワードハッシュ関数を使用します。検証側は、保存値に埋め込まれた設定を使用して入力されたパスワードをハッシュし、エンコード結果を比較します。平文パスワードの復元は設計に含まれません。データベースを入手した攻撃者は、代わりに候補パスワードをオフラインでテストします。したがって、現代のパスワードハッシュには、パスワードごとのランダムなソルトと、意図的に高コストでサポート対象のアルゴリズムが必要です。&lt;/p&gt;
+&lt;h2 id="crypt-のエンコード済みハッシュ"&gt;
+ &lt;code&gt;crypt&lt;/code&gt; のエンコード済みハッシュ
+ &lt;a href="#crypt-%e3%81%ae%e3%82%a8%e3%83%b3%e3%82%b3%e3%83%bc%e3%83%89%e6%b8%88%e3%81%bf%e3%83%8f%e3%83%83%e3%82%b7%e3%83%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;歴史的な &lt;code&gt;crypt(3)&lt;/code&gt; インターフェースは、パスワードと設定を受け取ります。そのモジュラー形式は一般に次のようになります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;$id$parameters$salt$checksum&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;識別子とパラメーター構文によってアルゴリズムを選択します。ソルトにより、同じパスワードでも異なる保存値が生成されます。チェックサムは検証値です。検証時には保存された文字列全体を設定として渡すため、アプリケーションはその文字列を正確に保持する必要があります。一方、従来の DES &lt;code&gt;crypt&lt;/code&gt; は 2 文字のソルトを使用するため、新しいパスワードハッシュには適していません。&lt;/p&gt;
+&lt;p&gt;glibc の旧 &lt;code&gt;libcrypt&lt;/code&gt; は &lt;code&gt;$1$&lt;/code&gt;（MD5）、&lt;code&gt;$5$&lt;/code&gt;（SHA-256）、&lt;code&gt;$6$&lt;/code&gt;（SHA-512）を文書化しており、SHA 形式は &lt;code&gt;rounds=N&lt;/code&gt; を受け付けます。歴史的な互換性があっても、MD5 や DES が新規導入に適するわけではありません。利用可能な方式と受け付ける識別子は、移植可能な POSIX パスワード形式ではなく、実装とビルド設定の詳細です。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;crypt&lt;/code&gt; は静的ストレージを返すため、並行呼び出しに対して安全ではありません。&lt;code&gt;crypt_r&lt;/code&gt; は呼び出し側が提供する &lt;code&gt;struct crypt_data&lt;/code&gt; を使用します。この構造体は実装の要件に従って初期化し、スレッド間で共有してはなりません。比較前に失敗を確認してください。実装によっては &lt;code&gt;NULL&lt;/code&gt; または無効な値を返す場合があります。アプリケーション自身がハッシュを比較する場合は定数時間比較を使用し、API が許す限り早くパスワード情報を消去してください。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; crypt_data data &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;candidate &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;crypt_r&lt;/span&gt;(password, stored_hash, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;data);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (candidate &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; NULL &lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;constant_time_equal&lt;/span&gt;(candidate, stored_hash)) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#75715e"&gt;/* authenticated */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;この例が示すのは検証の仕組みであり、ログインアーキテクチャではありません。PAM 対応プログラムは、アカウントデータベースを読み取ったり、プロンプトやスロットリングを独自に実装したりせず、認証を PAM に委任すべきです。&lt;/p&gt;
+&lt;h2 id="glibc-と-libxcrypt-の互換性"&gt;
+ glibc と libxcrypt の互換性
+ &lt;a href="#glibc-%e3%81%a8-libxcrypt-%e3%81%ae%e4%ba%92%e6%8f%9b%e6%80%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;crypt&lt;/code&gt; はオプションの POSIX XSI インターフェースです。glibc はバージョン 2.39 でツリー内の &lt;code&gt;libcrypt&lt;/code&gt; を削除しました。Linux ディストリビューションでは、代わりに &lt;a href="https://github.com/besser82/libxcrypt"&gt;libxcrypt&lt;/a&gt; が一般的に提供されています。libxcrypt は、glibc と互換性のあるシンボルバージョンを持つ &lt;code&gt;libcrypt.so.1&lt;/code&gt; を提供できるため、glibc の歴史的なライブラリにリンクされた既存の Linux バイナリは引き続きロードできます。その互換性なしで設定されたシステムでは異なる ABI 名がインストールされるため、ビルド時と実行時の互換性をそれぞれ確認する必要があります。&lt;/p&gt;</description></item></channel></rss>

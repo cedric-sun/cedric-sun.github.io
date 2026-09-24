@@ -1,0 +1,64 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>JAX-RS 与 Jersey</title></head><body><main><article><div class=article-header><h1>JAX-RS 与 Jersey</h1><div class=aux>最后更新: 2024-07-01 19:46:18 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/java/>Java</a>
+|
+<a href=/zh-cn/tags/jax-rs/>Jax-Rs</a>
+|
+<a href=/zh-cn/tags/jersey/>Jersey</a>
+|
+<a href=/zh-cn/tags/web/>Web</a></div></div><div class="translation-notice machine-translated"><a href=/jax-rs-and-jersey/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>JAX-RS 是 <code>jakarta.ws.rs</code> 包中用于 HTTP 资源的 Jakarta 标准 API 和规范。
+它定义注解、请求和响应类型、客户端 API、提供程序以及服务器发送事件支持。
+Jersey 是符合该规范的 JAX-RS 实现。</p><p>JAX-RS 不同于 JAX-WS，后者关注 XML Web 服务。</p><h2 id=定义资源>定义资源
+<a href=#%e5%ae%9a%e4%b9%89%e8%b5%84%e6%ba%90 class=heading-anchor><span>#</span></a></h2><p>在编译期添加 Jakarta REST API，并在运行期添加 JAX-RS 实现。
+资源类使用 <code>@Path</code>；方法使用 HTTP 方法注解，并可以增加相对路径：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Path</span>(<span style=color:#e6db74>&#34;/users&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Produces</span>(MediaType.<span style=color:#a6e22e>APPLICATION_JSON</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>UserResource</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@GET</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Path</span>(<span style=color:#e6db74>&#34;/{id}&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> User <span style=color:#a6e22e>get</span>(<span style=color:#a6e22e>@PathParam</span>(<span style=color:#e6db74>&#34;id&#34;</span>) <span style=color:#66d9ef>long</span> id) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> service.<span style=color:#a6e22e>find</span>(id);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@POST</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Consumes</span>(MediaType.<span style=color:#a6e22e>APPLICATION_JSON</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> Response <span style=color:#a6e22e>create</span>(User input) {
+</span></span><span style=display:flex><span>        User created <span style=color:#f92672>=</span> service.<span style=color:#a6e22e>create</span>(input);
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> Response.<span style=color:#a6e22e>created</span>(
+</span></span><span style=display:flex><span>                URI.<span style=color:#a6e22e>create</span>(<span style=color:#e6db74>&#34;/users/&#34;</span> <span style=color:#f92672>+</span> created.<span style=color:#a6e22e>id</span>())).<span style=color:#a6e22e>entity</span>(created).<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>Application</code> 子类可以使用 <code>@ApplicationPath("/api")</code> 注解。
+外围容器或实现决定请求如何到达 JAX-RS 运行时。</p><h2 id=绑定请求>绑定请求
+<a href=#%e7%bb%91%e5%ae%9a%e8%af%b7%e6%b1%82 class=heading-anchor><span>#</span></a></h2><p>为非请求体方法参数添加注解，标明其来源：</p><ul><li><code>@PathParam</code>、<code>@QueryParam</code> 和 <code>@MatrixParam</code> 读取 URI 组件。</li><li><code>@HeaderParam</code>、<code>@CookieParam</code> 和 <code>@FormParam</code> 读取标头、Cookie 和表单数据。</li><li><code>@Context</code> 注入 JAX-RS 上下文对象。</li></ul><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@GET</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> Response <span style=color:#a6e22e>search</span>(
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>@QueryParam</span>(<span style=color:#e6db74>&#34;q&#34;</span>) String query,
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>@QueryParam</span>(<span style=color:#e6db74>&#34;limit&#34;</span>) <span style=color:#a6e22e>@DefaultValue</span>(<span style=color:#e6db74>&#34;20&#34;</span>) <span style=color:#66d9ef>int</span> limit) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> Response.<span style=color:#a6e22e>ok</span>(service.<span style=color:#a6e22e>search</span>(query, limit)).<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>未注解的资源方法参数通常是请求实体。其 Java 类型必须受到 <code>MessageBodyReader</code> 支持；
+例如，从 JSON 绑定到对象需要已安装的 JSON 提供程序。声明 <code>@Consumes</code> 以使契约明确。
+<code>InputStream</code> 可以接受原始实体，但单独的核心 JAX-RS 不会解析 <code>multipart/form-data</code>；
+应使用受支持的多部分提供程序，例如 Jersey 的 multipart 模块。</p><p>使用 <code>@BeanParam</code> 将多个参数绑定组合到一个 bean：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>PageRequest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@QueryParam</span>(<span style=color:#e6db74>&#34;offset&#34;</span>) <span style=color:#a6e22e>@DefaultValue</span>(<span style=color:#e6db74>&#34;0&#34;</span>) <span style=color:#66d9ef>int</span> offset;
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@QueryParam</span>(<span style=color:#e6db74>&#34;limit&#34;</span>) <span style=color:#a6e22e>@DefaultValue</span>(<span style=color:#e6db74>&#34;20&#34;</span>) <span style=color:#66d9ef>int</span> limit;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>将其作为 <code>@BeanParam PageRequest page</code> 使用。可以显式验证输入，
+也可以使用运行时提供的 Jakarta Validation 集成。</p><h2 id=生成响应和错误>生成响应和错误
+<a href=#%e7%94%9f%e6%88%90%e5%93%8d%e5%ba%94%e5%92%8c%e9%94%99%e8%af%af class=heading-anchor><span>#</span></a></h2><p>方法可以直接返回实体，也可以返回 <code>Response</code> 来显式控制状态、标头和实体。
+<code>@Produces</code> 参与内容协商。返回适当的状态和稳定的错误表示；不要向客户端暴露堆栈跟踪。</p><p>抛出 <code>WebApplicationException</code>（例如 <code>NotFoundException</code> 或 <code>BadRequestException</code>）会提供 HTTP 响应。
+对于应用程序异常，编写 <code>ExceptionMapper&lt;T></code> 并使用 <code>@Provider</code> 标注：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Provider</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>IllegalArgumentMapper</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>implements</span> ExceptionMapper<span style=color:#f92672>&lt;</span>IllegalArgumentException<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> Response <span style=color:#a6e22e>toResponse</span>(IllegalArgumentException error) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> Response.<span style=color:#a6e22e>status</span>(Response.<span style=color:#a6e22e>Status</span>.<span style=color:#a6e22e>BAD_REQUEST</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>entity</span>(Map.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;error&#34;</span>, error.<span style=color:#a6e22e>getMessage</span>())).<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>运行时会选择适用的映射器，其异常类型是所抛异常的最近超类型。
+如果没有适用映射器，则根据容器集成生成服务器错误响应。</p><h2 id=使用-jersey-部署>使用 Jersey 部署
+<a href=#%e4%bd%bf%e7%94%a8-jersey-%e9%83%a8%e7%bd%b2 class=heading-anchor><span>#</span></a></h2><p>Jersey 实现 JAX-RS 契约，但本身不接受 TCP 连接。在 servlet 容器中，
+添加 <code>org.glassfish.jersey.containers:jersey-container-servlet</code>，
+注册 <code>org.glassfish.jersey.servlet.ServletContainer</code>，并配置资源包扫描或 <code>ResourceConfig</code>。</p><p>对于嵌入式服务器，创建 <code>ResourceConfig</code> 并将其传递给受支持的 Jersey 容器。
+尽可能让应用代码依赖 <code>jakarta.ws.rs</code>，并将 Jersey 特定配置隔离在部署边界。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/jax-rs-and-jersey/ class=language-option data-lang=en>English
+</a><a href=/ja/jax-rs-and-jersey/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/jax-rs-and-jersey/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/jax-rs-and-jersey/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Initialization on cesun.life</title><link>https://example.org/zh-cn/tags/initialization/</link><description>Recent content in Initialization on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Tue, 26 Dec 2023 14:30:46 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/initialization/index.xml" rel="self" type="application/rss+xml"/><item><title>C++ 静态初始化顺序</title><link>https://example.org/zh-cn/cpp-static-initialization/</link><pubDate>Tue, 26 Dec 2023 14:30:46 +0800</pubDate><guid>https://example.org/zh-cn/cpp-static-initialization/</guid><description>&lt;p&gt;C++ 独立于作用域分配存储期。静态存储期和线程存储期的初始化与销毁规则，决定了对象是在 &lt;code&gt;main&lt;/code&gt; 之前可用、首次使用时可用，还是每个线程各自初始化一次。&lt;/p&gt;
+&lt;h2 id="存储期与初始化阶段"&gt;
+ 存储期与初始化阶段
+ &lt;a href="#%e5%ad%98%e5%82%a8%e6%9c%9f%e4%b8%8e%e5%88%9d%e5%a7%8b%e5%8c%96%e9%98%b6%e6%ae%b5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;命名空间作用域对象、静态数据成员以及块作用域的 &lt;code&gt;static&lt;/code&gt; 对象具有静态存储期。&lt;code&gt;thread_local&lt;/code&gt; 对象具有线程存储期：每个线程都有独立的实例，并根据声明和实现规则，在该线程启动时或首次使用时初始化。&lt;/p&gt;
+&lt;p&gt;当静态存储期或线程存储期变量满足条件时，会进行常量初始化；否则，该变量会进行零初始化。常量初始化和零初始化合称静态初始化，并且会在动态初始化之前完成。因此，&lt;code&gt;constinit&lt;/code&gt; 变量必须进行常量初始化，而 &lt;code&gt;constexpr&lt;/code&gt; 对象是明确表达初始化要求的一种有效方式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;constinit &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; process_limit &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;256&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; cache_line_bytes &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;64&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;constinit&lt;/code&gt; 不会使对象变为不可变；它只会拒绝需要动态初始化的初始化器。&lt;/p&gt;
+&lt;h2 id="顺序边界"&gt;
+ 顺序边界
+ &lt;a href="#%e9%a1%ba%e5%ba%8f%e8%be%b9%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;同一翻译单元中普通的非内联命名空间作用域变量，其动态初始化按照定义顺序进行。跨翻译单元的动态初始化没有可靠的源代码顺序：它可能以不确定顺序进行，或者受到延迟初始化规则的影响。因此，读取另一个非局部对象的非局部初始化器，可能只能看到零初始化状态，而不是该对象预期的动态状态。&lt;/p&gt;
+&lt;p&gt;函数局部静态对象会将构造延迟到控制流首次经过其声明时：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Logger&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; logger() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; Logger instance;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; instance;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;从 C++11 开始，对块作用域静态对象的并发初始化尝试只会成功初始化一次；其他线程会等待初始化成功。如果初始化器抛出异常，则会在后续进入时重试初始化。首次使用时构造消除了 &lt;code&gt;instance&lt;/code&gt; 的跨翻译单元构造依赖，但调用方仍必须制定更广泛的关闭策略。&lt;/p&gt;
+&lt;h2 id="销毁是独立的设计问题"&gt;
+ 销毁是独立的设计问题
+ &lt;a href="#%e9%94%80%e6%af%81%e6%98%af%e7%8b%ac%e7%ab%8b%e7%9a%84%e8%ae%be%e8%ae%a1%e9%97%ae%e9%a2%98" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;静态对象和线程对象分别在程序终止或线程退出时销毁。不能将跨翻译单元的非局部对象销毁顺序作为安全的依赖机制，因为析构函数可能访问已经销毁的对象。函数局部静态对象按照构造完成顺序的逆序销毁；当其析构函数调用其他访问器时，也可能产生类似的风险。&lt;/p&gt;
+&lt;p&gt;对于在清理阶段相互作用的资源，应优先采用显式所有权和关闭顺序。对于进程生命周期内存在的服务，如果选择由操作系统回收资源的契约，可以有意不销毁这些服务；应记录这一选择，而不要依赖偶然的销毁顺序。&lt;/p&gt;</description></item></channel></rss>

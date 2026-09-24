@@ -1,0 +1,75 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Cryptographic Trust Stores</title></head><body><main><article><div class=article-header><h1>Cryptographic Trust Stores</h1><div class=aux>最終更新: 2023-08-26 03:30:48 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/cryptography/>Cryptography</a>
+|
+<a href=/ja/tags/certificates/>Certificates</a>
+|
+<a href=/ja/tags/pki/>Pki</a>
+|
+<a href=/ja/tags/trust/>Trust</a></div></div><div class="translation-notice machine-translated"><a href=/cryptographic-trust-stores/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>トラストストアにはローカルのトラストアンカーが含まれ、一部のプラットフォームでは中間証明書や秘密鍵エントリも含まれます。
+検証者は X.509 証明書パスを構築・検証するときにそれらのアンカーを使います。
+したがってルートをインストールすると、そのストアを読むすべてのクライアントのセキュリティ境界が変わります。</p><h2 id=トラストストアの境界>トラストストアの境界
+<a href=#%e3%83%88%e3%83%a9%e3%82%b9%e3%83%88%e3%82%b9%e3%83%88%e3%82%a2%e3%81%ae%e5%a2%83%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>ホストに普遍的なトラストストアはありません。接続は複数の独立したポリシー境界を越えることがあります。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>境界</th><th>一般的な動作</th><th>運用上の問い</th></tr></thead><tbody><tr><td>オペレーティングシステム</td><td>マシン全体およびユーザーごとのアンカーを提供する</td><td>どのアカウントとアプリケーションが変更を継承するか</td></tr><tr><td>ブラウザー</td><td>OS ストアを使うか、独自のルートプログラムとデータベースを保持する</td><td>管理ポリシーがブラウザーの既定値を上書きするか</td></tr><tr><td>言語ランタイム</td><td>OS API、パッケージ化された CA バンドル、ランタイムキーストアのいずれかを使う</td><td>どのランタイムバージョンとプロセス設定がストアを選ぶか</td></tr><tr><td>アプリケーション</td><td>非公開バンドルを同梱するか、選択した発行者や鍵をピン留めできる</td><td>発行者が変わったとき誰がバンドルを更新するか</td></tr></tbody></table></div></div><p>Windows exposes separate Current User and Local Machine stores. <strong>Trusted Root
+Certification Authorities</strong> contains anchors, <strong>Intermediate Certification
+Authorities</strong> supports chain building, and <strong>Personal</strong> can contain end-entity
+certificates with private keys. A Local Machine root affects more principals
+than a Current User root and requires corresponding administrative controls.</p><p>Apple platforms use Keychain trust settings with user, administrator, and
+system domains. Linux distributions commonly generate a system CA bundle and
+hashed certificate directory from administrator-managed source directories.
+Paths and update commands differ, so use the distribution&rsquo;s certificate
+management mechanism instead of copying a PEM file into a guessed OpenSSL
+directory.</p><p>Browser and runtime behavior must be tested rather than inferred. Firefox can
+maintain an NSS certificate database while enterprise policy can import or
+consult platform roots. Java applications can select a JSSE truststore
+explicitly and otherwise use runtime defaults such as <code>cacerts</code>. Python,
+Node.js, containers, and statically packaged applications can each select
+different bundles. Record the actual consumer and configuration in deployment
+documentation.</p><h2 id=root-intermediate-and-private-ca-installation>Root, Intermediate, and Private CA Installation
+<a href=#root-intermediate-and-private-ca-installation class=heading-anchor><span>#</span></a></h2><p>A root CA certificate becomes a trust anchor only when installed in an anchor
+store with appropriate trust settings. Trusting it delegates authority for
+every name and purpose allowed by local policy and certificate constraints.
+Import only the public root certificate; a root private key belongs in
+controlled CA infrastructure, not on client machines.</p><p>An intermediate CA normally belongs in chain-building material, not in the
+root store. Servers should transmit the intermediates needed to connect their
+leaf certificate to a known anchor. Marking an intermediate as an anchor can
+change name-constraint, policy, and path-processing behavior because RFC 5280
+path validation begins from locally trusted information.</p><p>A private CA deployment needs more than certificate import:</p><ol><li>Define the permitted DNS namespaces, extended key usages, certificate
+lifetime, and issuance approval policy.</li><li>Protect online issuing keys with access controls and protected key storage;
+keep an offline root where the deployment model permits.</li><li>Distribute only the required public anchors to an explicit user, machine,
+container, runtime, or application scope.</li><li>Inventory every store that receives the anchor because removal must reach
+all of them.</li></ol><p>開発用インターセプト CA にも同じ制御が必要です。CA 秘密鍵の保有者は、クライアントの信頼ポリシー内の任意サイトで受け入れられる証明書を発行できます。
+スコープと有効期間を制限し、生成した秘密鍵を共有せず、テスト後にアンカーを削除します。</p><h2 id=ownership-updates-and-rollback>Ownership, Updates, and Rollback
+<a href=#ownership-updates-and-rollback class=heading-anchor><span>#</span></a></h2><p>Treat trust changes as versioned configuration. Each anchor needs an owner,
+fingerprint, purpose, approved scope, installation source, activation date,
+expiry or review date, and removal procedure. Distribution should use managed
+policy or the platform&rsquo;s supported update tool so later changes are
+deterministic.</p><p>CA rotation requires an overlap period. Distribute the new root before issuing
+chains that depend on it, monitor path-building results, and remove the old
+root only after deployed certificates and clients no longer require it. Keep a
+tested rollback package that removes the new anchor and restores the previous
+bundle or trust settings without disabling certificate validation.</p><p>Revocation does not reliably undo an accidentally trusted private root because
+trust-anchor revocation processing is platform-specific. Compromise response
+must include stopping issuance, replacing affected certificates, removing the
+anchor from every managed store, rotating CA keys, and investigating
+certificates issued during the exposure.</p><h2 id=verify-path-building>Verify Path Building
+<a href=#verify-path-building class=heading-anchor><span>#</span></a></h2><p>Verification must reproduce the target client&rsquo;s inputs: leaf certificate,
+untrusted intermediates, trust anchors, DNS name, validation time, intended
+purpose, and algorithm policy. OpenSSL can diagnose one explicit path:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>openssl verify <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -CAfile organization-roots.pem <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -untrusted intermediates.pem <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -purpose sslserver <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -verify_hostname api.example.com <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  server.pem</span></span></code></pre></div></div></div><p>The result proves only the OpenSSL invocation&rsquo;s policy. Also test the real
+browser, runtime, or application because another path builder can choose a
+different issuer, trust anchor, or policy. Inspect the served chain with a
+diagnostic client, confirm the selected anchor&rsquo;s fingerprint, and test both a
+valid endpoint and expected failures such as a wrong hostname or unknown root.</p><p>Do not use <code>--insecure</code>, disable hostname checks, install a leaf certificate as
+a broad anchor, or replace the application trust manager to make a test pass.
+Those actions bypass the property under investigation and can turn a chain
+configuration error into a production vulnerability.</p><p>For certificate structure and path validation details, see
+<a href=/ja/x-509-certificates/>X.509 Certificates</a>.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc5280>RFC 5280: Internet X.509 Public Key Infrastructure Certificate and CRL Profile</a></li><li><a href=https://learn.microsoft.com/en-us/windows-hardware/drivers/install/certificate-stores>Microsoft: Certificate Stores</a></li><li><a href=https://support.apple.com/guide/keychain-access/change-the-trust-settings-of-a-certificate-kyca11871/mac>Apple: Change the Trust Settings of a Certificate</a></li><li><a href=https://support.mozilla.org/kb/setting-certificate-authorities-firefox>Mozilla: Setting Up Certificate Authorities in Firefox</a></li><li><a href=https://docs.oracle.com/en/java/javase/25/docs/specs/man/keytool.html>Java <code>keytool</code> Reference</a></li><li><a href=https://docs.openssl.org/master/man1/openssl-verify/>OpenSSL <code>verify</code> Documentation</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cryptographic-trust-stores/ class=language-option data-lang=en>English
+</a><a href=/ja/cryptographic-trust-stores/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cryptographic-trust-stores/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cryptographic-trust-stores/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

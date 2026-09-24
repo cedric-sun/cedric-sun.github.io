@@ -1,0 +1,42 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring 资源</title></head><body><main><article><div class=article-header><h1>Spring 资源</h1><div class=aux>最后更新: 2024-01-30 20:15:57 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/java/>Java</a>
+|
+<a href=/zh-cn/tags/resources/>Resources</a>
+|
+<a href=/zh-cn/tags/spring/>Spring</a></div></div><div class="translation-notice machine-translated"><a href=/spring-resources/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p><code>org.springframework.core.io.Resource</code> 为 Spring API 提供统一句柄，所表示的内容可以位于文件、
+类路径条目、URL、servlet 上下文、字节数组或已打开的流中。
+该抽象描述访问能力；它不会让每个资源都可寻址、可重复读取、可写或由文件支持。</p><h2 id=resource-契约><code>Resource</code> 契约
+<a href=#resource-%e5%a5%91%e7%ba%a6 class=heading-anchor><span>#</span></a></h2><p><code>Resource</code> 扩展了 <code>InputStreamSource</code>。<code>getInputStream()</code> 是基本操作，而
+<code>exists()</code>、<code>isReadable()</code>、<code>isOpen()</code>、<code>isFile()</code>、<code>contentLength()</code>、
+<code>lastModified()</code> 和 <code>getDescription()</code> 等方法暴露能力或元数据。</p><p>重要实现包括：</p><ul><li><code>ClassPathResource</code>：用于类加载器或类相对条目；</li><li><code>FileSystemResource</code> 和 <code>PathResource</code>：用于文件系统内容；</li><li><code>UrlResource</code>：用于 JVM 支持的 URL；</li><li><code>ServletContextResource</code>：用于 Web 应用路径；</li><li><code>ByteArrayResource</code>：用于可重复读取的内存字节；以及</li><li><code>InputStreamResource</code>：用于已打开的、通常只能使用一次的流。</li></ul><p>调用方拥有 <code>getInputStream()</code> 返回的每个流，并必须关闭它。
+<code>isOpen()</code> 尤其重要：<code>InputStreamResource</code> 包装已打开的句柄，不能安全地重复读取；
+文件和字节数组资源则可以在每次调用时打开新流。</p><h2 id=加载和相对解析>加载和相对解析
+<a href=#%e5%8a%a0%e8%bd%bd%e5%92%8c%e7%9b%b8%e5%af%b9%e8%a7%a3%e6%9e%90 class=heading-anchor><span>#</span></a></h2><p><code>ResourceLoader.getResource(String)</code> 将位置转换为一个资源。
+每个 <code>ApplicationContext</code> 都是资源加载器。前缀选择明确语义：</p><ul><li><code>classpath:com/example/report.html</code> 选择类路径资源。</li><li><code>file:/srv/app/report.html</code> 选择文件系统 URL。</li><li><code>https://example.net/schema.json</code> 选择 URL 资源。</li></ul><p>无前缀位置相对于上下文。<code>ClassPathXmlApplicationContext</code> 将其解释为类路径位置，
+<code>FileSystemXmlApplicationContext</code> 将其解释为文件系统位置，Web 应用上下文则将其解释为 servlet 上下文位置。
+库代码应请求 <code>Resource</code> 或 <code>ResourceLoader</code>，而不是假设一种默认位置。</p><p><code>ResourcePatternResolver</code> 将加载扩展到位置模式和多个匹配项。
+<code>classpath*:</code> 搜索所有匹配的类路径根；Ant 风格通配符通过模式解析生效，
+而不是通过单资源 <code>ResourceLoader</code> 契约生效。</p><h2 id=注入资源>注入资源
+<a href=#%e6%b3%a8%e5%85%a5%e8%b5%84%e6%ba%90 class=heading-anchor><span>#</span></a></h2><p>Spring 可以使用外围应用上下文作为加载器，将位置字符串转换为 <code>Resource</code>：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReportRenderer</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> Resource template;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReportRenderer(<span style=color:#a6e22e>@Value</span>(<span style=color:#e6db74>&#34;${report.template:classpath:reports/daily.html}&#34;</span>)
+</span></span><span style=display:flex><span>                   Resource template) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>template</span> <span style=color:#f92672>=</span> template;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>构造器注入使依赖可见，并允许测试提供 <code>ByteArrayResource</code>。
+当位置随操作变化时注入 <code>ResourceLoader</code>；只有应用确实有意接受多个匹配项时，
+才注入 <code>Resource[]</code> 或 <code>ResourcePatternResolver</code>。</p><h2 id=存在性可重复读取和写入>存在性、可重复读取和写入
+<a href=#%e5%ad%98%e5%9c%a8%e6%80%a7%e5%8f%af%e9%87%8d%e5%a4%8d%e8%af%bb%e5%8f%96%e5%92%8c%e5%86%99%e5%85%a5 class=heading-anchor><span>#</span></a></h2><p><code>exists()</code> 是探测而不是预留；内容可能在打开前消失。
+当正确性依赖访问成功时，优先打开资源并处理产生的 <code>IOException</code>。
+元数据操作也可能需要 I/O，而远程 URL 可能缓慢或不可用。</p><p><code>WritableResource</code> 增加 <code>isWritable()</code> 和 <code>getOutputStream()</code>。
+<code>FileSystemResource</code> 和 <code>PathResource</code> 实现该接口，而打包 JAR 内的类路径资源不实现。
+写入代码应要求 <code>WritableResource</code>，而不是根据位置字符串向下转型。</p><p>可重复性取决于具体实现。需要两遍处理的解析器可以将一次性资源缓冲为 <code>ByteArrayResource</code>，
+并明确设置大小限制。API 应记录它们是打开一次、重新打开、保留还是关闭流，
+从而保持资源所有权明确。</p><h2 id=主要参考资料>主要参考资料
+<a href=#%e4%b8%bb%e8%a6%81%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/core/resources.html>Spring 资源抽象</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/io/Resource.html><code>Resource</code> Javadoc</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/io/ResourceLoader.html><code>ResourceLoader</code> Javadoc</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-resources/ class=language-option data-lang=en>English
+</a><a href=/ja/spring-resources/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/spring-resources/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/spring-resources/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

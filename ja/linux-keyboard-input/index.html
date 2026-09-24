@@ -1,0 +1,96 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux キーボード入力</title></head><body><main><article><div class=article-header><h1>Linux キーボード入力</h1><div class=aux>最終更新: 2022-11-20 20:04:02 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/input/>Input</a>
+|
+<a href=/ja/tags/keyboard/>Keyboard</a>
+|
+<a href=/ja/tags/linux/>Linux</a></div></div><div class="translation-notice machine-translated"><a href=/linux-keyboard-input/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Linux は、キーボードの転送レベルのレポートを、安定した入力キーコード、および
+キーボードレイアウトが生成するテキストやアクションから分離します。これらの層を
+分けることで、PS/2 と USB キーボードが異なるハードウェアデータを生成しながら、
+どちらも <code>KEY_F</code> を報告できる理由を説明できます。</p><h2 id=概要>概要
+<a href=#%e6%a6%82%e8%a6%81 class=heading-anchor><span>#</span></a></h2><p>入力は概念的に 4 段階をたどります。</p><ol><li>転送ドライバーがバイトまたはレポートを受け取ります。<code>atkbd</code> ドライバーは AT と
+PS/2 のスキャンコードセットを処理し、<code>usbhid</code> は USB HID usage を解析します。</li><li>ドライバーは make、break、プレフィックス、repeat の状態を解析し、押下、解放、
+repeat の値とともに <code>KEY_F</code> (33) などの Linux 入力キーコードを報告します。</li><li>入力コアは evdev を通じてイベントを公開します。グラフィカルコンポジターまたは
+入力ライブラリは通常、これらのイベントに独自のレイアウトを適用します。</li><li>Linux 仮想コンソールでは、カーネルキーボード層がアクティブなコンソールキーマップ
+を適用し、バイト、Unicode 文字、文字列、コンソールアクションを端末層へ出力します。</li></ol><p>したがってスキャンコードは文字ではなく、Linux キーコードは X11、Wayland、Unicode
+のコードポイントではありません。</p><h2 id=ibm-pcxtat-プロトコル>IBM PC、XT、AT プロトコル
+<a href=#ibm-pcxtat-%e3%83%97%e3%83%ad%e3%83%88%e3%82%b3%e3%83%ab class=heading-anchor><span>#</span></a></h2><p>初期の 83 キー IBM PC および PC/XT キーボードは、現在スキャンコードセット 1 と
+呼ばれるバイト割り当てを確立しました。インターフェイスは実質的にキーボードから
+ホストへの一方向で、キーボードはクロック付きシリアルデータを供給しましたが、
+ホストには LED、repeat、スキャンセット選択を制御する AT コマンドプロトコルが
+ありませんでした。通常のセット 1 の押下は <code>0x01</code> から <code>0x7f</code> の make バイトを使い、
+そのキーを解放するとビット 7 が設定されます。たとえば Escape は押下時に <code>0x01</code>、
+解放時に <code>0x81</code> を生成します。</p><p>84 キー IBM PC/AT キーボードは双方向インターフェイスとスキャンコードセット 2 を
+導入しました。セット 2 はセット 1 を数値的に拡張するのではなく位置を変更しました。
+左 Control はセット 2 では <code>0x14</code>、セット 1 では <code>0x1d</code> です。break シーケンスは
+<code>0xf0</code> プレフィックスを使うため、左 Control は押下時に <code>14</code>、解放時に <code>f0 14</code> を
+生成します。ホストは LED、typematic 動作、アクティブセットを設定するコマンドを
+送信できます。</p><p>PC 互換 AT コントローラーは、ソフトウェア互換性のためにキーボードのセット 2 の
+バイトをセット 1 形式へ変換することがよくあります。そのため Linux は多くの内蔵
+キーボードを <code>AT Translated Set 2 keyboard</code> と識別します。物理キーボードはセット 2
+を話し、コントローラーは変換済みバイトを公開します。IBM 端末と後期 PS/2 設計に
+関連するスキャンコードセット 3 は、追加キーを独立して割り当て、キーごとの make、
+break、typematic 設定をサポートします。現在の Linux <code>atkbd</code> ソースは変換済み
+セット 2、raw セット 2、セット 3 をサポートし、セット 2 がデフォルトです。</p><p>USB キーボードはこれらの AT バイトストリームを送信しません。usage 識別子を含む
+HID レポートを送信し、HID 入力ドライバーがその usage を同じ Linux <code>KEY_*</code> 名前空間
+へマッピングします。</p><h2 id=スキャンコードシーケンス>スキャンコードシーケンス
+<a href=#%e3%82%b9%e3%82%ad%e3%83%a3%e3%83%b3%e3%82%b3%e3%83%bc%e3%83%89%e3%82%b7%e3%83%bc%e3%82%b1%e3%83%b3%e3%82%b9 class=heading-anchor><span>#</span></a></h2><p>押下は <strong>make</strong>、解放は <strong>break</strong> とも呼ばれます。押し続けた typematic キーは設定
+された遅延後に make レポートを繰り返し生成し、make と break を交互に生成するわけ
+ではありません。Linux 入力インターフェイスはハードウェアまたはソフトウェアの
+自動リピートを <code>EV_KEY</code> 値 2 で表します。</p><p><code>0xe0</code> プレフィックスはセット 1 とセット 2 の両方を拡張します。たとえばセット 1
+の左 Control は <code>1d</code>/<code>9d</code>、右 Control は <code>e0 1d</code>/<code>e0 9d</code> です。セット 2 は代わりに
+<code>14</code>/<code>f0 14</code> と <code>e0 14</code>/<code>e0 f0 14</code> を使います。<code>0xe1</code> プレフィックスは Pause など
+の例外的シーケンスを導入します。Print Screen と Pause は、単一バイトの通常キー
+ではなく複数バイトの互換シーケンスです。各バイトを個別に扱うと偽の Shift や Control
+イベントが生じるため、ドライバーはストリームをステートマシンとして解析します。</p><p>「スキャンコード」という用語は、より高レベルの転送識別子にも使われます。たとえば
+evdev の <code>EV_MSC</code>/<code>MSC_SCAN</code> 値は <code>0x70009</code> のような USB HID usage をエンコード
+できますが、対応する <code>EV_KEY</code> イベントは依然として <code>KEY_F</code> (33) です。古いセット 1
+値と初期 Linux キーコードの数値的一致は歴史的なもので、インターフェイス不変条件
+ではありません。</p><h2 id=カーネルのスキャンコードからキーコードへのマッピング>カーネルのスキャンコードからキーコードへのマッピング
+<a href=#%e3%82%ab%e3%83%bc%e3%83%8d%e3%83%ab%e3%81%ae%e3%82%b9%e3%82%ad%e3%83%a3%e3%83%b3%e3%82%b3%e3%83%bc%e3%83%89%e3%81%8b%e3%82%89%e3%82%ad%e3%83%bc%e3%82%b3%e3%83%bc%e3%83%89%e3%81%b8%e3%81%ae%e3%83%9e%e3%83%83%e3%83%94%e3%83%b3%e3%82%b0 class=heading-anchor><span>#</span></a></h2><p>各低レベルドライバーがプロトコルのマッピングを所有します。AT ドライバーはデフォルト
+で置換可能なスキャンコードからキーコードへのテーブルを索引付けし、HID ドライバー
+は HID usage からキーコードを導出します。Linux キーコードは UAPI の
+<a href=https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h><code>input-event-codes.h</code></a>
+and extend beyond the original 1–255 console range.</p><p><code>setkeycodes</code> はコンソール AT キーボード経路の選択したマッピングを変更します。
+エスケープされたセット 1 スキャンコードと 10 進キーコードなどのペアを受け取ります。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>sudo setkeycodes e06f <span style=color:#ae81ff>112</span></span></span></code></pre></div></div></div><p>このコマンドは任意の USB HID デバイスをリマップせず、キーコード 112 が生成する文字
+も定義しません。<code>loadkeys</code> でロードしたコンソールキーマップが後者の操作を行います。
+現代のデスクトップ入力スタックは代わりにユーザー空間のレイアウトを適用します。</p><h2 id=console-keymaps-modifiers-and-character-sets>Console Keymaps, Modifiers, and Character Sets
+<a href=#console-keymaps-modifiers-and-character-sets class=heading-anchor><span>#</span></a></h2><p>A <code>keymaps(5)</code> file describes the Linux virtual-console translation table.
+<code>keycode N = ...</code> selects an action according to the active modifier mask. The
+kernel keyboard layer defines weights for Shift (1), AltGr (2), Control (4), Alt
+(8), ShiftL (16), ShiftR (32), CtrlL (64), CtrlR (128), and CapsShift (256).
+Map files list only the combinations they need:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>keymaps 0-2,4-5,8,12
+</span></span><span style=display:flex><span>keycode 30 = +a A
+</span></span><span style=display:flex><span>control alt keycode 111 = Boot</span></span></code></pre></div></div></div><p>Keysyms can emit characters, strings, change a modifier or lock, switch virtual
+consoles, or request another console action. A leading <code>+</code> marks a letter as
+Caps-Lock-sensitive. <code>string F100 = "text"</code> binds a function-string action, while a
+compose definition combines two input characters after a Compose or dead-key action:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>compose &#39;`&#39; &#39;a&#39; to &#39;à&#39;</span></span></code></pre></div></div></div><p>A <code>charset "iso-8859-1"</code> declaration controls how subsequent symbolic keysyms are
+interpreted. Numeric keysyms are not portable between kernel versions; symbolic
+names or <code>U+hhhh</code> Unicode notation are preferable. The virtual console&rsquo;s
+<code>K_UNICODE</code> mode emits UTF-8 for Unicode keysyms, whereas <code>K_XLATE</code> applies the
+legacy byte-oriented translation. <code>K_MEDIUMRAW</code> exposes keycode-oriented data and
+<code>K_RAW</code> exposes an approximation of raw scan bytes. Those console modes do not
+change the evdev ABI.</p><h2 id=input-and-console-device-nodes>Input and Console Device Nodes
+<a href=#input-and-console-device-nodes class=heading-anchor><span>#</span></a></h2><p><code>/proc/bus/input/devices</code> and <code>/sys/class/input</code> enumerate input devices and their
+handlers. <code>/dev/input/eventN</code> is a binary evdev stream of native
+<code>struct input_event</code> records. Keyboard records commonly include:</p><ul><li><code>EV_MSC</code>/<code>MSC_SCAN</code> for a transport identifier when the driver supplies one;</li><li><code>EV_KEY</code> with a <code>KEY_*</code> code and value 0 (release), 1 (press), or 2 (repeat); and</li><li><code>EV_SYN</code>/<code>SYN_REPORT</code> to terminate one event frame.</li></ul><p>Use <code>evtest</code> or <code>libevdev</code> rather than decoding a <code>hexdump</code>, because record size and
+time fields follow the userspace ABI of the reading process:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>grep -A5 -B1 -i keyboard /proc/bus/input/devices
+</span></span><span style=display:flex><span>sudo evtest /dev/input/event4</span></span></code></pre></div></div></div><p>Reading an event node requires the permissions assigned by the system&rsquo;s input-device
+policy and can expose passwords typed anywhere on that device.</p><p><code>/dev/tty1</code>, <code>/dev/tty2</code>, and the other virtual-terminal nodes expose terminal input
+after console keymap translation and line-discipline processing. <code>/dev/tty0</code> refers
+to the active virtual terminal; <code>/dev/console</code> refers to the configured system
+console and is not a raw keyboard device.</p><h2 id=console-utilities>Console Utilities
+<a href=#console-utilities class=heading-anchor><span>#</span></a></h2><p>Run console-mode tools from a real virtual terminal rather than a terminal emulator:</p><ul><li><code>showkey -s</code>, <code>showkey -k</code>, and <code>showkey -a</code> display scan-code, keycode, and
+character-oriented views. Raw mode can make the console temporarily unusable if
+the program is interrupted.</li><li><code>getkeycodes</code> displays the AT driver&rsquo;s current scan-code mappings.</li><li><code>setkeycodes SCANCODE KEYCODE ...</code> changes selected AT mappings.</li><li><code>dumpkeys</code> writes the current console layout in <code>keymaps(5)</code> syntax;
+<code>dumpkeys --long-info</code> also lists known keysyms.</li><li><code>loadkeys FILE</code> compiles and installs a keymap into the kernel console tables.</li></ul><p>The upstream <a href=https://docs.kernel.org/input/input.html>Linux input documentation</a>,
+<a href=https://docs.kernel.org/input/event-codes.html>event-code specification</a>, current
+<a href=https://github.com/torvalds/linux/blob/master/drivers/input/keyboard/atkbd.c><code>atkbd</code> source</a>,
+and upstream <a href=https://man7.org/linux/man-pages/man5/keymaps.5.html><code>keymaps(5)</code></a>
+define the interfaces described here.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-keyboard-input/ class=language-option data-lang=en>English
+</a><a href=/ja/linux-keyboard-input/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/linux-keyboard-input/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/linux-keyboard-input/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Flex on cesun.life</title><link>https://example.org/zh-tw/tags/flex/</link><description>Recent content in Flex on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Tue, 10 Jan 2023 06:39:13 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/flex/index.xml" rel="self" type="application/rss+xml"/><item><title>Flex</title><link>https://example.org/zh-tw/flex/</link><pubDate>Tue, 10 Jan 2023 06:39:13 +0800</pubDate><guid>https://example.org/zh-tw/flex/</guid><description>&lt;p&gt;Flex 會根據將輸入文字對應至 C 或 C++ 動作的規則產生掃描器。掃描器通常會向剖析器提供權杖，但也可以轉換文字或驗證正則語言格式。&lt;a href="https://westes.github.io/flex/manual/"&gt;Flex 手冊&lt;/a&gt; 定義了產生的介面以及各選項的行為。&lt;/p&gt;
+&lt;h2 id="規格結構"&gt;
+ 規格結構
+ &lt;a href="#%e8%a6%8f%e6%a0%bc%e7%b5%90%e6%a7%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;.l&lt;/code&gt; 檔案包含三個以 &lt;code&gt;%%&lt;/code&gt; 分隔的部分：定義、規則和使用者程式碼。定義部分包含 C 宣告、命名正規表示式和開始條件。規則部分會將模式與動作配對。最後一個部分提供輔助函式，並在需要時提供驅動程式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;lex&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-lex" data-lang="lex"&gt;%option noyywrap
+%{
+#include &amp;#34;parser.h&amp;#34;
+%}
+
+identifier [[:alpha:]_][[:alnum:]_]*
+%%
+[[:space:]]+ ;
+{identifier} return IDENTIFIER;
+&amp;#34;+&amp;#34; return &amp;#39;+&amp;#39;;
+. return INVALID;
+%%&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Flex 會選取與輸入文字中&lt;strong&gt;最長&lt;/strong&gt;部分相符的規則。當多個規則相符的長度相同時，會選取書寫順序較前的規則。預設規則會將未相符的字元複製到標準輸出；當必須回報未相符的輸入時，請使用明確的萬用規則或 &lt;code&gt;-s&lt;/code&gt;/&lt;code&gt;%option nodefault&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="正規表示式與掃描器狀態"&gt;
+ 正規表示式與掃描器狀態
+ &lt;a href="#%e6%ad%a3%e8%a6%8f%e8%a1%a8%e7%a4%ba%e5%bc%8f%e8%88%87%e6%8e%83%e6%8f%8f%e5%99%a8%e7%8b%80%e6%85%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Flex 模式描述正規語言。命名定義可以減少重複，字元類別用來表示與地區設定相關的群組，而加引號的文字則用來比對字面字串。當語言權杖需要逐字使用中繼字元時，請將其逸出或加上引號。&lt;/p&gt;
+&lt;p&gt;開始條件可以將規則集分割。使用 &lt;code&gt;%s&lt;/code&gt; 宣告包含式條件，使用 &lt;code&gt;%x&lt;/code&gt; 宣告排他式條件；使用 &lt;code&gt;&amp;lt;STATE&amp;gt;&lt;/code&gt; 限定規則。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;lex&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-lex" data-lang="lex"&gt;%x COMMENT
+%%
+&amp;#34;/*&amp;#34; BEGIN(COMMENT);
+&amp;lt;COMMENT&amp;gt;&amp;#34;*/&amp;#34; BEGIN(INITIAL);
+&amp;lt;COMMENT&amp;gt;\n ++line;
+&amp;lt;COMMENT&amp;gt;. ;
+&amp;lt;COMMENT&amp;gt;&amp;lt;&amp;lt;EOF&amp;gt;&amp;gt; return UNTERMINATED_COMMENT;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;包含式條件會保留未限定的規則，而排他式條件只會執行明確限定為該條件或所有狀態的規則。除非使用 &lt;code&gt;%option nodefault&lt;/code&gt; 或明確的萬用規則取代，否則 Flex 產生的預設規則在每個狀態中都保持啟用。使用 &lt;code&gt;BEGIN&lt;/code&gt; 變更狀態；當動作需要檢查目前狀態時，使用 &lt;code&gt;YY_START&lt;/code&gt;。對於可能提早結束輸入的狀態，請處理 &lt;code&gt;&amp;lt;&amp;lt;EOF&amp;gt;&amp;gt;&lt;/code&gt;。請將字串、註解、縮排或詞法模式建模為明確狀態，而不要嘗試在單一模式中表達具上下文相關的結構。&lt;/p&gt;</description></item></channel></rss>

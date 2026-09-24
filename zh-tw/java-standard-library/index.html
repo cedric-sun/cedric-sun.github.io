@@ -1,0 +1,35 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java 標準函式庫</title></head><body><main><article><div class=article-header><h1>Java 標準函式庫</h1><div class=aux>最後更新: 2021-06-11 09:05:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/java/>Java</a>
+|
+<a href=/zh-tw/tags/jdk/>Jdk</a>
+|
+<a href=/zh-tw/tags/standard-library/>Standard-Library</a></div></div><div class="translation-notice machine-translated"><a href=/java-standard-library/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>小型函式庫的契約往往比 API 表面更能決定正確性。以下規則可避免常見的
+Java 整合失敗。</p><h2 id=物件契約>物件契約
+<a href=#%e7%89%a9%e4%bb%b6%e5%a5%91%e7%b4%84 class=heading-anchor><span>#</span></a></h2><p><code>equals</code> 必須具備反身性、對稱性、傳遞性與一致性，並且對<code>null</code>回傳 false。
+如果兩個物件相等，它們必須具有相同的<code>hashCode</code>；因此，在將值作為雜湊鍵之前，
+應同時覆寫這兩個方法。物件作為映射鍵期間，不要變更參與相等性判定的欄位。
+如果繼承會破壞對稱性，應優先使用組合而非繼承。</p><p><code>Object.clone</code>會執行欄位複製，且與建構函式、繼承和可變欄位的配合不佳。
+應優先使用複製建構函式或命名為<code>copyOf</code>的工廠方法。陣列是範圍有限的例外，
+因為其<code>clone</code>具有可預測的淺陣列契約。</p><h2 id=文字正規表示式與字串>文字、正規表示式與字串
+<a href=#%e6%96%87%e5%ad%97%e6%ad%a3%e8%a6%8f%e8%a1%a8%e7%a4%ba%e5%bc%8f%e8%88%87%e5%ad%97%e4%b8%b2 class=heading-anchor><span>#</span></a></h2><p>對於會重複使用的<code>Pattern</code>，應先進行編譯。<code>Matcher.matches()</code>要求整個輸入都符合，
+而<code>find()</code>會搜尋下一個符合的區域。<code>Pattern.quote(value)</code>會跳脫放入正規表示式的
+字面文字；<code>Matcher.quoteReplacement(value)</code>會跳脫替代字串。兩者不可互換。</p><p>自 JDK 9 起，HotSpot 的<code>String</code>實作使用緊湊字串：透過<code>byte[]</code>加上編碼標記，
+可以緊湊地表示 Latin-1 文字，其他情況則使用 UTF-16。這是實作細節；Java
+<code>String</code>仍然是 UTF-16 程式碼單位的序列，且必須在 I/O 邊界明確進行<code>Charset</code>轉換。</p><h2 id=計數器與列舉集合>計數器與列舉集合
+<a href=#%e8%a8%88%e6%95%b8%e5%99%a8%e8%88%87%e5%88%97%e8%88%89%e9%9b%86%e5%90%88 class=heading-anchor><span>#</span></a></h2><p><code>AtomicLong</code>提供一個精確且線性一致的值。<code>LongAdder</code>會在競爭下將更新分散到
+多個儲存格，因此更新具有更好的擴充性，但與更新同時執行的<code>sum()</code>不是原子快照。
+計量指標使用<code>LongAdder</code>；當每個觀測到的總數都會驅動正確性判定時，使用
+<code>AtomicLong</code>。</p><p><code>Enum&lt;E extends Enum&lt;E>></code>為單一列舉型別提供型別安全的排序與操作。<code>EnumSet</code>與
+<code>EnumMap</code>利用這個封閉的鍵空間，並保留列舉宣告順序；對於列舉網域，應優先使用
+它們，而不是<code>HashSet</code>和<code>HashMap</code>。</p><h2 id=集合與執行緒>集合與執行緒
+<a href=#%e9%9b%86%e5%90%88%e8%88%87%e5%9f%b7%e8%a1%8c%e7%b7%92 class=heading-anchor><span>#</span></a></h2><p><code>Thread.State</code>會回報<code>BLOCKED</code>、<code>WAITING</code>和<code>TIMED_WAITING</code>等 JVM 層級狀態；
+它是觀察機制，而非同步協定。應使用<code>join</code>、future、閂鎖或結構化擁有權來協調執行緒。</p><p><code>Map</code>是否允許<code>null</code>鍵或值取決於實作：<code>HashMap</code>允許一個 null 鍵，而
+<code>ConcurrentHashMap</code>拒絕 null 鍵和值；在自然排序下，<code>TreeMap</code>也可能拒絕 null
+鍵。不要假設<code>Map</code>介面的選用操作一定成功，而應驗證所選實作的契約。</p><p><code>Arrays.asList(array)</code>會回傳由提供的物件陣列支援的固定大小清單。<code>set</code>會更新
+該陣列，但<code>add</code>和<code>remove</code>會失敗。傳入<code>int[]</code>會建立包含一個元素的<code>List&lt;int[]></code>，
+因為可變參數不會將基本型別陣列裝箱。需要裝箱值清單時，請使用
+<code>Arrays.stream(ints).boxed().toList()</code>。</p><h2 id=參考資料>參考資料
+<a href=#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html>JDK <code>Object</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html>JDK <code>Pattern</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/LongAdder.html>JDK <code>LongAdder</code> API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-standard-library/ class=language-option data-lang=en>English
+</a><a href=/ja/java-standard-library/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/java-standard-library/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/java-standard-library/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

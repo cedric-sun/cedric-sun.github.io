@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Security on cesun.life</title><link>https://example.org/zh-cn/tags/security/</link><description>Recent content in Security on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 31 Jul 2026 20:08:54 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/security/index.xml" rel="self" type="application/rss+xml"/><item><title>Kerberos</title><link>https://example.org/zh-cn/kerberos/</link><pubDate>Fri, 31 Jul 2026 20:08:54 +0800</pubDate><guid>https://example.org/zh-cn/kerberos/</guid><description>&lt;p&gt;Kerberos 是一种面向受统一管理系统的网络身份验证协议。用户向受信任的密钥分发中心（KDC）进行身份验证，然后获取面向各个服务的限时票据。服务无需接收用户密码即可验证用户身份，客户端还可以请求证明某个服务持有预期的秘密。&lt;/p&gt;
+&lt;p&gt;Kerberos 主要使用对称密码学。对称密码学使 KDC 成为集中式信任锚点：如果 KDC 或其数据库遭到入侵，那么 KDC 控制其长期密钥的所有主体都可能受到入侵。因此，Kerberos 以集中式身份管理、高效的票据签发以及领域内的单点登录，换取了对分散式信任的依赖。&lt;/p&gt;
+&lt;h2 id="信任模型和核心对象"&gt;
+ 信任模型和核心对象
+ &lt;a href="#%e4%bf%a1%e4%bb%bb%e6%a8%a1%e5%9e%8b%e5%92%8c%e6%a0%b8%e5%bf%83%e5%af%b9%e8%b1%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;**领域（realm）**是一个管理上的身份验证域，通常使用大写形式书写，例如 &lt;code&gt;EXAMPLE.COM&lt;/code&gt;。领域名称通常类似于 DNS 域，但两者属于不同的命名空间。配置或 DNS 发现机制会将主机名和域名映射到 Kerberos 领域。&lt;/p&gt;
+&lt;p&gt;**主体（principal）**表示一个身份：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;alice@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP/web.example.com@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;主体名称由一个或多个组件以及后面的领域组成。&lt;code&gt;alice&lt;/code&gt; 是用户主体。&lt;code&gt;HTTP/web.example.com&lt;/code&gt; 是服务主体，其第一个组件表示服务，第二个组件表示主机。尽管领域、用户和主机组件的运维约定可能不同，主体字符串仍区分大小写。&lt;/p&gt;
+&lt;p&gt;每个主体都在 KDC 中注册一个或多个长期密钥。不同类型的主体以不同方式获取这些密钥：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;人类主体通常通过与加密类型相关的 string-to-key 函数和盐值，从密码派生密钥。&lt;/li&gt;
+&lt;li&gt;服务主体通常接收由管理员生成的随机密钥。&lt;/li&gt;
+&lt;li&gt;领域的 &lt;code&gt;krbtgt/REALM&lt;/code&gt; 主体拥有用于加密票据授予票据（TGT）的密钥。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;keytab&lt;/strong&gt; 保存主体名称、密钥版本号（KVNO）、加密类型和长期密钥。守护进程使用 keytab，因为无人值守的服务无法输入密码。keytab 是一种凭据，而不是公钥证书；任何能够读取可用服务密钥的人员都可以冒充该服务，并解密为其主体签发的票据。&lt;/p&gt;
+&lt;p&gt;KDC 提供两个逻辑服务：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;**身份验证服务（AS）**在初始身份验证后签发 TGT。&lt;/li&gt;
+&lt;li&gt;**票据授予服务（TGS）**将有效 TGT 兑换为面向特定服务的票据。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;两个服务通常运行在同一个 KDC 进程中，并使用同一个领域数据库。生产领域会部署冗余 KDC，因为否则票据获取会依赖单台主机；数据库管理和复制则需要额外的控制措施。&lt;/p&gt;
+&lt;h2 id="协议流程"&gt;
+ 协议流程
+ &lt;a href="#%e5%8d%8f%e8%ae%ae%e6%b5%81%e7%a8%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;假设 &lt;code&gt;alice@EXAMPLE.COM&lt;/code&gt; 希望访问 &lt;code&gt;HTTP/web.example.com@EXAMPLE.COM&lt;/code&gt;。需要通过三次交换来建立所需的凭据。下面的名称描述的是 Kerberos 协议消息，而不是应用特定的数据包。&lt;/p&gt;
+&lt;h3 id="初始身份验证as-req-和-as-rep"&gt;
+ 初始身份验证：AS-REQ 和 AS-REP
+ &lt;a href="#%e5%88%9d%e5%a7%8b%e8%ba%ab%e4%bb%bd%e9%aa%8c%e8%af%81as-req-%e5%92%8c-as-rep" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;客户端发送 &lt;strong&gt;AS-REQ&lt;/strong&gt;，请求获取面向 &lt;code&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/code&gt; 的 TGT。请求包含客户端主体、请求的有效期和标志、nonce、支持的加密类型，以及在需要时包含的预身份验证数据。&lt;/p&gt;</description></item><item><title>Linux 随机性 API</title><link>https://example.org/zh-cn/linux-randomness-apis/</link><pubDate>Tue, 22 Oct 2024 20:12:02 +0800</pubDate><guid>https://example.org/zh-cn/linux-randomness-apis/</guid><description>&lt;p&gt;随机性 API 服务于两种不同契约。 Deterministic pseudo-random number
+generators are useful for repeatable tests and simulations. Security-sensitive
+keys, nonces, tokens, salts, and seeds require bytes from the kernel&amp;rsquo;s
+cryptographically secure random number generator (CSPRNG).&lt;/p&gt;
+&lt;h2 id="c-库生成器"&gt;
+ C 库生成器
+ &lt;a href="#c-%e5%ba%93%e7%94%9f%e6%88%90%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;rand()&lt;/code&gt; advances hidden process state and returns an integer from 0 through
+&lt;code&gt;RAND_MAX&lt;/code&gt;. &lt;code&gt;srand(seed)&lt;/code&gt; selects a repeatable sequence for a particular C library
+implementation; omitting it behaves as though the seed were 1. ISO C does not
+specify the algorithm or require the same sequence across implementations, so a
+test that needs cross-platform reproducibility should choose and record an explicit
+algorithm.&lt;/p&gt;</description></item><item><title>浏览器 Content-Disposition 与下载</title><link>https://example.org/zh-cn/browser-content-disposition/</link><pubDate>Wed, 16 Aug 2023 17:13:20 +0800</pubDate><guid>https://example.org/zh-cn/browser-content-disposition/</guid><description>&lt;p&gt;浏览器会根据多个输入决定显示响应、下载响应，还是将其交给
+external application from several inputs. &lt;code&gt;Content-Disposition&lt;/code&gt; provides a
+strong preference, but content type, navigation context, sandboxing, browser
+capabilities, and user settings also affect the result.&lt;/p&gt;
+&lt;h2 id="inline-与-attachment-处置方式"&gt;
+ inline 与 attachment 处置方式
+ &lt;a href="#inline-%e4%b8%8e-attachment-%e5%a4%84%e7%bd%ae%e6%96%b9%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;attachment 响应请求下载：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;HTTP&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;1.1&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;200&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OK&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Type&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;application/pdf&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Disposition&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;attachment; filename=&amp;#34;guide.pdf&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Length&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;110352&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;X-Content-Type-Options&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;nosniff&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;inline 响应允许在浏览器内呈现：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Type: application/pdf
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Disposition: inline; filename=&amp;#34;guide.pdf&amp;#34;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;inline&lt;/code&gt; 不保证显示。 The browser needs a viewer for the media
+type, and the user can configure some types to download instead. Omitting the
+header leaves the choice primarily to the media type and navigation context.&lt;/p&gt;</description></item><item><title>Linux Seccomp</title><link>https://example.org/zh-cn/linux-seccomp/</link><pubDate>Fri, 07 Apr 2023 12:28:12 +0800</pubDate><guid>https://example.org/zh-cn/linux-seccomp/</guid><description>&lt;p&gt;Seccomp（secure computing）限制进程可以执行的系统调用。在 strict
+模式下，进程只能使用少量调用；在现有文件描述符上，这些调用历来包括 &lt;code&gt;read&lt;/code&gt;、&lt;code&gt;write&lt;/code&gt;、
+&lt;code&gt;_exit&lt;/code&gt; 和 &lt;code&gt;sigreturn&lt;/code&gt;。对于大多数现代应用程序而言，这种限制有意设置得过于狭窄。&lt;/p&gt;
+&lt;p&gt;filter 模式会附加一个 classic BPF 程序，用于检查系统调用编号和选定的参数。过滤器可以
+允许调用、返回 errno 拒绝调用、终止进程、记录日志、进行跟踪，或将决策委托给 userspace
+notifier。过滤器具有单调性：一旦安装，就不能放宽。无特权进程通常必须先设置
+&lt;code&gt;no_new_privs&lt;/code&gt;，然后才能安装过滤器，从而防止进程之后通过获得更高权限来绕过过滤器。
+容器运行时会将 seccomp 作为一层防御，与 namespaces、capabilities 以及
+mandatory-access-control 策略配合使用。&lt;/p&gt;</description></item><item><title>关于修复和预防 Docker 镜像 CVE</title><link>https://example.org/zh-cn/docker-cve-fix/</link><pubDate>Fri, 03 Mar 2023 14:00:22 +0800</pubDate><guid>https://example.org/zh-cn/docker-cve-fix/</guid><description>&lt;p&gt;经验法则：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;确保为镜像配置了适当的安全软件升级源，以免 &lt;code&gt;apt-get upgrade&lt;/code&gt;（或等效命令）不执行任何操作。&lt;/li&gt;
+&lt;li&gt;在 Dockerfile 中加入 &lt;code&gt;RUN apt-get update &amp;amp;&amp;amp; apt-get upgrade -y&lt;/code&gt;（或等效命令）。&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://example.org/zh-cn/fixing-gosu/"&gt;在涉及静态链接的 Go 程序这种少见情况下&lt;/a&gt;，请将其删除，或在 &lt;code&gt;docker build&lt;/code&gt; 过程中从源代码重新构建。&lt;/li&gt;
+&lt;li&gt;安排每周或每月自行重新构建镜像。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="背景"&gt;
+ 背景
+ &lt;a href="#%e8%83%8c%e6%99%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;Docker 官方镜像（DOI）的唯一事实来源是 &lt;a href="https://github.com/docker-library/official-images"&gt;https://github.com/docker-library/official-images&lt;/a&gt; 的 master 分支。该项目使用一种称为“库定义文件”（Library definition files）的格式，定义应主动重新构建哪些仓库中的哪些标签，以及在哪里查找相应的 Dockerfile（Git 仓库 URL 和提交 ID）。这些 &lt;code&gt;repo:tag&lt;/code&gt; 称为&lt;em&gt;当前维护的&lt;/em&gt;镜像。
+&lt;ul&gt;
+&lt;li&gt;这些被引用的 Dockerfile Git 仓库中，*大多数（但并非全部）*由 &lt;a href="https://github.com/docker-library"&gt;Docker Inc. 自身&lt;/a&gt;维护。可参见此&lt;a href="https://github.com/apple/swift-docker.git"&gt;示例&lt;/a&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://doi-janky.infosiftr.net/"&gt;https://doi-janky.infosiftr.net/&lt;/a&gt; 上的 Jenkins 作业会分析所有 DOI 的 Dockerfile，生成 DOI 之间最新的依赖关系，并将其持久化到 &lt;a href="https://github.com/docker-library/meta"&gt;https://github.com/docker-library/meta&lt;/a&gt;。&lt;/li&gt;
+&lt;li&gt;利用这些元数据，每当 DOI Dockerfile 的 PR 被合并后，https://doi-janky.infosiftr.net/ 都会触发其所有下游 DOI（即通过 &lt;code&gt;FROM&lt;/code&gt; 引用它的 DOI）重新构建并推送到 Docker Hub。
+&lt;ul&gt;
+&lt;li&gt;不保证会进行无条件的定期重新构建。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="观察结果"&gt;
+ 观察结果
+ &lt;a href="#%e8%a7%82%e5%af%9f%e7%bb%93%e6%9e%9c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;Docker Inc. 的 DOI 不会在 Dockerfile 中执行 &lt;code&gt;RUN apt upgrade&lt;/code&gt;（或等效命令），其他 DOI 供应商也没有被要求这样做。&lt;/li&gt;
+&lt;li&gt;即使 DOI 供应商在 Dockerfile 中包含操作系统升级步骤，如果没有无条件的定期重新构建，也不会安装安全补丁（如果存在）。&lt;/li&gt;
+&lt;li&gt;一些 DOI 使用的发行版默认禁用了上游安全更新。示例可参见 &lt;code&gt;docker run --rm mysql:9.6.0 tail /etc/yum.repos.d/oracle-linux-ol9.repo&lt;/code&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;因此，当前维护的 DOI 无法保证在构建时不存在 CVE。所以，原样重新构建（不执行 &lt;code&gt;RUN apt upgrade&lt;/code&gt; 或等效命令）不会修复任何问题。&lt;/p&gt;</description></item><item><title>x86 保护模式与特权</title><link>https://example.org/zh-cn/x86-protected-mode/</link><pubDate>Sat, 24 Dec 2022 15:42:13 +0800</pubDate><guid>https://example.org/zh-cn/x86-protected-mode/</guid><description>&lt;p&gt;x86 保护模式结合了基于描述符的分段、受控控制转移、分页和特权指令。长模式减少了普通分段的作用，但仍保留描述符表、特权级别、中断门和任务状态段（TSS）。操作系统使用这些机制进入内核并隔离用户执行，而页表则在当前 x86-64 系统中提供主要的内存保护边界。&lt;/p&gt;
+&lt;h2 id="table-registers"&gt;
+ 表寄存器
+ &lt;a href="#table-registers" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;全局描述符表（GDT）包含由逻辑处理器共享的代码、数据和系统描述符。&lt;code&gt;GDTR&lt;/code&gt;存储GDT的线性基址和字节限制。按照惯例，GDT条目0是空描述符，因此索引为0的选择子不能用于普通代码或数据访问。&lt;/p&gt;
+&lt;p&gt;局部描述符表（LDT）是通过&lt;code&gt;LDTR&lt;/code&gt;选择的可选表。&lt;code&gt;LDTR&lt;/code&gt;包含GDT中LDT系统描述符的选择子，并缓存解析后的基址、限制和属性。在传统架构中，任务可以拥有自己的LDT，但当前的64位操作系统很少使用LDT。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;IDTR&lt;/code&gt;存储中断描述符表（IDT）的线性基址和字节限制。IDT按异常或中断向量索引，而不是按普通段选择子索引。其条目是门，用于标识处理程序代码并控制进入语义。&lt;/p&gt;
+&lt;p&gt;任务寄存器（&lt;code&gt;TR&lt;/code&gt;）包含GDT中TSS描述符的选择子，并缓存该描述符。&lt;code&gt;LGDT&lt;/code&gt;、&lt;code&gt;LIDT&lt;/code&gt;、&lt;code&gt;LLDT&lt;/code&gt;和&lt;code&gt;LTR&lt;/code&gt;会在架构规定的特权和类型检查下加载表状态。&lt;/p&gt;
+&lt;h2 id="selectors-and-hidden-caches"&gt;
+ 选择子与隐藏缓存
+ &lt;a href="#selectors-and-hidden-caches" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;16位段选择子包含索引、表指示器（&lt;code&gt;TI&lt;/code&gt;）和请求特权级别（&lt;code&gt;RPL&lt;/code&gt;）：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;15 3 2 1 0
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;+--------------------------------+---+---+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;| index | TI|RPL|
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;+--------------------------------+---+---+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;TI=0&lt;/code&gt;选择GDT，&lt;code&gt;TI=1&lt;/code&gt;选择当前LDT。处理器将索引乘以描述符大小，检查表限制，获取描述符，并验证其类型、存在位以及该操作所需的特权。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;CS&lt;/code&gt;、&lt;code&gt;SS&lt;/code&gt;、&lt;code&gt;DS&lt;/code&gt;、&lt;code&gt;ES&lt;/code&gt;、&lt;code&gt;FS&lt;/code&gt;和&lt;code&gt;GS&lt;/code&gt;不仅公开选择子，还包含基址、限制、类型和访问权限的隐藏缓存。内存引用使用该缓存，而不会再次读取描述符表。因此，重写GDT或LDT条目不会改变已加载的段；软件必须重新加载选择子，或执行架构要求的转换。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;LDTR&lt;/code&gt;和&lt;code&gt;TR&lt;/code&gt;也会缓存解析后的描述符。改变GDT、LDT或TSS的上下文切换必须考虑这些缓存，而不能把可见选择子视为完整状态。&lt;/p&gt;
+&lt;h2 id="segment-descriptors"&gt;
+ 段描述符
+ &lt;a href="#segment-descriptors" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;传统保护模式的代码和数据描述符长度为8字节。它们编码32位基址、可选使用4 KiB粒度的20位限制、描述符特权级别（&lt;code&gt;DPL&lt;/code&gt;）、存在位、描述符类别以及类型相关标志。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;S=1&lt;/code&gt;表示代码或数据描述符；&lt;code&gt;S=0&lt;/code&gt;表示系统描述符或门。&lt;/li&gt;
+&lt;li&gt;代码描述符选择可执行、可读和一致代码行为。&lt;/li&gt;
+&lt;li&gt;数据描述符选择可写和向下扩展行为。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;G&lt;/code&gt;缩放限制，而&lt;code&gt;D/B&lt;/code&gt;根据描述符类型控制默认操作数大小或栈大小。&lt;/li&gt;
+&lt;li&gt;在长模式中，&lt;code&gt;L&lt;/code&gt;表示64位代码段；与&lt;code&gt;D&lt;/code&gt;组合的无效配置会被拒绝。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;分段会将描述符基址加到指令的有效偏移上，并在分页前检查限制和访问权限。平坦的32位模型使用基址为零、限制较大的段，同时保留这些检查。&lt;/p&gt;
+&lt;p&gt;在64位模式中，普通地址生成会将&lt;code&gt;CS&lt;/code&gt;、&lt;code&gt;SS&lt;/code&gt;、&lt;code&gt;DS&lt;/code&gt;和&lt;code&gt;ES&lt;/code&gt;的基址视为零，并且不应用它们的传统限制。&lt;code&gt;FS&lt;/code&gt;和&lt;code&gt;GS&lt;/code&gt;保留分别控制的64位基址。代码段类型、&lt;code&gt;CS&lt;/code&gt;特权以及选定的&lt;code&gt;SS&lt;/code&gt;规则仍具有架构意义。&lt;/p&gt;
+&lt;h2 id="system-descriptors-and-gates"&gt;
+ 系统描述符与门
+ &lt;a href="#system-descriptors-and-gates" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;系统描述符用于标识LDT、可用或忙碌的TSS以及传统门。IA-32使用8字节的TSS和LDT描述符。在64位模式中，TSS和LDT描述符占用16字节，以便容纳64位基址；高8字节会占用下一个GDT槽。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;调用门&lt;/strong&gt;指定目标代码选择子和偏移量，为向同级或更高特权级别执行远调用提供经过检查的路径。传统调用门可以将配置数量的参数复制到新栈上。远返回会在另一组检查下反转特权转换。&lt;/p&gt;
+&lt;p&gt;IDT条目可以是中断门、陷阱门，或者在传统模式下是任务门。中断门和陷阱门包含处理程序选择子和偏移量。中断门在进入时清除&lt;code&gt;IF&lt;/code&gt;；陷阱门保留它。64位中断门或陷阱门还包含一个IST选择器，用于紧急栈或专用栈。&lt;/p&gt;
+&lt;h2 id="privilege-values"&gt;
+ 特权值与有效检查
+ &lt;a href="#privilege-values" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;x86定义了编号为0到3的四个特权级别。编号越小，特权越高。当前特权级别（&lt;code&gt;CPL&lt;/code&gt;）由&lt;code&gt;CS&lt;/code&gt;的低两位表示；内核通常运行在CPL 0，应用程序运行在CPL 3。环1和环2存在，但操作系统设计不要求使用它们。&lt;/p&gt;
+&lt;p&gt;每个描述符都有一个&lt;code&gt;DPL&lt;/code&gt;，每个选择子都携带一个&lt;code&gt;RPL&lt;/code&gt;。对于许多数据访问，处理器会形成有效特权级别：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;EPL = max(CPL, RPL)&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;访问普通数据段要求&lt;code&gt;EPL &amp;lt;= DPL&lt;/code&gt;，并且还必须通过类型和存在性检查。由于数值越大表示特权越低，RPL可以有意降低选择子的权限。&lt;code&gt;SS&lt;/code&gt;加载遵循更严格的规则：选择子RPL和可写数据段DPL必须与CPL匹配。&lt;/p&gt;
+&lt;p&gt;代码转移根据具体机制使用不同规则：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;直接远转移到非一致代码段不会任意降低CPL；其DPL必须符合所要求的当前特权关系。&lt;/li&gt;
+&lt;li&gt;一致代码段允许数值相同或特权较低的CPL执行，只要其DPL允许，但CPL保持不变。这种转移不会授予对目标DPL数据的访问权限。&lt;/li&gt;
+&lt;li&gt;调用门选择子会使用CPL和RPL相对于门DPL进行检查，然后由该门控制进入目标代码段。&lt;/li&gt;
+&lt;li&gt;软件&lt;code&gt;INT n&lt;/code&gt;会根据CPL检查IDT门DPL。处理器异常和外部中断不会把门DPL用作调用者授权检查，因为软件并未通过&lt;code&gt;INT n&lt;/code&gt;调用它们。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;没有单一的&lt;code&gt;CPL&lt;/code&gt;/&lt;code&gt;DPL&lt;/code&gt;比较可以描述每种操作。段加载、一致代码、门、任务切换、&lt;code&gt;IRET&lt;/code&gt;、端口I/O和特权指令各自定义了不同的检查规则。&lt;/p&gt;</description></item><item><title>浏览器身份验证</title><link>https://example.org/zh-cn/browser-authentication/</link><pubDate>Tue, 12 Jul 2022 14:43:24 +0800</pubDate><guid>https://example.org/zh-cn/browser-authentication/</guid><description>&lt;p&gt;浏览器身份验证将应用程序请求分配给用户或工作负载身份。应用程序必须定义凭据的存放位置、
+哪些请求携带凭据、浏览器如何限制这些凭据，以及服务器如何使其失效。&lt;/p&gt;
+&lt;h2 id="会话和-cookie"&gt;
+ 会话和 Cookie
+ &lt;a href="#%e4%bc%9a%e8%af%9d%e5%92%8c-cookie" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;对于具有同站点后端的浏览器应用程序，Cookie 中的不透明会话标识符可以使凭据不暴露给
+JavaScript。将会话状态存储在服务器端，在身份验证后以及权限变更后轮换标识符，并在注销
+或一段时间不活动后使其过期。&lt;/p&gt;
+&lt;p&gt;设置 &lt;code&gt;Secure&lt;/code&gt;、&lt;code&gt;HttpOnly&lt;/code&gt; 和适当的 &lt;code&gt;SameSite&lt;/code&gt; 值。&lt;code&gt;Secure&lt;/code&gt; 要求使用 HTTPS，&lt;code&gt;HttpOnly&lt;/code&gt;
+阻止 JavaScript 访问，&lt;code&gt;SameSite&lt;/code&gt; 则降低跨站请求伪造的暴露风险。&lt;code&gt;SameSite&lt;/code&gt; 不能替代
+CSRF 防御：会改变状态的 Cookie 身份验证端点应验证 CSRF 令牌，或要求使用应用程序明确
+信任的源。&lt;/p&gt;
+&lt;h2 id="oauth-20-和-openid-connect"&gt;
+ OAuth 2.0 和 OpenID Connect
+ &lt;a href="#oauth-20-%e5%92%8c-openid-connect" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;OAuth 2.0 将授权委托给授权服务器；它本身并不规范用户身份验证。OpenID Connect 增加了
+身份层和 ID 令牌。基于浏览器的公共客户端应使用带 PKCE 的 Authorization Code，并验证
+&lt;code&gt;state&lt;/code&gt;、使用 OpenID Connect 时的 &lt;code&gt;nonce&lt;/code&gt;、精确的重定向 URI、issuer、audience、expiry
+和 signature。&lt;/p&gt;
+&lt;p&gt;不要将访问令牌放入可能进入日志、引用来源和浏览器历史记录的 URL 查询字符串或片段中。
+Backend-for-Frontend 可以将令牌保留在服务器端，并向浏览器公开应用程序会话 Cookie。&lt;/p&gt;
+&lt;h2 id="saml"&gt;
+ SAML
+ &lt;a href="#saml" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;SAML 在身份提供商和服务提供商之间交换带签名的 XML 断言。应根据已配置的元数据验证断言
+签名，并验证 issuer、audience、recipient、时间条件以及请求关联关系。XML 签名验证必须
+使用受维护的库和经过强化的解析器；手写 XML 或签名处理是不安全的。&lt;/p&gt;</description></item><item><title>Kubernetes 访问控制</title><link>https://example.org/zh-cn/kubernetes-access-control/</link><pubDate>Mon, 27 Jun 2022 04:47:20 +0800</pubDate><guid>https://example.org/zh-cn/kubernetes-access-control/</guid><description>&lt;p&gt;Kubernetes 通过身份认证、授权和准入控制处理 API 请求。身份认证建立身份；授权决定该身份是否可以执行某项操作；准入控制可以验证或修改被接受的对象。这些是彼此独立的控制，应分别配置和审计。&lt;/p&gt;
+&lt;h2 id="使用-oidc-进行身份认证"&gt;
+ 使用 OIDC 进行身份认证
+ &lt;a href="#%e4%bd%bf%e7%94%a8-oidc-%e8%bf%9b%e8%a1%8c%e8%ba%ab%e4%bb%bd%e8%ae%a4%e8%af%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;OpenID Connect（OIDC）允许 API 服务器验证外部身份提供商签发的持有者令牌。API 服务器配置发行者 URL、客户端 ID，以及可选的用户名和组声明映射。API 服务器必须能够访问发行者，并且发行者的 TLS 证书必须通过验证。&lt;/p&gt;
+&lt;p&gt;身份提供商负责用户生命周期和多因素身份认证；Kubernetes 从有效令牌中接收用户名和组。不要为人员使用共享的静态令牌。在 &lt;code&gt;kubectl&lt;/code&gt; 中使用获批准的 OIDC 登录插件或 exec 凭据提供商，从而刷新短期令牌，而无需在 kubeconfig 文件中存储长期凭据。&lt;/p&gt;
+&lt;h2 id="使用-rbac-进行授权"&gt;
+ 使用 RBAC 进行授权
+ &lt;a href="#%e4%bd%bf%e7%94%a8-rbac-%e8%bf%9b%e8%a1%8c%e6%8e%88%e6%9d%83" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;RBAC 通过 &lt;code&gt;Role&lt;/code&gt; 和 &lt;code&gt;ClusterRole&lt;/code&gt; 对象授予资源类型上的动词权限，再通过绑定附加这些权限。&lt;code&gt;Role&lt;/code&gt; 的作用域是命名空间；&lt;code&gt;ClusterRole&lt;/code&gt; 可以授予集群范围的访问权限，也可以在命名空间内绑定。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;yaml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-yaml" data-lang="yaml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io/v1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Role&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;metadata&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;deployment-reader&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;namespace&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;rules&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; - &lt;span style="color:#f92672"&gt;apiGroups&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;apps&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;resources&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;deployments&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;verbs&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;get&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;list&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;watch&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;---
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io/v1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;RoleBinding&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;metadata&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;developers-can-read-deployments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;namespace&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;subjects&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; - &lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Group&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments-developers&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;apiGroup&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;roleRef&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Role&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;deployment-reader&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;apiGroup&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;只授予所需的最小动词、资源、命名空间和非资源 URL。除非用于严格控制的平台管理，否则应避免 &lt;code&gt;cluster-admin&lt;/code&gt;、通配符动词和通配符资源。使用 &lt;code&gt;kubectl auth can-i&lt;/code&gt; 检查拟授予的权限。&lt;/p&gt;</description></item></channel></rss>

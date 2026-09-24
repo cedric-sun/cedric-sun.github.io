@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Cve on cesun.life</title><link>https://example.org/zh-cn/tags/cve/</link><description>Recent content in Cve on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Thu, 09 Nov 2023 07:27:26 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/cve/index.xml" rel="self" type="application/rss+xml"/><item><title>修复基于 Golang 的静态链接可执行文件中的 CVE</title><link>https://example.org/zh-cn/fixing-gosu/</link><pubDate>Thu, 09 Nov 2023 07:27:26 +0800</pubDate><guid>https://example.org/zh-cn/fixing-gosu/</guid><description>&lt;p&gt;&lt;code&gt;gosu&lt;/code&gt; 是 &lt;code&gt;su&lt;/code&gt;/&lt;code&gt;sudo&lt;/code&gt; 的容器友好替代方案，使用 Go 编写。它包含在&lt;a href="https://github.com/docker-library/mysql/blob/master/9.7/Dockerfile.oracle"&gt;我们的一个生产镜像的基础镜像&lt;/a&gt;中，该镜像会触发 &lt;a href="https://nvd.nist.gov/vuln/detail/CVE-2025-68121"&gt;https://nvd.nist.gov/vuln/detail/CVE-2025-68121&lt;/a&gt;.&lt;/p&gt;
+&lt;h2 id="所有基于-golang-的静态链接可执行文件的通用注意事项"&gt;
+ 所有基于 Golang 的静态链接可执行文件的通用注意事项
+ &lt;a href="#%e6%89%80%e6%9c%89%e5%9f%ba%e4%ba%8e-golang-%e7%9a%84%e9%9d%99%e6%80%81%e9%93%be%e6%8e%a5%e5%8f%af%e6%89%a7%e8%a1%8c%e6%96%87%e4%bb%b6%e7%9a%84%e9%80%9a%e7%94%a8%e6%b3%a8%e6%84%8f%e4%ba%8b%e9%a1%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;静态链接的 Golang 程序中的 CVE 来源有两个：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;软件自身的代码。这只是传统的软件 CVE&lt;/li&gt;
+&lt;li&gt;Golang 标准 SDK；&lt;a href="https://vuln.go.dev/"&gt;官方公告&lt;/a&gt;。这些 CVE 存在于用于构建特定可执行文件的工具链中。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;大多数情况下，应归咎于 Golang SDK，而修复此类 CVE 就像使用最新的 Golang SDK 重新构建程序一样简单。&lt;/p&gt;
+&lt;p&gt;我们以 &lt;code&gt;gosu&lt;/code&gt; 为例，但你可以将其替换为任意静态链接的可执行文件：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#!/bin/bash
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;set -eux
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;CONT_NAME&lt;span style="color:#f92672"&gt;=&lt;/span&gt;tmp_mysqlcontainer
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;docker create --pull&lt;span style="color:#f92672"&gt;=&lt;/span&gt;always --name $CONT_NAME mysql:latest 
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;docker cp $CONT_NAME:/usr/local/bin/gosu /tmp/gosu
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;docker run -it --rm -v /tmp/gosu:/tmp/gosu golang:latest&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;以及在 Docker 中：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ldd /tmp/gosu/gosu
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#	not a dynamic executable&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;go version /tmp/gosu/gosu
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# /tmp/gosu/gosu: go1.24.6&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;由于 &lt;a href="https://nvd.nist.gov/vuln/detail/CVE-2025-68121"&gt;https://nvd.nist.gov/vuln/detail/CVE-2025-68121&lt;/a&gt; 会影响所有低于 1.24.13 的 Golang 版本，我们可以确定这个程序是由存在漏洞的 Golang 工具链构建的。&lt;/p&gt;</description></item></channel></rss>

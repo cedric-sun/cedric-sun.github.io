@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Pthreads on cesun.life</title><link>https://example.org/zh-cn/tags/pthreads/</link><description>Recent content in Pthreads on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 12 May 2023 06:43:30 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/pthreads/index.xml" rel="self" type="application/rss+xml"/><item><title>POSIX 线程</title><link>https://example.org/zh-cn/pthreads/</link><pubDate>Fri, 12 May 2023 06:43:30 +0800</pubDate><guid>https://example.org/zh-cn/pthreads/</guid><description>&lt;p&gt;POSIX 线程在一个进程和一个地址空间内提供并发执行。共享地址空间并不意味着共享可变状态是安全的：必须通过互斥锁、条件变量或 C 原子操作建立所有权和内存可见性。&lt;/p&gt;
+&lt;h2 id="创建终止与取消"&gt;
+ 创建、终止与取消
+ &lt;a href="#%e5%88%9b%e5%bb%ba%e7%bb%88%e6%ad%a2%e4%b8%8e%e5%8f%96%e6%b6%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;pthread_create&lt;/code&gt; 启动 &lt;code&gt;void *(*start_routine)(void *)&lt;/code&gt;，并向其传递一个指针参数。它直接返回错误号，而不是通过 &lt;code&gt;errno&lt;/code&gt; 返回。线程可以通过从启动例程返回、调用 &lt;code&gt;pthread_exit&lt;/code&gt; 或响应取消请求来终止；返回等价于使用该返回值调用 &lt;code&gt;pthread_exit&lt;/code&gt;。调用 &lt;code&gt;exit&lt;/code&gt; 或从 &lt;code&gt;main&lt;/code&gt; 返回会终止整个进程，而初始线程调用 &lt;code&gt;pthread_exit&lt;/code&gt; 时，其他线程会继续运行。&lt;/p&gt;
+&lt;p&gt;可连接线程会一直保留其退出值和资源，直到另一个线程成功调用 &lt;code&gt;pthread_join&lt;/code&gt;。分离线程会在终止时释放这些资源，因此不能被连接。由此，每个已创建的线程都需要明确由某个线程负责连接或分离。线程不得连接自身，应用逻辑还必须确保只有一个线程连接给定的目标线程。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;&lt;span style="color:#a6e22e"&gt;worker&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;arg) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; arg;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;pthread_t&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;thread&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; error &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;pthread_create&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;thread&lt;/span&gt;, NULL, worker, value);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (error &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;result;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; error &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;pthread_join&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;thread&lt;/span&gt;, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;result);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;取消默认处于启用且延迟处理状态。&lt;code&gt;pthread_cancel&lt;/code&gt; 只是请求取消，并不保证立即终止。被指定为取消点的调用（包括条件等待）可以处理该请求。在跨越取消点获取资源的代码中，应安装 &lt;code&gt;pthread_cleanup_push&lt;/code&gt; 处理程序，或以其他方式建立清理规则；对于会操作不变量的代码，异步取消并不适用。&lt;/p&gt;
+&lt;h2 id="属性与资源上限"&gt;
+ 属性与资源上限
+ &lt;a href="#%e5%b1%9e%e6%80%a7%e4%b8%8e%e8%b5%84%e6%ba%90%e4%b8%8a%e9%99%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;如果创建线程时需要非默认行为，应初始化 &lt;code&gt;pthread_attr_t&lt;/code&gt;，并在 &lt;code&gt;pthread_create&lt;/code&gt; 返回后销毁属性对象。&lt;code&gt;pthread_attr_setdetachstate&lt;/code&gt; 用于选择创建可连接线程还是分离线程。&lt;code&gt;pthread_attr_setstacksize&lt;/code&gt;、&lt;code&gt;pthread_attr_setstack&lt;/code&gt; 和 &lt;code&gt;pthread_attr_setguardsize&lt;/code&gt; 控制栈分配与保护页；应用程序提供的栈必须保持映射状态，并在该线程终止前只能由该线程使用。&lt;/p&gt;
+&lt;p&gt;调度继承、调度策略、优先级参数和竞争范围也属于线程属性。对所请求调度策略的支持以及设置该策略所需的权限取决于具体实现。应将 &lt;code&gt;pthread_attr_setaffinity_np&lt;/code&gt; 等 Linux 专用接口隔离在平台边界之后。每个线程都会消耗栈地址空间和运行时元数据，因此无上限地为每个请求创建线程会导致资源耗尽。&lt;/p&gt;
+&lt;h2 id="互斥锁与条件变量"&gt;
+ 互斥锁与条件变量
+ &lt;a href="#%e4%ba%92%e6%96%a5%e9%94%81%e4%b8%8e%e6%9d%a1%e4%bb%b6%e5%8f%98%e9%87%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;条件变量表示受互斥锁保护的谓词发生变化，而不是表示谓词本身。应在持有互斥锁时检查谓词，在循环中等待，在仍持有同一互斥锁时将谓词设为真或假，然后发出信号或广播。&lt;/p&gt;</description></item></channel></rss>

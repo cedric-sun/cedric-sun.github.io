@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Authentication on cesun.life</title><link>https://example.org/zh-cn/tags/authentication/</link><description>Recent content in Authentication on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 31 Jul 2026 20:08:54 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/authentication/index.xml" rel="self" type="application/rss+xml"/><item><title>Kerberos</title><link>https://example.org/zh-cn/kerberos/</link><pubDate>Fri, 31 Jul 2026 20:08:54 +0800</pubDate><guid>https://example.org/zh-cn/kerberos/</guid><description>&lt;p&gt;Kerberos 是一种面向受统一管理系统的网络身份验证协议。用户向受信任的密钥分发中心（KDC）进行身份验证，然后获取面向各个服务的限时票据。服务无需接收用户密码即可验证用户身份，客户端还可以请求证明某个服务持有预期的秘密。&lt;/p&gt;
+&lt;p&gt;Kerberos 主要使用对称密码学。对称密码学使 KDC 成为集中式信任锚点：如果 KDC 或其数据库遭到入侵，那么 KDC 控制其长期密钥的所有主体都可能受到入侵。因此，Kerberos 以集中式身份管理、高效的票据签发以及领域内的单点登录，换取了对分散式信任的依赖。&lt;/p&gt;
+&lt;h2 id="信任模型和核心对象"&gt;
+ 信任模型和核心对象
+ &lt;a href="#%e4%bf%a1%e4%bb%bb%e6%a8%a1%e5%9e%8b%e5%92%8c%e6%a0%b8%e5%bf%83%e5%af%b9%e8%b1%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;**领域（realm）**是一个管理上的身份验证域，通常使用大写形式书写，例如 &lt;code&gt;EXAMPLE.COM&lt;/code&gt;。领域名称通常类似于 DNS 域，但两者属于不同的命名空间。配置或 DNS 发现机制会将主机名和域名映射到 Kerberos 领域。&lt;/p&gt;
+&lt;p&gt;**主体（principal）**表示一个身份：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;alice@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP/web.example.com@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;主体名称由一个或多个组件以及后面的领域组成。&lt;code&gt;alice&lt;/code&gt; 是用户主体。&lt;code&gt;HTTP/web.example.com&lt;/code&gt; 是服务主体，其第一个组件表示服务，第二个组件表示主机。尽管领域、用户和主机组件的运维约定可能不同，主体字符串仍区分大小写。&lt;/p&gt;
+&lt;p&gt;每个主体都在 KDC 中注册一个或多个长期密钥。不同类型的主体以不同方式获取这些密钥：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;人类主体通常通过与加密类型相关的 string-to-key 函数和盐值，从密码派生密钥。&lt;/li&gt;
+&lt;li&gt;服务主体通常接收由管理员生成的随机密钥。&lt;/li&gt;
+&lt;li&gt;领域的 &lt;code&gt;krbtgt/REALM&lt;/code&gt; 主体拥有用于加密票据授予票据（TGT）的密钥。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;keytab&lt;/strong&gt; 保存主体名称、密钥版本号（KVNO）、加密类型和长期密钥。守护进程使用 keytab，因为无人值守的服务无法输入密码。keytab 是一种凭据，而不是公钥证书；任何能够读取可用服务密钥的人员都可以冒充该服务，并解密为其主体签发的票据。&lt;/p&gt;
+&lt;p&gt;KDC 提供两个逻辑服务：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;**身份验证服务（AS）**在初始身份验证后签发 TGT。&lt;/li&gt;
+&lt;li&gt;**票据授予服务（TGS）**将有效 TGT 兑换为面向特定服务的票据。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;两个服务通常运行在同一个 KDC 进程中，并使用同一个领域数据库。生产领域会部署冗余 KDC，因为否则票据获取会依赖单台主机；数据库管理和复制则需要额外的控制措施。&lt;/p&gt;
+&lt;h2 id="协议流程"&gt;
+ 协议流程
+ &lt;a href="#%e5%8d%8f%e8%ae%ae%e6%b5%81%e7%a8%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;假设 &lt;code&gt;alice@EXAMPLE.COM&lt;/code&gt; 希望访问 &lt;code&gt;HTTP/web.example.com@EXAMPLE.COM&lt;/code&gt;。需要通过三次交换来建立所需的凭据。下面的名称描述的是 Kerberos 协议消息，而不是应用特定的数据包。&lt;/p&gt;
+&lt;h3 id="初始身份验证as-req-和-as-rep"&gt;
+ 初始身份验证：AS-REQ 和 AS-REP
+ &lt;a href="#%e5%88%9d%e5%a7%8b%e8%ba%ab%e4%bb%bd%e9%aa%8c%e8%af%81as-req-%e5%92%8c-as-rep" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;客户端发送 &lt;strong&gt;AS-REQ&lt;/strong&gt;，请求获取面向 &lt;code&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/code&gt; 的 TGT。请求包含客户端主体、请求的有效期和标志、nonce、支持的加密类型，以及在需要时包含的预身份验证数据。&lt;/p&gt;</description></item><item><title>Linux 上的密码哈希</title><link>https://example.org/zh-cn/password-hashing-on-linux/</link><pubDate>Fri, 08 Aug 2025 11:46:18 +0800</pubDate><guid>https://example.org/zh-cn/password-hashing-on-linux/</guid><description>&lt;p&gt;密码存储使用单向密码哈希函数，而非加密。验证程序使用存储值中嵌入的设置对提交的密码进行哈希，并比较编码后的结果。该设计不包含恢复明文密码的功能；攻击者取得数据库后，会改为离线测试候选密码。因此，现代密码哈希需要为每个密码生成随机盐值，并采用计算成本经过刻意提高且仍受支持的算法。&lt;/p&gt;
+&lt;h2 id="crypt-编码哈希"&gt;
+ &lt;code&gt;crypt&lt;/code&gt; 编码哈希
+ &lt;a href="#crypt-%e7%bc%96%e7%a0%81%e5%93%88%e5%b8%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;历史上的 &lt;code&gt;crypt(3)&lt;/code&gt; 接口接受密码和设置。其模块化格式通常如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;$id$parameters$salt$checksum&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;标识符和参数语法用于选择算法；盐值使相同密码产生不同的存储值；校验和则用于验证。验证时会将完整的存储字符串作为设置传入，因此应用程序必须原样保留该字符串。传统 DES &lt;code&gt;crypt&lt;/code&gt; 改用双字符盐值，不适合生成新的密码哈希。&lt;/p&gt;
+&lt;p&gt;glibc 以前的 &lt;code&gt;libcrypt&lt;/code&gt; 记录了 &lt;code&gt;$1$&lt;/code&gt;（MD5）、&lt;code&gt;$5$&lt;/code&gt;（SHA-256）和 &lt;code&gt;$6$&lt;/code&gt;（SHA-512）；SHA 格式接受 &lt;code&gt;rounds=N&lt;/code&gt;。具备历史兼容性并不意味着 MD5 或 DES 适合新部署。可用方法和接受的标识符取决于具体实现和构建配置，而不是可移植的 POSIX 密码格式。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;crypt&lt;/code&gt; 返回静态存储区，无法安全用于并发调用。&lt;code&gt;crypt_r&lt;/code&gt; 使用调用方提供的 &lt;code&gt;struct crypt_data&lt;/code&gt;；必须按照实现要求初始化该结构，且不得在线程间共享。比较前应检查调用是否失败：不同实现可能返回 &lt;code&gt;NULL&lt;/code&gt; 或无效值。当应用程序自行处理哈希比较时，应采用常量时间比较，并在 API 允许后尽快清除密码材料。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; crypt_data data &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;candidate &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;crypt_r&lt;/span&gt;(password, stored_hash, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;data);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (candidate &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; NULL &lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;constant_time_equal&lt;/span&gt;(candidate, stored_hash)) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#75715e"&gt;/* authenticated */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;该示例仅说明验证机制，而非登录架构。支持 PAM 的程序应将身份验证委托给 PAM，而不应自行读取账户数据库，也不应自行实现提示和限流。&lt;/p&gt;
+&lt;h2 id="glibc-与-libxcrypt-的兼容性"&gt;
+ glibc 与 libxcrypt 的兼容性
+ &lt;a href="#glibc-%e4%b8%8e-libxcrypt-%e7%9a%84%e5%85%bc%e5%ae%b9%e6%80%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;crypt&lt;/code&gt; 是可选的 POSIX XSI 接口。glibc 2.39 移除了其源码树内置的 &lt;code&gt;libcrypt&lt;/code&gt;；Linux 发行版通常改为提供 &lt;a href="https://github.com/besser82/libxcrypt"&gt;libxcrypt&lt;/a&gt;。libxcrypt 可以提供带有 glibc 兼容符号版本的 &lt;code&gt;libcrypt.so.1&lt;/code&gt;，使链接到 glibc 历史库的现有 Linux 二进制文件仍可继续加载。未配置该兼容性的系统会安装不同的 ABI 名称，因此必须分别检查构建时和运行时兼容性。&lt;/p&gt;</description></item><item><title>浏览器身份验证</title><link>https://example.org/zh-cn/browser-authentication/</link><pubDate>Tue, 12 Jul 2022 14:43:24 +0800</pubDate><guid>https://example.org/zh-cn/browser-authentication/</guid><description>&lt;p&gt;浏览器身份验证将应用程序请求分配给用户或工作负载身份。应用程序必须定义凭据的存放位置、
+哪些请求携带凭据、浏览器如何限制这些凭据，以及服务器如何使其失效。&lt;/p&gt;
+&lt;h2 id="会话和-cookie"&gt;
+ 会话和 Cookie
+ &lt;a href="#%e4%bc%9a%e8%af%9d%e5%92%8c-cookie" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;对于具有同站点后端的浏览器应用程序，Cookie 中的不透明会话标识符可以使凭据不暴露给
+JavaScript。将会话状态存储在服务器端，在身份验证后以及权限变更后轮换标识符，并在注销
+或一段时间不活动后使其过期。&lt;/p&gt;
+&lt;p&gt;设置 &lt;code&gt;Secure&lt;/code&gt;、&lt;code&gt;HttpOnly&lt;/code&gt; 和适当的 &lt;code&gt;SameSite&lt;/code&gt; 值。&lt;code&gt;Secure&lt;/code&gt; 要求使用 HTTPS，&lt;code&gt;HttpOnly&lt;/code&gt;
+阻止 JavaScript 访问，&lt;code&gt;SameSite&lt;/code&gt; 则降低跨站请求伪造的暴露风险。&lt;code&gt;SameSite&lt;/code&gt; 不能替代
+CSRF 防御：会改变状态的 Cookie 身份验证端点应验证 CSRF 令牌，或要求使用应用程序明确
+信任的源。&lt;/p&gt;
+&lt;h2 id="oauth-20-和-openid-connect"&gt;
+ OAuth 2.0 和 OpenID Connect
+ &lt;a href="#oauth-20-%e5%92%8c-openid-connect" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;OAuth 2.0 将授权委托给授权服务器；它本身并不规范用户身份验证。OpenID Connect 增加了
+身份层和 ID 令牌。基于浏览器的公共客户端应使用带 PKCE 的 Authorization Code，并验证
+&lt;code&gt;state&lt;/code&gt;、使用 OpenID Connect 时的 &lt;code&gt;nonce&lt;/code&gt;、精确的重定向 URI、issuer、audience、expiry
+和 signature。&lt;/p&gt;
+&lt;p&gt;不要将访问令牌放入可能进入日志、引用来源和浏览器历史记录的 URL 查询字符串或片段中。
+Backend-for-Frontend 可以将令牌保留在服务器端，并向浏览器公开应用程序会话 Cookie。&lt;/p&gt;
+&lt;h2 id="saml"&gt;
+ SAML
+ &lt;a href="#saml" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;SAML 在身份提供商和服务提供商之间交换带签名的 XML 断言。应根据已配置的元数据验证断言
+签名，并验证 issuer、audience、recipient、时间条件以及请求关联关系。XML 签名验证必须
+使用受维护的库和经过强化的解析器；手写 XML 或签名处理是不安全的。&lt;/p&gt;</description></item></channel></rss>

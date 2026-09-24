@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Maven on cesun.life</title><link>https://example.org/ja/tags/maven/</link><description>Recent content in Maven on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Mon, 17 Aug 2026 10:18:23 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/maven/index.xml" rel="self" type="application/rss+xml"/><item><title>JUnit 5のアーキテクチャ、Maven設定、JUnit 4からの移行</title><link>https://example.org/ja/junit-5/</link><pubDate>Mon, 17 Aug 2026 10:18:23 +0800</pubDate><guid>https://example.org/ja/junit-5/</guid><description>&lt;p&gt;JUnit 5は、テストの記述に使用するAPIを、テストを検出して実行する
+インフラストラクチャから分離しています。この分離により、Maven、IDE、
+およびカスタムランチャーは、一つのインターフェイスを通じて複数の
+テストモデルを実行できます。&lt;/p&gt;
+&lt;p&gt;例ではJUnit 5.13.4を対象とします。JUnit 6も同じアーキテクチャを維持していますが、
+JUnit 5を使い続ける必要があるプロジェクトでは、
+&lt;a href="https://docs.junit.org/5.13.4/user-guide/"&gt;バージョン指定されたJUnit 5ドキュメント&lt;/a&gt;
+を使用してください。&lt;/p&gt;
+&lt;h2 id="platformjupitervintage"&gt;
+ Platform、Jupiter、Vintage
+ &lt;a href="#platformjupitervintage" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JUnit 5は三つのコンポーネントで構成されます。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;コンポーネント&lt;/th&gt;
+ &lt;th&gt;責務&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;JUnit Platform&lt;/td&gt;
+ &lt;td&gt;テストを検出し、登録されたテストエンジンを起動します。Maven SurefireとIDEはこのレベルで統合されます。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;JUnit Jupiter&lt;/td&gt;
+ &lt;td&gt;JUnit 5のプログラミングモデル、拡張API、およびテストエンジンを定義します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;JUnit Vintage&lt;/td&gt;
+ &lt;td&gt;移行期間中にJUnit 3およびJUnit 4のテストをPlatform上で実行します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Jupiterテストは、&lt;code&gt;@Test&lt;/code&gt; とアサーションを &lt;code&gt;org.junit.jupiter.api&lt;/code&gt; から
+インポートします。SurefireはPlatformにテストの検出を要求し、その後
+&lt;code&gt;junit-jupiter-engine&lt;/code&gt; が検出されたメソッドを実行します。テスト依存関係には
+Mavenの &lt;code&gt;test&lt;/code&gt; スコープを使用するため、アプリケーションコードはいずれの
+JUnitコンポーネントにも依存しません。&lt;/p&gt;
+&lt;h2 id="最小構成のmavenプロジェクト"&gt;
+ 最小構成のMavenプロジェクト
+ &lt;a href="#%e6%9c%80%e5%b0%8f%e6%a7%8b%e6%88%90%e3%81%aemaven%e3%83%97%e3%83%ad%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;次のレイアウトでは、プロダクション用クラスとテストクラスを分離します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;junit-hello/
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;├── pom.xml
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;└── src
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ├── main/java/com/example/Greeter.java
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; └── test/java/com/example/GreeterTest.java&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;保守可能な最小構成のPOMには &lt;code&gt;org.junit.jupiter:junit-jupiter&lt;/code&gt; を使用します。
+このアーティファクトは、Jupiter API、パラメーター化テストのサポート、
+およびランタイムエンジンを集約しています。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;xml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-xml" data-lang="xml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;project&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;xmlns=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;http://maven.apache.org/POM/4.0.0&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;xmlns:xsi=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;http://www.w3.org/2001/XMLSchema-instance&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;xsi:schemaLocation=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;http://maven.apache.org/POM/4.0.0
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#e6db74"&gt; https://maven.apache.org/xsd/maven-4.0.0.xsd&amp;#34;&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;modelVersion&amp;gt;&lt;/span&gt;4.0.0&lt;span style="color:#f92672"&gt;&amp;lt;/modelVersion&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;groupId&amp;gt;&lt;/span&gt;com.example&lt;span style="color:#f92672"&gt;&amp;lt;/groupId&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;artifactId&amp;gt;&lt;/span&gt;junit-hello&lt;span style="color:#f92672"&gt;&amp;lt;/artifactId&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;version&amp;gt;&lt;/span&gt;1.0-SNAPSHOT&lt;span style="color:#f92672"&gt;&amp;lt;/version&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;properties&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;maven.compiler.release&amp;gt;&lt;/span&gt;17&lt;span style="color:#f92672"&gt;&amp;lt;/maven.compiler.release&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;junit.version&amp;gt;&lt;/span&gt;5.13.4&lt;span style="color:#f92672"&gt;&amp;lt;/junit.version&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;/properties&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;dependencies&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;dependency&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;groupId&amp;gt;&lt;/span&gt;org.junit.jupiter&lt;span style="color:#f92672"&gt;&amp;lt;/groupId&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;artifactId&amp;gt;&lt;/span&gt;junit-jupiter&lt;span style="color:#f92672"&gt;&amp;lt;/artifactId&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;version&amp;gt;&lt;/span&gt;${junit.version}&lt;span style="color:#f92672"&gt;&amp;lt;/version&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;scope&amp;gt;&lt;/span&gt;test&lt;span style="color:#f92672"&gt;&amp;lt;/scope&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;/dependency&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;/dependencies&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;build&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;plugins&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;plugin&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;groupId&amp;gt;&lt;/span&gt;org.apache.maven.plugins&lt;span style="color:#f92672"&gt;&amp;lt;/groupId&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;artifactId&amp;gt;&lt;/span&gt;maven-surefire-plugin&lt;span style="color:#f92672"&gt;&amp;lt;/artifactId&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;version&amp;gt;&lt;/span&gt;3.5.4&lt;span style="color:#f92672"&gt;&amp;lt;/version&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;/plugin&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;/plugins&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;/build&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;/project&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;package&lt;/span&gt; com.example;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Greeter&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; String &lt;span style="color:#a6e22e"&gt;greet&lt;/span&gt;(String name) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (name &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;null&lt;/span&gt; &lt;span style="color:#f92672"&gt;||&lt;/span&gt; name.&lt;span style="color:#a6e22e"&gt;isBlank&lt;/span&gt;()) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;throw&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; IllegalArgumentException(&lt;span style="color:#e6db74"&gt;&amp;#34;name must not be blank&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;Hello, &amp;#34;&lt;/span&gt; &lt;span style="color:#f92672"&gt;+&lt;/span&gt; name;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;package&lt;/span&gt; com.example;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import static&lt;/span&gt; org.junit.jupiter.api.Assertions.assertEquals;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import static&lt;/span&gt; org.junit.jupiter.api.Assertions.assertThrows;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import&lt;/span&gt; org.junit.jupiter.api.Test;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;GreeterTest&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; Greeter greeter &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; Greeter();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Test&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;greetsByName&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; assertEquals(&lt;span style="color:#e6db74"&gt;&amp;#34;Hello, Ada&amp;#34;&lt;/span&gt;, greeter.&lt;span style="color:#a6e22e"&gt;greet&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;Ada&amp;#34;&lt;/span&gt;));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Test&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;rejectsBlankNames&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; error &lt;span style="color:#f92672"&gt;=&lt;/span&gt; assertThrows(
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; IllegalArgumentException.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; () &lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt; greeter.&lt;span style="color:#a6e22e"&gt;greet&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34; &amp;#34;&lt;/span&gt;));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; assertEquals(&lt;span style="color:#e6db74"&gt;&amp;#34;name must not be blank&amp;#34;&lt;/span&gt;, error.&lt;span style="color:#a6e22e"&gt;getMessage&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Mavenを通じてテストを実行します。&lt;/p&gt;</description></item><item><title>Maven</title><link>https://example.org/ja/maven/</link><pubDate>Thu, 16 Oct 2025 19:43:25 +0800</pubDate><guid>https://example.org/ja/maven/</guid><description>&lt;p&gt;Maven は、ライフサイクルの順序に従ってプラグインのゴールを実行することでプロジェクトをビルドします。ライフサイクルには順序付けられたフェーズが含まれます。あるフェーズを呼び出すと、同じライフサイクル内のそのフェーズと、それより前のすべてのフェーズが実行されます。プラグインはゴールを提供し、ライフサイクルバインディングは、プロジェクトのパッケージングに応じて実行するゴールを選択します。&lt;/p&gt;
+&lt;h2 id="プロジェクトモデルと座標"&gt;
+ プロジェクトモデルと座標
+ &lt;a href="#%e3%83%97%e3%83%ad%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88%e3%83%a2%e3%83%87%e3%83%ab%e3%81%a8%e5%ba%a7%e6%a8%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;POM は、&lt;code&gt;groupId&lt;/code&gt;、&lt;code&gt;artifactId&lt;/code&gt;、&lt;code&gt;version&lt;/code&gt;、&lt;code&gt;packaging&lt;/code&gt; によってアーティファクトを識別します。親 POM、依存関係管理、インポートした BOM によって、アーティファクトをクラスパスに追加せずにバージョンを一元管理できます。したがって &lt;code&gt;dependencyManagement&lt;/code&gt; は、子 POM が依存関係を宣言した後でのみ、その依存関係を制約します。&lt;/p&gt;
+&lt;p&gt;継承と集約は独立しています。子プロジェクトは &lt;code&gt;&amp;lt;parent&amp;gt;&lt;/code&gt; で指定された POM を継承します。一方、アグリゲーターは &lt;code&gt;&amp;lt;modules&amp;gt;&lt;/code&gt; にリアクタープロジェクトを列挙し、依存関係の順序に従ってビルドします。1 つの POM が両方の役割を担うことはできますが、モジュールがアグリゲーターから継承する必要はありません。マージ後のモデルと有効なプロファイルを確認するには、次を実行します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;mvn help:effective-pom
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;mvn help:active-profiles&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;リポジトリ、認証情報、デプロイ設定は分離して管理します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;プロジェクトで必要な場合に限り、プロジェクトリポジトリをコミットします。&lt;/li&gt;
+&lt;li&gt;認証情報と組織固有のミラーは POM ではなく、ユーザーまたは CI の
+&lt;code&gt;settings.xml&lt;/code&gt; に配置します。&lt;/li&gt;
+&lt;li&gt;依存関係とプラグインのバージョンは、直接宣言するか、レビュー済みの管理セクションを通じて明示します。プラグインのバージョンを省略すると、ビルドはソースツリーではなく Maven の解決動作に依存します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="ライフサイクルとフェーズ"&gt;
+ ライフサイクルとフェーズ
+ &lt;a href="#%e3%83%a9%e3%82%a4%e3%83%95%e3%82%b5%e3%82%a4%e3%82%af%e3%83%ab%e3%81%a8%e3%83%95%e3%82%a7%e3%83%bc%e3%82%ba" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Maven は &lt;code&gt;clean&lt;/code&gt;、&lt;code&gt;default&lt;/code&gt;、&lt;code&gt;site&lt;/code&gt; のライフサイクルを提供します。日常的なビルドでは &lt;code&gt;default&lt;/code&gt; ライフサイクルを使用します。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;フェーズ範囲&lt;/th&gt;
+ &lt;th&gt;目的&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;validate&lt;/code&gt; から &lt;code&gt;process-resources&lt;/code&gt; まで&lt;/td&gt;
+ &lt;td&gt;モデルを検証し、入力を生成し、リソースを準備します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;compile&lt;/code&gt; から &lt;code&gt;test&lt;/code&gt; まで&lt;/td&gt;
+ &lt;td&gt;本番コードとテストコードをコンパイルし、ユニットテストを実行します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;package&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;JAR、WAR、その他の配布可能なアーティファクトを作成します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;pre-integration-test&lt;/code&gt; から &lt;code&gt;post-integration-test&lt;/code&gt; まで&lt;/td&gt;
+ &lt;td&gt;統合テスト環境を準備、実行、解体します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;verify&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;テスト後に品質チェックを実行します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;install&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;アーティファクトをローカルリポジトリに追加します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;deploy&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;アーティファクトをリモートリポジトリに公開します。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;mvn verify&lt;/code&gt; は、アーティファクトを公開せずに検証フェーズまで到達するため、CI の基準コマンドとして適しています。&lt;code&gt;mvn clean verify&lt;/code&gt; は、以前のビルド出力も削除します。&lt;code&gt;clean&lt;/code&gt; ライフサイクルには &lt;code&gt;pre-clean&lt;/code&gt;、&lt;code&gt;clean&lt;/code&gt;、&lt;code&gt;post-clean&lt;/code&gt; があり、&lt;code&gt;clean&lt;/code&gt; は生成されたビルドファイルを削除します。&lt;code&gt;site&lt;/code&gt; ライフサイクルは、プロジェクトのドキュメントを生成し、公開することもできます。&lt;/p&gt;</description></item></channel></rss>

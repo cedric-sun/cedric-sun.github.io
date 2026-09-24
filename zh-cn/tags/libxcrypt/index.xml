@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Libxcrypt on cesun.life</title><link>https://example.org/zh-cn/tags/libxcrypt/</link><description>Recent content in Libxcrypt on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 08 Aug 2025 11:46:18 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/libxcrypt/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 上的密码哈希</title><link>https://example.org/zh-cn/password-hashing-on-linux/</link><pubDate>Fri, 08 Aug 2025 11:46:18 +0800</pubDate><guid>https://example.org/zh-cn/password-hashing-on-linux/</guid><description>&lt;p&gt;密码存储使用单向密码哈希函数，而非加密。验证程序使用存储值中嵌入的设置对提交的密码进行哈希，并比较编码后的结果。该设计不包含恢复明文密码的功能；攻击者取得数据库后，会改为离线测试候选密码。因此，现代密码哈希需要为每个密码生成随机盐值，并采用计算成本经过刻意提高且仍受支持的算法。&lt;/p&gt;
+&lt;h2 id="crypt-编码哈希"&gt;
+ &lt;code&gt;crypt&lt;/code&gt; 编码哈希
+ &lt;a href="#crypt-%e7%bc%96%e7%a0%81%e5%93%88%e5%b8%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;历史上的 &lt;code&gt;crypt(3)&lt;/code&gt; 接口接受密码和设置。其模块化格式通常如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;$id$parameters$salt$checksum&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;标识符和参数语法用于选择算法；盐值使相同密码产生不同的存储值；校验和则用于验证。验证时会将完整的存储字符串作为设置传入，因此应用程序必须原样保留该字符串。传统 DES &lt;code&gt;crypt&lt;/code&gt; 改用双字符盐值，不适合生成新的密码哈希。&lt;/p&gt;
+&lt;p&gt;glibc 以前的 &lt;code&gt;libcrypt&lt;/code&gt; 记录了 &lt;code&gt;$1$&lt;/code&gt;（MD5）、&lt;code&gt;$5$&lt;/code&gt;（SHA-256）和 &lt;code&gt;$6$&lt;/code&gt;（SHA-512）；SHA 格式接受 &lt;code&gt;rounds=N&lt;/code&gt;。具备历史兼容性并不意味着 MD5 或 DES 适合新部署。可用方法和接受的标识符取决于具体实现和构建配置，而不是可移植的 POSIX 密码格式。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;crypt&lt;/code&gt; 返回静态存储区，无法安全用于并发调用。&lt;code&gt;crypt_r&lt;/code&gt; 使用调用方提供的 &lt;code&gt;struct crypt_data&lt;/code&gt;；必须按照实现要求初始化该结构，且不得在线程间共享。比较前应检查调用是否失败：不同实现可能返回 &lt;code&gt;NULL&lt;/code&gt; 或无效值。当应用程序自行处理哈希比较时，应采用常量时间比较，并在 API 允许后尽快清除密码材料。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; crypt_data data &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;candidate &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;crypt_r&lt;/span&gt;(password, stored_hash, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;data);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (candidate &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; NULL &lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;constant_time_equal&lt;/span&gt;(candidate, stored_hash)) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#75715e"&gt;/* authenticated */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;该示例仅说明验证机制，而非登录架构。支持 PAM 的程序应将身份验证委托给 PAM，而不应自行读取账户数据库，也不应自行实现提示和限流。&lt;/p&gt;
+&lt;h2 id="glibc-与-libxcrypt-的兼容性"&gt;
+ glibc 与 libxcrypt 的兼容性
+ &lt;a href="#glibc-%e4%b8%8e-libxcrypt-%e7%9a%84%e5%85%bc%e5%ae%b9%e6%80%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;crypt&lt;/code&gt; 是可选的 POSIX XSI 接口。glibc 2.39 移除了其源码树内置的 &lt;code&gt;libcrypt&lt;/code&gt;；Linux 发行版通常改为提供 &lt;a href="https://github.com/besser82/libxcrypt"&gt;libxcrypt&lt;/a&gt;。libxcrypt 可以提供带有 glibc 兼容符号版本的 &lt;code&gt;libcrypt.so.1&lt;/code&gt;，使链接到 glibc 历史库的现有 Linux 二进制文件仍可继续加载。未配置该兼容性的系统会安装不同的 ABI 名称，因此必须分别检查构建时和运行时兼容性。&lt;/p&gt;</description></item></channel></rss>

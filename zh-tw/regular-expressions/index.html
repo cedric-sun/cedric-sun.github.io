@@ -1,0 +1,26 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>正規表示式</title></head><body><main><article><div class=article-header><h1>正規表示式</h1><div class=aux>最後更新: 2022-10-11 18:31:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/regex/>Regex</a>
+|
+<a href=/zh-tw/tags/text-processing/>Text-Processing</a></div></div><div class="translation-notice machine-translated"><a href=/regular-expressions/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>正規表示式並非單一語言。POSIX BRE、POSIX ERE 和 Perl 相容引擎有所重疊，
+但它們的語法、比對規則和可用功能並不相同。</p><h2 id=posix-bre>POSIX BRE
+<a href=#posix-bre class=heading-anchor><span>#</span></a></h2><p>基本正規表示式是 <code>grep</code> 和 <code>sed</code> 採用的歷史語法。</p><p>重要規則：</p><ul><li>群組使用 <code>\(</code> 和 <code>\)</code>；</li><li>計數重複使用 <code>\{m,n\}</code>；</li><li>除非工具加入擴充功能，否則 <code>+</code>、<code>?</code>、<code>|</code> 和 <code>()</code> 都是常值字元；</li><li>反向參照使用 <code>\1</code>、<code>\2</code>，依此類推。</li></ul><p>BRE 具備可攜性，但因為許多中繼字元需要跳脫，所以較為冗長。</p><h2 id=posix-ere>POSIX ERE
+<a href=#posix-ere class=heading-anchor><span>#</span></a></h2><p>擴充正規表示式更接近現代正規表示式語法：</p><ul><li><code>()</code> 用於群組；</li><li><code>+</code> 表示一次或多次；</li><li><code>?</code> 表示零次或一次；</li><li><code>{m,n}</code> 計算重複次數；</li><li><code>|</code> 表示替代。</li></ul><p><code>grep -E</code> 和 <code>sed -E</code> 使用這種形式。POSIX ERE 仍有限制，因為它不支援
+惰性量詞、前瞻或後顧。</p><h2 id=perl-相容引擎>Perl 相容引擎
+<a href=#perl-%e7%9b%b8%e5%ae%b9%e5%bc%95%e6%93%8e class=heading-anchor><span>#</span></a></h2><p>Perl 相容正規表示式增加了 POSIX RE 所沒有的功能：</p><ul><li><code>*?</code> 和 <code>+?</code> 等惰性量詞；</li><li>前瞻與後顧；</li><li><code>(?:...)</code> 等非擷取群組；</li><li>許多引擎支援具名擷取；</li><li>更豐富的字元類別語法。</li></ul><p>因此，非貪婪比對經常會迫使你切換引擎。POSIX BRE 和 ERE 根本沒有
+等效的運算子。</p><h2 id=比對行為>比對行為
+<a href=#%e6%af%94%e5%b0%8d%e8%a1%8c%e7%82%ba class=heading-anchor><span>#</span></a></h2><p>POSIX 引擎以最左最長比對為規範。即使語法看似相同，此規則產生的結果仍可能
+與 Perl 風格引擎不同。</p><p>當替代和重複有所重疊時，這一點相當重要，因為引擎可能偏好較長的比對，
+而非第一個成功的語法替代項。</p><p>錨點也取決於引擎和模式。POSIX 的 <code>^</code> 與 <code>$</code> 表示字串的開頭和結尾，
+各工具對行的行為則有所不同；PCRE 風格引擎通常提供獨立的絕對字串錨點和
+多行模式。請明確比對常值輸入邊界，而不要假設命令的預設行為。</p><p>字元類別並非固定的 ASCII 簡寫。<code>[[:alpha:]]</code> 等 POSIX 方括號類別遵循
+目前使用中的語系，而 <code>\w</code>、大小寫摺疊和 Unicode 屬性會隨 Perl 相容
+實作及旗標而異。對於以位元組為導向的自動化，請設定已知語系；或明確選擇
+引擎的 Unicode 模式。</p><p>對於模稜兩可的巢狀重複，回溯引擎可能耗費指數級時間，例如使用 <code>(a+)+$</code>
+比對一段很長且不相符的輸入。處理不受信任的資料時，請限制輸入大小、避免
+重疊的替代項和巢狀量詞，或使用線性時間引擎。環視和非擷取群組可以改善
+運算式結構，但不會使引擎彼此相容。</p><h2 id=實務轉換>實務轉換
+<a href=#%e5%af%a6%e5%8b%99%e8%bd%89%e6%8f%9b class=heading-anchor><span>#</span></a></h2><p>相同意圖經常需要不同語法：</p><ul><li>擷取群組：BRE 使用 <code>\(...\)</code>，ERE 使用 <code>(...)</code>；</li><li>一個或多個數字：BRE 使用 <code>\{1,\}</code>，ERE 使用 <code>+</code>；</li><li>非貪婪萬用字元：POSIX RE 不支援。</li></ul><p>需要可攜性時，請選擇特定引擎，並使用能符合任務需求的最小功能集合。
+應根據預期語言和比對語意進行轉換，而非機械式地增加或移除反斜線。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/regular-expressions/ class=language-option data-lang=en>English
+</a><a href=/ja/regular-expressions/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/regular-expressions/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/regular-expressions/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

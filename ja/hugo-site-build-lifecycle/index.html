@@ -1,0 +1,53 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Hugo Site Build Lifecycle</title></head><body><main><article><div class=article-header><h1>Hugo Site Build Lifecycle</h1><div class=aux>最終更新: 2024-09-24 05:23:14 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/hugo/>Hugo</a>
+|
+<a href=/ja/tags/go/>Go</a></div></div><div class="translation-notice machine-translated"><a href=/hugo-site-build-lifecycle/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Hugo は設定、マウントされたファイル、コンテンツメタデータ、テンプレート、リソースからサイトを構築します。
+ファイルの配置はページ種別、バンドル境界、テンプレート検索を決定するため、データモデルの一部です。</p><h2 id=ビルド設定の選択>ビルド設定の選択
+<a href=#%e3%83%93%e3%83%ab%e3%83%89%e8%a8%ad%e5%ae%9a%e3%81%ae%e9%81%b8%e6%8a%9e class=heading-anchor><span>#</span></a></h2><p><code>hugo</code> コマンドは本番ビルドを実行し、<code>--destination</code> で対象を変更しない限り <code>public/</code> に書き込みます。
+<code>hugo server</code> は開発ビルドを提供し、その依存関係を監視します。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>hugo --environment production
+</span></span><span style=display:flex><span>hugo server --environment development</span></span></code></pre></div></div></div><p>環境の既定値は異なり、<code>hugo</code> は <code>production</code>、<code>hugo server</code> は <code>development</code> を使います。
+<code>--environment</code> または <code>HUGO_ENVIRONMENT</code> で明示的な環境を選びます。プロジェクトでは <code>hugo.toml</code> のような単一の設定ファイル、
+コンマ区切りの <code>--config</code> リスト、<code>config/_default/</code> と <code>config/&lt;environment>/</code> 下の階層化ファイルを使えます。
+後から指定した、より具体的な設定が先の設定を上書きするため、ビルド診断にはリポジトリのリビジョンだけでなくコマンドと環境を記録します。</p><p>モジュールのマウントはコンテンツ収集より前に解決されます。マウントは複数のソースディレクトリを仮想の
+<code>content</code>、<code>assets</code>、<code>static</code>、<code>layouts</code> ツリーへ結合できます。そのため物理的な <code>content/</code> ディレクトリだけを調べると、
+ビルド入力を見落とす可能性があります。</p><h2 id=ページセクションタクソノミーリソースの分類>ページ、セクション、タクソノミー、リソースの分類
+<a href=#%e3%83%9a%e3%83%bc%e3%82%b8%e3%82%bb%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3%e3%82%bf%e3%82%af%e3%82%bd%e3%83%8e%e3%83%9f%e3%83%bc%e3%83%aa%e3%82%bd%e3%83%bc%e3%82%b9%e3%81%ae%e5%88%86%e9%a1%9e class=heading-anchor><span>#</span></a></h2><p>Hugo はファイル名とディレクトリ構造からページ種別を導出します。</p><ul><li><code>content/_index.md</code> はホームページのコンテンツとメタデータを提供します。</li><li>セクションディレクトリには <code>_index.md</code> を置け、それによってそのセクションのブランチバンドルが作られます。</li><li><code>index.md</code> を含むディレクトリはリーフバンドルです。その下の Markdown ファイルは独立したページではなくページリソースになります。</li><li>その他のコンテンツファイルは、含まれているセクション内の通常ページになります。</li><li>設定されたタクソノミーは front matter からタクソノミーページとタームページを生成します。</li></ul><p>ブランチバンドルには子ページとセクションを含められます。リーフバンドルは、画像、データ、生成ファイルなどのリソースを伴う 1 ページを表します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>content/
+</span></span><span style=display:flex><span>  posts/
+</span></span><span style=display:flex><span>    _index.md
+</span></span><span style=display:flex><span>    canvas/
+</span></span><span style=display:flex><span>      index.md
+</span></span><span style=display:flex><span>      diagram.svg</span></span></code></pre></div></div></div><p><code>posts/canvas/</code> のページは <code>.Page.Resources</code> を通じて <code>diagram.svg</code> を解決できます。
+<code>static/</code> 下のファイルは別の経路をたどります。Hugo はそれらを処理可能なページやグローバルリソースとして公開せず、宛先へコピーします。</p><h2 id=front-matter-とカスケードからのページ構築>Front Matter とカスケードからのページ構築
+<a href=#front-matter-%e3%81%a8%e3%82%ab%e3%82%b9%e3%82%b1%e3%83%bc%e3%83%89%e3%81%8b%e3%82%89%e3%81%ae%e3%83%9a%e3%83%bc%e3%82%b8%e6%a7%8b%e7%af%89 class=heading-anchor><span>#</span></a></h2><p>Front matter は <code>title</code>、<code>date</code>、<code>draft</code>、<code>outputs</code>、<code>layout</code>、<code>type</code>、タクソノミー、カスタムパラメーターなどのフィールドを提供します。
+Hugo はそれらの値を、パス、言語、サイト設定、Git メタデータから推測した既定値と組み合わせます。</p><p>サイト設定またはブランチバンドルの <code>_index.md</code> にある <code>cascade</code> は、子孫へ front matter の既定値を提供します。</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>cascade</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>type</span>: <span style=color:#ae81ff>docs</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>params</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>audience</span>: <span style=color:#ae81ff>developers</span></span></span></code></pre></div></div></div><p>子孫の front matter はカスケードされた値を上書きできます。カスケードではパス、ページ種別、環境、言語の対象セレクターも使えます。
+結果のページオブジェクトは適用されたすべての層を反映するため、予想外の <code>.Type</code> や <code>.Params</code> の値は、
+コンテンツファイルと祖先のカスケードの両方をたどって調査します。</p><p>Hugo はページ構築中に翻訳、エイリアス、ページリソース、タクソノミーターム、セクションの祖先も関連付けます。
+テンプレートはファイルを個別に解析するのではなく、完成したページグラフを利用します。</p><h2 id=コンテンツの変換と出力のレンダリング>コンテンツの変換と出力のレンダリング
+<a href=#%e3%82%b3%e3%83%b3%e3%83%86%e3%83%b3%e3%83%84%e3%81%ae%e5%a4%89%e6%8f%9b%e3%81%a8%e5%87%ba%e5%8a%9b%e3%81%ae%e3%83%ac%e3%83%b3%e3%83%80%e3%83%aa%e3%83%b3%e3%82%b0 class=heading-anchor><span>#</span></a></h2><p>概念上のビルド経路は次のとおりです。</p><ol><li>設定、モジュール、データ、翻訳、テンプレート、マウントされた
+files.</li><li>セクションとタクソノミーを含むページとリソースのグラフを構築する。</li><li>コンテンツを解析し、ショートコードを展開し、Markdown レンダーフックを呼び出す。</li><li>有効な各出力形式を対応するテンプレートでレンダリングする。</li><li>要求されたアセットを処理し、レンダリング済みファイルと静的ファイルを公開する。</li></ol><p>テンプレート評価はコンテンツやアセットの変換を遅延して要求できるため、これらのフェーズは依存関係を示すものであり、
+内部 goroutine の順序を保証するものではありません。<code>.Content</code> の生成中にショートコードが実行され、
+周囲のページテンプレートがその結果を HTML、RSS、JSON などの出力へ配置します。</p><p>出力形式はサイトとページ種別ごとに設定します。1 つのページは同じコンテンツから複数のファイルを出力できます。</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>outputs</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>home</span>:
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>HTML</span>
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>RSS</span>
+</span></span><span style=display:flex><span>    - <span style=color:#ae81ff>JSON</span></span></span></code></pre></div></div></div><p>テンプレート検索では、ページ種別、type、セクション、レイアウト、言語、出力形式を考慮します。
+HTML の単一ページレイアウトのような形式固有のテンプレートが、RSS 出力を自動的に提供するわけではありません。
+予期しないフォールバックを診断する場合は、ハードコードされたファイル名を仮定せず、テンプレートメトリクスや警告を有効にして Hugo を実行します。</p><h2 id=キャッシュと開発ビルドの考慮>キャッシュと開発ビルドの考慮
+<a href=#%e3%82%ad%e3%83%a3%e3%83%83%e3%82%b7%e3%83%a5%e3%81%a8%e9%96%8b%e7%99%ba%e3%83%93%e3%83%ab%e3%83%89%e3%81%ae%e8%80%83%e6%85%ae class=heading-anchor><span>#</span></a></h2><p>Hugo はダウンロードしたモジュール、リモートリソース、処理済みアセットをキャッシュします。
+アセットフィンガープリントによって有効なキャッシュ結果を再利用でき、テンプレートやソースの変更は依存先を無効化します。
+プロジェクトが意図的にそのキャッシュを使う場合、<code>resources/_gen/</code> 下の生成ファイルをコミットまたは CI で復元できますが、
+それらはソースコンテンツではなく派生アーティファクトです。</p><p><code>hugo server</code> は依存関係グラフをメモリに保持し、変更を監視し、高速レンダリングで対話的な開発に必要なページを再構築します。
+通常は <code>public/</code> のファイルを正確に再現するのではなく、メモリから提供します。
+完全な開発再レンダリングが必要な場合は <code>--disableFastRender</code> を使い、サーバー出力をディスクで調べる場合だけ <code>--renderToDisk</code> を使います。</p><p>開発用キャッシュと差分レンダリングは宣言されていない依存関係を隠す可能性があるため、クリーンな本番ビルドがリリースチェックになります。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>hugo --gc --cleanDestinationDir --environment production</span></span></code></pre></div></div></div><p><code>--cleanDestinationDir</code> は現在のビルドで Hugo が生成しない宛先内のファイルを削除し、<code>--gc</code> は未使用のキャッシュエントリを削除します。
+どちらのオプションも誤ったコンテンツ分類やテンプレート検索を修復するものではありません。これらはプロジェクト構造と設定から決まります。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/hugo-site-build-lifecycle/ class=language-option data-lang=en>English
+</a><a href=/ja/hugo-site-build-lifecycle/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/hugo-site-build-lifecycle/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/hugo-site-build-lifecycle/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

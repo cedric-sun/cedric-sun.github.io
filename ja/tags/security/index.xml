@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Security on cesun.life</title><link>https://example.org/ja/tags/security/</link><description>Recent content in Security on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Fri, 31 Jul 2026 20:08:54 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/security/index.xml" rel="self" type="application/rss+xml"/><item><title>Kerberos</title><link>https://example.org/ja/kerberos/</link><pubDate>Fri, 31 Jul 2026 20:08:54 +0800</pubDate><guid>https://example.org/ja/kerberos/</guid><description>&lt;p&gt;Kerberos は、統合された管理下にあるシステム向けのネットワーク認証プロトコルです。ユーザーは信頼された鍵配布センター（KDC）で認証し、その後、個々のサービス向けの有効期限付きチケットを取得します。サービスはユーザーのパスワードを受け取らずにユーザーの身元を検証でき、クライアントはサービスが期待された秘密情報を保持していることの証明を要求できます。&lt;/p&gt;
+&lt;p&gt;Kerberos は主に共通鍵暗号を使用します。共通鍵暗号では KDC が中央の信頼アンカーになります。KDC またはそのデータベースが侵害されると、KDC が長期鍵を管理するすべてのプリンシパルが侵害される可能性があります。したがって Kerberos は、分散型の信頼を、集中型の ID 管理、効率的なチケット発行、およびレルム内のシングルサインオンと交換します。&lt;/p&gt;
+&lt;h2 id="信頼モデルと中核オブジェクト"&gt;
+ 信頼モデルと中核オブジェクト
+ &lt;a href="#%e4%bf%a1%e9%a0%bc%e3%83%a2%e3%83%87%e3%83%ab%e3%81%a8%e4%b8%ad%e6%a0%b8%e3%82%aa%e3%83%96%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;strong&gt;レルム&lt;/strong&gt;は、管理上の認証ドメインです。通常は &lt;code&gt;EXAMPLE.COM&lt;/code&gt; のように大文字で表記します。レルム名は DNS ドメインに似ていることがありますが、両者の名前空間は異なります。設定または DNS 探索によって、ホスト名とドメイン名が Kerberos レルムに対応付けられます。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;プリンシパル&lt;/strong&gt;は ID を表します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;alice@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP/web.example.com@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;プリンシパル名は、1 つ以上のコンポーネントに続いてレルムを含みます。&lt;code&gt;alice&lt;/code&gt; はユーザープリンシパルです。&lt;code&gt;HTTP/web.example.com&lt;/code&gt; はサービスプリンシパルで、最初のコンポーネントはサービスを、2 番目のコンポーネントはホストを示します。レルム、ユーザー、ホストの各コンポーネントでは運用上の慣例が異なる場合がありますが、プリンシパル文字列は大文字と小文字を区別します。&lt;/p&gt;
+&lt;p&gt;すべてのプリンシパルには、KDC に登録された 1 つ以上の長期鍵があります。プリンシパルの種類によって、これらの鍵の取得方法は異なります。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;人間のプリンシパルは通常、パスワードから、暗号方式固有の string-to-key 関数とソルトを使用して鍵を導出します。&lt;/li&gt;
+&lt;li&gt;サービスプリンシパルは通常、管理者が生成したランダムな鍵を受け取ります。&lt;/li&gt;
+&lt;li&gt;レルムの &lt;code&gt;krbtgt/REALM&lt;/code&gt; プリンシパルには、チケット認可チケット（TGT）の暗号化に使用する鍵があります。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;keytab&lt;/strong&gt; には、プリンシパル名、鍵バージョン番号（KVNO）、暗号化タイプ、長期鍵が保存されます。無人サービスはパスワードを入力できないため、デーモンは keytab を使用します。keytab は認証情報であり、公開証明書ではありません。使用可能なサービス鍵を読み取れる者は、そのサービスになりすまし、そのプリンシパル向けに発行されたチケットを復号できます。&lt;/p&gt;
+&lt;p&gt;KDC は、論理的には次の 2 つのサービスを提供します。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;**認証サービス（AS）**は、初回認証後に TGT を発行します。&lt;/li&gt;
+&lt;li&gt;**チケット認可サービス（TGS）**は、有効な TGT を特定のサービス向けチケットと交換します。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;通常、両サービスは同じ KDC プロセスで実行され、同じレルムデータベースを使用します。チケット取得が 1 台のホストに依存しないよう、本番レルムでは冗長 KDC を配置します。一方、データベース管理とレプリケーションには追加の制御が必要です。&lt;/p&gt;</description></item><item><title>Gitの認証情報管理</title><link>https://example.org/ja/git-credential-management/</link><pubDate>Tue, 07 Oct 2025 11:26:05 +0800</pubDate><guid>https://example.org/ja/git-credential-management/</guid><description>&lt;p&gt;GitはHTTP(S)認証を認証情報ヘルパーに委任します。一方、SSHリモートはSSHキーと
+エージェントを使用するため、&lt;code&gt;credential.helper&lt;/code&gt; はその秘密鍵を管理しません。&lt;/p&gt;
+&lt;h2 id="認証情報ヘルパーの選択"&gt;
+ 認証情報ヘルパーの選択
+ &lt;a href="#%e8%aa%8d%e8%a8%bc%e6%83%85%e5%a0%b1%e3%83%98%e3%83%ab%e3%83%91%e3%83%bc%e3%81%ae%e9%81%b8%e6%8a%9e" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;設定済みのヘルパーを、それらを設定した構成ファイルとともに一覧表示します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git config --show-origin --get-all credential.helper
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git help -a | grep credential-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Gitは、設定された順序でヘルパーに問い合わせ、不足している認証情報フィールドを
+埋めます。ヘルパーは応答を拒否したり、一部のデータのみを返したりできます。その後、
+Gitは別のヘルパーに問い合わせるか、ユーザーに入力を求める場合があります。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;ヘルパー&lt;/th&gt;
+ &lt;th&gt;保存先&lt;/th&gt;
+ &lt;th&gt;適した用途&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;cache&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;ローカルデーモンのメモリ&lt;/td&gt;
+ &lt;td&gt;短時間の開発セッション&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;store&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;平文の &lt;code&gt;~/.git-credentials&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;平文での保存が許容されるリスクである場合のみ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;osxkeychain&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;macOSキーチェーン&lt;/td&gt;
+ &lt;td&gt;macOSでの開発&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;Git Credential Manager&lt;/td&gt;
+ &lt;td&gt;プラットフォームの安全なストレージとブラウザーによるサインイン&lt;/td&gt;
+ &lt;td&gt;対応するデスクトッププラットフォーム&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;たとえば、期限付きのメモリ内キャッシュを使用します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git config --global credential.helper &lt;span style="color:#e6db74"&gt;&amp;#39;cache --timeout=3600&amp;#39;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;store&lt;/code&gt; よりもプラットフォームのキーチェーンまたはGit Credential Managerを優先して
+ください。&lt;code&gt;--global&lt;/code&gt; を省略すると、ローカルリポジトリでグローバルヘルパーを
+上書きできます。&lt;/p&gt;
+&lt;h2 id="トークンとユーザー名のスコープ設定"&gt;
+ トークンとユーザー名のスコープ設定
+ &lt;a href="#%e3%83%88%e3%83%bc%e3%82%af%e3%83%b3%e3%81%a8%e3%83%a6%e3%83%bc%e3%82%b6%e3%83%bc%e5%90%8d%e3%81%ae%e3%82%b9%e3%82%b3%e3%83%bc%e3%83%97%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;パス照合が有効でない限り、Gitはプロトコルとホストによって認証情報を照合します。
+アカウントまたはトークンがリポジトリごとに異なる場合は、HTTPパスを含めます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git config --global credential.useHttpPath true&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;認証情報セクションでは、シークレットを保存せずにユーザー名を事前設定できます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;ini&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-ini" data-lang="ini"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;[credential &amp;#34;https://github.com&amp;#34;]&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;username&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;octo&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;リモートURLにトークンを埋め込まないでください。Gitの構成、プロセス引数、
+ターミナル履歴、デバッグ出力、コピーされたログによって、そのようなURLが露出する
+可能性があります。&lt;/p&gt;</description></item><item><title>Linux の乱数 API</title><link>https://example.org/ja/linux-randomness-apis/</link><pubDate>Tue, 22 Oct 2024 20:12:02 +0800</pubDate><guid>https://example.org/ja/linux-randomness-apis/</guid><description>&lt;p&gt;乱数 API が提供する契約には、異なる 2 種類があります。決定論的な疑似乱数生成器は、再現可能なテストやシミュレーションに役立ちます。セキュリティー上重要なキー、ノンス、トークン、ソルト、およびシードには、カーネルの暗号論的擬似乱数生成器（CSPRNG）から得たバイト列が必要です。&lt;/p&gt;
+&lt;h2 id="c-ライブラリの生成器"&gt;
+ C ライブラリの生成器
+ &lt;a href="#c-%e3%83%a9%e3%82%a4%e3%83%96%e3%83%a9%e3%83%aa%e3%81%ae%e7%94%9f%e6%88%90%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;rand()&lt;/code&gt; はプロセス内の隠れた状態を進め、0 から &lt;code&gt;RAND_MAX&lt;/code&gt; までの整数を返します。&lt;code&gt;srand(seed)&lt;/code&gt; は、特定の C ライブラリ実装における再現可能なシーケンスを選択します。省略した場合の動作は、シードに 1 を指定した場合と同じです。ISO C はアルゴリズムを規定しておらず、実装間で同じシーケンスになることも要求していません。したがって、クロスプラットフォームでの再現性が必要なテストでは、明示的なアルゴリズムを選択して記録する必要があります。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;random()&lt;/code&gt; と &lt;code&gt;srandom()&lt;/code&gt; は、別の決定論的な関数群を提供します。glibc は加算フィードバック方式の状態を使用して &lt;code&gt;random()&lt;/code&gt; を実装しており、呼び出し元は &lt;code&gt;initstate()&lt;/code&gt; と &lt;code&gt;setstate()&lt;/code&gt; で状態配列を切り替えられます。&lt;code&gt;random_r()&lt;/code&gt; では、その状態が明示的になります。&lt;code&gt;rand_r()&lt;/code&gt; が保持する状態は &lt;code&gt;unsigned int&lt;/code&gt; 1 個だけであり、POSIX では廃止予定です。そのため、独立した高品質のストリームを生成する設計には適していません。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;drand48()&lt;/code&gt; 関数群では、48 ビットの線形合同漸化式が規定されています。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;X(n + 1) = (0x5DEECE66D * X(n) + 0xB) mod 2^48&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;drand48()&lt;/code&gt; は &lt;code&gt;[0.0, 1.0)&lt;/code&gt; の範囲の &lt;code&gt;double&lt;/code&gt; を返し、&lt;code&gt;lrand48()&lt;/code&gt; は &lt;code&gt;[0, 2^31)&lt;/code&gt; の範囲の &lt;code&gt;long&lt;/code&gt; を返し、&lt;code&gt;mrand48()&lt;/code&gt; は &lt;code&gt;[-2^31, 2^31)&lt;/code&gt; の範囲の符号付きの値を返します。&lt;code&gt;erand48()&lt;/code&gt;、&lt;code&gt;nrand48()&lt;/code&gt;、&lt;code&gt;jrand48()&lt;/code&gt; は、呼び出し元が提供する 3 要素の状態を使用します。&lt;code&gt;_r&lt;/code&gt; インターフェースは、明示的なリエントラント状態構造体を使用します。&lt;/p&gt;</description></item><item><title>GnuPG チートシート</title><link>https://example.org/ja/gnupg/</link><pubDate>Thu, 31 Aug 2023 20:10:33 +0800</pubDate><guid>https://example.org/ja/gnupg/</guid><description>&lt;p&gt;&lt;code&gt;gpg&lt;/code&gt; コマンドには、いくつかの異なる役割がある。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;OpenPGP 鍵を管理し、受信者向けにデータを暗号化する&lt;/li&gt;
+&lt;li&gt;鍵の所有者向けにデータを復号する&lt;/li&gt;
+&lt;li&gt;署名を作成または検証する&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;GPG の最も一般的な用途には、ソフトウェアリリースに付属する &lt;code&gt;.asc&lt;/code&gt; ファイルを開発者の公開鍵で検証することや、
+&lt;a href="https://example.org/git-misc/#gpg-signing"&gt;秘密鍵で Git のコミットとタグに署名すること&lt;/a&gt;が含まれる。&lt;/p&gt;
+&lt;h2 id="インストール"&gt;
+ インストール
+ &lt;a href="#%e3%82%a4%e3%83%b3%e3%82%b9%e3%83%88%e3%83%bc%e3%83%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# archlinux&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# gnupg and pinentry should already be installed on your system as it is a dependency of pacman.&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# debian/ubuntu&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo apt install gnupg pinentry-curses pinentry-gtk-2
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# redhat/fedora/centos&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo dnf install gnupg2 pinentry &lt;span style="color:#75715e"&gt;# fedora/rhel 8+&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo yum install gnupg2 pinentry &lt;span style="color:#75715e"&gt;# rhel 7&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# mac&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;brew install gnupg pinentry-mac&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;GPG は、秘密鍵をアンロックする際にパスフレーズの入力を求めるため、&lt;code&gt;pinentry&lt;/code&gt; というプログラムを使用する。設計上の原則は分離である。&lt;code&gt;pinentry&lt;/code&gt; は独立したプロセスとして動作するため、復号を要求するアプリケーションがパスフレーズを見ることはなく、GPG エージェントだけがパスフレーズを受け取る。これにより、ユーザーと暗号処理の間に信頼できる経路が確立される。&lt;code&gt;pinentry-curses&lt;/code&gt;（CLI）、&lt;code&gt;pinentry-gtk&lt;/code&gt;（GTK）、&lt;code&gt;pinentry-qt&lt;/code&gt;（Qt）、&lt;code&gt;pinentry-mac&lt;/code&gt;（macOS ネイティブ）など、複数の種類が存在する。使用するプログラムは、&lt;code&gt;~/.gnupg/gpg-agent.conf&lt;/code&gt; の &lt;code&gt;pinentry-program&lt;/code&gt; ディレクティブで設定できる。&lt;/p&gt;</description></item><item><title>Browser Content Disposition and Downloads</title><link>https://example.org/ja/browser-content-disposition/</link><pubDate>Wed, 16 Aug 2023 17:13:20 +0800</pubDate><guid>https://example.org/ja/browser-content-disposition/</guid><description>&lt;p&gt;ブラウザーは複数の入力から、レスポンスを表示するか、ダウンロードするか、外部アプリケーションへ渡すかを決定します。
+&lt;code&gt;Content-Disposition&lt;/code&gt; は強い優先指定を提供しますが、コンテンツ型、ナビゲーションコンテキスト、サンドボックス、
+ブラウザーの機能、ユーザー設定も結果に影響します。&lt;/p&gt;
+&lt;h2 id="inline-と-attachment-の処理"&gt;
+ inline と attachment の処理
+ &lt;a href="#inline-%e3%81%a8-attachment-%e3%81%ae%e5%87%a6%e7%90%86" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;attachment レスポンスはダウンロードを要求します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;HTTP&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;1.1&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;200&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OK&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Type&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;application/pdf&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Disposition&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;attachment; filename=&amp;#34;guide.pdf&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Length&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;110352&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;X-Content-Type-Options&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;nosniff&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;inline レスポンスはブラウザー内での表示を許可します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Type: application/pdf
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Disposition: inline; filename=&amp;#34;guide.pdf&amp;#34;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;inline&lt;/code&gt; は表示を保証しません。ブラウザーにはメディア型向けのビューアーが必要であり、
+ユーザーは一部の型を代わりにダウンロードするよう設定できます。ヘッダーを省略すると、主にメディア型とナビゲーションコンテキストが選択を決めます。&lt;/p&gt;
+&lt;h2 id="安全なファイル名の指定"&gt;
+ 安全なファイル名の指定
+ &lt;a href="#%e5%ae%89%e5%85%a8%e3%81%aa%e3%83%95%e3%82%a1%e3%82%a4%e3%83%ab%e5%90%8d%e3%81%ae%e6%8c%87%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;filename&lt;/code&gt; は ASCII 互換のフォールバックを持ちます。&lt;code&gt;filename*&lt;/code&gt; は RFC 5987 に代わる RFC 8187 が定義する
+拡張パラメーターエンコーディングを使い、Unicode を表現できます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Disposition: attachment;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt; filename=&amp;#34;report.pdf&amp;#34;;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt; filename*=UTF-8&amp;#39;&amp;#39;r%C3%A9sum%C3%A9.pdf&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;古いクライアントは &lt;code&gt;filename*&lt;/code&gt; を無視する可能性があるため、両方のパラメーターを送信します。
+準拠する受信側は両方が有効な場合 &lt;code&gt;filename*&lt;/code&gt; を優先します。サーバーが指定したファイル名は信頼できない入力として扱います。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ディレクトリ区切り文字と制御文字を削除する。&lt;/li&gt;
+&lt;li&gt;最終名として &lt;code&gt;.&lt;/code&gt; と &lt;code&gt;..&lt;/code&gt; を拒否する。&lt;/li&gt;
+&lt;li&gt;想定する拡張子をメディア型と一致させる。&lt;/li&gt;
+&lt;li&gt;適切な長さの上限を設ける。&lt;/li&gt;
+&lt;li&gt;値からサーバーのファイルシステムパスを直接構築しない。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;ブラウザーはそれぞれ独立してファイル名をサニタイズするため、正確な改名動作は実装によって異なります。&lt;/p&gt;</description></item><item><title>Linux Seccomp</title><link>https://example.org/ja/linux-seccomp/</link><pubDate>Fri, 07 Apr 2023 12:28:12 +0800</pubDate><guid>https://example.org/ja/linux-seccomp/</guid><description>&lt;p&gt;Seccomp（secure computing）は、プロセスが実行できるシステムコールを制限します。strict
+モードでは、プロセスは、既存のファイルディスクリプターに対する歴史的な
+&lt;code&gt;read&lt;/code&gt;、&lt;code&gt;write&lt;/code&gt;、&lt;code&gt;_exit&lt;/code&gt;、&lt;code&gt;sigreturn&lt;/code&gt; という少数のコールに制限されます。現代の
+アプリケーションの大半にとっては、意図的に狭すぎる制限です。&lt;/p&gt;
+&lt;p&gt;filter モードでは、システムコール番号と選択した引数を検査する classic BPF
+プログラムをアタッチします。フィルターは、許可、errno を返して拒否、プロセスの
+強制終了、ログ記録、トレース、または userspace notifier への判断の委譲を行えます。
+フィルターは単調です。一度インストールすると、緩和できません。通常、権限を持たない
+プロセスがフィルターをインストールする前に &lt;code&gt;no_new_privs&lt;/code&gt; が必要です。これにより、
+後から権限を獲得してフィルターを回避することを防ぎます。コンテナランタイムは、
+namespaces、capabilities、mandatory-access-control ポリシーと併せて、防御の一層として
+seccomp を使用します。&lt;/p&gt;</description></item><item><title>Docker イメージの CVE 修正と予防について</title><link>https://example.org/ja/docker-cve-fix/</link><pubDate>Fri, 03 Mar 2023 14:00:22 +0800</pubDate><guid>https://example.org/ja/docker-cve-fix/</guid><description>&lt;p&gt;経験則：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;イメージに適切なセキュリティ更新用のソースが設定されていることを確認します。これにより、&lt;code&gt;apt-get upgrade&lt;/code&gt;（または同等のコマンド）が何も行わない事態を防げます。&lt;/li&gt;
+&lt;li&gt;Dockerfile に &lt;code&gt;RUN apt-get update &amp;amp;&amp;amp; apt-get upgrade -y&lt;/code&gt;（または同等のコマンド）を含めます。&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://example.org/ja/fixing-gosu/"&gt;静的リンクされた Go 製プログラムが関係するまれなケース&lt;/a&gt;では、&lt;code&gt;docker build&lt;/code&gt; の一環として、そのプログラムを削除するかソースから再ビルドします。&lt;/li&gt;
+&lt;li&gt;独自の再ビルドを毎週または毎月実行するようスケジュールします。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="背景"&gt;
+ 背景
+ &lt;a href="#%e8%83%8c%e6%99%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;Docker 公式イメージ（DOI）の信頼できる唯一の情報源は、https://github.com/docker-library/official-images の master ブランチです。ここでは「Library definition files」と呼ばれる形式を用いて、どのリポジトリのどのタグを継続的に再ビルドするか、およびその Dockerfile の場所（Git リポジトリの URL とコミット ID）を定義しています。これらの &lt;code&gt;repo:tag&lt;/code&gt; は、&lt;em&gt;現在メンテナンスされている&lt;/em&gt;ものと呼ばれます。
+&lt;ul&gt;
+&lt;li&gt;参照先の Dockerfile の Git リポジトリは、&lt;em&gt;すべてではありませんが大部分が&lt;/em&gt; &lt;a href="https://github.com/docker-library"&gt;Docker Inc. 自身&lt;/a&gt;によってメンテナンスされています。&lt;a href="https://github.com/apple/swift-docker.git"&gt;一例&lt;/a&gt;を参照してください。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://doi-janky.infosiftr.net/"&gt;https://doi-janky.infosiftr.net/&lt;/a&gt; の Jenkins ジョブが、すべての DOI の Dockerfile を解析して DOI 間の最新の依存関係を生成し、https://github.com/docker-library/meta に永続化します。&lt;/li&gt;
+&lt;li&gt;このメタデータを使用し、DOI の Dockerfile に対してマージされた各 PR は、https://doi-janky.infosiftr.net/ 上で、その下流にあるすべての DOI（その DOI を &lt;code&gt;FROM&lt;/code&gt; しているもの）の再ビルドと Docker Hub へのプッシュをトリガーします。
+&lt;ul&gt;
+&lt;li&gt;スケジュールされた無条件の再ビルドは保証されていません。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="観察結果"&gt;
+ 観察結果
+ &lt;a href="#%e8%a6%b3%e5%af%9f%e7%b5%90%e6%9e%9c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;Docker Inc. の DOI は、Dockerfile で &lt;code&gt;RUN apt upgrade&lt;/code&gt;（または同等のコマンド）を実行しておらず、他の DOI ベンダーにも実行は義務付けられていません。&lt;/li&gt;
+&lt;li&gt;DOI ベンダーが Dockerfile に OS のアップグレード手順を含めていても、スケジュールされた無条件の再ビルドがなければ、セキュリティパッチが存在してもインストールされません。&lt;/li&gt;
+&lt;li&gt;一部の DOI は、上流のセキュリティ更新がデフォルトで無効になっているディストリビューションを使用しています。一例として &lt;code&gt;docker run --rm mysql:9.6.0 tail /etc/yum.repos.d/oracle-linux-ol9.repo&lt;/code&gt; を参照してください。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;したがって、現在メンテナンスされている DOI であっても、ビルド時に CVE が存在しないことは保証されません。そのため、何も変更しない再ビルド（&lt;code&gt;RUN apt upgrade&lt;/code&gt; または同等のコマンドを実行しないもの）では、何も修正されません。&lt;/p&gt;</description></item><item><title>x86プロテクトモードと特権</title><link>https://example.org/ja/x86-protected-mode/</link><pubDate>Sat, 24 Dec 2022 15:42:13 +0800</pubDate><guid>https://example.org/ja/x86-protected-mode/</guid><description>&lt;p&gt;x86プロテクトモードは、ディスクリプタベースのセグメンテーション、制御された制御転送、ページング、特権命令を組み合わせます。ロングモードでは通常のセグメンテーションが縮小されていますが、ディスクリプタテーブル、特権レベル、割り込みゲート、タスク状態セグメント（TSS）は保持されます。オペレーティングシステムはこれらの機構を使用してカーネルへ移行し、ユーザー実行を隔離します。一方、現在のx86-64システムでは、ページテーブルが主要なメモリ保護境界を提供します。&lt;/p&gt;
+&lt;h2 id="table-registers"&gt;
+ テーブルレジスタ
+ &lt;a href="#table-registers" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;グローバルディスクリプタテーブル（GDT）には、論理プロセッサが共有するコード、データ、システムディスクリプタが含まれます。&lt;code&gt;GDTR&lt;/code&gt;はGDTのリニアベースとバイト単位のリミットを格納します。GDTエントリ0は慣例的にヌルディスクリプタであり、インデックス0のセレクタを通常のコードまたはデータアクセスに使用できないようにします。&lt;/p&gt;
+&lt;p&gt;ローカルディスクリプタテーブル（LDT）は、&lt;code&gt;LDTR&lt;/code&gt;を介して選択するオプションのテーブルです。&lt;code&gt;LDTR&lt;/code&gt;には、GDT内のLDTシステムディスクリプタを指すセレクタが含まれ、解決済みのベース、リミット、属性をキャッシュします。レガシーアーキテクチャでは、タスクごとに独自のLDTを持てますが、現在の64ビットオペレーティングシステムでLDTが使われることはほとんどありません。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;IDTR&lt;/code&gt;は割り込みディスクリプタテーブル（IDT）のリニアベースとバイト単位のリミットを格納します。IDTは通常のセグメントセレクタではなく、例外または割り込みベクタによってインデックスされます。エントリは、ハンドラコードを識別し、エントリの意味を制御するゲートです。&lt;/p&gt;
+&lt;p&gt;タスクレジスタ（&lt;code&gt;TR&lt;/code&gt;）には、GDT内のTSSディスクリプタを指すセレクタが含まれ、そのディスクリプタをキャッシュします。&lt;code&gt;LGDT&lt;/code&gt;、&lt;code&gt;LIDT&lt;/code&gt;、&lt;code&gt;LLDT&lt;/code&gt;、&lt;code&gt;LTR&lt;/code&gt;は、アーキテクチャで定義された特権および型チェックの下でテーブル状態をロードします。&lt;/p&gt;
+&lt;h2 id="selectors-and-hidden-caches"&gt;
+ セレクタと隠しキャッシュ
+ &lt;a href="#selectors-and-hidden-caches" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;16ビットのセグメントセレクタには、インデックス、テーブルインジケータ（&lt;code&gt;TI&lt;/code&gt;）、要求特権レベル（&lt;code&gt;RPL&lt;/code&gt;）が含まれます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;15 3 2 1 0
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;+--------------------------------+---+---+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;| index | TI|RPL|
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;+--------------------------------+---+---+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;TI=0&lt;/code&gt;はGDTを選択し、&lt;code&gt;TI=1&lt;/code&gt;は現在のLDTを選択します。プロセッサはインデックスにディスクリプタサイズを乗算し、テーブルリミットを検査し、ディスクリプタを取得して、その型、存在状態、操作に対する特権を検証します。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;CS&lt;/code&gt;、&lt;code&gt;SS&lt;/code&gt;、&lt;code&gt;DS&lt;/code&gt;、&lt;code&gt;ES&lt;/code&gt;、&lt;code&gt;FS&lt;/code&gt;、&lt;code&gt;GS&lt;/code&gt;はセレクタを公開しますが、ベース、リミット、型、アクセス権の隠しキャッシュも保持します。メモリ参照では、ディスクリプタテーブルを再読み込みせずにキャッシュを使用します。したがって、GDTまたはLDTのエントリを書き換えても、ロード済みセグメントは変化しません。ソフトウェアはセレクタを再ロードするか、アーキテクチャで要求される遷移を実行する必要があります。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;LDTR&lt;/code&gt;と&lt;code&gt;TR&lt;/code&gt;も解決済みディスクリプタをキャッシュします。GDT、LDT、またはTSSを変更するコンテキストスイッチでは、可視セレクタだけが完全な状態であるとみなさず、これらのキャッシュを考慮する必要があります。&lt;/p&gt;
+&lt;h2 id="segment-descriptors"&gt;
+ セグメントディスクリプタ
+ &lt;a href="#segment-descriptors" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;レガシープロテクトモードのコードおよびデータディスクリプタは8バイトです。これらは、32ビットのベース、オプションで4 KiB粒度を使用する20ビットのリミット、ディスクリプタ特権レベル（&lt;code&gt;DPL&lt;/code&gt;）、プレゼントビット、ディスクリプタクラス、型固有のフラグをエンコードします。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;S=1&lt;/code&gt;はコードまたはデータディスクリプタを示し、&lt;code&gt;S=0&lt;/code&gt;はシステムディスクリプタまたはゲートを示します。&lt;/li&gt;
+&lt;li&gt;コードディスクリプタは、実行可能、読み取り可能、コンフォーミングの動作を選択します。&lt;/li&gt;
+&lt;li&gt;データディスクリプタは、書き込み可能および拡張方向下向きの動作を選択します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;G&lt;/code&gt;はリミットをスケールし、&lt;code&gt;D/B&lt;/code&gt;はディスクリプタ型に応じてデフォルトのオペランドサイズまたはスタックサイズを制御します。&lt;/li&gt;
+&lt;li&gt;ロングモードでは、&lt;code&gt;L&lt;/code&gt;が64ビットコードセグメントを示します。&lt;code&gt;D&lt;/code&gt;との無効な組み合わせは拒否されます。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;セグメンテーションは、命令の実効オフセットにディスクリプタベースを加算し、ページングの前にリミットとアクセス権を検査します。フラットな32ビットモデルでは、ベースがゼロでリミットが大きいセグメントを使用しながら、これらの検査を保持します。&lt;/p&gt;
+&lt;p&gt;64ビットモードでは、通常のアドレス生成において&lt;code&gt;CS&lt;/code&gt;、&lt;code&gt;SS&lt;/code&gt;、&lt;code&gt;DS&lt;/code&gt;、&lt;code&gt;ES&lt;/code&gt;のベースはゼロとして扱われ、レガシーのリミットは適用されません。&lt;code&gt;FS&lt;/code&gt;と&lt;code&gt;GS&lt;/code&gt;は個別に制御される64ビットベースを保持します。コードセグメントの型、&lt;code&gt;CS&lt;/code&gt;の特権、および選択された&lt;code&gt;SS&lt;/code&gt;の規則は、引き続きアーキテクチャ上重要です。&lt;/p&gt;
+&lt;h2 id="system-descriptors-and-gates"&gt;
+ システムディスクリプタとゲート
+ &lt;a href="#system-descriptors-and-gates" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;システムディスクリプタは、LDT、利用可能またはビジーなTSS、レガシーゲートを識別します。IA-32では、TSSおよびLDTディスクリプタは8バイトです。64ビットモードでは、TSSおよびLDTディスクリプタは64ビットのベースを格納できるよう16バイトを占有し、上位8バイトは次のGDTスロットを使用します。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;コールゲート&lt;/strong&gt;は、宛先コードセレクタとオフセットを指定し、同じレベルまたはより特権の高いレベルへの遠距離コールに対して検査済みの経路を提供します。レガシーコールゲートは、設定された数のパラメータを新しいスタックにコピーできます。遠距離リターンは、別の一連の検査の下で特権遷移を逆転させます。&lt;/p&gt;
+&lt;p&gt;IDTエントリは、割り込みゲート、トラップゲート、またはレガシーモードではタスクゲートにできます。割り込みゲートとトラップゲートには、ハンドラのセレクタとオフセットが含まれます。割り込みゲートはエントリ時に&lt;code&gt;IF&lt;/code&gt;をクリアし、トラップゲートは保持します。64ビットの割り込みゲートまたはトラップゲートには、緊急スタックまたは専用スタックに使用するISTセレクタも含まれます。&lt;/p&gt;
+&lt;h2 id="privilege-values"&gt;
+ 特権値と実効チェック
+ &lt;a href="#privilege-values" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;x86は、0から3までの4つの特権レベルを定義します。数値が小さいほど特権が高くなります。現在の特権レベル（&lt;code&gt;CPL&lt;/code&gt;）は&lt;code&gt;CS&lt;/code&gt;の下位2ビットで表されます。カーネルは通常CPL 0で実行され、アプリケーションはCPL 3で実行されます。リング1とリング2は存在しますが、オペレーティングシステム設計では必須ではありません。&lt;/p&gt;
+&lt;p&gt;各ディスクリプタには&lt;code&gt;DPL&lt;/code&gt;があり、各セレクタには&lt;code&gt;RPL&lt;/code&gt;があります。多くのデータアクセスでは、プロセッサは実効特権レベルを形成します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;EPL = max(CPL, RPL)&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;通常のデータセグメントへのアクセスには、型および存在状態の検査に加えて、&lt;code&gt;EPL &amp;lt;= DPL&lt;/code&gt;が必要です。数値が大きいほど特権が低いため、RPLによってセレクタの権限を意図的に下げることができます。&lt;code&gt;SS&lt;/code&gt;のロードにはより厳格な規則があり、セレクタRPLと書き込み可能なデータセグメントDPLはCPLと一致しなければなりません。&lt;/p&gt;
+&lt;p&gt;コード転送では、機構ごとに固有の規則が使用されます。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;非コンフォーミングコードセグメントへの直接の遠距離転送は、CPLを任意に下げません。そのDPLは、要求される現在の特権関係と一致しなければなりません。&lt;/li&gt;
+&lt;li&gt;コンフォーミングコードセグメントは、そのDPLが許可する場合、数値的に同じまたは低い特権のCPLからの実行を許可しますが、CPLは変化しません。この転送によって、対象DPLのデータへのアクセスが付与されることはありません。&lt;/li&gt;
+&lt;li&gt;コールゲートセレクタは、CPLとRPLを使用してゲートDPLに対して検査されます。その後、ゲートが宛先コードセグメントへのエントリを制御します。&lt;/li&gt;
+&lt;li&gt;ソフトウェア&lt;code&gt;INT n&lt;/code&gt;は、CPLに対してIDTゲートDPLを検査します。プロセッサ例外および外部割り込みは&lt;code&gt;INT n&lt;/code&gt;を介してソフトウェアが呼び出したものではないため、呼び出し元の認可検査としてゲートDPLを使用しません。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;すべての操作を単一の&lt;code&gt;CPL&lt;/code&gt;/&lt;code&gt;DPL&lt;/code&gt;比較で表すことはできません。セグメントロード、コンフォーミングコード、ゲート、タスクスイッチ、&lt;code&gt;IRET&lt;/code&gt;、ポートI/O、特権命令は、それぞれ独自の検査を定義します。&lt;/p&gt;</description></item><item><title>Kubernetes Access Control</title><link>https://example.org/ja/kubernetes-access-control/</link><pubDate>Mon, 27 Jun 2022 04:47:20 +0800</pubDate><guid>https://example.org/ja/kubernetes-access-control/</guid><description>&lt;p&gt;Kubernetes は API リクエストを認証、認可、アドミッション制御の順に処理します。認証はアイデンティティを確立し、
+認可はそのアイデンティティが操作を実行できるかを決定し、アドミッションは受け入れたオブジェクトを検証または変更できます。
+これらは別個の制御であり、個別に設定・監査すべきです。&lt;/p&gt;
+&lt;h2 id="oidc-による認証"&gt;
+ OIDC による認証
+ &lt;a href="#oidc-%e3%81%ab%e3%82%88%e3%82%8b%e8%aa%8d%e8%a8%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;OpenID Connect（OIDC）により、API サーバーは外部アイデンティティプロバイダーが発行したベアラートークンを検証できます。
+API サーバーには issuer URL、クライアント ID、任意のユーザー名・グループクレームのマッピングを設定します。
+issuer は API サーバーから到達可能であり、TLS 証明書が検証できなければなりません。&lt;/p&gt;
+&lt;p&gt;アイデンティティプロバイダーがユーザーライフサイクルと多要素認証を管理し、Kubernetes は有効なトークンからユーザー名とグループを受け取ります。
+人に共有静的トークンを使ってはいけません。&lt;code&gt;kubectl&lt;/code&gt; では承認済みの OIDC ログインプラグインまたは exec credential provider を使い、
+長期資格情報を kubeconfig ファイルに保存せず短命トークンを更新します。&lt;/p&gt;
+&lt;h2 id="rbac-による認可"&gt;
+ RBAC による認可
+ &lt;a href="#rbac-%e3%81%ab%e3%82%88%e3%82%8b%e8%aa%8d%e5%8f%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;RBAC は &lt;code&gt;Role&lt;/code&gt; と &lt;code&gt;ClusterRole&lt;/code&gt; オブジェクトを通じてリソース型に対する verb を許可し、バインディングで権限を関連付けます。
+&lt;code&gt;Role&lt;/code&gt; は名前空間スコープであり、&lt;code&gt;ClusterRole&lt;/code&gt; はクラスタースコープのアクセスを許可するか、名前空間内でバインドできます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;yaml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-yaml" data-lang="yaml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io/v1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Role&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;metadata&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;deployment-reader&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;namespace&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;rules&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; - &lt;span style="color:#f92672"&gt;apiGroups&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;apps&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;resources&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;deployments&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;verbs&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;get&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;list&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;watch&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;---
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io/v1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;RoleBinding&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;metadata&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;developers-can-read-deployments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;namespace&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;subjects&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; - &lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Group&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments-developers&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;apiGroup&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;roleRef&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Role&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;deployment-reader&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;apiGroup&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;必要な verb、リソース、名前空間、非リソース URL だけを最小範囲で許可します。厳格に管理されたプラットフォーム管理を除き、
+&lt;code&gt;cluster-admin&lt;/code&gt;、ワイルドカードの verb、ワイルドカードのリソースは避けます。提案した許可は &lt;code&gt;kubectl auth can-i&lt;/code&gt; で確認します。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,46 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring Bean 生命周期与原型作用域</title></head><body><main><article><div class=article-header><h1>Spring Bean 生命周期与原型作用域</h1><div class=aux>最后更新: 2025-11-17 23:19:46 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/dependency-injection/>Dependency-Injection</a>
+|
+<a href=/zh-cn/tags/java/>Java</a>
+|
+<a href=/zh-cn/tags/spring/>Spring</a></div></div><div class="translation-notice machine-translated"><a href=/spring-bean-lifecycle/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Spring 将 Bean 元数据与 Bean 实例分离。<code>BeanDefinition</code> 描述如何创建对象，
+而 <code>BeanFactory</code> 会在请求对象时应用该定义。<code>ApplicationContext</code> 还提供协调启动、
+后处理、事件、资源加载和关闭功能。</p><h2 id=上下文刷新期间发生的事情>上下文刷新期间发生的事情
+<a href=#%e4%b8%8a%e4%b8%8b%e6%96%87%e5%88%b7%e6%96%b0%e6%9c%9f%e9%97%b4%e5%8f%91%e7%94%9f%e7%9a%84%e4%ba%8b%e6%83%85 class=heading-anchor><span>#</span></a></h2><p><code>AbstractApplicationContext.refresh()</code> 会在应用程序单例可以使用之前准备环境和
+Bean 工厂。主要阶段如下：</p><ol><li>准备或获取 <code>BeanFactory</code> 并加载 Bean 定义。</li><li>在定义仍可修改时调用 <code>BeanFactoryPostProcessor</code>s，包括配置类处理。</li><li>发现并注册 <code>BeanPostProcessor</code>s。</li><li>初始化上下文基础设施，例如消息解析、事件和上下文特定的资源。</li><li>实例化其余的非延迟初始化单例 Bean。</li><li>发布已刷新的状态和 <code>ContextRefreshedEvent</code>。</li></ol><p><code>BeanFactoryPostProcessor</code> 修改元数据。相比之下，<code>BeanPostProcessor</code> 会处理实例，
+可以注入字段、调用生命周期注解，或将 Bean 替换为代理。由于普通应用程序 Bean
+可能会在所有后处理器注册之前被实例化，因此从工厂后处理器中创建普通应用程序 Bean
+是不安全的。</p><h2 id=依赖顺序与-depends-on>依赖顺序与 <code>depends-on</code>
+<a href=#%e4%be%9d%e8%b5%96%e9%a1%ba%e5%ba%8f%e4%b8%8e-depends-on class=heading-anchor><span>#</span></a></h2><p>容器会先创建 Bean 的构造器依赖和属性依赖，再创建依赖它的 Bean。因此，构造器注入
+同时表达了必需的关系和创建顺序：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReportService</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> ReportRepository repository;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReportService(ReportRepository repository) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>repository</span> <span style=color:#f92672>=</span> repository;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>当不存在注入关系时，例如初始化共享外部资源，<code>@DependsOn("schemaInitializer")</code>
+或 XML 中的 <code>depends-on</code> 可以添加顺序约束。对于单例 Bean，它还会反转销毁顺序：
+依赖其他 Bean 的 Bean 会先于其依赖的 Bean 被销毁。<code>depends-on</code> 会隐藏类所使用的
+依赖，因此不应替代实际的类型化依赖关系。</p><h2 id=实例初始化>实例初始化
+<a href=#%e5%ae%9e%e4%be%8b%e5%88%9d%e5%a7%8b%e5%8c%96 class=heading-anchor><span>#</span></a></h2><p>对于普通 Bean，Spring 会执行以下操作：</p><ol><li>实例化对象，通常通过调用构造器或工厂方法完成。</li><li>解析并注入属性和字段。</li><li>调用 aware 回调，包括 <code>BeanNameAware</code>、<code>BeanFactoryAware</code> 和
+<code>ApplicationContextAware</code>。</li><li>在初始化之前调用每个 <code>BeanPostProcessor</code>。</li><li>依次调用 <code>@PostConstruct</code>、<code>InitializingBean.afterPropertiesSet()</code>，
+以及配置的自定义 init 方法。</li><li>在初始化之后调用每个 <code>BeanPostProcessor</code>。</li></ol><p>Spring 基础设施通过后处理器实现该序列的部分步骤，因此自定义处理器必须遵守顺序约定。
+初始化后的处理器可能返回代理，而不是原始对象。只有在整个处理链完成后，调用方才会
+收到已准备就绪、可能经过增强的对象。</p><p>构造器注入是建立必需不变量最安全的位置。当初始化依赖注入的属性或构造器中不可用的
+容器服务时，适合使用 <code>@PostConstruct</code>。</p><h2 id=销毁与上下文关闭>销毁与上下文关闭
+<a href=#%e9%94%80%e6%af%81%e4%b8%8e%e4%b8%8a%e4%b8%8b%e6%96%87%e5%85%b3%e9%97%ad class=heading-anchor><span>#</span></a></h2><p>关闭可配置的上下文会销毁受管理的单例。对于每个 Bean，Spring 会调用 <code>@PreDestroy</code>、
+<code>DisposableBean.destroy()</code> 和配置的自定义 destroy 方法，但会遵循适配器的重复方法检查。
+<code>SmartLifecycle</code> 为需要协调关闭的组件增加了分阶段的停止回调。</p><p>应用程序应关闭手动创建的上下文，或使用 <code>registerShutdownHook()</code> 注册关闭钩子。
+Spring Boot 会在进程正常关闭的过程中关闭其应用程序上下文。进程突然终止时无法保证
+回调执行，因此持久性正确性不能仅依赖这些回调。</p><h2 id=原型的所有权>原型的所有权
+<a href=#%e5%8e%9f%e5%9e%8b%e7%9a%84%e6%89%80%e6%9c%89%e6%9d%83 class=heading-anchor><span>#</span></a></h2><p>原型作用域意味着每次容器请求都会产生一个新实例。当原型直接注入单例时，只会在创建
+单例期间解析一次；该字段会一直保留同一个原型实例。如果每次操作都需要新实例，请使用
+<code>ObjectProvider&lt;T></code>、Jakarta <code>Provider&lt;T></code>、方法注入或作用域代理。</p><p>Spring 会完整初始化原型并将其返回给调用方，但不会保留该实例，也不会在之后调用销毁回调。
+因此，所有权会转移给接收方。获取了持有文件、套接字或执行器的原型的代码必须显式关闭它。
+如果需要集中清理，自定义 <code>BeanPostProcessor</code> 可以跟踪此类实例，但显式的资源所有权更清晰。</p><h2 id=主要参考资料>主要参考资料
+<a href=#%e4%b8%bb%e8%a6%81%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html>Spring Bean 生命周期回调</a></li><li><a href=https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html>Spring Bean 作用域</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/context/support/AbstractApplicationContext.html#refresh%28%29><code>AbstractApplicationContext.refresh()</code> Javadoc</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-bean-lifecycle/ class=language-option data-lang=en>English
+</a><a href=/ja/spring-bean-lifecycle/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/spring-bean-lifecycle/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/spring-bean-lifecycle/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

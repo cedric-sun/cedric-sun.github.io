@@ -1,0 +1,42 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Load Balancing</title></head><body><main><article><div class=article-header><h1>Load Balancing</h1><div class=aux>最終更新: 2022-07-21 00:23:46 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/load-balancing/>Load-Balancing</a>
+|
+<a href=/ja/tags/networking/>Networking</a></div></div><div class="translation-notice machine-translated"><a href=/load-balancing/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>ロードバランシングは、トランスポートとアプリケーションの意味論を保ちながら、需要を健全な容量へ割り当てます。
+配置、ヘルス、再試行、過負荷ポリシーは 1 つのシステムを形成します。アルゴリズムでは、
+ヘルスチェックが誤分類したり再試行が消費したりした容量を回復できません。</p><h2 id=配置レイヤー>配置レイヤー
+<a href=#%e9%85%8d%e7%bd%ae%e3%83%ac%e3%82%a4%e3%83%a4%e3%83%bc class=heading-anchor><span>#</span></a></h2><ul><li><strong>DNS 配置</strong>はリージョンまたはサービスのアドレスを返します。リゾルバーとクライアントの
+キャッシュにより変更は粗い粒度になるため、DNS は個々の接続をドレインしたり、リクエストごとの負荷に反応したりできません。</li><li><strong>Anycast 配置</strong>は複数サイトから同じアドレスを広告し、ルーティングにパスを選ばせます。
+ルート変更によってフローが移動する可能性があり、最も近いネットワークパスがアプリケーション容量に余裕のあるサイトとは限りません。</li><li><strong>トランスポートロードバランシング</strong>は、アプリケーションリクエストを解釈せず、TCP、UDP、QUIC フローの
+メタデータからバックエンドを選択します。ダイレクトサーバーリターンと接続追跡はトポロジーと障害動作に影響します。</li><li><strong>リバースプロキシ</strong>はアプリケーションプロトコルを終端し、オーソリティ、パス、ヘッダー、メソッド、Cookie によって
+HTTP をルーティングできます。終端により再試行と可観測性が可能になりますが、プロキシ容量を消費し、別の障害ドメインを作ります。</li><li><strong>アプリケーション配置</strong>は、テナント、シャード所有権、キューのパーティション、アクセラレーターの可用性など、
+ドメイン状態を使って処理を割り当てます。アプリケーションは所有権の変更と古いルーティングメタデータを処理しなければなりません。</li></ul><p>大規模システムではレイヤーを組み合わせます。DNS または anycast がサイトを選び、L4 ロードバランサーがプロキシを選び、
+プロキシがワークロードを選びます。</p><h2 id=選択アルゴリズム>選択アルゴリズム
+<a href=#%e9%81%b8%e6%8a%9e%e3%82%a2%e3%83%ab%e3%82%b4%e3%83%aa%e3%82%ba%e3%83%a0 class=heading-anchor><span>#</span></a></h2><p>ラウンドロビンは容量とリクエストコストが似たエンドポイントに適しています。重み付きラウンドロビンは既知の容量差を反映します。
+最小接続数はアクティブ接続数を負荷信号として使いますが、長時間存続するアイドル接続や多重化された HTTP/2・HTTP/3 ストリームにより、
+接続 1 つが不正確な単位になることがあります。最小リクエスト数やレイテンシー認識型の変種には、安定した測定とダンピングが必要です。
+そうしないと、一時的に高速なエンドポイントへすべてのリクエストを送ってしまいます。</p><p>安定したキーによるハッシュはアフィニティを提供します。コンシステントハッシュまたはランデブーハッシュはメンバーシップ変更時の
+再マッピングを減らしますが、ホットキーを集中させる可能性があり、フェイルオーバーをなくすものではありません。
+局所性認識型アルゴリズムは同じゾーンまたはリージョンを優先してレイテンシーと転送コストを下げつつ、
+ローカル不足に備えてスピルオーバー容量を保持します。</p><h2 id=ヘルス外れ値ドレイン>ヘルス、外れ値、ドレイン
+<a href=#%e3%83%98%e3%83%ab%e3%82%b9%e5%a4%96%e3%82%8c%e5%80%a4%e3%83%89%e3%83%ac%e3%82%a4%e3%83%b3 class=heading-anchor><span>#</span></a></h2><p>アクティブヘルスチェックは合成プローブを送信します。パッシブチェックは実際の接続エラー、リセット、タイムアウト、ステータスコードを観測します。
+レディネスはトラフィック処理に必要な依存関係の境界を検証すべきであり、すべての一時的な下流障害を全体の除外に変えてはなりません。</p><p>フラッピングを避けるため、連続成功数と連続失敗数のしきい値を使います。外れ値検出は観測された動作がピアと異なるエンドポイントを
+一時的に除外します。共有依存関係の 1 つの障害でサービス全体が除外されないよう、除外率に上限を設けます。</p><p>ドレインは新規選択からエンドポイントを外しつつ、確立済みのリクエストや接続を期限内に完了させます。
+ロードバランサーのドレイン時間、アプリケーションのシャットダウンフック、オーケストレーションのレディネス、
+プロトコルのキープアライブ動作を調整します。</p><h2 id=アフィニティ再試行フェイルオーバー>アフィニティ、再試行、フェイルオーバー
+<a href=#%e3%82%a2%e3%83%95%e3%82%a3%e3%83%8b%e3%83%86%e3%82%a3%e5%86%8d%e8%a9%a6%e8%a1%8c%e3%83%95%e3%82%a7%e3%82%a4%e3%83%ab%e3%82%aa%e3%83%bc%e3%83%90%e3%83%bc class=heading-anchor><span>#</span></a></h2><p>Cookie、送信元アドレス、ハッシュによるアフィニティは、キャッシュ局所性を改善したり従来型のセッション状態を保持したりできます。
+アフィニティはバランシングの自由度を下げるため、選択したバックエンドが消えた場合の動作を定義する必要があります。
+リクエストに透過的なフェイルオーバーが必要なら、外部化または複製されたセッション状態を優先します。</p><p>タイムアウトは呼び出し側が結果を受け取らなかったことを意味するだけで、バックエンドが処理を行わなかった証明ではありません。
+再試行は呼び出し側の期限内かつ上限付きの再試行予算内でのみ行います。安全でべき等な操作は候補になりますが、
+非べき等操作にはアプリケーションのべき等キーと永続的な重複排除が必要です。バックオフとジッターで再試行を分散し、
+すでに飽和したピア集合へ過負荷応答を再試行しないようにします。</p><p>ゾーン間またはリージョン間のフェイルオーバーには、予約容量、互換性のあるデータ、明示的な整合性モデルが必要です。
+ルーティングの切り替えだけでは、リモートサイトを書き込み受付可能にはできません。</p><h2 id=容量と過負荷>容量と過負荷
+<a href=#%e5%ae%b9%e9%87%8f%e3%81%a8%e9%81%8e%e8%b2%a0%e8%8d%b7 class=heading-anchor><span>#</span></a></h2><p>エンドポイント数は容量ではありません。同時リクエスト数、キュー深度、制約資源の使用率、レイテンシーパーセンタイル、
+エラー、受付拒否を追跡します。オートスケーリングは測定とプロビジョニングの遅延後に反応するため、
+バーストと障害に備えて余裕を残します。</p><p>需要が容量を超えたら、キューに上限を設け、低優先度の処理を捨て、テナント単位の制限を適用し、
+プロトコルが対応する場合は明確な再試行シグナルを返します。メモリや接続プールが枯渇する前に、
+バックプレッシャーが呼び出し側へ到達する必要があります。ロードバランサーのメトリクスでは、健全なエンドポイントがない状態、
+ローカルプロキシの飽和、バックエンドの過負荷、ポリシーによる拒否を区別します。それぞれ必要な対応が異なるためです。</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc9110>RFC 9110: HTTP Semantics</a></li><li><a href=https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/overview>Envoy Load Balancing</a></li><li><a href=https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/#terminating>Kubernetes Endpoint Termination</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/load-balancing/ class=language-option data-lang=en>English
+</a><a href=/ja/load-balancing/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/load-balancing/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/load-balancing/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

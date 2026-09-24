@@ -1,0 +1,72 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>ディスクアドレッシングとパーティションテーブル</title></head><body><main><article><div class=article-header><h1>ディスクアドレッシングとパーティションテーブル</h1><div class=aux>最終更新: 2024-02-16 16:23:16 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/storage/>Storage</a>
+|
+<a href=/ja/tags/filesystem/>Filesystem</a></div></div><div class="translation-notice machine-translated"><a href=/disk-addressing-and-partition-tables/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>ディスクアドレスはセクターを識別し、パーティションテーブルは、その結果得られるアドレス
+空間を領域に分割します。ファイルシステムはそれらの領域の一部を占有しますが、別の
+フォーマット層に属します。各層を明確に区別すると、廃止されたジオメトリフィールドが
+現代の論理アドレッシングと共存できる理由を理解できます。</p><h2 id=物理-chs-ジオメトリと変換された-chs-ジオメトリ>物理 CHS ジオメトリと変換された CHS ジオメトリ
+<a href=#%e7%89%a9%e7%90%86-chs-%e3%82%b8%e3%82%aa%e3%83%a1%e3%83%88%e3%83%aa%e3%81%a8%e5%a4%89%e6%8f%9b%e3%81%95%e3%82%8c%e3%81%9f-chs-%e3%82%b8%e3%82%aa%e3%83%a1%e3%83%88%e3%83%aa class=heading-anchor><span>#</span></a></h2><p>シリンダー・ヘッド・セクター（CHS）アドレッシングは、回転ディスクを 3 つの
+座標でモデル化します。</p><ul><li><strong>シリンダー</strong>は、プラッターの各記録面にまたがる同じ半径位置のトラックを選択します。</li><li><strong>ヘッド</strong>は、記録面を選択します。</li><li><strong>セクター</strong>は、そのトラック内で番号が付けられたレコードを選択します。</li></ul><p>BIOS の <code>INT 13h</code> インターフェイスと初期の IBM PC パーティションテーブルは CHS を
+エンコードしていましたが、それぞれのフィールドは同じ規模には拡張できませんでした。
+従来の MBR エントリーは、シリンダーに 10 ビット、ヘッドに 8 ビット、1 から始まる
+セクター番号に 6 ビットを割り当てます。したがって、エンコード可能な最大ジオメトリは
+1024 シリンダー、256 ヘッド、1 トラックあたり 63 セクターです。512 バイトの
+セクターを使用する場合、これらのフィールドで表現できる容量は最大約 8.4 GB です。</p><p>実際のドライブでもゾーンビット記録、予備セクターへの再マッピング、組み込み
+コントローラーが使われるようになったため、単一の固定されたトラックあたりセクター数では
+媒体を表現できなくなりました。BIOS とドライブファームウェアは、変換されたジオメトリや
+仮想的なジオメトリを使って対応しました。その結果、古いパーティションエントリー内の
+CHS タプルは、物理トラックの位置ではなく互換性メタデータの場合があります。</p><h2 id=論理ブロックアドレッシングと容量>論理ブロックアドレッシングと容量
+<a href=#%e8%ab%96%e7%90%86%e3%83%96%e3%83%ad%e3%83%83%e3%82%af%e3%82%a2%e3%83%89%e3%83%ac%e3%83%83%e3%82%b7%e3%83%b3%e3%82%b0%e3%81%a8%e5%ae%b9%e9%87%8f class=heading-anchor><span>#</span></a></h2><p>論理ブロックアドレッシング（LBA）は、アドレス指定可能なセクターに 0 から番号を
+付けます。ホストは LBA 0、LBA 1 のように要求し、デバイスは各番号を内部媒体に
+マッピングします。容量は、論理ブロックの数とサイズから直接算出されます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>capacity in bytes = logical-block count × logical-block size</span></span></code></pre></div></div></div><p>MBR パーティションエントリーには、32 ビットの開始 LBA と 32 ビットのセクター数が
+格納されます。1 セクターが 512 バイトの場合、セクター数フィールドによって 1 つの
+パーティションは 2 TiB 弱に制限されます。4096 バイトの論理ブロックを公開する
+ドライブでは、この算術上の上限が変わりますが、従来のファームウェアやソフトウェアとの
+互換性によって別の制約が課される場合があります。LBA は CHS 変換を不要にしますが、
+LBA を格納するすべてのフィールドの幅を無制限にするわけではありません。</p><h2 id=mbr-ブートストラップとパーティションエントリー>MBR ブートストラップとパーティションエントリー
+<a href=#mbr-%e3%83%96%e3%83%bc%e3%83%88%e3%82%b9%e3%83%88%e3%83%a9%e3%83%83%e3%83%97%e3%81%a8%e3%83%91%e3%83%bc%e3%83%86%e3%82%a3%e3%82%b7%e3%83%a7%e3%83%b3%e3%82%a8%e3%83%b3%e3%83%88%e3%83%aa%e3%83%bc class=heading-anchor><span>#</span></a></h2><p>従来のレイアウトでは、マスターブートレコードは先頭の 512 バイト論理セクターを
+占有します。その一般的な構造は次のとおりです。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th style=text-align:right>オフセット</th><th style=text-align:right>サイズ</th><th>用途</th></tr></thead><tbody><tr><td style=text-align:right>0</td><td style=text-align:right>446 バイト</td><td>ブートストラップコードと実装固有のデータ</td></tr><tr><td style=text-align:right>446</td><td style=text-align:right>64 バイト</td><td>16 バイトのパーティションエントリー 4 個</td></tr><tr><td style=text-align:right>510</td><td style=text-align:right>2 バイト</td><td><code>0x55AA</code> シグネチャ</td></tr></tbody></table></div></div><p>各エントリーには、ブートインジケーター、パーティション種別バイト、開始および終了
+CHS フィールド、開始 LBA、セクター数が含まれます。BIOS ブートストラップは
+アクティブなエントリーを調べ、選択されたパーティションからコードをロードできます。
+テーブル自体はファイルシステムを定義せず、パーティションにブートコードが含まれることも
+保証しません。</p><h3 id=拡張パーティション>拡張パーティション
+<a href=#%e6%8b%a1%e5%bc%b5%e3%83%91%e3%83%bc%e3%83%86%e3%82%a3%e3%82%b7%e3%83%a7%e3%83%b3 class=heading-anchor><span>#</span></a></h3><p>4 個のエントリーでは制約が厳しかったため、MBR システムは拡張パーティション用に
+パーティション種別の値を予約しています。拡張領域には、拡張ブートレコード（EBR）が
+連結されたシーケンスとして格納されます。</p><ol><li>最初の EBR エントリーは、その EBR からの相対位置で 1 つの論理パーティションを
+記述します。</li><li>2 番目のエントリーが存在する場合は、それを含む拡張パーティションの先頭からの
+相対位置で次の EBR を指します。</li><li>リンクをたどることで、論理パーティションを列挙できます。</li></ol><p>したがって、拡張パーティションはメタデータと論理パーティションのコンテナーであり、
+追加のファイルシステムボリューム 1 個ではありません。EBR チェーン内のオフセットが
+壊れていたりループがあったりすると、ファイルシステムデータが残っていても、後続の
+パーティションが見えなくなる場合があります。</p><h3 id=ボリュームブートレコード>ボリュームブートレコード
+<a href=#%e3%83%9c%e3%83%aa%e3%83%a5%e3%83%bc%e3%83%a0%e3%83%96%e3%83%bc%e3%83%88%e3%83%ac%e3%82%b3%e3%83%bc%e3%83%89 class=heading-anchor><span>#</span></a></h3><p>BIOS ブートに使用するパーティションは、多くの場合、ボリュームブートレコード（VBR）
+から始まります。FAT の VBR は、初期マシンコードと、ボリュームを記述する BIOS
+Parameter Block を組み合わせたものです。NTFS などのブート可能なファイルシステムは、
+それぞれ独自の先頭セクターフォーマットを定義しています。MBR はパーティションの位置を
+特定し、VBR とファイルシステムメタデータはその内容を解釈します。どちらの構造も、
+もう一方の代わりにはなりません。</p><h2 id=guid-パーティションテーブル>GUID パーティションテーブル
+<a href=#guid-%e3%83%91%e3%83%bc%e3%83%86%e3%82%a3%e3%82%b7%e3%83%a7%e3%83%b3%e3%83%86%e3%83%bc%e3%83%96%e3%83%ab class=heading-anchor><span>#</span></a></h2><p>UEFI の一部として標準化された GUID パーティションテーブル（GPT）は、4 エントリーの
+配列と 32 ビットの MBR LBA を、自己記述型のレイアウトに置き換えます。一般的な
+ディスクには次の要素があります。</p><ol><li>LBA 0 の保護 MBR</li><li>LBA 1 のプライマリ GPT ヘッダー</li><li>プライマリパーティションエントリー配列</li><li>パーティションに使用可能な LBA</li><li>ディスク終端付近のバックアップパーティションエントリー配列</li><li>最後の論理ブロックにあるバックアップ GPT ヘッダー</li></ol><p>ヘッダーには、自身の LBA、代替ヘッダーの LBA、使用可能な LBA の範囲、ディスク
+GUID、エントリー配列の位置と構成、およびヘッダーとエントリー配列それぞれの CRC32
+チェックサムが記録されます。一方のコピーが破損した場合に復旧できるだけのメタデータが
+バックアップに格納されていますが、修復ソフトウェアは、有効なコピーのうち意図した
+レイアウトを反映しているものを判断する必要があります。</p><p>各パーティションエントリーには、パーティション種別 GUID、一意のパーティション GUID、
+先頭と末尾の 64 ビット LBA、属性、UTF-16LE の名前が格納されます。種別 GUID は
+パーティションの意図された役割を示し、一意の GUID は個々のパーティションを識別します。
+どちらの GUID も、存在するファイルシステムを証明するものではありません。</p><p>保護 MBR には通常、32 ビットの MBR サイズで許容される範囲まで GPT ディスクを覆う
+<code>0xEE</code> エントリーがあります。その目的は防御です。MBR のみを扱うプログラムには、
+ディスクの再パーティション化を提案させるのではなく、ディスクが使用中であると認識させます。
+ハイブリッド MBR は、選択された GPT パーティションを従来のエントリーに複製しますが、
+2 つのテーブルは乖離する可能性があり、標準の保護レイアウトではありません。</p><h2 id=アドレッシングパーティショニングファイルシステムを分離する>アドレッシング、パーティショニング、ファイルシステムを分離する
+<a href=#%e3%82%a2%e3%83%89%e3%83%ac%e3%83%83%e3%82%b7%e3%83%b3%e3%82%b0%e3%83%91%e3%83%bc%e3%83%86%e3%82%a3%e3%82%b7%e3%83%a7%e3%83%8b%e3%83%b3%e3%82%b0%e3%83%95%e3%82%a1%e3%82%a4%e3%83%ab%e3%82%b7%e3%82%b9%e3%83%86%e3%83%a0%e3%82%92%e5%88%86%e9%9b%a2%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>ストレージツールは異なる層で動作します。</p><ul><li>デバイスは、論理ブロックとそのサイズを報告します。</li><li>MBR または GPT メタデータは、それらのブロックの範囲をパーティションに割り当てます。</li><li>ファイルシステムは、割り当てられた 1 つの範囲内のブロックを、ブートレコード、
+割り当て構造、ディレクトリー、ファイルデータとして解釈します。</li></ul><p>パーティション境界を変更しても、内部のファイルシステムのサイズは変更されません。
+パーティションをフォーマットしても、その GPT エントリーは再作成されません。同様に、
+あるオフセットで見つかったファイルシステムシグネチャは、パーティションエントリーが
+削除された後も残る場合があります。安全な復旧および移行ツールは、ある層から別の層を
+推測するのではなく、3 つの層すべてを検証する必要があります。</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://uefi.org/specifications>UEFI 仕様</a></li><li><a href=https://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc>Microsoft FAT32 ファイルシステム仕様</a></li><li><a href=https://man7.org/linux/man-pages/man8/fdisk.8.html>Linux <code>fdisk(8)</code> マニュアル</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/disk-addressing-and-partition-tables/ class=language-option data-lang=en>English
+</a><a href=/ja/disk-addressing-and-partition-tables/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/disk-addressing-and-partition-tables/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/disk-addressing-and-partition-tables/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

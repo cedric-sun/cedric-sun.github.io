@@ -1,0 +1,34 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>X.509 憑證</title></head><body><main><article><div class=article-header><h1>X.509 憑證</h1><div class=aux>最後更新: 2025-04-27 23:24:38 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/cryptography/>Cryptography</a>
+|
+<a href=/zh-tw/tags/x-509/>X-509</a>
+|
+<a href=/zh-tw/tags/certificates/>Certificates</a>
+|
+<a href=/zh-tw/tags/pki/>Pki</a></div></div><div class="translation-notice machine-translated"><a href=/x-509-certificates/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>X.509 憑證透過簽發者簽章，將主體公開金鑰繫結至所宣告的主體身分。
+憑證驗證用於判定在特定通訊協定和連線中是否可以接受此繫結。
+僅解析憑證或僅驗證其簽章並不足夠。</p><h2 id=編碼與憑證結構>編碼與憑證結構
+<a href=#%e7%b7%a8%e7%a2%bc%e8%88%87%e6%86%91%e8%ad%89%e7%b5%90%e6%a7%8b class=heading-anchor><span>#</span></a></h2><p>憑證是 ASN.1 值，通常使用 DER 編碼。PEM 是 DER 物件的 Base64
+文字形式：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>-----BEGIN CERTIFICATE-----
+</span></span><span style=display:flex><span>...
+</span></span><span style=display:flex><span>-----END CERTIFICATE-----</span></span></code></pre></div></div></div><p>經簽署的 <code>tbsCertificate</code> 包含版本、由簽發者唯一指派的序號、簽發者
+辨別名稱、有效期間、主體辨別名稱、SubjectPublicKeyInfo (SPKI) 以及擴充功能。
+外層憑證還包含簽發者的簽章演算法識別碼，以及對 <code>tbsCertificate</code> 的簽章。
+簽發者公開金鑰不會以獨立憑證欄位的形式嵌入；必須透過建立通往簽發者憑證或
+信任錨點的路徑來找到它。</p><h2 id=tls-使用的擴充功能>TLS 使用的擴充功能
+<a href=#tls-%e4%bd%bf%e7%94%a8%e7%9a%84%e6%93%b4%e5%85%85%e5%8a%9f%e8%83%bd class=heading-anchor><span>#</span></a></h2><p>RFC 5280 擴充功能會限制憑證的使用方式：</p><ul><li><code>basicConstraints</code> 識別 CA 憑證和路徑長度限制。</li><li><code>keyUsage</code> 限制 <code>keyCertSign</code> 或 <code>digitalSignature</code> 等操作。</li><li><code>extendedKeyUsage</code> 可以將用途限制為伺服器驗證或用戶端驗證。</li><li><code>subjectAltName</code> 搭載用於 TLS 身分檢查的 DNS 名稱和 IP 位址。</li><li>主體金鑰識別碼和授權機構金鑰識別碼有助於路徑建立，但不能取代簽章驗證。</li></ul><p>TLS 用戶端會將要求的 DNS 名稱與 <code>subjectAltName</code> 進行比對。對於正確簽發的
+現代憑證，一般名稱不是通用的後備機制。有效時間、關鍵擴充功能、簽章演算法
+原則、基本限制和金鑰用途都會參與驗證。</p><h2 id=路徑撤銷與釘選>路徑、撤銷與釘選
+<a href=#%e8%b7%af%e5%be%91%e6%92%a4%e9%8a%b7%e8%88%87%e9%87%98%e9%81%b8 class=heading-anchor><span>#</span></a></h2><p>路徑建立會從葉憑證到本機設定的信任錨點選取一連串簽發者。路徑驗證接著會
+驗證簽章、時間、<code>basicConstraints</code>、路徑長度和名稱限制、金鑰用途、關鍵擴充
+功能，以及依賴方的演算法和原則要求。如果應用程式使用憑證原則，原則樹可以
+限制可接受的憑證原則。伺服器會傳送此程序所需的中繼憑證，但信任錨點通常由
+用戶端信任存放區提供。</p><p>CRL 和 OCSP 提供撤銷資訊，但用戶端行為會因平台和通訊協定而異。未對實際
+用戶端群體進行測試，不得聲稱能夠立即強制執行撤銷。憑證釘選會增加公開金鑰
+或憑證限制；它具有營運復原成本，因此只有在定義明確的輪替程序時才應使用。</p><p>使用 <code>openssl x509 -in cert.pem -noout -text</code> 檢查欄位。顯示的 SHA-256
+指紋是憑證位元組的摘要，用於頻外比對；它不是身分證明，也不能取代路徑驗證。</p><p>關於用於驗證憑證的 TLS 1.3 交握，請參閱
+<a href=/zh-tw/tls-1-3/>TLS 1.3</a>。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/x-509-certificates/ class=language-option data-lang=en>English
+</a><a href=/ja/x-509-certificates/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/x-509-certificates/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/x-509-certificates/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

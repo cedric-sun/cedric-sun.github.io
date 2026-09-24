@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Classloading on cesun.life</title><link>https://example.org/zh-tw/tags/classloading/</link><description>Recent content in Classloading on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sat, 25 Feb 2023 22:30:58 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/classloading/index.xml" rel="self" type="application/rss+xml"/><item><title>Java 類別載入</title><link>https://example.org/zh-tw/java-class-loading/</link><pubDate>Sat, 25 Feb 2023 22:30:58 +0800</pubDate><guid>https://example.org/zh-tw/java-class-loading/</guid><description>&lt;p&gt;類別載入會將二進位表示轉換為 &lt;code&gt;Class&lt;/code&gt; 物件。連結與初始化是分開的步驟，因此載入型別不代表其靜態初始化器已經執行。&lt;/p&gt;
+&lt;h2 id="載入器與型別識別"&gt;
+ 載入器與型別識別
+ &lt;a href="#%e8%bc%89%e5%85%a5%e5%99%a8%e8%88%87%e5%9e%8b%e5%88%a5%e8%ad%98%e5%88%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JDK 提供 bootstrap、platform 與 application 載入器。bootstrap 載入器定義核心平台類別，並在選定的 API 中以 &lt;code&gt;null&lt;/code&gt; 表示；platform 載入器定義平台模組；application 載入器從 class path 或 module path 載入應用程式類別。自訂載入器通常使用 parent-first 委派：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;重複使用已載入的定義；&lt;/li&gt;
+&lt;li&gt;要求父載入器載入二進位名稱；接著&lt;/li&gt;
+&lt;li&gt;尋找位元組並呼叫 &lt;code&gt;defineClass&lt;/code&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Parent-first 委派能保護平台型別識別。它是慣例而非絕對規則：外掛系統有時會使用 child-first 載入，並嚴格排除特定套件。執行期型別同時由其二進位名稱與定義它的載入器識別。因此，兩個載入器可以定義不同的 &lt;code&gt;com.example.Plugin&lt;/code&gt; 型別，且實例不能在兩者之間轉型。&lt;/p&gt;
+&lt;h2 id="載入連結與初始化"&gt;
+ 載入、連結與初始化
+ &lt;a href="#%e8%bc%89%e5%85%a5%e9%80%a3%e7%b5%90%e8%88%87%e5%88%9d%e5%a7%8b%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JVM 規格將生命週期區分如下：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;載入&lt;/strong&gt;取得位元組、建立 &lt;code&gt;Class&lt;/code&gt; 物件，並建立定義載入器的關聯。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;連結&lt;/strong&gt;包括驗證、準備與選擇性解析。驗證會檢查結構與型別安全限制。準備會配置靜態欄位並指派其預設值。解析會將符號參照轉換成執行期參照；實作可以延後解析。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;初始化&lt;/strong&gt;會執行合成的 &lt;code&gt;&amp;lt;clinit&amp;gt;&lt;/code&gt; 方法，其中包含靜態欄位初始化器與依原始碼順序排列的靜態區塊。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;編譯期常數會在準備階段指派，因此讀取常數變數可能避免初始化其宣告類別。不要從實作的記錄輸出推論可移植的解析排程。&lt;/p&gt;
+&lt;h2 id="確切的初始化觸發條件"&gt;
+ 確切的初始化觸發條件
+ &lt;a href="#%e7%a2%ba%e5%88%87%e7%9a%84%e5%88%9d%e5%a7%8b%e5%8c%96%e8%a7%b8%e7%99%bc%e6%a2%9d%e4%bb%b6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JLS §12.4.1 要求在類別首次被主動使用前立即初始化：建立實例、呼叫靜態方法、指派靜態欄位，或讀取不是常數變數的靜態欄位。它也包括執行需要該類別的 &lt;code&gt;static&lt;/code&gt; 斷言、選定的反射操作，以及指定的方法控制代碼行為。&lt;code&gt;Class.forName&lt;/code&gt; 預設會初始化；使用三個參數的多載並傳入 &lt;code&gt;false&lt;/code&gt;，即可在不要求初始化的情況下載入。&lt;/p&gt;
+&lt;p&gt;類別 &lt;code&gt;C&lt;/code&gt; 初始化前，其超類別會先初始化；接著在適用時，依 JLS 定義的順序初始化宣告預設方法的超介面。初始化類別不會初始化它實作的任意介面。讀取 &lt;code&gt;Child.value&lt;/code&gt; 會初始化實際宣告 &lt;code&gt;value&lt;/code&gt; 的類別，不一定是 &lt;code&gt;Child&lt;/code&gt;。&lt;/p&gt;</description></item></channel></rss>

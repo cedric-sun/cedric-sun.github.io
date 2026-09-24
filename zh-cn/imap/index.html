@@ -1,0 +1,39 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>IMAP4rev2</title></head><body><main><article><div class=article-header><h1>IMAP4rev2</h1><div class=aux>最后更新: 2021-06-05 00:21:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/email/>Email</a>
+|
+<a href=/zh-cn/tags/imap/>Imap</a>
+|
+<a href=/zh-cn/tags/protocols/>Protocols</a></div></div><div class="translation-notice machine-translated"><a href=/imap/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>IMAP 是有状态的邮件访问协议。RFC 9051 定义了 IMAP4rev2；它取代了 RFC 3501 中的
+IMAP4rev1。客户端管理服务器上的邮箱和邮件状态，从而允许多个客户端查看同一个邮箱。</p><h2 id=连接和命令>连接和命令
+<a href=#%e8%bf%9e%e6%8e%a5%e5%92%8c%e5%91%bd%e4%bb%a4 class=heading-anchor><span>#</span></a></h2><p>IMAP 是通过 TCP 传输的文本协议。端口 143 以明文开始，并可使用 <code>STARTTLS</code> 协商 TLS；
+端口 993 从建立连接时起就使用 TLS。客户端必须获取能力，先于密码身份验证协商 TLS，
+并要求验证证书和主机名。</p><p>协议状态限制了合法命令：</p><ol><li>在<strong>未身份验证</strong>状态下，客户端协商能力、TLS 和身份验证。</li><li>在<strong>已身份验证</strong>状态下，客户端可以管理和列出邮箱。</li><li>在<strong>已选择</strong>状态下，客户端已选择一个邮箱，可以获取或更改邮件状态。</li><li><code>LOGOUT</code> 进入注销状态；服务器发送未标记的 <code>BYE</code> 和标记的完成响应后，会话关闭。</li></ol><p>每个客户端命令都以客户端选择的标签开头。服务器响应可以是未标记响应（<code>*</code>）、继续请求（<code>+</code>）或标记的完成响应：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>S: * OK IMAP4rev2 ready
+</span></span><span style=display:flex><span>C: A001 CAPABILITY
+</span></span><span style=display:flex><span>S: * CAPABILITY IMAP4rev2 STARTTLS SASL-IR
+</span></span><span style=display:flex><span>S: A001 OK completed
+</span></span><span style=display:flex><span>C: A002 STARTTLS
+</span></span><span style=display:flex><span>S: A002 OK begin TLS negotiation now</span></span></code></pre></div></div></div><p>TLS 建立后，客户端再次发送 <code>CAPABILITY</code>，因为能力可能不同。当服务器和客户端支持
+SASL 身份验证机制时，应使用它们，而不是使用 <code>LOGIN</code>。</p><h2 id=邮箱和邮件>邮箱和邮件
+<a href=#%e9%82%ae%e7%ae%b1%e5%92%8c%e9%82%ae%e4%bb%b6 class=heading-anchor><span>#</span></a></h2><p>已身份验证的连接可以列出、创建、重命名、订阅和选择邮箱。<code>SELECT</code> 以读写方式打开邮箱；
+<code>EXAMINE</code> 以只读方式打开。邮件具有会随邮箱变化的序列号，并在一个 UIDVALIDITY
+周期内具有稳定的唯一标识符（UID）。持久化客户端必须使用 UID，记录 UIDVALIDITY，
+并在其变化时重新同步。</p><p>邮箱名称是协议字符串，而不是操作系统路径。使用 <code>LIST</code> 发现层级分隔符和名称，保留
+服务器提供的 UTF-8 名称，并在需要时将它们加引号或作为字面量发送。<code>INBOX</code> 不区分大小写；
+其他名称是否区分大小写取决于服务器规则。</p><p>系统标志包括 <code>\Seen</code>、<code>\Answered</code>、<code>\Flagged</code>、<code>\Deleted</code> 和 <code>\Draft</code>。客户端使用
+<code>STORE</code> 将邮件标记为已删除；<code>EXPUNGE</code> 会移除标记为 <code>\Deleted</code> 的邮件。对于可能接收
+并发邮箱更新的工作流，应避免使用序列号。</p><p><code>FETCH</code> 获取邮件属性或正文部分。<code>SEARCH</code> 返回匹配的邮件。IMAP 字面量承载不能安全地
+出现在带引号字符串中的数据；服务器可以在客户端发送同步字面量前请求继续。诸如
+<code>{4096}\r\n</code> 的字面量标记声明后续的确切八位字节数。解析器必须消耗该长度，而不能扫描
+字面量内容来查找换行符。</p><h2 id=空闲和同步>空闲和同步
+<a href=#%e7%a9%ba%e9%97%b2%e5%92%8c%e5%90%8c%e6%ad%a5 class=heading-anchor><span>#</span></a></h2><p><code>IDLE</code> 允许客户端在保持连接的同时接收未经请求的邮箱变更。客户端必须先用 <code>DONE</code>
+终止 IDLE，才能发送另一个命令。基于 UID 的同步、<code>UID FETCH</code> 和服务器能力检查可以
+避免将邮箱快照视为永久稳定。</p><p>选择邮箱期间，未标记的 <code>EXISTS</code>、<code>EXPUNGE</code>、<code>FETCH</code> 和相关响应会报告变更。清除一封
+邮件会重新编号后续序列号，因此客户端必须立即更新序列号映射，并继续使用 UID 标识持久
+状态。存储最后已知的 UID、标志、UIDVALIDITY 和相关修改状态；当双方都公布支持时，
+CONDSTORE 和 QRESYNC 等扩展可以减少传输，但回退方案必须执行正确的基于 UID 的重新扫描。</p><p>IMAP 传输邮件字节和元数据；MIME 定义邮件正文结构和传输编码。不要将 IMAP 的面向行的
+命令编码与七位打包方案混淆：IMAP 命令行使用 ASCII 语法，而字面量传输八位字节。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc9051>RFC 9051：IMAP4rev2</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc8314>RFC 8314：明文邮件访问</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/imap/ class=language-option data-lang=en>English
+</a><a href=/ja/imap/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/imap/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/imap/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

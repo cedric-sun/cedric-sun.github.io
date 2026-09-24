@@ -1,0 +1,77 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux ファイルディスクリプター</title></head><body><main><article><div class=article-header><h1>Linux ファイルディスクリプター</h1><div class=aux>最終更新: 2021-10-06 12:25:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/file-descriptors/>File-Descriptors</a>
+|
+<a href=/ja/tags/kernel/>Kernel</a>
+|
+<a href=/ja/tags/linux/>Linux</a></div></div><div class="translation-notice machine-translated"><a href=/linux-file-descriptors/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Linux は、プロセスの整数ハンドルと、開いたインスタンスの状態を保持するカーネル
+オブジェクトを分離します。この区別により、オフセットの共有、複製、継承、多くの
+ディスクリプターリークを説明できます。</p><h2 id=ディスクリプターテーブルとオープンファイル記述>ディスクリプターテーブルとオープンファイル記述
+<a href=#%e3%83%87%e3%82%a3%e3%82%b9%e3%82%af%e3%83%aa%e3%83%97%e3%82%bf%e3%83%bc%e3%83%86%e3%83%bc%e3%83%96%e3%83%ab%e3%81%a8%e3%82%aa%e3%83%bc%e3%83%97%e3%83%b3%e3%83%95%e3%82%a1%e3%82%a4%e3%83%ab%e8%a8%98%e8%bf%b0 class=heading-anchor><span>#</span></a></h2><p>ファイルディスクリプターは、呼び出し元プロセスのディスクリプターテーブルを索引付け
+する非負整数です。テーブルエントリは、Linux 内部で <code>struct file</code> によって表される
+<strong>オープンファイル記述</strong> を参照します。オープンファイル記述は次のような状態を記録します。</p><ul><li>現在のファイルオフセット。</li><li><code>O_APPEND</code> や <code>O_NONBLOCK</code> などのファイル状態フラグ。</li><li>開いたパス、アクセスモード、認証情報、ファイル操作。</li></ul><p>成功した <code>open()</code> は通常、新しいオープンファイル記述を作成し、プロセステーブルに
+参照を追加します。そのため同じパスを 2 回開くと独立したオフセットが作成されます。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>int</span> a <span style=color:#f92672>=</span> <span style=color:#a6e22e>open</span>(<span style=color:#e6db74>&#34;events.log&#34;</span>, O_RDONLY);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>int</span> b <span style=color:#f92672>=</span> <span style=color:#a6e22e>open</span>(<span style=color:#e6db74>&#34;events.log&#34;</span>, O_RDONLY); <span style=color:#75715e>/* independent description and offset */</span></span></span></code></pre></div></div></div><p>inode はファイルシステムオブジェクトを識別し、オープンファイル記述はその 1 回の
+オープンを識別します。パス名の unlink や rename は既存のディスクリプターを無効に
+しません。</p><p>ディスクリプターフラグは共有オープンファイル記述ではなくテーブルエントリに属します。
+主なディスクリプターフラグは <code>FD_CLOEXEC</code> で、<code>fcntl(fd, F_GETFD/F_SETFD)</code> で
+読み取りまたは変更します。<code>O_CLOEXEC</code>、<code>pipe2(O_CLOEXEC)</code>、<code>dup3(..., O_CLOEXEC)</code>
+などのアトミックな作成フラグを優先します。後続の <code>fcntl()</code> でフラグを設定すると、
+別スレッドの <code>fork()</code> と <code>execve()</code> との競合が起こるためです。</p><h2 id=複製forkexecve>複製、<code>fork()</code>、<code>execve()</code>
+<a href=#%e8%a4%87%e8%a3%bdforkexecve class=heading-anchor><span>#</span></a></h2><p><code>dup()</code>、<code>dup2()</code>、<code>dup3()</code> は同じオープンファイル記述を参照する別のディスクリプター
+を作成します。そのため複製されたディスクリプターはオフセットとファイル状態フラグを
+共有します。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>int</span> input <span style=color:#f92672>=</span> <span style=color:#a6e22e>open</span>(<span style=color:#e6db74>&#34;input&#34;</span>, O_RDONLY <span style=color:#f92672>|</span> O_CLOEXEC);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>int</span> stdin_copy <span style=color:#f92672>=</span> <span style=color:#a6e22e>dup</span>(input);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>read</span>(input, buf, <span style=color:#ae81ff>16</span>);      <span style=color:#75715e>/* advances the shared offset */</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>read</span>(stdin_copy, buf, <span style=color:#ae81ff>16</span>); <span style=color:#75715e>/* starts after those 16 bytes */</span></span></span></code></pre></div></div></div><p>新しいディスクリプターには独自のディスクリプターフラグがあります。特に <code>dup()</code> と
+<code>dup2()</code> は新しいディスクリプターの close-on-exec をクリアし、<code>dup3()</code> はそれを
+アトミックに設定できます。<code>dup2(oldfd, newfd)</code> は必要なら <code>newfd</code> をアトミックに
+閉じ、その番号を再利用するため、close 後に dup する競合を避けます。</p><p><code>fork()</code> 後、親と子は別々のディスクリプターテーブルを持ちますが、継承されたエントリ
+は同じオープンファイル記述を参照します。オフセットと状態フラグの変更はそれらの参照
+間で共有されます。<code>execve()</code> が成功した後、エントリに <code>FD_CLOEXEC</code> がない限り
+ディスクリプターは開いたままで、ディスクリプターテーブル自体は新しいプログラムへ
+引き継がれます。</p><p>POSIX スレッドのように共有ファイルテーブルで作成されたスレッドは同じディスクリプター
+エントリを参照します。そのため、あるスレッドでディスクリプターを閉じたり置き換えたり
+すると別のスレッドに影響し、ディスクリプター番号が直ちに再利用されることがあります。</p><h2 id=匿名パイプ>匿名パイプ
+<a href=#%e5%8c%bf%e5%90%8d%e3%83%91%e3%82%a4%e3%83%97 class=heading-anchor><span>#</span></a></h2><p><code>pipe()</code> は 1 つのカーネルバイトストリームを作成し、読み取り端と書き込み端の
+ディスクリプターを返します。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>int</span> fd[<span style=color:#ae81ff>2</span>];
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>pipe2</span>(fd, O_CLOEXEC) <span style=color:#f92672>==</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>    <span style=color:#75715e>/* handle error */</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>/* fd[0] is readable; fd[1] is writable. */</span></span></span></code></pre></div></div></div><p>通常の <code>fork()</code> パイプラインでは、各プロセスが未使用のコピーを閉じなければなりません。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>fork</span>() <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>close</span>(fd[<span style=color:#ae81ff>1</span>]);
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>consume</span>(fd[<span style=color:#ae81ff>0</span>]);
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>close</span>(fd[<span style=color:#ae81ff>0</span>]);
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>_exit</span>(<span style=color:#ae81ff>0</span>);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>close</span>(fd[<span style=color:#ae81ff>0</span>]);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>produce</span>(fd[<span style=color:#ae81ff>1</span>]);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>close</span>(fd[<span style=color:#ae81ff>1</span>]); <span style=color:#75715e>/* the reader can observe EOF after every writer closes */</span></span></span></code></pre></div></div></div><p>クローズの規律はプロトコルの一部です。</p><ul><li>空のパイプに対する <code>read()</code> は、<code>O_NONBLOCK</code> が設定されていない限り、書き込み側が
+残っている間ブロックします。</li><li><code>read()</code> が 0 を返すのは、バッファーが空で、書き込み端を参照する <strong>すべて</strong> の
+ディスクリプターが閉じた後だけです。</li><li>満杯のパイプへの <code>write()</code> はブロックするか、<code>O_NONBLOCK</code> 下では失敗または部分成功します。</li><li>すべての読み取り端が閉じた後の <code>write()</code> は <code>SIGPIPE</code> を発生させ、無視または処理
+されている場合は <code>EPIPE</code> で失敗します。</li></ul><p>パイプはバイトストリームであり、一般的なメッセージ境界を保持しません。POSIX は、
+最大 <code>PIPE_BUF</code> バイトの書き込みが他プロセスの書き込みとインターリーブしないことを
+保証します。Linux は <code>PIPE_BUF</code> を 4096 バイトと定義します。大きな書き込みは分割または
+インターリーブされる可能性があり、ノンブロッキング書き込みも部分成功するため、
+呼び出し側は戻り値を確認しなければなりません。</p><p><code>O_NONBLOCK</code> はオープンファイル記述のファイル状態フラグです。複製された 1 つの
+ディスクリプターを通じて設定すると、その記述を共有するすべてのディスクリプターで
+観測される動作が変わります。</p><h2 id=名前付きランデブーポイントとしての-fifo>名前付きランデブーポイントとしての FIFO
+<a href=#%e5%90%8d%e5%89%8d%e4%bb%98%e3%81%8d%e3%83%a9%e3%83%b3%e3%83%87%e3%83%96%e3%83%bc%e3%83%9d%e3%82%a4%e3%83%b3%e3%83%88%e3%81%a8%e3%81%97%e3%81%a6%e3%81%ae-fifo class=heading-anchor><span>#</span></a></h2><p><code>mkfifo()</code> は FIFO 型のファイルシステムエントリを作成します。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>mkfifo</span>(<span style=color:#e6db74>&#34;/run/example/events.fifo&#34;</span>, <span style=color:#ae81ff>0600</span>) <span style=color:#f92672>==</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span> <span style=color:#f92672>&amp;&amp;</span> errno <span style=color:#f92672>!=</span> EEXIST)
+</span></span><span style=display:flex><span>    <span style=color:#75715e>/* handle error */</span>;</span></span></code></pre></div></div></div><p>ディレクトリエントリはストリーム内容を保存しません。FIFO が開いている間、カーネルは
+パイプオブジェクトを維持し、プロセスはパス名を開いてそこへ到達します。開いた後の
+読み取り、書き込み、アトミック性、EOF、<code>SIGPIPE</code> はパイプのセマンティクスに従います。</p><p>オープンはランデブー動作を提供します。</p><ul><li>ブロッキングする <code>open(path, O_RDONLY)</code> は書き込み側を待ちます。</li><li>ブロッキングする <code>open(path, O_WRONLY)</code> は読み取り側を待ちます。</li><li>ノンブロッキングの読み取り専用オープンは書き込み側なしで成功します。書き込み側が
+ない間の読み取りは 0 を返し、書き込み側があるがデータがない場合は <code>EAGAIN</code> を返します。</li><li>ノンブロッキングの書き込み専用オープンは、読み取り側が FIFO を開くまで <code>ENXIO</code> で失敗します。</li></ul><p>Linux では相手がいなくても <code>O_RDWR</code> で FIFO を開けますが、POSIX はこの動作を未定義
+としています。両端を開いたままにすると EOF が抑制されたり自己デッドロックが生じたり
+するため、移植可能なプロトコルでは読み取り側と書き込み側の役割を明示します。</p><p>FIFO 名はチェックと <code>open()</code> の間に置き換えられる可能性があるため、管理された
+ディレクトリに置き、信頼境界で必要な場合は所有者と型を検証し、check-then-open の
+認可ロジックを避けます。</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://man7.org/linux/man-pages/man2/open.2.html>Linux man-pages: <code>open(2)</code></a></li><li><a href=https://man7.org/linux/man-pages/man2/dup.2.html>Linux man-pages: <code>dup(2)</code></a></li><li><a href=https://man7.org/linux/man-pages/man7/pipe.7.html>Linux man-pages: <code>pipe(7)</code></a></li><li><a href=https://man7.org/linux/man-pages/man7/fifo.7.html>Linux man-pages: <code>fifo(7)</code></a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-file-descriptors/ class=language-option data-lang=en>English
+</a><a href=/ja/linux-file-descriptors/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/linux-file-descriptors/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/linux-file-descriptors/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

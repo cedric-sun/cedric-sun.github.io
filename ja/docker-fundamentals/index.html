@@ -1,0 +1,99 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Docker の基礎</title></head><body><main><article><div class=article-header><h1>Docker の基礎</h1><div class=aux>最終更新: 2022-01-28 15:44:22 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/containers/>Containers</a>
+|
+<a href=/ja/tags/docker/>Docker</a></div></div><div class="translation-notice machine-translated"><a href=/docker-fundamentals/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Docker は、ホストのカーネル、CPU ISA、x86-64 の <code>syscall</code> に依存するコンテナシステムです。
+Docker コンテナ内で動作するアプリケーションは、コンテナ化されているといいます。</p><h2 id=コンポーネントの概要>コンポーネントの概要
+<a href=#%e3%82%b3%e3%83%b3%e3%83%9d%e3%83%bc%e3%83%8d%e3%83%b3%e3%83%88%e3%81%ae%e6%a6%82%e8%a6%81 class=heading-anchor><span>#</span></a></h2><h3 id=docker-enginedockerd>Docker Engine：<code>dockerd</code>
+<a href=#docker-enginedockerd class=heading-anchor><span>#</span></a></h3><p><code>dockerd</code> は、ローカルシステムにインストールされたコンテナを管理する CLI デーモンプログラムです。
+<em>Docker Engine</em> または Docker CE（Community Edition）という名称で提供されており、オープンソースかつ無料です。</p><p><code>dockerd</code> デーモンは、クライアントからの接続を UNIX ドメインソケット <code>/var/run/docker.sock</code> で待ち受けます。
+ソケット接続を確立して HTTP リクエストを送信するには、Docker クライアントを実行するユーザーがこのソケットファイルを読み取れる必要があります。
+Linux ディストリビューションのパッケージマネージャーから Docker Engine をインストールした場合、このソケットファイルを読み取れるのは <code>root</code> または
+<code>docker</code> など Docker 専用のユーザーグループだけである可能性があります。
+自身をそのユーザーグループに追加するか、<code>docker</code> クライアントを使用するたびに <code>root</code> になる方法を選択できます。
+<code>dockerd</code> が実行中で、クライアントに権限があるかどうかは <code>docker info</code> で確認します。</p><p><code>dockerd</code> デーモンは、任意のプログラムから利用できるコンテナ管理用 HTTP API を公開します。
+公式クライアントプログラムは <code>docker</code> CLI です。</p><h3 id=docker-desktop>Docker Desktop
+<a href=#docker-desktop class=heading-anchor><span>#</span></a></h3><p>Docker Desktop は <code>dockerd</code> と通信し、コンテナを管理するプロプライエタリな GUI クライアントプログラムです。
+Docker Desktop アプリケーションの使用は必須ではありません。</p><h3 id=docker-compose>Docker Compose
+<a href=#docker-compose class=heading-anchor><span>#</span></a></h3><p><a href=https://docs.docker.com/compose/>https://docs.docker.com/compose/</a></p><p>Docker Compose は、<code>dockerd</code> と通信する別の CLI クライアントです。実行ファイルは <code>docker-compose</code> です。
+毎回多数の <code>docker run</code> オプションを入力する代わりに、<code>docker-compose.yml</code> ファイルでコンテナのプロパティを指定します。
+頻繁に使用するサービスや、複雑な設定を持つサービスを繰り返し構築する場合に役立ちます。</p><h2 id=イメージ>イメージ
+<a href=#%e3%82%a4%e3%83%a1%e3%83%bc%e3%82%b8 class=heading-anchor><span>#</span></a></h2><p>Docker イメージはファイルシステム内容のレイヤーで構成され、各レイヤーが前のレイヤーにファイルを追加します。
+あるイメージの最初のレイヤーが別のイメージの全レイヤーに依存する場合、そのイメージは別のイメージをベースにしているといいます。</p><p>イメージには、人間が読める名前 <code>REPOSITORY</code> と、人間が読める <code>TAG</code>（一般にはバージョン番号ですが必須ではありません）があります。
+<code>IMAGE ID</code> と呼ばれる SHA256 ハッシュがイメージを一意に識別します。</p><p>独自のイメージをビルドするには、イメージ作成に必要な手順を単純な構文で定義した <code>Dockerfile</code> を作成します。
+<em>Dockerfile の各命令は、イメージ内にレイヤーを作成します。</em>
+Dockerfile を変更してイメージを再ビルドする場合、変更されたレイヤーだけが再ビルドされます。</p><p>たとえば、<code>esolang/vim:latest</code> イメージには 10 個のレイヤーが含まれます。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># $ Docker Pull Esolang/vim</span>
+</span></span><span style=display:flex><span>Using default tag: latest
+</span></span><span style=display:flex><span>latest: Pulling from esolang/vim
+</span></span><span style=display:flex><span>4abcf2066143: Downloading  2.951MB/3.409MB
+</span></span><span style=display:flex><span>e7609a7fad9e: Download complete
+</span></span><span style=display:flex><span>a891a2921638: Download complete
+</span></span><span style=display:flex><span>6ea6322cdcb0: Download complete
+</span></span><span style=display:flex><span>729f825b6ae6: Download complete
+</span></span><span style=display:flex><span>e6cb43f5f474: Downloading  2.618MB/31.24MB
+</span></span><span style=display:flex><span>c12ed1c2e19b: Download complete
+</span></span><span style=display:flex><span>6928286dd6f6: Download complete
+</span></span><span style=display:flex><span>05de04103836: Download complete
+</span></span><span style=display:flex><span>b5a8264627eb: Download complete</span></span></code></pre></div></div></div><p>Docker はビルド済みイメージ内に <code>Dockerfile</code> を保存しないため、イメージのビルド方法を確認するのはやや困難です。</p><p>コンテナを実行し、変更を加え、その結果をコミットすることでもイメージを作成できるためです。
+実際、<code>Dockerfile</code> は、この実行、変更、コミットのプロセスを自動化するスクリプトと考えられます。</p><h3 id=最小イメージ>最小イメージ
+<a href=#%e6%9c%80%e5%b0%8f%e3%82%a4%e3%83%a1%e3%83%bc%e3%82%b8 class=heading-anchor><span>#</span></a></h3><p>ベースイメージもファイルシステム内容も持たない、最小限の Hello World 実行ファイルだけを含む Docker イメージをビルドします。</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#75715e>; linux_syscall call_no, arg0, arg1, arg2, arg3, arg4, arg5
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>%</span><span style=color:#a6e22e>macro</span> <span style=color:#66d9ef>linux_syscall</span> <span style=color:#ae81ff>1</span>-<span style=color:#ae81ff>7</span> <span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rax</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rdi</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rsi</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>3</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rdx</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>4</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r10</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>5</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r8</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>6</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r9</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>7</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>syscall</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>%</span><span style=color:#a6e22e>endmacro</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>SECTION</span> <span style=color:#66d9ef>.data</span>
+</span></span><span style=display:flex><span>msg:    <span style=color:#a6e22e>db</span> <span style=color:#960050;background-color:#1e0010>`</span><span style=color:#66d9ef>hello</span> <span style=color:#66d9ef>world</span><span style=color:#960050;background-color:#1e0010>\</span><span style=color:#66d9ef>n</span><span style=color:#960050;background-color:#1e0010>`</span>
+</span></span><span style=display:flex><span>msglen: <span style=color:#a6e22e>equ</span> <span style=color:#66d9ef>$-msg</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>GLOBAL</span> <span style=color:#66d9ef>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>SECTION</span> <span style=color:#66d9ef>.text</span>
+</span></span><span style=display:flex><span>main:
+</span></span><span style=display:flex><span>    <span style=color:#75715e>; write to stdout a string
+</span></span></span><span style=display:flex><span>    <span style=color:#a6e22e>linux_syscall</span> <span style=color:#ae81ff>1</span>,<span style=color:#ae81ff>1</span>,<span style=color:#66d9ef>msg</span>,<span style=color:#66d9ef>msglen</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>; exit the process with code 42
+</span></span></span><span style=display:flex><span>    <span style=color:#a6e22e>linux_syscall</span> <span style=color:#ae81ff>0x3c</span>, <span style=color:#ae81ff>42</span></span></span></code></pre></div></div></div><p><code>make</code> で実行ファイルをビルドします。</p><div class=jose-wrapper><div class=jose-tools><span>Makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Makefile data-lang=Makefile><span style=display:flex><span><span style=color:#a6e22e>main</span><span style=color:#f92672>:</span> main.o
+</span></span><span style=display:flex><span>	<span style=color:#75715e># -N: don&#39;t align data segment on a new memory page, thus makes the executable as small as possible</span>
+</span></span><span style=display:flex><span>	ld -N -e manbaout -omain main.o
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>main.o</span><span style=color:#f92672>:</span> main.asm
+</span></span><span style=display:flex><span>	nasm -f elf64 -o main.o main.asm
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>clean</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>	rm *.o main
+</span></span></code></pre></div></div></div><p>次の Dockerfile でイメージをビルドします。</p><div class=jose-wrapper><div class=jose-tools><span>Dockerfile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Dockerfile data-lang=Dockerfile><span style=display:flex><span>FROM    scratch<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>ADD</span>     main    /</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker build -t foo .</span></span></code></pre></div></div></div><p>筆者の環境では、これにより 904 バイト（<code>docker image ls</code> の表示値）の Docker イメージが作成されます。
+そのイメージからコンテナを実行します。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker run foo ./main</span></span></code></pre></div></div></div><h2 id=コンテナ>コンテナ
+<a href=#%e3%82%b3%e3%83%b3%e3%83%86%e3%83%8a class=heading-anchor><span>#</span></a></h2><p>コンテナは、実行中のイメージインスタンスです。コンテナのライフサイクルは <code>docker container create &lt;image></code> コマンドで始まり、その後 <code>docker start &lt;container></code> を実行します。<code>docker run &lt;image></code> はこの両方を実行するショートカットであり、<code>&lt;image></code> がローカルに存在しない場合は、設定済みレジストリ（デフォルトは Docker Hub）からのイメージダウンロードも行います。<code>docker run</code> は、指定されたイメージから常に新しいコンテナを作成して起動します。</p><p>既存の非アクティブなコンテナ（終了済みまたは一時停止中）を使用するには、再度 <code>docker start</code> を使用します。</p><p>任意の時点で、Docker コンテナは次の 6 状態のいずれかにあります。</p><ol><li>created：コンテナは作成後一度も起動されておらず、そのままの状態</li><li>running：ENTRYPOINT プロセスが実行中（厳密には、そのプロセスに対する <code>wait(2)</code> がブロックする状態）</li><li>Restarting：</li><li>Exited(num)：ENTRYPOINT プロセスが num で終了した状態</li><li>Paused：</li><li>Dead：</li></ol><h2 id=dockerfile>Dockerfile
+<a href=#dockerfile class=heading-anchor><span>#</span></a></h2><p>Dockerfile には 17 個の命令だけが定義されています。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>名前</th><th></th></tr></thead><tbody><tr><td>ADD</td><td>ローカルまたはリモートのファイルとディレクトリを追加する。</td></tr><tr><td>ARG</td><td>ビルド時変数を使用する。</td></tr><tr><td>CMD</td><td>デフォルトコマンドを指定する。</td></tr><tr><td>COPY</td><td>ファイルとディレクトリをコピーする。</td></tr><tr><td>ENTRYPOINT</td><td>デフォルトの実行ファイルを指定する。</td></tr><tr><td>ENV</td><td>環境変数を設定する。</td></tr><tr><td>EXPOSE</td><td>アプリケーションが待ち受けるポートを記述する。</td></tr><tr><td>FROM</td><td>ベースイメージから新しいビルドステージを作成する。</td></tr><tr><td>HEALTHCHECK</td><td>起動時にコンテナの正常性を確認する。</td></tr><tr><td>LABEL</td><td>イメージにメタデータを追加する。</td></tr><tr><td>MAINTAINER</td><td>イメージの作成者を指定する。</td></tr><tr><td>ONBUILD</td><td>イメージがビルドに使用されるときの命令を指定する。</td></tr><tr><td>RUN</td><td>ビルドコマンドを実行する。</td></tr><tr><td>SHELL</td><td>イメージのデフォルトシェルを設定する。</td></tr><tr><td>STOPSIGNAL</td><td>コンテナ終了時のシステムコールシグナルを指定する。</td></tr><tr><td>USER</td><td>ユーザー ID とグループ ID を設定する。</td></tr><tr><td>VOLUME</td><td>ボリュームマウントを作成する。</td></tr><tr><td>WORKDIR</td><td>作業ディレクトリを変更する。</td></tr></tbody></table></div></div><p>結果のイメージに永続化されるレイヤーを作成する命令は、RUN、COPY、ADD だけです。</p><p>大半の命令は、<code>docker image build</code> コマンドが静的なイメージに新しいレイヤーを追加する方法を指定します。</p><ul><li>例外は <code>RUN</code> コマンドで、ビルド時に外部コマンドを直ちに実行します。</li></ul><p><code>docker image build</code> の実行時に即座に実行される命令と、作成したイメージからコンテナを
+インスタンス化した後の Docker の動作を指定する命令を区別することが重要です。</p><h2 id=cli-チートシート>CLI チートシート
+<a href=#cli-%e3%83%81%e3%83%bc%e3%83%88%e3%82%b7%e3%83%bc%e3%83%88 class=heading-anchor><span>#</span></a></h2><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># Show Active Container</span>
+</span></span><span style=display:flex><span>docker container ls
+</span></span><span style=display:flex><span><span style=color:#75715e># Show All Container Includes Dead One</span>
+</span></span><span style=display:flex><span>docker container ls -a
+</span></span><span style=display:flex><span><span style=color:#75715e># Stop Certain Containers</span>
+</span></span><span style=display:flex><span>docker stop &lt;cid1&gt; &lt;cid2&gt; ...
+</span></span><span style=display:flex><span><span style=color:#75715e># Stop All Active Containers</span>
+</span></span><span style=display:flex><span>docker stop <span style=color:#66d9ef>$(</span>docker container ls –aq<span style=color:#66d9ef>)</span></span></span></code></pre></div></div></div></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/docker-fundamentals/ class=language-option data-lang=en>English
+</a><a href=/ja/docker-fundamentals/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/docker-fundamentals/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/docker-fundamentals/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

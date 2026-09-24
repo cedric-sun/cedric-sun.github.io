@@ -1,0 +1,93 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>x86 および x86-64 向け NASM</title></head><body><main><article><div class=article-header><h1>x86 および x86-64 向け NASM</h1><div class=aux>最終更新: 2025-01-13 21:14:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/nasm/>Nasm</a>
+|
+<a href=/ja/tags/assembly/>Assembly</a>
+|
+<a href=/ja/tags/x86/>X86</a></div></div><div class="translation-notice machine-translated"><a href=/nasm/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>NASM は Intel 構文の x86 アセンブリを、フラットバイナリまたはオブジェクトファイルに変換します。
+フラットバイナリには出力されたバイト列が含まれますが、標準的な再配置情報やシンボルの
+メタデータは含まれません。ELF、Mach-O、COFF などのオブジェクトファイルは、セクション、
+シンボル、再配置情報を保持するため、リンカーはほかのオブジェクトやライブラリと結合できます。</p><h2 id=セクションラベルシンボル>セクション、ラベル、シンボル
+<a href=#%e3%82%bb%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3%e3%83%a9%e3%83%99%e3%83%ab%e3%82%b7%e3%83%b3%e3%83%9c%e3%83%ab class=heading-anchor><span>#</span></a></h2><p>オブジェクトファイル用のソースでは、通常、実行可能コード、初期化済みデータ、
+ゼロ初期化されるストレージを分けます。</p><div class=jose-wrapper><div class=jose-tools><span>nasm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-nasm data-lang=nasm><span style=display:flex><span><span style=color:#66d9ef>global</span> add_one
+</span></span><span style=display:flex><span><span style=color:#66d9ef>extern</span> external_value
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>section</span> .text
+</span></span><span style=display:flex><span>add_one:
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> eax, edi
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>add</span> eax, <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>ret</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>section</span> .rodata
+</span></span><span style=display:flex><span>message: <span style=color:#66d9ef>db</span> <span style=color:#e6db74>&#34;hello&#34;</span>, <span style=color:#ae81ff>10</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>message_size</span><span style=color:#66d9ef> equ</span> <span style=color:#66d9ef>$</span> <span style=color:#f92672>-</span> message
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>section</span> .bss
+</span></span><span style=display:flex><span>scratch: <span style=color:#66d9ef>resq</span> <span style=color:#ae81ff>8</span></span></span></code></pre></div></div></div><p>ラベルは現在のアセンブリ位置を定義します。<code>GLOBAL</code> はシンボルをリンカーへ公開し、
+<code>EXTERN</code> は別のオブジェクトで定義される必要があるシンボルを宣言します。<code>.</code> で始まる
+ローカルラベルのスコープは、直前の非ローカルラベルです。セクション名と属性は出力形式に
+依存します。<code>.text</code>、<code>.rodata</code>、<code>.data</code>、<code>.bss</code> は ELF の慣例であり、NASM に普遍的な
+キーワードではありません。</p><p><code>-f bin</code> で選択するフラットバイナリには、仮想アドレスを割り当てるリンカーがありません。
+<code>ORG</code> はアドレス計算に使用する起点を変更しますが、パディングを挿入することも、
+そのアドレスへバイト列をロードすることもありません。ブートセクター、ファームウェア、
+組み込みイメージでは、独自にレイアウトと充填要件を定める必要があります。</p><h2 id=実効アドレスと位置独立性>実効アドレスと位置独立性
+<a href=#%e5%ae%9f%e5%8a%b9%e3%82%a2%e3%83%89%e3%83%ac%e3%82%b9%e3%81%a8%e4%bd%8d%e7%bd%ae%e7%8b%ac%e7%ab%8b%e6%80%a7 class=heading-anchor><span>#</span></a></h2><p>NASM ではデスティネーションオペランドを先に記述します。角括弧はメモリの実効アドレスを
+表します。</p><div class=jose-wrapper><div class=jose-tools><span>nasm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-nasm data-lang=nasm><span style=display:flex><span><span style=color:#a6e22e>mov</span> rax, value          <span style=color:#75715e>; address/immediate determined by relocation rules</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>mov</span> rbx, [value]        <span style=color:#75715e>; load from memory</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>mov</span> ecx, [base <span style=color:#f92672>+</span> index<span style=color:#f92672>*</span><span style=color:#ae81ff>4</span> <span style=color:#f92672>+</span> <span style=color:#ae81ff>8</span>]
+</span></span><span style=display:flex><span><span style=color:#a6e22e>lea</span> rdx, [base <span style=color:#f92672>+</span> index<span style=color:#f92672>*</span><span style=color:#ae81ff>4</span> <span style=color:#f92672>+</span> <span style=color:#ae81ff>8</span>]  <span style=color:#75715e>; calculate address; do not load</span></span></span></code></pre></div></div></div><p>x86 のアドレッシングでは、モード固有のエンコード規則に従って、ベース、1、2、4、8 の
+いずれかを乗じたインデックス、ディスプレースメントを使用できます。メモリオペランドの
+サイズをレジスターから判定できない場合、<code>byte</code>、<code>dword</code>、<code>qword</code> などの修飾子を
+明示する必要があります。</p><p><code>BITS 16</code>、<code>BITS 32</code>、<code>BITS 64</code> は、対象となる命令エンコードモードを選択します。
+実行時にプロセッサーのモードを切り替えるものではありません。オブジェクト形式では適切な
+デフォルトが設定されます。<code>-f bin</code> のデフォルトは 16 ビットモードであるため、フラットな
+32 ビットまたは 64 ビットコードではモードを明記する必要があります。</p><p>64 ビットモードでは、<code>DEFAULT REL</code> により、レジスターを使用しないメモリ参照が、
+<code>ABS</code> で上書きされない限り RIP 相対になります。<code>FS</code> と <code>GS</code> のオーバーライドには、
+NASM の文書に記載された特別なデフォルトがあります。RIP 相対参照は ±2 GiB 以内の
+コードまたは静的データへ到達でき、位置独立コードに有用です。位置独立性は、オブジェクト
+形式、再配置タイプ、コードモデル、シンボルの可視性、リンカーにも依存します。
+<code>DEFAULT REL</code> だけでは、任意の外部シンボルや絶対アドレスの使用を位置独立にできません。</p><h2 id=データの定義予約アラインメント>データの定義、予約、アラインメント
+<a href=#%e3%83%87%e3%83%bc%e3%82%bf%e3%81%ae%e5%ae%9a%e7%be%a9%e4%ba%88%e7%b4%84%e3%82%a2%e3%83%a9%e3%82%a4%e3%83%b3%e3%83%a1%e3%83%b3%e3%83%88 class=heading-anchor><span>#</span></a></h2><p><code>DB</code>、<code>DW</code>、<code>DD</code>、<code>DQ</code>、<code>DT</code>、<code>DO</code>、<code>DY</code>、<code>DZ</code> は、順にサイズが大きくなる
+初期化済みの値を出力します。一般的な定義を次に示します。</p><div class=jose-wrapper><div class=jose-tools><span>nasm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-nasm data-lang=nasm><span style=display:flex><span>bytes:  <span style=color:#66d9ef>db</span> <span style=color:#ae81ff>0x7f</span>, <span style=color:#e6db74>&#34;NASM&#34;</span>, <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>words:  <span style=color:#66d9ef>dw</span> <span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>2</span>, <span style=color:#ae81ff>3</span>
+</span></span><span style=display:flex><span>value:  <span style=color:#66d9ef>dq</span> <span style=color:#ae81ff>42</span>
+</span></span><span style=display:flex><span>table:  <span style=color:#66d9ef>times</span> <span style=color:#ae81ff>16</span> dd <span style=color:#ae81ff>0</span></span></span></code></pre></div></div></div><p><code>RESB</code>、<code>RESW</code>、<code>RESD</code>、<code>RESQ</code> は、それらをサポートするセクションで未初期化
+ストレージを予約します。<code>EQU</code> はアセンブル時の定数を定義し、<code>$</code> は現在位置を表します。
+BSS のようなセクションは初期化済みの内容ではなくサイズを記録するため、予約によって
+オブジェクトファイルに必ずしもバイトが追加されるわけではありません。</p><p><code>ALIGN n</code> は指定された境界まで位置を進め、引数と現在のセクションに従って間隙を
+埋められます。オブジェクト内のアラインメントはセクションのアラインメントとリンカーの
+配置にも依存するため、アラインメントが不足したセクション内でオフセットだけを整列させても
+不十分です。セクション全体でより強い保証が必要な場合は、<code>SECTION ... align=n</code> または
+形式固有の仕組みを使用してください。</p><h2 id=プリプロセッサーマクロとインクルード>プリプロセッサーマクロとインクルード
+<a href=#%e3%83%97%e3%83%aa%e3%83%97%e3%83%ad%e3%82%bb%e3%83%83%e3%82%b5%e3%83%bc%e3%83%9e%e3%82%af%e3%83%ad%e3%81%a8%e3%82%a4%e3%83%b3%e3%82%af%e3%83%ab%e3%83%bc%e3%83%89 class=heading-anchor><span>#</span></a></h2><p>NASM はアセンブル前にトークンベースのプリプロセッサーを実行します。</p><ul><li><code>%define</code> と <code>%xdefine</code> は、展開のタイミングが異なる単一行マクロを定義します。</li><li><code>%macro</code> と <code>%endmacro</code> は複数行マクロを定義し、<code>%1</code>、<code>%2</code> などは位置引数を
+表します。</li><li><code>%if</code>、<code>%ifdef</code>、<code>%elif</code>、<code>%endif</code> はソースを条件に応じて選択します。</li><li><code>%include</code> は別のソースファイルを読み込み、<code>-I</code> はインクルード検索パスを追加します。</li><li><code>%assign</code> は数値のプリプロセッサー変数を保持します。</li></ul><div class=jose-wrapper><div class=jose-tools><span>nasm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-nasm data-lang=nasm><span style=display:flex><span><span style=color:#75715e>%ifndef WORD_SIZE
+</span></span></span><span style=display:flex><span><span style=color:#75715e>    %define WORD_SIZE 8
+</span></span></span><span style=display:flex><span><span style=color:#75715e>%endif
+</span></span></span><span style=display:flex><span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>%macro save_pair 2
+</span></span></span><span style=display:flex><span>    <span style=color:#a6e22e>push</span> <span style=color:#f92672>%</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>push</span> <span style=color:#f92672>%</span><span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>%endmacro</span></span></span></code></pre></div></div></div><p>マクロが生成するのはソースであり、呼び出し可能なルーチンではありません。マクロはコードを
+複製したり、名前を捕捉したり、予想外の診断を発生させたりすることがあるため、その展開を
+調べる際にはリスティング（<code>-l file.lst</code>）と逆アセンブルが役立ちます。共有マクロファイルが
+複数回インクルードされた場合、インクルードガードは多重定義を防ぎます。</p><h2 id=abi-に合わせたアセンブルとリンク>ABI に合わせたアセンブルとリンク
+<a href=#abi-%e3%81%ab%e5%90%88%e3%82%8f%e3%81%9b%e3%81%9f%e3%82%a2%e3%82%bb%e3%83%b3%e3%83%96%e3%83%ab%e3%81%a8%e3%83%aa%e3%83%b3%e3%82%af class=heading-anchor><span>#</span></a></h2><p>出力形式と ABI は別個の選択です。64 ビット Linux System V を対象とする場合は、
+次のように実行します。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>nasm -f elf64 -g -F dwarf -o add_one.o add_one.asm
+</span></span><span style=display:flex><span>cc -o demo main.c add_one.o</span></span></code></pre></div></div></div><p>32 ビット Linux を対象とする場合は、<code>-f elf32</code> と、<code>cc -m32</code> など必要な 32 ビット
+ランタイム向けに構成されたリンカーまたはコンパイラーを使用します。Windows x64 では
+<code>win64</code> と Microsoft x64 呼び出し規約を使用し、macOS では <code>macho64</code> と Mach-O の
+シンボル規則を使用します。これらの形式間でオブジェクトファイルに互換性はありません。</p><p>手書きの関数は、対象 ABI の引数レジスター、スタックアラインメント、戻り値、保存対象
+レジスター、アンワインドメタデータ、シンボル命名規則を実装する必要があります。Linux の
+<code>syscall</code> シーケンスは、ユーザー空間の関数 ABI ではなくカーネルのシステムコール ABI に
+従います。C または C++ ランタイムの起動処理、デフォルトライブラリ、位置独立実行可能
+ファイルのポリシー、プラットフォーム固有のリンカーオプションが必要な場合は、
+コンパイラードライバーを使用してリンクしてください。</p><p>NASM の<a href=https://www.nasm.us/doc/>現行マニュアル</a>では、ディレクティブと形式固有の
+動作を定義しています。アセンブラーの範囲外にある規約は、オペレーティングシステムの
+ABI とプロセッサーのマニュアルで定義されています。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/nasm/ class=language-option data-lang=en>English
+</a><a href=/ja/nasm/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/nasm/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/nasm/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

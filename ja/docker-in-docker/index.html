@@ -1,0 +1,33 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Docker-in-Docker</title></head><body><main><article><div class=article-header><h1>Docker-in-Docker</h1><div class=aux>最終更新: 2022-09-14 14:25:00 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/ci-cd/>Ci-Cd</a>
+|
+<a href=/ja/tags/containers/>Containers</a>
+|
+<a href=/ja/tags/docker/>Docker</a></div></div><div class="translation-notice machine-translated"><a href=/docker-in-docker/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Docker-in-Docker（DinD）はコンテナ内で Docker デーモンを実行します。イメージをビルドまたはテストする使い捨て CI ジョブには有用な場合がありますが、
+特権カーネルアクセス、入れ子になったストレージ、キャッシュの複雑さが加わります。<code>docker</code> を呼び出すすべてのジョブで既定の選択にすべきではありません。</p><h2 id=適切なビルドモデルの選択>適切なビルドモデルの選択
+<a href=#%e9%81%a9%e5%88%87%e3%81%aa%e3%83%93%e3%83%ab%e3%83%89%e3%83%a2%e3%83%87%e3%83%ab%e3%81%ae%e9%81%b8%e6%8a%9e class=heading-anchor><span>#</span></a></h2><p>一般的なモデルは 3 つあります。</p><ol><li><strong>DinD:</strong> 専用デーモンがジョブのネットワーク名前空間で動作します。ホストデーモンから分離できますが、通常は特権モードが必要です。</li><li><strong>Docker-outside-of-Docker:</strong> ジョブがホストの Docker ソケットをマウントします。単純で高速ですが、ソケットを使えるプロセスはホストの Docker デーモンを制御できます。</li><li><strong>デーモンレスビルダー:</strong> BuildKit、Kaniko、Buildah、またはマネージドビルダーが、汎用ホストデーモンを公開せずに OCI イメージを作成します。</li></ol><p>ビルドを支えられる中で最小権限の選択肢を使います。rootless BuildKit またはリモート BuildKit ビルダーなら、
+CI ジョブにランナーの Docker ソケットへのアクセスを与えず、キャッシュ効率を維持できます。</p><h2 id=tls-付き-dind-サービスの実行>TLS 付き DinD サービスの実行
+<a href=#tls-%e4%bb%98%e3%81%8d-dind-%e3%82%b5%e3%83%bc%e3%83%93%e3%82%b9%e3%81%ae%e5%ae%9f%e8%a1%8c class=heading-anchor><span>#</span></a></h2><p>公式の <code>docker:dind</code> イメージは <code>dockerd</code> を起動し、独立した Docker CLI コンテナまたは CI ジョブと組み合わせて使うことを想定しています。
+デーモンを隔離ネットワークに置き、TCP リスナーには TLS を使います。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker network create ci-build
+</span></span><span style=display:flex><span>docker volume create dind-certs
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>docker run -d --name dind --privileged --network ci-build <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -e DOCKER_TLS_CERTDIR<span style=color:#f92672>=</span>/certs <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -v dind-certs:/certs/client <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  docker:27-dind
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>docker run --rm --network ci-build <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -e DOCKER_HOST<span style=color:#f92672>=</span>tcp://dind:2376 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -e DOCKER_TLS_VERIFY<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -e DOCKER_CERT_PATH<span style=color:#f92672>=</span>/certs/client <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -v dind-certs:/certs/client:ro <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  docker:27-cli version</span></span></code></pre></div></div></div><p><code>--privileged</code> フラグはサービスにホストカーネルの広範な機能を与えます。隔離された使い捨てランナーでのみ実行してください。
+認証されていない <code>dockerd</code> の TCP ポートを公開してはいけません。到達できる人は特権コンテナを作成でき、通常はホストを制御できます。</p><h2 id=キャッシュとクリーンアップの扱い>キャッシュとクリーンアップの扱い
+<a href=#%e3%82%ad%e3%83%a3%e3%83%83%e3%82%b7%e3%83%a5%e3%81%a8%e3%82%af%e3%83%aa%e3%83%bc%e3%83%b3%e3%82%a2%e3%83%83%e3%83%97%e3%81%ae%e6%89%b1%e3%81%84 class=heading-anchor><span>#</span></a></h2><p>DinD のイメージとレイヤーのキャッシュはサービスコンテナの <code>/var/lib/docker</code> にあります。
+永続キャッシュボリュームは繰り返しビルドを高速化しますが、信頼できるプロジェクトまたはテナントに限定してください。
+イメージレイヤーにはソースコードやビルドシークレットが含まれる可能性があります。共有 CI 基盤ではレジストリ対応の BuildKit キャッシュを優先します。</p><p>不変のコミット識別子に基づく一意のタグを使い、テスト合格後だけプッシュし、ランナーの保持ポリシーに従って一時コンテナとイメージを削除します。
+Dockerfile の <code>ARG</code> や <code>ENV</code> でシークレットを渡してはいけません。代わりに BuildKit のシークレットマウントまたは CI システムのシークレット機構を使います。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/docker-in-docker/ class=language-option data-lang=en>English
+</a><a href=/ja/docker-in-docker/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/docker-in-docker/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/docker-in-docker/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

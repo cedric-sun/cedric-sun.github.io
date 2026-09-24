@@ -1,0 +1,246 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>OpenAI Chat Completions 與 Spring AI</title></head><body><main><article><div class=article-header><h1>OpenAI Chat Completions 與 Spring AI</h1><div class=aux>最後更新: 2025-04-20 05:43:09 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/ai/>Ai</a>
+|
+<a href=/zh-tw/tags/llm/>Llm</a>
+|
+<a href=/zh-tw/tags/openai/>Openai</a>
+|
+<a href=/zh-tw/tags/spring-ai/>Spring-Ai</a>
+|
+<a href=/zh-tw/tags/api/>Api</a>
+|
+<a href=/zh-tw/tags/json/>Json</a></div></div><div class="translation-notice machine-translated"><a href=/openai-chat-completions/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>OpenAI Chat Completions API 是一種廣泛實作、以 JSON over HTTP 為基礎的對話式語言模型介面。用戶端會傳送依序排列的訊息清單與生成選項；伺服器則回傳一則或多則包含中繼資料與權杖用量的 assistant 訊息。</p><p>其基本結構如下：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>HTTP client
+</span></span><span style=display:flex><span>  -&gt; POST /v1/chat/completions
+</span></span><span style=display:flex><span>  -&gt; request JSON containing messages and options
+</span></span><span style=display:flex><span>  -&gt; model inference
+</span></span><span style=display:flex><span>  &lt;- response JSON containing choices and usage</span></span></code></pre></div></div></div><p>許多閘道與模型伺服器即使底層模型並非由 OpenAI 託管，也會實作 OpenAI 相容端點。因此，這種格式可作為事實上的互通 API，但它不是像 HTTP、JSON-RPC 或 MCP 那樣獨立的正式標準。不同的相容提供者可能支援不同的欄位、模型、限制、錯誤格式或擴充功能。</p><p>Spring AI 在這種線上格式之上，為 Java 應用程式提供與提供者無關的模型。應用程式程式碼使用 <code>Prompt</code>、<code>Message</code>、<code>ChatOptions</code> 和 <code>ChatResponse</code>；OpenAI 或 OpenAI 相容介面卡負責在這些物件與提供者 JSON 之間進行轉換。</p><h2 id=http-請求>HTTP 請求
+<a href=#http-%e8%ab%8b%e6%b1%82 class=heading-anchor><span>#</span></a></h2><p>簡化後的請求如下：</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#a6e22e>POST</span> /v1/chat/completions <span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span>
+</span></span><span style=display:flex><span>Host<span style=color:#f92672>:</span> <span style=color:#ae81ff>api.example.com</span>
+</span></span><span style=display:flex><span>Authorization<span style=color:#f92672>:</span> <span style=color:#ae81ff>Bearer ...</span>
+</span></span><span style=display:flex><span>Content-Type<span style=color:#f92672>:</span> <span style=color:#ae81ff>application/json</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;model&#34;</span>: <span style=color:#e6db74>&#34;gpt-4.1&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;messages&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;system&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;Answer concisely.&#34;</span>
+</span></span><span style=display:flex><span>    },
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;Explain optimistic locking.&#34;</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;temperature&#34;</span>: <span style=color:#ae81ff>0.3</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;max_tokens&#34;</span>: <span style=color:#ae81ff>1000</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;stream&#34;</span>: <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>model</code> 和 <code>messages</code> 用來識別應執行的模型，以及模型應該看到的對話內容。其餘欄位則控制生成行為。有些閘道會透過設定、部署名稱、URL 或標頭選取模型，而不是要求請求本文包含 <code>model</code>。</p><h3 id=訊息>訊息
+<a href=#%e8%a8%8a%e6%81%af class=heading-anchor><span>#</span></a></h3><p><code>messages</code> 是有順序的。其順序是提示的一部分：</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>[
+</span></span><span style=display:flex><span>  {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;system&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;You are a support assistant.&#34;</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;Where is order 42?&#34;</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;I need to look up that order.&#34;</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;It belongs to account 7.&#34;</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>]</span></span></code></pre></div></div></div><p>常見角色如下：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Role</th><th>Meaning</th></tr></thead><tbody><tr><td><code>system</code></td><td>應用程式指示與行為</td></tr><tr><td><code>developer</code></td><td>較新模型 API 支援的開發者指示</td></tr><tr><td><code>user</code></td><td>使用者提供的輸入</td></tr><tr><td><code>assistant</code></td><td>先前的或新生成的模型輸出</td></tr><tr><td><code>tool</code></td><td>應用程式工具呼叫的結果</td></tr></tbody></table></div></div><p>文字通常以字串表示。支援多模態的模型可能接受由具類型內容部分組成的陣列，其中包含文字、影像、音訊或其他媒體。</p><p>端點通常是無狀態的。呼叫端僅僅重複使用對話 ID，並不會讓模型記住先前的 HTTP 請求。若要繼續對話，用戶端必須再次傳送所選取的先前訊息：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>load conversation history
+</span></span><span style=display:flex><span>  -&gt; append current user message
+</span></span><span style=display:flex><span>  -&gt; send all selected messages
+</span></span><span style=display:flex><span>  -&gt; receive assistant message
+</span></span><span style=display:flex><span>  -&gt; save new user and assistant messages</span></span></code></pre></div></div></div><p>為了保持在模型的上下文限制內，歷史記錄可以被截斷、摘要化，或從外部儲存中擷取。</p><h3 id=生成選項>生成選項
+<a href=#%e7%94%9f%e6%88%90%e9%81%b8%e9%a0%85 class=heading-anchor><span>#</span></a></h3><p>常見的請求欄位包括：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Field</th><th>Purpose</th></tr></thead><tbody><tr><td><code>model</code></td><td>模型或部署識別碼</td></tr><tr><td><code>temperature</code></td><td>控制取樣隨機性</td></tr><tr><td><code>top_p</code></td><td>核心取樣閾值</td></tr><tr><td><code>max_tokens</code></td><td>在舊版或相容 API 中限制生成的權杖數</td></tr><tr><td><code>max_completion_tokens</code></td><td>部分模型使用的新式 completion 權杖數上限</td></tr><tr><td><code>n</code></td><td>候選選項的數量</td></tr><tr><td><code>frequency_penalty</code></td><td>抑制重複使用頻率較高的權杖</td></tr><tr><td><code>presence_penalty</code></td><td>鼓勵引入尚未使用的權杖</td></tr><tr><td><code>stop</code></td><td>在設定的序列處停止生成</td></tr><tr><td><code>stream</code></td><td>選擇回傳一個完整回應或串流區塊</td></tr><tr><td><code>response_format</code></td><td>在支援時要求 JSON 或受 schema 約束的輸出</td></tr><tr><td><code>tools</code></td><td>描述模型可以要求的函式</td></tr><tr><td><code>tool_choice</code></td><td>限制是否可以選取工具，以及可選取哪個工具</td></tr></tbody></table></div></div><p>提供者的支援範圍與語意可能不同。某個相容端點接受的欄位，在另一個端點可能被拒絕、忽略、重新命名，或以不同方式解讀。即使是同一端點背後的不同模型版本，也可能存在差異。</p><p>取樣選項也會互相影響。應用程式通常會調整 <code>temperature</code> 或 <code>top_p</code> 其中之一，而不是未經評估就同時修改兩者。</p><h2 id=http-回應>HTTP 回應
+<a href=#http-%e5%9b%9e%e6%87%89 class=heading-anchor><span>#</span></a></h2><p>簡化後的非串流回應如下：</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;id&#34;</span>: <span style=color:#e6db74>&#34;chatcmpl-123&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;object&#34;</span>: <span style=color:#e6db74>&#34;chat.completion&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;created&#34;</span>: <span style=color:#ae81ff>1784778339</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;model&#34;</span>: <span style=color:#e6db74>&#34;gpt-4.1&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;choices&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;index&#34;</span>: <span style=color:#ae81ff>0</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;message&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;Optimistic locking detects concurrent updates...&#34;</span>
+</span></span><span style=display:flex><span>      },
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;finish_reason&#34;</span>: <span style=color:#e6db74>&#34;stop&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;logprobs&#34;</span>: <span style=color:#66d9ef>null</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;usage&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;prompt_tokens&#34;</span>: <span style=color:#ae81ff>25</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;completion_tokens&#34;</span>: <span style=color:#ae81ff>18</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;total_tokens&#34;</span>: <span style=color:#ae81ff>43</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>主要欄位如下：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody><tr><td><code>id</code></td><td>提供者生成的請求或 completion 識別碼</td></tr><tr><td><code>object</code></td><td>回應類型，通常為 <code>chat.completion</code></td></tr><tr><td><code>created</code></td><td>提供者指派的 Unix 時間戳</td></tr><tr><td><code>model</code></td><td>產生結果的模型</td></tr><tr><td><code>choices</code></td><td>assistant 輸出候選項</td></tr><tr><td><code>usage</code></td><td>輸入、輸出與總權杖用量</td></tr><tr><td><code>system_fingerprint</code></td><td>可選的提供者端模型設定識別碼</td></tr></tbody></table></div></div><p>每個 choice 通常包含 <code>index</code>、assistant <code>message</code>、<code>finish_reason</code> 和可選的對數機率。常見的結束原因包括：</p><ul><li><code>stop</code>：正常完成；</li><li><code>length</code>：達到輸出或上下文限制；</li><li><code>tool_calls</code>：模型要求一個或多個工具；以及</li><li><code>content_filter</code>：安全性篩選器停止生成。</li></ul><p>HTTP 回應成功並不代表答案正確。它只表示提供者接受了請求，並產生了語法有效的模型結果。</p><h3 id=提供者擴充功能>提供者擴充功能
+<a href=#%e6%8f%90%e4%be%9b%e8%80%85%e6%93%b4%e5%85%85%e5%8a%9f%e8%83%bd class=heading-anchor><span>#</span></a></h3><p>OpenAI 相容並不代表逐位元完全相同。例如：</p><ul><li>Azure 相容回應可能包含 <code>prompt_filter_results</code> 與 <code>content_filter_results</code>。</li><li>閘道可能新增延遲檢查點、路由詳細資料、快取統計或服務層級中繼資料。</li><li>權杖詳細資料可能區分推理、音訊、快取、已接受預測或已拒絕預測權杖。</li><li>不同提供者的錯誤回應與速率限制標頭可能不同。</li></ul><p>在可能的情況下，應用程式應忽略未知欄位，並避免讓其領域模型繫結至每一個提供者擴充功能。若某項擴充功能是必要的，應在提供者專用設定或中繼資料中明確表示。</p><h2 id=schema-中的工具呼叫>Schema 中的工具呼叫
+<a href=#schema-%e4%b8%ad%e7%9a%84%e5%b7%a5%e5%85%b7%e5%91%bc%e5%8f%ab class=heading-anchor><span>#</span></a></h2><p>請求可以包含工具定義：</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;model&#34;</span>: <span style=color:#e6db74>&#34;gpt-4.1&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;messages&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;What is the status of order 42?&#34;</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;tools&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;function&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;function&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;name&#34;</span>: <span style=color:#e6db74>&#34;find_order&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;description&#34;</span>: <span style=color:#e6db74>&#34;Look up an order by ID&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;parameters&#34;</span>: {
+</span></span><span style=display:flex><span>          <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;object&#34;</span>,
+</span></span><span style=display:flex><span>          <span style=color:#f92672>&#34;properties&#34;</span>: {
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&#34;order_id&#34;</span>: {
+</span></span><span style=display:flex><span>              <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;string&#34;</span>,
+</span></span><span style=display:flex><span>              <span style=color:#f92672>&#34;description&#34;</span>: <span style=color:#e6db74>&#34;Canonical order ID&#34;</span>
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>          },
+</span></span><span style=display:flex><span>          <span style=color:#f92672>&#34;required&#34;</span>: [
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;order_id&#34;</span>
+</span></span><span style=display:flex><span>          ]
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>模型不會執行函式。它可以回傳包含結構化請求的 assistant 訊息：</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;tool_calls&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;id&#34;</span>: <span style=color:#e6db74>&#34;call_123&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;function&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;function&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;name&#34;</span>: <span style=color:#e6db74>&#34;find_order&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;arguments&#34;</span>: <span style=color:#e6db74>&#34;{\&#34;order_id\&#34;:\&#34;42\&#34;}&#34;</span>
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>主機應用程式會驗證引數、呼叫本地或遠端操作，並在後續請求中傳送結果：</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;tool&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;tool_call_id&#34;</span>: <span style=color:#e6db74>&#34;call_123&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;{\&#34;status\&#34;:\&#34;SHIPPED\&#34;}&#34;</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>因此，通常的流量如下：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>model request with tool schemas
+</span></span><span style=display:flex><span>  &lt;- assistant tool-call request
+</span></span><span style=display:flex><span>application executes tool
+</span></span><span style=display:flex><span>  -&gt; model request with tool result
+</span></span><span style=display:flex><span>  &lt;- final assistant answer</span></span></code></pre></div></div></div><p>工具呼叫通常至少需要兩次模型往返。授權、驗證、冪等性、逾時與副作用仍由應用程式負責，而不是由模型負責。</p><h2 id=串流回應>串流回應
+<a href=#%e4%b8%b2%e6%b5%81%e5%9b%9e%e6%87%89 class=heading-anchor><span>#</span></a></h2><p>當 <code>"stream": true</code> 時，伺服器通常會回傳 Server-Sent Events，其資料包含增量的 <code>chat.completion.chunk</code> 物件：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>data: {&#34;object&#34;:&#34;chat.completion.chunk&#34;,&#34;choices&#34;:[{&#34;delta&#34;:{&#34;role&#34;:&#34;assistant&#34;}}]}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>data: {&#34;object&#34;:&#34;chat.completion.chunk&#34;,&#34;choices&#34;:[{&#34;delta&#34;:{&#34;content&#34;:&#34;Optimistic&#34;}}]}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>data: {&#34;object&#34;:&#34;chat.completion.chunk&#34;,&#34;choices&#34;:[{&#34;delta&#34;:{&#34;content&#34;:&#34; locking&#34;}}]}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>data: [DONE]</span></span></code></pre></div></div></div><p>區塊包含差異，而不是完整訊息。用戶端必須聚合內容、工具呼叫片段、結束原因，以及回應提供時的權杖用量。串流可以改善首次可見輸出的時間，但不一定會降低總延遲或權杖成本。</p><h2 id=spring-ai-的物件模型>Spring AI 的物件模型
+<a href=#spring-ai-%e7%9a%84%e7%89%a9%e4%bb%b6%e6%a8%a1%e5%9e%8b class=heading-anchor><span>#</span></a></h2><p>Spring AI 將面向應用程式的聊天概念與提供者線上協定 DTO 分離。主要型別如下：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Spring AI type</th><th>Responsibility</th></tr></thead><tbody><tr><td><code>ChatClient</code></td><td>用於提示、Advisor、工具和輸出轉換的流暢應用程式 API</td></tr><tr><td><code>ChatModel</code></td><td>呼叫聊天模型的提供者無關介面</td></tr><tr><td><code>Prompt</code></td><td>有序訊息與請求選項</td></tr><tr><td><code>Message</code></td><td>表示單一對話項目的通用介面</td></tr><tr><td><code>SystemMessage</code></td><td>system 角色指示</td></tr><tr><td><code>UserMessage</code></td><td>user 角色輸入</td></tr><tr><td><code>AssistantMessage</code></td><td>assistant 文字與可選的工具呼叫</td></tr><tr><td><code>ToolResponseMessage</code></td><td>與 assistant 工具呼叫關聯的結果</td></tr><tr><td><code>ChatOptions</code></td><td>可移植的請求選項</td></tr><tr><td><code>OpenAiChatOptions</code></td><td>使用 OpenAI 介面卡時的 OpenAI 專用選項</td></tr><tr><td><code>ChatResponse</code></td><td>包含生成結果與中繼資料的提供者無關回應</td></tr><tr><td><code>Generation</code></td><td>一個 assistant 候選項</td></tr><tr><td><code>ChatResponseMetadata</code></td><td>模型、用量、速率限制與提供者中繼資料</td></tr><tr><td><code>Usage</code></td><td>輸入、輸出與總權杖數</td></tr></tbody></table></div></div><p>低階應用程式流程如下：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatOptions options <span style=color:#f92672>=</span> OpenAiChatOptions.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>model</span>(<span style=color:#e6db74>&#34;gpt-4.1&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>temperature</span>(0.<span style=color:#a6e22e>3</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>maxTokens</span>(1000)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Prompt prompt <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Prompt(
+</span></span><span style=display:flex><span>    List.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> SystemMessage(<span style=color:#e6db74>&#34;Answer concisely.&#34;</span>),
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> UserMessage(<span style=color:#e6db74>&#34;Explain optimistic locking.&#34;</span>)
+</span></span><span style=display:flex><span>    ),
+</span></span><span style=display:flex><span>    options
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ChatResponse response <span style=color:#f92672>=</span> chatModel.<span style=color:#a6e22e>call</span>(prompt);
+</span></span><span style=display:flex><span>AssistantMessage answer <span style=color:#f92672>=</span> response.<span style=color:#a6e22e>getResult</span>().<span style=color:#a6e22e>getOutput</span>();</span></span></code></pre></div></div></div><p><code>ChatClient</code> 提供更高階的流暢式等效 API：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatResponse response <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>system</span>(<span style=color:#e6db74>&#34;Answer concisely.&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(<span style=color:#e6db74>&#34;Explain optimistic locking.&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>options</span>(options)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>chatResponse</span>();</span></span></code></pre></div></div></div><p><code>call()</code> 是同步終端操作。提示建構方法只會設定請求；<code>call()</code> 會呼叫 Advisor 鏈與模型介面卡，並等待完成。相較之下，<code>stream()</code> 會回傳反應式串流。</p><h2 id=spring-ai-如何序列化請求>Spring AI 如何序列化請求
+<a href=#spring-ai-%e5%a6%82%e4%bd%95%e5%ba%8f%e5%88%97%e5%8c%96%e8%ab%8b%e6%b1%82 class=heading-anchor><span>#</span></a></h2><p>Spring AI 通常不會將 <code>Prompt.toString()</code> 序列化為 HTTP 本文。提供者介面卡會執行對映：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Spring AI Prompt
+</span></span><span style=display:flex><span>  messages:
+</span></span><span style=display:flex><span>    SystemMessage
+</span></span><span style=display:flex><span>    UserMessage
+</span></span><span style=display:flex><span>    AssistantMessage
+</span></span><span style=display:flex><span>    ToolResponseMessage
+</span></span><span style=display:flex><span>  options:
+</span></span><span style=display:flex><span>    ChatOptions
+</span></span><span style=display:flex><span>       |
+</span></span><span style=display:flex><span>       v
+</span></span><span style=display:flex><span>OpenAI adapter
+</span></span><span style=display:flex><span>  OpenAI request DTOs
+</span></span><span style=display:flex><span>  role/content conversion
+</span></span><span style=display:flex><span>  option and tool-schema conversion
+</span></span><span style=display:flex><span>       |
+</span></span><span style=display:flex><span>       v
+</span></span><span style=display:flex><span>JSON serializer
+</span></span><span style=display:flex><span>       |
+</span></span><span style=display:flex><span>       v
+</span></span><span style=display:flex><span>POST /v1/chat/completions</span></span></code></pre></div></div></div><p>對於 Spring AI OpenAI 整合，傳輸型別會在 <code>OpenAiApi</code> 下表示，其中包含請求、訊息、choice 與 completion 結構。應用程式通常應使用可移植型別，而不是直接建構這些傳輸 DTO。</p><p>回應會沿著相反路徑處理：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>HTTP response JSON
+</span></span><span style=display:flex><span>  -&gt; OpenAI response DTOs
+</span></span><span style=display:flex><span>  -&gt; AssistantMessage
+</span></span><span style=display:flex><span>  -&gt; Generation
+</span></span><span style=display:flex><span>  -&gt; ChatResponseMetadata and Usage
+</span></span><span style=display:flex><span>  -&gt; ChatResponse</span></span></code></pre></div></div></div><p>這個邊界解釋了為何記錄 <code>ChatClientRequest</code> 時可能顯示 Java record 或 <code>Prompt</code> 表示，而 HTTP 線上記錄則顯示具體的 OpenAI 相容 JSON。前者是轉換前的提供者無關請求；後者則是轉換後序列化的傳輸本文。</p><h2 id=advisor-與對話記憶>Advisor 與對話記憶
+<a href=#advisor-%e8%88%87%e5%b0%8d%e8%a9%b1%e8%a8%98%e6%86%b6 class=heading-anchor><span>#</span></a></h2><p><code>ChatMemory</code> 不屬於 OpenAI 線上 schema，而是應用程式端的抽象。記憶 Advisor 會在模型呼叫前載入訊息，並在呼叫後儲存新訊息：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatMemory memory <span style=color:#f92672>=</span> MessageWindowChatMemory.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>maxMessages</span>(20)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ChatClient client <span style=color:#f92672>=</span> builder
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>defaultAdvisors</span>(
+</span></span><span style=display:flex><span>        MessageChatMemoryAdvisor.<span style=color:#a6e22e>builder</span>(memory).<span style=color:#a6e22e>build</span>()
+</span></span><span style=display:flex><span>    )
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>每個請求都會提供對話鍵：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatResponse response <span style=color:#f92672>=</span> client.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(question)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>advisors</span>(spec <span style=color:#f92672>-&gt;</span> spec.<span style=color:#a6e22e>param</span>(
+</span></span><span style=display:flex><span>        ChatMemory.<span style=color:#a6e22e>CONVERSATION_ID</span>,
+</span></span><span style=display:flex><span>        conversationId
+</span></span><span style=display:flex><span>    ))
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>chatResponse</span>();</span></span></code></pre></div></div></div><p>從概念上看，Advisor 會執行：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ChatMemory.get(conversationId)
+</span></span><span style=display:flex><span>  -&gt; add historical messages to Prompt
+</span></span><span style=display:flex><span>  -&gt; ChatModel.call(Prompt)
+</span></span><span style=display:flex><span>  -&gt; ChatMemory.add(current user and assistant messages)</span></span></code></pre></div></div></div><p>因此，序列化後的 <code>messages</code> 陣列可能包含所選取對話視窗的完整內容。對話 ID、儲存、保留策略與存取控制屬於主機應用程式；Chat Completions API 並未定義這些內容。</p><h2 id=spring-ai-的工具序列化>Spring AI 的工具序列化
+<a href=#spring-ai-%e7%9a%84%e5%b7%a5%e5%85%b7%e5%ba%8f%e5%88%97%e5%8c%96 class=heading-anchor><span>#</span></a></h2><p>Spring AI 使用 <code>ToolCallback</code> 表示可執行能力。帶有註解的 Java 方法可以被探索並轉換為回呼：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderTools</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Tool</span>(description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Look up an order by ID&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderStatus <span style=color:#a6e22e>findOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Canonical order ID&#34;</span>) String orderId) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orderService.<span style=color:#a6e22e>find</span>(orderId);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>註冊該物件：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String answer <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(<span style=color:#e6db74>&#34;Where is order 42?&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>tools</span>(orderTools)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>content</span>();</span></span></code></pre></div></div></div><p>會使 Spring AI：</p><ol><li>檢查帶有註解的方法；</li><li>建立 <code>ToolCallback</code>；</li><li>為其引數推導 JSON Schema；</li><li>將回呼定義對映到提供者的 <code>tools</code> 陣列；</li><li>將回傳的 <code>tool_calls</code> 對映為 <code>AssistantMessage.ToolCall</code> 值；</li><li>啟用自動工具執行時，在主機應用程式中呼叫回呼；以及</li><li>將結果序列化為下一次模型請求的工具訊息。</li></ol><p>LLM 只能看到名稱、描述和 schema。它無法反射 JVM，也無法呼叫任意方法。</p><h2 id=記錄兩種表示>記錄兩種表示
+<a href=#%e8%a8%98%e9%8c%84%e5%85%a9%e7%a8%ae%e8%a1%a8%e7%a4%ba class=heading-anchor><span>#</span></a></h2><p>Spring AI Advisor 記錄與 HTTP 線上記錄回答的是不同問題。</p><p><code>SimpleLoggerAdvisor</code> 等 Advisor 可以顯示：</p><ul><li>先前的 Advisor 修改請求後的 Spring AI 訊息；</li><li><code>ChatOptions</code>；</li><li>對話 ID 等 Advisor 上下文；以及</li><li>提供者無關的 <code>ChatResponse</code>。</li></ul><p>請求看起來像 Java <code>toString()</code> 輸出，是因為記錄的是 <code>ChatClientRequest</code>，而不是最終的 HTTP 本文。</p><p>HTTP 用戶端記錄可以顯示：</p><ul><li>URL 與標頭；</li><li>最終序列化的 JSON 請求；</li><li>提供者特有的欄位與預設值；</li><li>原始 JSON 回應；以及</li><li>串流區塊。</li></ul><p>線上記錄發生在提供者介面卡建立傳輸 DTO 之後，因此適合診斷序列化與提供者相容性。但它也具有風險：訊息、擷取的文件、工具結果、授權標頭、Cookie 與個人資料都可能出現在記錄中。只有在受控的開發環境中才應啟用完整負載記錄，並套用遮罩與保留期限限制。</p><h2 id=相容性邊界>相容性邊界
+<a href=#%e7%9b%b8%e5%ae%b9%e6%80%a7%e9%82%8a%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>OpenAI 相容端點應被視為提供者契約，而不是行為完全相同的證明。請驗證：</p><ul><li>端點路徑與驗證；</li><li>支援的訊息角色與內容型別；</li><li>模型命名與部署選取；</li><li>請求選項名稱與限制；</li><li>工具呼叫與結構化輸出支援；</li><li>串流事件格式；</li><li>權杖用量計算；</li><li>安全性與拒絕欄位；</li><li>錯誤本文與 HTTP 狀態碼；以及</li><li>提供者特有的擴充功能。</li></ul><p>Spring AI 透過將這些細節保留在模型介面卡中，降低應用程式耦合；但它無法讓不相容的提供者行為變得一致。請將每個受支援的閘道與模型作為獨立的執行路徑進行測試。</p><p>請參閱 <a href=/spring-ai/>Spring AI</a>，了解更廣泛的應用程式模型，包括 Advisors、RAG、向量儲存、記憶儲存庫、可觀測性與正式環境架構。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/openai-chat-completions/ class=language-option data-lang=en>English
+</a><a href=/ja/openai-chat-completions/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/openai-chat-completions/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/openai-chat-completions/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

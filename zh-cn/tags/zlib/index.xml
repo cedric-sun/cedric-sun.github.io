@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Zlib on cesun.life</title><link>https://example.org/zh-cn/tags/zlib/</link><description>Recent content in Zlib on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Wed, 03 Apr 2024 14:47:29 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/zlib/index.xml" rel="self" type="application/rss+xml"/><item><title>zlib 流式 API</title><link>https://example.org/zh-cn/zlib/</link><pubDate>Wed, 03 Apr 2024 14:47:29 +0800</pubDate><guid>https://example.org/zh-cn/zlib/</guid><description>&lt;p&gt;zlib 是实现 DEFLATE 及其常用封装的 C 库。其流式 API 使用 &lt;code&gt;z_stream&lt;/code&gt;，因此应用可以
+在有界缓冲区中处理输入和输出，而不必假设一次调用会消耗或生成完整消息。&lt;/p&gt;
+&lt;h2 id="流状态和初始化"&gt;
+ 流状态和初始化
+ &lt;a href="#%e6%b5%81%e7%8a%b6%e6%80%81%e5%92%8c%e5%88%9d%e5%a7%8b%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;应用提供 &lt;code&gt;next_in&lt;/code&gt;/&lt;code&gt;avail_in&lt;/code&gt; 和 &lt;code&gt;next_out&lt;/code&gt;/&lt;code&gt;avail_out&lt;/code&gt;。调用后，zlib 会推进指针并
+减少可用计数；&lt;code&gt;total_in&lt;/code&gt; 和 &lt;code&gt;total_out&lt;/code&gt; 提供累计计数器。应用必须在下一次调用前消耗
+已生成的字节并补充缓冲区，同时将其他状态字段留给 zlib。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;deflateInit()&lt;/code&gt; 生成 zlib 封装的流。&lt;code&gt;deflateInit2()&lt;/code&gt; 使用负的 &lt;code&gt;windowBits&lt;/code&gt; 选择原始
+DEFLATE，使用 &lt;code&gt;windowBits + 16&lt;/code&gt; 选择 gzip。在初始化前初始化分配器字段，并对每个成功
+初始化的流调用 &lt;code&gt;deflateEnd()&lt;/code&gt;，包括错误路径。压缩器可以使用
+&lt;code&gt;deflateSetDictionary()&lt;/code&gt; 预加载共享历史。zlib 封装携带 Adler-32 字典标识符，并允许
+&lt;code&gt;inflate()&lt;/code&gt; 返回 &lt;code&gt;Z_NEED_DICT&lt;/code&gt;；原始 DEFLATE 要求外层协议识别字典。gzip 封装没有定义
+预置字典信令。&lt;/p&gt;
+&lt;h2 id="正确的-deflate-循环"&gt;
+ 正确的 Deflate 循环
+ &lt;a href="#%e6%ad%a3%e7%a1%ae%e7%9a%84-deflate-%e5%be%aa%e7%8e%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;普通输入使用 &lt;code&gt;Z_NO_FLUSH&lt;/code&gt;；频繁刷新会降低压缩率。在输入仍存在或输出仍待处理时，
+继续调用 &lt;code&gt;deflate()&lt;/code&gt;。要完成压缩，应停止提供输入，并持续调用
+&lt;code&gt;deflate(..., Z_FINISH)&lt;/code&gt;，直到它返回 &lt;code&gt;Z_STREAM_END&lt;/code&gt;，期间在调用之间扩大或排空输出缓冲区。以下有界输入示例假设 &lt;code&gt;input_len&lt;/code&gt; 能放入 zlib 的 &lt;code&gt;uInt&lt;/code&gt; 计数：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;z_stream strm &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (&lt;span style="color:#a6e22e"&gt;deflateInit&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm, Z_DEFAULT_COMPRESSION) &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; Z_OK) &lt;span style="color:#a6e22e"&gt;fail&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;strm.next_in &lt;span style="color:#f92672"&gt;=&lt;/span&gt; input;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;strm.avail_in &lt;span style="color:#f92672"&gt;=&lt;/span&gt; (uInt)input_len;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;for&lt;/span&gt; (;;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; strm.next_out &lt;span style="color:#f92672"&gt;=&lt;/span&gt; out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; strm.avail_out &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt; out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; uInt input_before &lt;span style="color:#f92672"&gt;=&lt;/span&gt; strm.avail_in;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; flush &lt;span style="color:#f92672"&gt;=&lt;/span&gt; strm.avail_in &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; Z_FINISH : Z_NO_FLUSH;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; rc &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;deflate&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm, flush);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;size_t&lt;/span&gt; produced &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt; out &lt;span style="color:#f92672"&gt;-&lt;/span&gt; strm.avail_out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;write_bytes&lt;/span&gt;(out, produced);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (rc &lt;span style="color:#f92672"&gt;==&lt;/span&gt; Z_STREAM_END) &lt;span style="color:#66d9ef"&gt;break&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (rc &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; Z_OK) &lt;span style="color:#a6e22e"&gt;fail&lt;/span&gt;(rc);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (input_before &lt;span style="color:#f92672"&gt;==&lt;/span&gt; strm.avail_in &lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; produced &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;) &lt;span style="color:#a6e22e"&gt;fail_no_progress&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;deflateEnd&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;实际代码必须在下一次 &lt;code&gt;Z_NO_FLUSH&lt;/code&gt; 调用前补充 &lt;code&gt;next_in&lt;/code&gt;，并跟踪两个游标的进度。
+&lt;code&gt;Z_BUF_ERROR&lt;/code&gt; 可能表示由于缓冲区为空或已满而无法取得进展；它本身不表示损坏。
+&lt;code&gt;Z_SYNC_FLUSH&lt;/code&gt; 使数据可供解码器使用但不结束流，而 &lt;code&gt;Z_FINISH&lt;/code&gt; 会结束流。&lt;/p&gt;</description></item></channel></rss>

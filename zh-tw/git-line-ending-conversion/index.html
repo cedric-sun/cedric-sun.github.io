@@ -1,0 +1,44 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Git 行尾轉換</title></head><body><main><article><div class=article-header><h1>Git 行尾轉換</h1><div class=aux>最後更新: 2026-04-29 00:23:56 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/git/>Git</a>
+|
+<a href=/zh-tw/tags/version-control/>Version-Control</a></div></div><div class="translation-notice machine-translated"><a href=/git-line-ending-conversion/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>Git 可以在儲存庫邊界將文字正規化為 LF，同時在工作目錄中呈現 LF 或
+CRLF。穩定的 <code>.gitattributes</code> 政策可避免受平台影響的提交，並讓編輯器
+只負責簽出後的形式。</p><h2 id=區分-head索引與工作目錄的位元組>區分 HEAD、索引與工作目錄的位元組
+<a href=#%e5%8d%80%e5%88%86-head%e7%b4%a2%e5%bc%95%e8%88%87%e5%b7%a5%e4%bd%9c%e7%9b%ae%e9%8c%84%e7%9a%84%e4%bd%8d%e5%85%83%e7%b5%84 class=heading-anchor><span>#</span></a></h2><p>一個受追蹤路徑有三種相關的表示形式：</p><ol><li><code>HEAD</code> 指向目前提交所儲存的 blob。</li><li>索引保存預計納入下一次提交的 blob。</li><li>工作目錄保存供編輯器和建置工具使用的位元組。</li></ol><p>對於經過正規化的文字，<code>git add</code> 會執行從 CRLF 到 LF 的清理轉換。
+簽出則會執行塗抹轉換，將索引中的 LF 轉成所選的工作目錄行尾。
+既有提交不會被重寫。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git ls-files --eol -- path/to/file
+</span></span><span style=display:flex><span>git show HEAD:path/to/file | od -An -t x1
+</span></span><span style=display:flex><span>git check-attr -a -- path/to/file</span></span></code></pre></div></div></div><p><code>git ls-files --eol</code> 會回報索引、工作目錄及實際套用的屬性形式。
+在處理轉換警告前，請先檢查這些形式。</p><h2 id=使用-gitattributes-宣告儲存庫政策>使用 <code>.gitattributes</code> 宣告儲存庫政策
+<a href=#%e4%bd%bf%e7%94%a8-gitattributes-%e5%ae%a3%e5%91%8a%e5%84%b2%e5%ad%98%e5%ba%ab%e6%94%bf%e7%ad%96 class=heading-anchor><span>#</span></a></h2><p>請提交屬性設定，因為如此每個複製出的儲存庫都會共用該政策：</p><div class=jose-wrapper><div class=jose-tools><span>gitattributes</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-gitattributes data-lang=gitattributes>*       text=auto
+*.sh    text eol=lf
+*.py    text eol=lf
+*.bat   text eol=crlf
+*.png   binary
+*.pdf   binary</code></pre></div></div><p><code>text=auto</code> 讓 Git 對未指定的路徑進行分類。<code>text</code> 強制正規化；
+<code>-text</code> 停用正規化；<code>binary</code> 則是 <code>-diff -merge -text</code> 的內建屬性巨集。
+明確指定 <code>eol=lf</code> 或 <code>eol=crlf</code> 會將路徑標記為文字，並控制其簽出形式。
+請將封存檔、影像、產生的二進位格式和已簽署成品標記為非文字，因為轉換會
+改變其位元組。</p><h2 id=僅將設定作為後備方案>僅將設定作為後備方案
+<a href=#%e5%83%85%e5%b0%87%e8%a8%ad%e5%ae%9a%e4%bd%9c%e7%82%ba%e5%be%8c%e5%82%99%e6%96%b9%e6%a1%88 class=heading-anchor><span>#</span></a></h2><p>當路徑的屬性未做出更明確的決定時，<code>core.autocrlf</code> 和 <code>core.eol</code> 才會
+影響該路徑：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>core.autocrlf</code></th><th>清理至索引</th><th>從索引簽出</th></tr></thead><tbody><tr><td><code>false</code></td><td>不進行 autocrlf 轉換</td><td>不進行 autocrlf 轉換</td></tr><tr><td><code>input</code></td><td>CRLF 轉為 LF</td><td>LF 維持 LF</td></tr><tr><td><code>true</code></td><td>CRLF 轉為 LF</td><td>LF 轉為 CRLF</td></tr></tbody></table></div></div><p><code>core.eol</code> 可為正規化文字選擇 <code>lf</code>、<code>crlf</code> 或 <code>native</code>，但具有明確
+<code>eol</code> 屬性的文字除外。<code>core.safecrlf=true</code> 會拒絕不可逆的轉換；<code>warn</code> 則會回報
+這類轉換。這兩項設定都無法取代已提交的屬性政策。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git config --show-origin --get core.autocrlf
+</span></span><span style=display:flex><span>git config --show-origin --get core.eol
+</span></span><span style=display:flex><span>git config --show-origin --get core.safecrlf</span></span></code></pre></div></div></div><h2 id=安全地重新正規化>安全地重新正規化
+<a href=#%e5%ae%89%e5%85%a8%e5%9c%b0%e9%87%8d%e6%96%b0%e6%ad%a3%e8%a6%8f%e5%8c%96 class=heading-anchor><span>#</span></a></h2><p>新增或修正屬性後，請從乾淨的工作目錄開始，或先保留尚未提交的工作。
+接著刻意暫存正規化變更並加以檢查：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git add --renormalize .
+</span></span><span style=display:flex><span>git diff --cached --check
+</span></span><span style=display:flex><span>git diff --cached</span></span></code></pre></div></div></div><p>請將行尾正規化與語意變更分開提交，因為獨立提交可以維持程式碼審查、
+blame 和回復操作的品質。該操作會更新索引；不會變更被忽略或未追蹤的檔案。</p><p>請讓編輯器設定符合簽出政策，尤其是強制使用 CRLF 的檔案。編輯器設定會
+影響工作目錄中的位元組，而 <code>.gitattributes</code> 則定義版本控制的邊界。
+不要為了實驗而反覆加入和簽出尚未提交的重要檔案；請先檢查實際套用的屬性
+並儲存工作。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/git-line-ending-conversion/ class=language-option data-lang=en>English
+</a><a href=/ja/git-line-ending-conversion/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/git-line-ending-conversion/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/git-line-ending-conversion/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

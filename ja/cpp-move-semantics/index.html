@@ -1,0 +1,62 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>C++ の値カテゴリーとムーブセマンティクス</title></head><body><main><article><div class=article-header><h1>C++ の値カテゴリーとムーブセマンティクス</h1><div class=aux>最終更新: 2021-01-25 02:14:28 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/c-plus-plus/>C-Plus-Plus</a>
+|
+<a href=/ja/tags/language/>Language</a></div></div><div class="translation-notice machine-translated"><a href=/cpp-move-semantics/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>ムーブセマンティクスはオーバーロード選択と型で定義された状態移転であり、所有権の
+自動移転ではありません。まず式の値カテゴリーを確認し、次に所有権とライフタイムを
+表すパラメーター型を選びます。</p><h2 id=式のカテゴリー>式のカテゴリー
+<a href=#%e5%bc%8f%e3%81%ae%e3%82%ab%e3%83%86%e3%82%b4%e3%83%aa%e3%83%bc class=heading-anchor><span>#</span></a></h2><p>すべての <code>void</code> ではない式は、次のカテゴリーのいずれか 1 つに該当します。</p><ul><li><strong>lvalue</strong> はオブジェクト、関数、ビットフィールドを識別します。</li><li><strong>xvalue</strong> はリソースを再利用できるオブジェクトを識別します。</li><li><strong>prvalue</strong> は値を計算するか、オブジェクトを初期化します。</li></ul><p>lvalue と xvalue は <strong>glvalue</strong> であり、prvalue と xvalue は <strong>rvalue</strong> です。名前付き
+変数は型が <code>T&&</code> であっても lvalue 式です。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>int</span><span style=color:#f92672>&amp;</span> counter();
+</span></span><span style=display:flex><span><span style=color:#66d9ef>int</span><span style=color:#f92672>&amp;&amp;</span> cache_slot();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>counter() <span style=color:#f92672>=</span> <span style=color:#ae81ff>42</span>;              <span style=color:#75715e>// The call is an lvalue.
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>int</span><span style=color:#f92672>&amp;&amp;</span> slot <span style=color:#f92672>=</span> cache_slot();
+</span></span><span style=display:flex><span>consume(slot);               <span style=color:#75715e>// `slot` is an lvalue expression.
+</span></span></span><span style=display:flex><span>consume(std<span style=color:#f92672>::</span>move(slot));    <span style=color:#75715e>// Casts it to an xvalue.
+</span></span></span></code></pre></div></div></div><p><code>T</code> を返す呼び出しは prvalue、<code>T&</code> を返す呼び出しは lvalue、<code>T&&</code> を返す呼び出し
+は xvalue です。<code>std::move</code> は xvalue キャストを行うだけで、データを移動したり
+ソースオブジェクトのライフタイムを終了させたりしません。</p><h2 id=ムーブ構築はオーバーロード選択である>ムーブ構築はオーバーロード選択である
+<a href=#%e3%83%a0%e3%83%bc%e3%83%96%e6%a7%8b%e7%af%89%e3%81%af%e3%82%aa%e3%83%bc%e3%83%90%e3%83%bc%e3%83%ad%e3%83%bc%e3%83%89%e9%81%b8%e6%8a%9e%e3%81%a7%e3%81%82%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>参照の束縛には次の違いがあります。</p><ul><li><code>T&</code> は互換性のある lvalue に束縛します。</li><li><code>const T&</code> は lvalue、xvalue、prvalue に束縛します。</li><li><code>T&&</code> は xvalue と prvalue に束縛します。</li></ul><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span>std<span style=color:#f92672>::</span>string source <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;payload&#34;</span>;
+</span></span><span style=display:flex><span>std<span style=color:#f92672>::</span>string destination <span style=color:#f92672>=</span> std<span style=color:#f92672>::</span>move(source); <span style=color:#75715e>// Selects a move constructor when viable.
+</span></span></span></code></pre></div></div></div><p>選択されたコンストラクターが移転を定義します。確保領域を移転する場合も、小さな
+表現をコピーする場合も、コピーと区別できない効果の場合もあります。ローカルを値で
+返す場合は通常 <code>return local;</code> を使います。コピー省略で結果を直接構築でき、適用
+されない場合も適格なローカルはオーバーロード選択で xvalue として扱えます。
+<code>return std::move(local);</code> は名前付き戻り値最適化を妨げることがあります。</p><h2 id=転送参照は呼び出し側のカテゴリーを保持する>転送参照は呼び出し側のカテゴリーを保持する
+<a href=#%e8%bb%a2%e9%80%81%e5%8f%82%e7%85%a7%e3%81%af%e5%91%bc%e3%81%b3%e5%87%ba%e3%81%97%e5%81%b4%e3%81%ae%e3%82%ab%e3%83%86%e3%82%b4%e3%83%aa%e3%83%bc%e3%82%92%e4%bf%9d%e6%8c%81%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>推論されるテンプレートパラメーターの <code>T&&</code> は転送参照です。lvalue 引数では <code>T</code>
+が <code>U&</code> と推論され、rvalue では <code>U</code> と推論されます。参照折り畳みにより <code>U& &&</code>
+は <code>U&</code> になるため、<code>std::forward&lt;T></code> は元のカテゴリーを再現できます。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>template</span><span style=color:#f92672>&lt;</span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>T</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>void</span> relay(T<span style=color:#f92672>&amp;&amp;</span> value) {
+</span></span><span style=display:flex><span>    consume(std<span style=color:#f92672>::</span>forward<span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span>(value));
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>std::move(value)</code> は両方のケースを xvalue に変換し、lvalue の呼び出し側から予期せず
+ムーブすることがあります。推論を使わない <code>T&&</code>（たとえば <code>T</code> がすでに固定された
+クラステンプレートのメンバー）は通常の rvalue 参照であり、転送参照ではありません。</p><h2 id=パラメーター設計は所有権から始める>パラメーター設計は所有権から始める
+<a href=#%e3%83%91%e3%83%a9%e3%83%a1%e3%83%bc%e3%82%bf%e3%83%bc%e8%a8%ad%e8%a8%88%e3%81%af%e6%89%80%e6%9c%89%e6%a8%a9%e3%81%8b%e3%82%89%e5%a7%8b%e3%82%81%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>呼び出し先の契約を表すパラメーター形式を使います。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>形式</th><th>契約</th></tr></thead><tbody><tr><td><code>const T&</code></td><td>呼び出し中に読み取り専用で借用する。</td></tr><tr><td><code>T&</code></td><td>呼び出し中に借用して変更する。</td></tr><tr><td><code>T</code></td><td>独立した値を受け取り、呼び出し側がコピーまたはムーブする。</td></tr><tr><td><code>T&&</code></td><td>呼び出し先が消費できる rvalue を要求する。所有権は暗黙に移転しない。</td></tr><tr><td><code>std::unique_ptr&lt;T></code></td><td>排他的所有権を移転する。</td></tr><tr><td><code>std::shared_ptr&lt;T></code></td><td>呼び出し先が共有所有権を保持する場合に共有する。</td></tr><tr><td><code>T*</code></td><td>借用する。null 許容性は API で明示する。</td></tr></tbody></table></div></div><p>独立した値を保存するコンストラクターは、値渡しで受け取り、パラメーターからムーブできます。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Message</span> {
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>explicit</span> Message(std<span style=color:#f92672>::</span>string text) <span style=color:#f92672>:</span> text_{std<span style=color:#f92672>::</span>move(text)} {}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    std<span style=color:#f92672>::</span>string text_;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>lvalue の呼び出し側はパラメーターへ 1 回コピーし、rvalue の呼び出し側はムーブできます。
+問い合わせや、呼び出し先が単に借用するオブジェクトには値渡しは不適切です。</p><p>所有権を示すために <code>FILE*&&</code> などの生ポインター rvalue 参照を使わないでください。
+生ポインターのムーブはアドレスをコピーするだけなので、どちらの名前も同じリソースを
+指します。呼び出しが破棄責任を移転する場合は、<code>std::unique_ptr&lt;T, Deleter></code> など
+所有権を持つラッパーを使います。スマートポインターが所有するオブジェクトを使うだけ
+の関数は、アクセスと null 許容性に応じて <code>T&</code>、<code>const T&</code>、<code>T*</code>、<code>const T*</code> を
+受け取るべきで、スマートポインターのハンドルを受け取る必要はありません。</p><h2 id=ムーブ元オブジェクトは存続する>ムーブ元オブジェクトは存続する
+<a href=#%e3%83%a0%e3%83%bc%e3%83%96%e5%85%83%e3%82%aa%e3%83%96%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88%e3%81%af%e5%ad%98%e7%b6%9a%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>標準ライブラリのオブジェクトは、仕様に追加の記載がない限り、ムーブされた後も有効
+だが未規定の値を持ちます。破棄、代入、その状態を事前条件が受け入れる操作は有効です。
+ムーブ元の <code>std::vector</code> が空である、または容量を保持していると仮定しないでください。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span>std<span style=color:#f92672>::</span>vector<span style=color:#f92672>&lt;</span><span style=color:#66d9ef>int</span><span style=color:#f92672>&gt;</span> buffer <span style=color:#f92672>=</span> read_row();
+</span></span><span style=display:flex><span>rows.push_back(std<span style=color:#f92672>::</span>move(buffer));
+</span></span><span style=display:flex><span>buffer.clear(); <span style=color:#75715e>// Valid, but capacity reuse is not guaranteed.
+</span></span></span></code></pre></div></div></div><p>借用は所有者より長く存続してはなりません。所有権を持つ <code>unique_ptr</code> をムーブしても、
+指示対象や既存の借用がすべて破棄されるわけではありませんが、新しい所有者を後で破棄
+またはリセットすると、借用がダングリングする可能性があります。ムーブ操作は表現の
+移転を解決しますが、ライフタイムを明示する必要性をなくすものではありません。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cpp-move-semantics/ class=language-option data-lang=en>English
+</a><a href=/ja/cpp-move-semantics/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cpp-move-semantics/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cpp-move-semantics/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

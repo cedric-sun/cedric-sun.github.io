@@ -1,0 +1,55 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring Resources</title></head><body><main><article><div class=article-header><h1>Spring Resources</h1><div class=aux>最終更新: 2024-01-30 20:15:57 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/java/>Java</a>
+|
+<a href=/ja/tags/resources/>Resources</a>
+|
+<a href=/ja/tags/spring/>Spring</a></div></div><div class="translation-notice machine-translated"><a href=/spring-resources/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p><code>org.springframework.core.io.Resource</code> は、ファイル、クラスパスエントリ、URL、
+サーブレットコンテキスト、バイト配列、すでに開かれたストリームなどに存在し得る
+コンテンツを、Spring API から扱う 1 つのハンドルとして提供します。この抽象化が
+記述するのはアクセス能力であり、すべてのリソースをシーク可能、反復可能、書き込み
+可能、またはファイルを基盤とするものにするわけではありません。</p><h2 id=resource-の契約><code>Resource</code> の契約
+<a href=#resource-%e3%81%ae%e5%a5%91%e7%b4%84 class=heading-anchor><span>#</span></a></h2><p><code>Resource</code> は <code>InputStreamSource</code> を拡張します。基本操作は <code>getInputStream()</code> であり、
+<code>exists()</code>、<code>isReadable()</code>、<code>isOpen()</code>、<code>isFile()</code>、<code>contentLength()</code>、<code>lastModified()</code>、
+<code>getDescription()</code> などのメソッドが能力またはメタデータを公開します。</p><p>重要な実装には次があります。</p><ul><li><code>ClassPathResource</code> for class-loader or class-relative entries;</li><li><code>FileSystemResource</code> and <code>PathResource</code> for filesystem content;</li><li><code>UrlResource</code> for URLs supported by the JVM;</li><li><code>ServletContextResource</code> for web-application paths;</li><li><code>ByteArrayResource</code> for repeatable in-memory bytes; and</li><li><code>InputStreamResource</code> for an already-open, normally single-use stream.</li></ul><p>呼び出し側は <code>getInputStream()</code> が返すすべてのストリームを所有し、閉じなければ
+なりません。<code>isOpen()</code> は特に重要です。<code>InputStreamResource</code> は開かれたハンドルを
+ラップするため安全に繰り返し読めませんが、ファイルおよびバイト配列のリソースは
+呼び出しごとに新しいストリームを開けます。</p><h2 id=ロードと相対解決>ロードと相対解決
+<a href=#%e3%83%ad%e3%83%bc%e3%83%89%e3%81%a8%e7%9b%b8%e5%af%be%e8%a7%a3%e6%b1%ba class=heading-anchor><span>#</span></a></h2><p><code>ResourceLoader.getResource(String)</code> はロケーションを 1 つのリソースに変換します。
+すべての <code>ApplicationContext</code> はリソースローダーです。プレフィックスで明示的な
+意味を選択できます。</p><ul><li><code>classpath:com/example/report.html</code> selects a classpath resource.</li><li><code>file:/srv/app/report.html</code> selects a filesystem URL.</li><li><code>https://example.net/schema.json</code> selects a URL resource.</li></ul><p>プレフィックスのないロケーションはコンテキスト相対です。
+<code>ClassPathXmlApplicationContext</code> はクラスパスロケーションとして、
+<code>FileSystemXmlApplicationContext</code> はファイルシステムロケーションとして、Web
+アプリケーションコンテキストはサーブレットコンテキストロケーションとして解釈します。
+ライブラリコードは 1 つのデフォルトを仮定せず、<code>Resource</code> または <code>ResourceLoader</code>
+を要求します。</p><p><code>ResourcePatternResolver</code> はロケーションパターンと複数一致にロード機能を拡張します。
+<code>classpath*:</code> は一致するすべてのクラスパスルートを検索します。Ant 形式のワイルド
+カードはパターン解決で適用され、単一リソースの <code>ResourceLoader</code> 契約では適用
+されません。</p><h2 id=リソースを注入する>リソースを注入する
+<a href=#%e3%83%aa%e3%82%bd%e3%83%bc%e3%82%b9%e3%82%92%e6%b3%a8%e5%85%a5%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Spring は周囲のアプリケーションコンテキストをローダーとして、ロケーション文字列を
+<code>Resource</code> に変換できます。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReportRenderer</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> Resource template;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReportRenderer(<span style=color:#a6e22e>@Value</span>(<span style=color:#e6db74>&#34;${report.template:classpath:reports/daily.html}&#34;</span>)
+</span></span><span style=display:flex><span>                   Resource template) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>template</span> <span style=color:#f92672>=</span> template;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>コンストラクター注入により依存関係が明確になり、テストから <code>ByteArrayResource</code> を
+渡せます。操作ごとにロケーションが変わる場合は <code>ResourceLoader</code> を注入し、アプリ
+ケーションが意図的に複数一致を受け入れる場合だけ <code>Resource[]</code> または
+<code>ResourcePatternResolver</code> を注入します。</p><h2 id=存在反復性書き込み>存在、反復性、書き込み
+<a href=#%e5%ad%98%e5%9c%a8%e5%8f%8d%e5%be%a9%e6%80%a7%e6%9b%b8%e3%81%8d%e8%be%bc%e3%81%bf class=heading-anchor><span>#</span></a></h2><p><code>exists()</code> は確認であり予約ではありません。開く前にコンテンツが消えることがあります。
+アクセスの正しさが重要な場合は、リソースを開いて発生する <code>IOException</code> を処理する
+ことを優先します。メタデータ操作にも I/O が必要な場合があり、リモート URL は遅い
+か利用できない可能性があります。</p><p><code>WritableResource</code> は <code>isWritable()</code> と <code>getOutputStream()</code> を追加します。
+<code>FileSystemResource</code> と <code>PathResource</code> はこれを実装しますが、パッケージ化された JAR
+内のクラスパスリソースは実装しません。書き込みを行うコードはロケーション文字列に
+基づいてダウンキャストせず、<code>WritableResource</code> を要求します。</p><p>反復性は実装に依存します。2 回のパスを必要とするパーサーは、明示的なサイズ制限を
+設けて、一度しか使えないリソースを <code>ByteArrayResource</code> にバッファーできます。
+リソースの所有権を曖昧にしないため、API はストリームを一度だけ開くのか、再度開く
+のか、保持するのか、閉じるのかを文書化します。</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/core/resources.html>Spring resource abstraction</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/io/Resource.html><code>Resource</code> Javadoc</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/io/ResourceLoader.html><code>ResourceLoader</code> Javadoc</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-resources/ class=language-option data-lang=en>English
+</a><a href=/ja/spring-resources/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/spring-resources/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/spring-resources/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,31 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>使用 SLF4J 和 Log4j 2 记录 Java 日志</title></head><body><main><article><div class=article-header><h1>使用 SLF4J 和 Log4j 2 记录 Java 日志</h1><div class=aux>最后更新: 2025-08-15 19:45:52 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/java/>Java</a>
+|
+<a href=/zh-cn/tags/log4j2/>Log4j2</a>
+|
+<a href=/zh-cn/tags/logging/>Logging</a>
+|
+<a href=/zh-cn/tags/slf4j/>Slf4j</a></div></div><div class="translation-notice machine-translated"><a href=/java-logging/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>SLF4J 是日志 API 外观。应用代码应依赖 <code>slf4j-api</code>，而部署时选择一个兼容的提供程序，
+例如 Log4j 2 或 Logback。SLF4J 2 通过 <code>ServiceLoader</code> 发现提供程序；应只保留一个。
+使用 Log4j 2 时，<code>log4j-slf4j2-impl</code> 将 SLF4J 适配到 Log4j Core。
+不要将它与 <code>log4j-to-slf4j</code> 组合使用，否则事件会重新进入外观并形成桥接循环。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> Logger log <span style=color:#f92672>=</span> LoggerFactory.<span style=color:#a6e22e>getLogger</span>(Orders.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>log.<span style=color:#a6e22e>info</span>(<span style=color:#e6db74>&#34;Accepted order {}&#34;</span>, orderId);
+</span></span><span style=display:flex><span>log.<span style=color:#a6e22e>warn</span>(<span style=color:#e6db74>&#34;Order {} failed validation&#34;</span>, orderId, exception);</span></span></code></pre></div></div></div><p>参数化消息会在日志级别禁用时延迟格式化。应使用显式异常参数，而不是将堆栈跟踪插入文本。</p><h2 id=层次结构和配置>层次结构和配置
+<a href=#%e5%b1%82%e6%ac%a1%e7%bb%93%e6%9e%84%e5%92%8c%e9%85%8d%e7%bd%ae class=heading-anchor><span>#</span></a></h2><p>记录器名称构成以点分隔的层次结构。没有配置级别时，子记录器会继承最近的已配置级别；
+Log4j 2 中常见的有序级别为 <code>TRACE</code>、<code>DEBUG</code>、<code>INFO</code>、<code>WARN</code>、<code>ERROR</code> 和 <code>FATAL</code>。
+Log4j 2 将事件路由到匹配的 <code>LoggerConfig</code>，默认还会经过其祖先的 appender。
+仅当专用 appender 不应同时向父级 appender 提供事件时，才设置 <code>additivity="false"</code>，
+否则会产生重复事件。</p><p>Appender 是目的地；布局负责序列化事件。Log4j Core 提供控制台、滚动文件、套接字和其他 appender，
+以及模式和 JSON 布局。其插件系统发现 <code>@Plugin</code> 扩展类型，并将配置元素映射到受支持的实现。
+配置发现会先遵循显式的 <code>log4j2.configurationFile</code>，然后遵循类路径约定；
+在打包可能存在歧义的生产环境中，应使用显式位置。</p><p>Log4j 2 可以使用 <code>monitorInterval</code> 监控本地配置。重新加载会改变运行中的系统，
+因此应在部署时验证配置，并确保重新加载不会暂时选择不安全的级别、目的地或凭据。</p><h2 id=运维数据>运维数据
+<a href=#%e8%bf%90%e7%bb%b4%e6%95%b0%e6%8d%ae class=heading-anchor><span>#</span></a></h2><p>将关联标识符和稳定的请求元数据放入 SLF4J MDC/Log4j Thread Context，
+然后在 <code>finally</code> 块和执行器包装器中清除上下文，以防止跨请求泄漏。
+后端能够建立索引时，优先使用结构化字段。绝不记录密码、令牌、会话标识符、私钥或未经脱敏的个人数据；
+应在构造日志事件前完成脱敏。限制配置写入和插件加载，因为日志配置属于可执行的运维策略。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.slf4j.org/manual.html>SLF4J 手册</a></li><li><a href=https://logging.apache.org/log4j/2.x/manual/architecture.html>Log4j 2 架构</a></li><li><a href=https://logging.apache.org/log4j/2.x/manual/configuration.html>Log4j 2 配置</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-logging/ class=language-option data-lang=en>English
+</a><a href=/ja/java-logging/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/java-logging/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/java-logging/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

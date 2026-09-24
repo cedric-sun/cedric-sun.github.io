@@ -1,0 +1,35 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java 标准库</title></head><body><main><article><div class=article-header><h1>Java 标准库</h1><div class=aux>最后更新: 2021-06-11 09:05:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/java/>Java</a>
+|
+<a href=/zh-cn/tags/jdk/>Jdk</a>
+|
+<a href=/zh-cn/tags/standard-library/>Standard-Library</a></div></div><div class="translation-notice machine-translated"><a href=/java-standard-library/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>小型库的契约往往比 API 的表面积更能决定正确性。以下规则可以避免常见的
+Java 集成失败。</p><h2 id=对象契约>对象契约
+<a href=#%e5%af%b9%e8%b1%a1%e5%a5%91%e7%ba%a6 class=heading-anchor><span>#</span></a></h2><p><code>equals</code> 必须满足自反性、对称性、传递性和一致性，并且对<code>null</code>返回 false。
+如果两个对象相等，它们必须具有相同的<code>hashCode</code>；因此，在将值用作哈希键之前，
+应同时重写这两个方法。对象作为映射键期间，不要修改参与相等性判断的字段。
+如果继承会破坏对称性，应优先使用组合而非继承。</p><p><code>Object.clone</code>执行字段复制，并且与构造函数、继承和可变字段的配合较差。
+应优先使用复制构造函数或命名为<code>copyOf</code>的工厂方法。数组是一个范围有限的例外，
+因为它们的<code>clone</code>具有可预测的浅数组契约。</p><h2 id=文本正则表达式和字符串>文本、正则表达式和字符串
+<a href=#%e6%96%87%e6%9c%ac%e6%ad%a3%e5%88%99%e8%a1%a8%e8%be%be%e5%bc%8f%e5%92%8c%e5%ad%97%e7%ac%a6%e4%b8%b2 class=heading-anchor><span>#</span></a></h2><p>对于会重复使用的<code>Pattern</code>，应进行编译。<code>Matcher.matches()</code>要求整个输入都匹配，
+而<code>find()</code>搜索下一个匹配区域。<code>Pattern.quote(value)</code>会转义放入正则表达式的
+字面文本；<code>Matcher.quoteReplacement(value)</code>会转义替换字符串。两者不能互换。</p><p>从 JDK 9 开始，HotSpot 的<code>String</code>实现使用紧凑字符串：通过<code>byte[]</code>加编码标记，
+可以紧凑地表示 Latin-1 文本，否则使用 UTF-16。这属于实现细节；Java <code>String</code>
+仍然是 UTF-16 代码单元序列，并且必须在 I/O 边界显式进行<code>Charset</code>转换。</p><h2 id=计数器和枚举集合>计数器和枚举集合
+<a href=#%e8%ae%a1%e6%95%b0%e5%99%a8%e5%92%8c%e6%9e%9a%e4%b8%be%e9%9b%86%e5%90%88 class=heading-anchor><span>#</span></a></h2><p><code>AtomicLong</code>提供一个精确且线性一致的值。<code>LongAdder</code>在存在竞争时将更新分散到
+多个单元中，因此更新具有更好的扩展性，但与更新并发执行的<code>sum()</code>不是原子快照。
+对于度量指标使用<code>LongAdder</code>；当每个观测到的总数都会驱动正确性判断时，使用
+<code>AtomicLong</code>。</p><p><code>Enum&lt;E extends Enum&lt;E>></code>为单个枚举类型提供类型安全的排序和操作。<code>EnumSet</code>和
+<code>EnumMap</code>利用这一封闭的键空间，并保留枚举声明顺序；对于枚举域，应优先使用
+它们而不是<code>HashSet</code>和<code>HashMap</code>。</p><h2 id=集合和线程>集合和线程
+<a href=#%e9%9b%86%e5%90%88%e5%92%8c%e7%ba%bf%e7%a8%8b class=heading-anchor><span>#</span></a></h2><p><code>Thread.State</code>报告<code>BLOCKED</code>、<code>WAITING</code>和<code>TIMED_WAITING</code>等 JVM 级别的状态；
+它用于观察，而不是同步协议。应使用<code>join</code>、future、闩锁或结构化所有权来协调线程。</p><p><code>Map</code>是否允许<code>null</code>键或值取决于具体实现：<code>HashMap</code>允许一个 null 键，而
+<code>ConcurrentHashMap</code>拒绝 null 键和值；在自然排序下，<code>TreeMap</code>也可能拒绝 null
+键。不要假定<code>Map</code>接口的可选操作一定成功，而应验证所选实现的契约。</p><p><code>Arrays.asList(array)</code>返回一个由所提供对象数组支持的固定大小列表。<code>set</code>会更新
+该数组，但<code>add</code>和<code>remove</code>会失败。传入<code>int[]</code>会创建包含一个元素的<code>List&lt;int[]></code>，
+因为可变参数不会将基本类型数组装箱。需要装箱值列表时，请使用
+<code>Arrays.stream(ints).boxed().toList()</code>。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html>JDK <code>Object</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html>JDK <code>Pattern</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/LongAdder.html>JDK <code>LongAdder</code> API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-standard-library/ class=language-option data-lang=en>English
+</a><a href=/ja/java-standard-library/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/java-standard-library/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/java-standard-library/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

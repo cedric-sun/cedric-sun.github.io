@@ -1,0 +1,133 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>GNOME 开发环境</title></head><body><main><article><div class=article-header><h1>GNOME 开发环境</h1><div class=aux>最后更新: 2021-05-31 01:36:17 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/gnome/>Gnome</a>
+|
+<a href=/zh-cn/tags/linux/>Linux</a>
+|
+<a href=/zh-cn/tags/development/>Development</a></div></div><div class="translation-notice machine-translated"><a href=/gnome-development/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Debugging across GLib 和 GTK 需要 a consistent 依赖 graph. If GTK
+loads a 开发 <code>libgtk</code> but resolves GLib, Pango, 或 GDK Pixbuf 来自 the
+host, 源码 lines 和 runtime types no longer correspond 到 one coherent
+build. 一个 isolated installation prefix 提供 consistency without
+replacing distribution packages.</p><h2 id=选择隔离边界>选择隔离边界
+<a href=#%e9%80%89%e6%8b%a9%e9%9a%94%e7%a6%bb%e8%be%b9%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>GNOME recommends Builder 用于 application 开发 和 Toolbx 用于 libraries,
+services, 和 host-integrated modules. JHBuild remains available 用于 building
+a 依赖 graph. Those tools encode more 的 the graph than a hand-written
+script 和 应当 be preferred 用于 sustained contribution work.</p><p>A manual Meson/Ninja prefix remains useful 用于 源码 inspection 或 a small,
+controlled stack. Use it inside a container 或 disposable development
+environment 当 possible. prefix isolates 已安装的 files, 同时 the
+container isolates 构建 tools 和 依赖项 still come 来自 the
+distribution.</p><p>GLib, GObject, GModule, GThread, 和 GIO 是 built 来自 the same
+<a href=https://gitlab.gnome.org/GNOME/glib>GLib repository</a>; GObject 是 不 a
+separate 源码 checkout. GTK 是 a separate repository. GTK&rsquo;s exact dependency
+set varies，使用 its enabled Wayland, X11, Vulkan, documentation, and
+introspection features, so each checkout&rsquo;s <code>README.md</code>, <code>meson_options.txt</code>,
+and Meson 错误 messages 是 authoritative 用于 revision.</p><p>Install the distribution&rsquo;s compiler, Python, Meson, Ninja, <code>pkg-config</code>, and
+the 开发 头文件 needed 到 bootstrap the graph. Documentation builds
+may additionally require tools such 作为 gi-docgen, Graphviz, 和 Doxygen; they
+are 不 required 用于 every GLib 或 GTK configuration.</p><h2 id=定义一个开发前缀>定义一个开发前缀
+<a href=#%e5%ae%9a%e4%b9%89%e4%b8%80%e4%b8%aa%e5%bc%80%e5%8f%91%e5%89%8d%e7%bc%80 class=heading-anchor><span>#</span></a></h2><p>Keep source, 构建 directories, 和 已安装的 artifacts separate:</p><div class="goat svg-container"><svg font-family="Menlo,Lucida Console,monospace" viewBox="0 0 112 105"><g transform="translate(8,16)"><path d="M8 16h8" fill="none" stroke="currentColor"/><path d="M8 32h8" fill="none" stroke="currentColor"/><path d="M40 64h8" fill="none" stroke="currentColor"/><path d="M0 16V32" fill="none" stroke="currentColor"/><path d="M32 56V72" fill="none" stroke="currentColor"/><path d="M88 80l8-16" fill="none" stroke="currentColor"/><text text-anchor="middle" x="0" y="4" fill="currentColor" style="font-size:1em">g</text><text text-anchor="middle" x="0" y="52" fill="currentColor" style="font-size:1em">`</text><text text-anchor="middle" x="8" y="4" fill="currentColor" style="font-size:1em">n</text><text text-anchor="middle" x="8" y="52" fill="currentColor" style="font-size:1em">-</text><text text-anchor="middle" x="16" y="4" fill="currentColor" style="font-size:1em">o</text><text text-anchor="middle" x="16" y="52" fill="currentColor" style="font-size:1em">-</text><text text-anchor="middle" x="24" y="4" fill="currentColor" style="font-size:1em">m</text><text text-anchor="middle" x="32" y="4" fill="currentColor" style="font-size:1em">e</text><text text-anchor="middle" x="32" y="20" fill="currentColor" style="font-size:1em">e</text><text text-anchor="middle" x="32" y="36" fill="currentColor" style="font-size:1em">p</text><text text-anchor="middle" x="32" y="52" fill="currentColor" style="font-size:1em">s</text><text text-anchor="middle" x="32" y="84" fill="currentColor" style="font-size:1em">`</text><text text-anchor="middle" x="40" y="4" fill="currentColor" style="font-size:1em">-</text><text text-anchor="middle" x="40" y="20" fill="currentColor" style="font-size:1em">n</text><text text-anchor="middle" x="40" y="36" fill="currentColor" style="font-size:1em">r</text><text text-anchor="middle" x="40" y="52" fill="currentColor" style="font-size:1em">r</text><text text-anchor="middle" x="40" y="84" fill="currentColor" style="font-size:1em">-</text><text text-anchor="middle" x="48" y="4" fill="currentColor" style="font-size:1em">d</text><text text-anchor="middle" x="48" y="20" fill="currentColor" style="font-size:1em">v</text><text text-anchor="middle" x="48" y="36" fill="currentColor" style="font-size:1em">e</text><text text-anchor="middle" x="48" y="52" fill="currentColor" style="font-size:1em">c</text><text text-anchor="middle" x="48" y="84" fill="currentColor" style="font-size:1em">-</text><text text-anchor="middle" x="56" y="4" fill="currentColor" style="font-size:1em">e</text><text text-anchor="middle" x="56" y="20" fill="currentColor" style="font-size:1em">.</text><text text-anchor="middle" x="56" y="36" fill="currentColor" style="font-size:1em">f</text><text text-anchor="middle" x="56" y="52" fill="currentColor" style="font-size:1em">/</text><text text-anchor="middle" x="64" y="4" fill="currentColor" style="font-size:1em">v</text><text text-anchor="middle" x="64" y="20" fill="currentColor" style="font-size:1em">s</text><text text-anchor="middle" x="64" y="36" fill="currentColor" style="font-size:1em">i</text><text text-anchor="middle" x="64" y="68" fill="currentColor" style="font-size:1em">g</text><text text-anchor="middle" x="64" y="84" fill="currentColor" style="font-size:1em">g</text><text text-anchor="middle" x="72" y="4" fill="currentColor" style="font-size:1em">/</text><text text-anchor="middle" x="72" y="20" fill="currentColor" style="font-size:1em">h</text><text text-anchor="middle" x="72" y="36" fill="currentColor" style="font-size:1em">x</text><text text-anchor="middle" x="72" y="68" fill="currentColor" style="font-size:1em">l</text><text text-anchor="middle" x="72" y="84" fill="currentColor" style="font-size:1em">t</text><text text-anchor="middle" x="80" y="36" fill="currentColor" style="font-size:1em">/</text><text text-anchor="middle" x="80" y="68" fill="currentColor" style="font-size:1em">i</text><text text-anchor="middle" x="80" y="84" fill="currentColor" style="font-size:1em">k</text><text text-anchor="middle" x="88" y="68" fill="currentColor" style="font-size:1em">b</text></g></svg></div><p>An activation script makes all discovery paths refer 到 the same prefix:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e>#!/usr/bin/env bash
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ROOT<span style=color:#f92672>=</span><span style=color:#66d9ef>$(</span>cd -- <span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span>dirname -- <span style=color:#e6db74>&#34;</span><span style=color:#e6db74>${</span>BASH_SOURCE[0]<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span> <span style=color:#f92672>&amp;&amp;</span> pwd<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>PREFIX<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$ROOT<span style=color:#e6db74>/prefix&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>export PREFIX
+</span></span><span style=display:flex><span>export PATH<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/bin:</span>$PATH<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>export PKG_CONFIG_PATH<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/lib/pkgconfig:</span>$PREFIX<span style=color:#e6db74>/share/pkgconfig&#34;</span>
+</span></span><span style=display:flex><span>export LD_LIBRARY_PATH<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/lib</span><span style=color:#e6db74>${</span>LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>export GI_TYPELIB_PATH<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/lib/girepository-1.0&#34;</span>
+</span></span><span style=display:flex><span>export GIO_EXTRA_MODULES<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/lib/gio/modules&#34;</span>
+</span></span><span style=display:flex><span>export GSETTINGS_SCHEMA_DIR<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/share/glib-2.0/schemas&#34;</span>
+</span></span><span style=display:flex><span>export XDG_DATA_DIRS<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/share</span><span style=color:#e6db74>${</span>XDG_DATA_DIRS:+:$XDG_DATA_DIRS<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span></span></span></code></pre></div></div></div><p>Setting <code>--libdir=lib</code> during every Meson setup makes these paths independent
+of a distribution&rsquo;s <code>lib64</code> 或 multiarch default. <code>PKG_CONFIG_PATH</code> searches
+the prefix first but still permits host fallback. After the entire required
+dependency closure has been 已安装的 到 the prefix, strict builds can
+replace it with:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>export PKG_CONFIG_LIBDIR<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/lib/pkgconfig:</span>$PREFIX<span style=color:#e6db74>/share/pkgconfig&#34;</span>
+</span></span><span style=display:flex><span>unset PKG_CONFIG_PATH</span></span></code></pre></div></div></div><p><code>PKG_CONFIG_LIBDIR</code> suppresses pkg-config&rsquo;s standard search directories.
+Enabling it too early also hides bootstrap libraries such 作为 libffi, PCRE2,
+FreeType, 和 Fontconfig, so either 构建 those 到 the prefix 或 使用 a
+container，使用 an explicitly documented host baseline.</p><p>Do 不 place this activation in a login profile. <code>LD_LIBRARY_PATH</code> applies to
+every 进程 started 来自 the shell 和 可以 make unrelated host applications
+load ABI-incompatible 开发 libraries.</p><h2 id=按依赖顺序构建>按依赖顺序构建
+<a href=#%e6%8c%89%e4%be%9d%e8%b5%96%e9%a1%ba%e5%ba%8f%e6%9e%84%e5%bb%ba class=heading-anchor><span>#</span></a></h2><p>Build leaves 在……之前 roots because Meson resolves 依赖项 当 configuring
+each 构建 directory. 一个 GTK stack commonly includes the following groups:</p><ol><li>GLib&rsquo;s bootstrap dependencies, including libffi 和 PCRE2.</li><li>GLib, which produces GLib, GObject, 和 GIO together.</li><li>Graphics 和 text 依赖项 such 作为 pixman/Cairo, FreeType, Fontconfig,
+HarfBuzz, GDK Pixbuf, Pango, Graphene, 和 libepoxy.</li><li>Backend dependencies, such 作为 Wayland 和 wayland-protocols 或 the required
+X11 libraries.</li><li>GTK, followed 由 language bindings such 作为 gtkmm 当 the project needs
+them.</li></ol><p>Dependency edges within the middle groups depend 在 selected features. A
+topological module set 来自 JHBuild 或 GNOME Build Metadata 是 safer than
+copying a fixed 列表 across releases.</p><p>same 构建 函数 可以 be 用于 用于 each Meson project:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>build_one<span style=color:#f92672>()</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>  source_dir<span style=color:#f92672>=</span>$1
+</span></span><span style=display:flex><span>  build_dir<span style=color:#f92672>=</span>$2
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  meson setup <span style=color:#e6db74>&#34;</span>$build_dir<span style=color:#e6db74>&#34;</span> <span style=color:#e6db74>&#34;</span>$source_dir<span style=color:#e6db74>&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    --prefix<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    --libdir<span style=color:#f92672>=</span>lib <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    -Ddebug<span style=color:#f92672>=</span>true <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    -Doptimization<span style=color:#f92672>=</span><span style=color:#ae81ff>0</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>    -Dstrip<span style=color:#f92672>=</span>false
+</span></span><span style=display:flex><span>  meson compile -C <span style=color:#e6db74>&#34;</span>$build_dir<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>  meson test -C <span style=color:#e6db74>&#34;</span>$build_dir<span style=color:#e6db74>&#34;</span> --print-errorlogs
+</span></span><span style=display:flex><span>  meson install -C <span style=color:#e6db74>&#34;</span>$build_dir<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>Run the 函数 来自 a shell has sourced <code>env.sh</code>:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mkdir -p <span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>build_one <span style=color:#e6db74>&#34;</span>$PWD<span style=color:#e6db74>/src/glib&#34;</span> <span style=color:#e6db74>&#34;</span>$PWD<span style=color:#e6db74>/src/glib/_build&#34;</span>
+</span></span><span style=display:flex><span>build_one <span style=color:#e6db74>&#34;</span>$PWD<span style=color:#e6db74>/src/gtk&#34;</span>  <span style=color:#e6db74>&#34;</span>$PWD<span style=color:#e6db74>/src/gtk/_build&#34;</span></span></span></code></pre></div></div></div><p>two 调用 show the endpoints, 不 a complete GTK 构建 plan. Invoke the
+same 函数 用于 every source-built 依赖 between GLib 和 GTK in the
+module set&rsquo;s topological order.</p><p>Meson&rsquo;s <code>debug</code> 构建 type currently corresponds 到 debug information with
+optimization level 0, but spelling out <code>debug</code>, <code>optimization</code>, 和 <code>strip</code>
+makes the intended debugger behavior visible. Individual projects 可以 add
+feature options 在……之后 inspecting <code>meson configure _build</code>; disabling an
+unneeded backend 是 preferable 到 accidentally satisfying it 来自 the host.</p><p>Installing each completed layer matters because the next project finds its
+headers, <code>.pc</code> files, shared objects, schemas, 和 introspection 数据 under one
+prefix. Compile 已安装的 schemas 在……之后 installing a project provides
+them:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>glib-compile-schemas <span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/share/glib-2.0/schemas&#34;</span></span></span></code></pre></div></div></div><h2 id=避免混合系统构建>避免混合系统构建
+<a href=#%e9%81%bf%e5%85%8d%e6%b7%b7%e5%90%88%e7%b3%bb%e7%bb%9f%e6%9e%84%e5%bb%ba class=heading-anchor><span>#</span></a></h2><p>Check 依赖 resolution immediately 在……之后 Meson setup:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>pkg-config --variable<span style=color:#f92672>=</span>prefix glib-2.0
+</span></span><span style=display:flex><span>pkg-config --variable<span style=color:#f92672>=</span>prefix gtk4
+</span></span><span style=display:flex><span>meson introspect src/gtk/_build --dependencies</span></span></code></pre></div></div></div><p>Both pkg-config prefix queries 应当 print the 开发 prefix. Meson&rsquo;s
+setup log 必须 also show prefix paths 用于 Pango, GDK Pixbuf, Graphene, and
+other libraries intended 到 be under 源码 control.</p><p>Check the final ELF resolution rather than trusting link-time output:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>ldd <span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/bin/gtk4-demo&#34;</span>
+</span></span><span style=display:flex><span>readelf -d <span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/bin/gtk4-demo&#34;</span> | grep -E <span style=color:#e6db74>&#39;NEEDED|RPATH|RUNPATH&#39;</span></span></span></code></pre></div></div></div><p>All libraries in the source-built closure 应当 resolve below <code>$PREFIX</code>.
+System C libraries, the dynamic loader, GPU drivers, 和 deliberately retained
+bootstrap 依赖项 may still resolve 来自 the host. Record boundary
+instead 的 claiming complete isolation.</p><p>An rpath 可以 make binaries usable without <code>LD_LIBRARY_PATH</code>:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>export LDFLAGS<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;-Wl,-rpath,</span>$PREFIX<span style=color:#e6db74>/lib&#34;</span></span></span></code></pre></div></div></div><p>Use the comma-separated linker form shown above. 一个 rpath 仅 changes runtime
+loading; it does 不 influence which 头文件 或 <code>.pc</code> metadata Meson selected.
+<code>pkg-config</code> inspection 是 still required.</p><h2 id=使更新可重复>使更新可重复
+<a href=#%e4%bd%bf%e6%9b%b4%e6%96%b0%e5%8f%af%e9%87%8d%e5%a4%8d class=heading-anchor><span>#</span></a></h2><p>Clone each upstream repository once:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git clone https://gitlab.gnome.org/GNOME/glib.git src/glib
+</span></span><span style=display:flex><span>git clone https://gitlab.gnome.org/GNOME/gtk.git src/gtk</span></span></code></pre></div></div></div><p>Apply the same pattern 到 source-built 依赖项 来自 the selected module
+set. Subsequent updates 应当 不 delete untracked work:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git -C src/glib fetch --prune
+</span></span><span style=display:flex><span>git -C src/glib switch main
+</span></span><span style=display:flex><span>git -C src/glib pull --ff-only
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>git -C src/gtk fetch --prune
+</span></span><span style=display:flex><span>git -C src/gtk switch main
+</span></span><span style=display:flex><span>git -C src/gtk pull --ff-only</span></span></code></pre></div></div></div><p>For each dependency, record the tested commit in a lock 文件 或 构建 log.
+&ldquo;Current source&rdquo; changes continuously; commit IDs make a successful graph
+reproducible. Update leaves first, then rebuild 和 install dependents. Use
+<code>meson setup --reconfigure</code> 当 仅 options 或 detected 依赖项 changed,
+and <code>meson setup --wipe</code> 仅 用于 a 生成的 构建 目录 当 cached
+state 必须 be discarded.</p><p>Avoid <code>git clean -fdx</code> in update scripts because it destroys untracked source
+work. Build directories already provide a replaceable boundary.</p><h2 id=调试已安装的依赖图>调试已安装的依赖图
+<a href=#%e8%b0%83%e8%af%95%e5%b7%b2%e5%ae%89%e8%a3%85%e7%9a%84%e4%be%9d%e8%b5%96%e5%9b%be class=heading-anchor><span>#</span></a></h2><p>Run the debugger 来自 the activated environment:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>gdb --args <span style=color:#e6db74>&#34;</span>$PREFIX<span style=color:#e6db74>/bin/gtk4-demo&#34;</span></span></span></code></pre></div></div></div><p>Useful initial checks are:</p><div class=jose-wrapper><div class=jose-tools><span>gdb</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-gdb data-lang=gdb>(gdb) set breakpoint pending on
+(gdb) break g_main_context_dispatch
+(gdb) break gtk_widget_snapshot
+(gdb) run
+(gdb) info sharedlibrary</code></pre></div></div><p><code>info sharedlibrary</code> 应当 show the intended prefix. If a breakpoint resolves
+to a 系统 path, inspect <code>LD_DEBUG=libs</code>, <code>ldd</code>, pkg-config prefixes, and
+Meson&rsquo;s 依赖 report 在……之前 debugging application logic. Source lookup
+can be corrected，使用 GDB&rsquo;s <code>directory</code> 或 <code>set substitute-path</code>, but path
+substitution cannot repair a binary linked against the wrong library.</p><p>update workflow 是 therefore deterministic:</p><ol><li>Activate the environment.</li><li>Fetch pinned 或 selected commits.</li><li>Reconfigure, build, test, 和 install in 依赖 order.</li><li>Recompile schemas 和 any 生成的 loader caches required 由 the stack.</li><li>Audit pkg-config 和 ELF resolution.</li><li>Start the debugger 仅 在……之后 the graph passes those checks.</li></ol><h2 id=upstream-参考资料>Upstream 参考资料
+<a href=#upstream-%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://handbook.gnome.org/development/building.html>GNOME Handbook: Building</a></li><li><a href=https://gitlab.gnome.org/GNOME/glib/-/blob/main/README.md>GLib Build Instructions</a></li><li><a href=https://gitlab.gnome.org/GNOME/gtk/-/blob/main/README.md>GTK Build Instructions</a></li><li><a href=https://mesonbuild.com/Builtin-options.html>Meson Built-In Options</a></li><li><a href=https://gnome.pages.gitlab.gnome.org/jhbuild/>JHBuild Manual</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/gnome-development/ class=language-option data-lang=en>English
+</a><a href=/ja/gnome-development/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/gnome-development/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/gnome-development/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

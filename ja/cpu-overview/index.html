@@ -1,0 +1,75 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>CPU アーキテクチャの概要</title></head><body><main><article><div class=article-header><h1>CPU アーキテクチャの概要</h1><div class=aux>最終更新: 2021-07-15 15:11:38 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/cpu/>Cpu</a>
+|
+<a href=/ja/tags/computer-architecture/>Computer Architecture</a>
+|
+<a href=/ja/tags/assembly/>Assembly</a></div></div><div class="translation-notice machine-translated"><a href=/cpu-overview/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>プロセッサーは命令セットアーキテクチャ（ISA）を実装します。ISA は、命令、レジスター、
+データ型、アドレス形成、例外、特権動作を定義する規約です。<strong>マイクロアーキテクチャ</strong>は、
+パイプライン、実行ユニット、キャッシュ、予測器、内部キューによって、その規約を実装します。
+プログラムから観測できるのはアーキテクチャ状態ですが、性能はマイクロアーキテクチャ状態に
+依存します。</p><h2 id=フェッチからリタイアまで>フェッチからリタイアまで
+<a href=#%e3%83%95%e3%82%a7%e3%83%83%e3%83%81%e3%81%8b%e3%82%89%e3%83%aa%e3%82%bf%e3%82%a4%e3%82%a2%e3%81%be%e3%81%a7 class=heading-anchor><span>#</span></a></h2><p>概念上、プロセッサーは命令バイト列をフェッチし、命令をデコードし、オペランドを取得して
+処理を実行し、必要に応じてメモリへアクセスした後、結果をコミットします。単純なプロセッサー
+では、これらの段階を順番に実行できます。パイプライン方式のプロセッサーは複数の命令の
+各段階を重ねて実行するため、すべての命令のレイテンシーを短縮しなくてもスループットを
+向上させられます。</p><p>アーキテクチャ状態には、汎用レジスター、ステータスレジスター、プログラムカウンター、
+アーキテクチャ上可視なメモリが含まれます。マイクロアーキテクチャ状態には、デコード済み
+オペレーションのキャッシュ、物理レジスター、リオーダーバッファー、分岐履歴、
+キャッシュ置換メタデータが含まれます。コンテキストスイッチでは ABI が保証する
+アーキテクチャ状態を保存する必要がありますが、内部の予測器やパイプラインの全エントリーを
+保存または公開するわけではありません。</p><p>パイプラインでは、次の 3 種類の依存関係を処理する必要があります。</p><ul><li><strong>データハザード</strong>は、ある処理が、別の処理でまだ生成されていない結果を使用するときに
+発生します。</li><li><strong>構造ハザード</strong>は、複数の処理が実行ユニット、ポート、キュー、キャッシュリソースを
+競合して使用するときに発生します。</li><li><strong>制御ハザード</strong>は、分岐によって次のフェッチアドレスが変わる可能性があるため発生します。</li></ul><p>フォワーディングは、レジスターへの書き戻し前に結果を供給します。レジスターリネーミングは、
+アーキテクチャ上の名前をより大きな物理レジスターセットへ対応付けるため、write-after-read
+および write-after-write の偽の依存関係を取り除きます。リオーダーバッファーにより、
+独立した処理をアウトオブオーダーで実行しながら、正確なアーキテクチャ例外を維持する順序で
+完了した処理をリタイアできます。</p><h2 id=スーパースカラー実行と投機的実行>スーパースカラー実行と投機的実行
+<a href=#%e3%82%b9%e3%83%bc%e3%83%91%e3%83%bc%e3%82%b9%e3%82%ab%e3%83%a9%e3%83%bc%e5%ae%9f%e8%a1%8c%e3%81%a8%e6%8a%95%e6%a9%9f%e7%9a%84%e5%ae%9f%e8%a1%8c class=heading-anchor><span>#</span></a></h2><p>スーパースカラー方式のフロントエンドは、1 サイクルに複数の処理をデコードまたは発行
+できます。ディスパッチ幅だけが制約ではありません。真の依存関係、実行ポートへの負荷、
+キャッシュミス、リタイア幅によって、持続可能なスループットが低下する場合があります。</p><p>分岐予測は、分岐結果が確定する前に可能性の高い制御フローパスを選択します。予測が正しければ
+パイプラインへの供給が維持されます。予測が外れると、後続の投機的な処理を破棄し、確定した
+ターゲットからフェッチを再開します。投機によって誤ったアーキテクチャ状態をコミットしては
+なりませんが、一時的実行はキャッシュやほかの共有マイクロアーキテクチャリソースに影響を
+与える可能性があります。したがって、分離を担うコードは、アーキテクチャ上の特権チェック
+だけに依存せず、一時的実行の脆弱性に関するプラットフォームの指針に従う必要があります。</p><h2 id=キャッシュ階層とメモリレイテンシー>キャッシュ階層とメモリレイテンシー
+<a href=#%e3%82%ad%e3%83%a3%e3%83%83%e3%82%b7%e3%83%a5%e9%9a%8e%e5%b1%a4%e3%81%a8%e3%83%a1%e3%83%a2%e3%83%aa%e3%83%ac%e3%82%a4%e3%83%86%e3%83%b3%e3%82%b7%e3%83%bc class=heading-anchor><span>#</span></a></h2><p>高速な記憶装置は高コストで物理的制約もあるため、プロセッサーコアは階層を介して DRAM に
+アクセスします。L1 命令キャッシュと L1 データキャッシュは小さく、コアの近くにあります。
+より大きな L2 キャッシュと最終レベルキャッシュは、レイテンシーと容量をトレードオフします。
+キャッシュラインは隣接するバイトをまとめて転送するため、シーケンシャルアクセスは空間的
+局所性を、再利用は時間的局所性を活用します。</p><p>キャッシュはアドレスをタグ、セットインデックス、ラインオフセットに分割します。
+セットアソシアティビティにより 1 つのセットへ複数のラインを格納できるため、タグ比較と
+置換処理の複雑性を代償として競合ミスを減らせます。ハードウェアプリフェッチャーは予測可能な
+レイテンシーを隠蔽できますが、ポインターチェイシングや容量ミスでは、下位キャッシュまたは
+DRAM の遅延が依然として顕在化します。</p><p>マルチコアシステムでは、コヒーレンスプロトコルによって同じラインのキャッシュ済みコピーを
+調整します。コヒーレンスは 1 つの位置に対する書き込み順序を確立し、メモリ一貫性モデルは
+異なるアクセス間で許容される順序を定義します。キャッシュコヒーレンスによって、同期されて
+いない複合操作がアトミックになるわけではないため、正しい並行ソフトウェアでは、言語が
+提供するアトミック操作、ロック、またはほかの同期機構を使用する必要があります。</p><p>仮想メモリ用ハードウェアは、ページテーブルを介して仮想アドレスを変換します。
+トランスレーションルックアサイドバッファーは最近の変換をキャッシュします。したがって、
+データ自体がキャッシュされていても、TLB ミスによってページテーブルウォークが追加されます。
+NUMA システムでは、さらに距離の違いが加わります。コアは、別のソケットに接続された
+メモリよりも、ローカルメモリへ低レイテンシーまたは高帯域幅でアクセスできます。</p><h2 id=コアスレッドsimd>コア、スレッド、SIMD
+<a href=#%e3%82%b3%e3%82%a2%e3%82%b9%e3%83%ac%e3%83%83%e3%83%89simd class=heading-anchor><span>#</span></a></h2><p><strong>コア</strong>には、1 つ以上のアーキテクチャ上の実行コンテキストが含まれます。同時
+マルチスレッディング（SMT）では、ハードウェアスレッドがコアのフロントエンド、
+キャッシュ、実行リソースを共有します。SMT は空いている発行スロットを利用できますが、
+競合によってスレッドごとの性能が低下する場合もあります。オペレーティングシステムの
+スレッドはスケジューリング対象であり、その数はコア数とハードウェアスレッド数の
+どちらよりも多くなる可能性があります。</p><p>複数のコアは独立した命令ストリームを実行します。共有メモリプログラムでは、引き続き同期、
+キャッシュラインの競合、フォルスシェアリングを考慮する必要があります。コアを追加しても、
+直列の依存関係チェーンは高速化されません。</p><p>SIMD 命令は、ベクトルレジスター内の複数のレーンへ 1 つの処理を適用します。x86 は
+SSE、AVX、AVX-512 の各ファミリーを提供し、Arm と RISC-V はそれぞれ独自のベクトル機能を
+提供します。公称ベクトル幅が表すのはアーキテクチャ状態であり、レイテンシーやスループット
+ではありません。コンパイラーが安全にベクトル化するには、エイリアシング、アラインメント、
+依存関係、ターゲット機能に関する情報が必要です。</p><h2 id=アセンブリ構文と-abi-境界>アセンブリ構文と ABI 境界
+<a href=#%e3%82%a2%e3%82%bb%e3%83%b3%e3%83%96%e3%83%aa%e6%a7%8b%e6%96%87%e3%81%a8-abi-%e5%a2%83%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>アセンブリ構文はツールの規約であり、ISA の特性ではありません。x86 の Intel 構文では
+デスティネーションを先に記述します。</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rax</span>, <span style=color:#66d9ef>rbx</span></span></span></code></pre></div></div></div><p>AT&amp;T 構文ではソースを先に記述し、レジスターに <code>%</code> を付け、多くのニーモニックに
+オペランドサイズを表す接尾辞を付けます。</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>movq</span> %rbx, %rax</span></span></code></pre></div></div></div><p>NASM は Intel 構文を使用します。一方、GNU の <code>objdump -d</code> はデフォルトで AT&amp;T 構文を
+使用し、<code>-Mintel</code> も受け付けます。ほかのアーキテクチャには、それぞれ独自の構文と
+ツール固有のディレクティブがあります。構文は呼び出し規約も定義しません。引数レジスター、
+呼び出し先保存状態、スタックアラインメント、オブジェクト形式は ABI に属します。
+アセンブラーのワークフローについては、<a href=/ja/nasm/>NASM</a>を参照してください。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cpu-overview/ class=language-option data-lang=en>English
+</a><a href=/ja/cpu-overview/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cpu-overview/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cpu-overview/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

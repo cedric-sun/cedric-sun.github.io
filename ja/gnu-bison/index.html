@@ -1,0 +1,38 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>GNU Bison</title></head><body><main><article><div class=article-header><h1>GNU Bison</h1><div class=aux>最終更新: 2026-05-19 10:53:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/bison/>Bison</a>
+|
+<a href=/ja/tags/gnu/>Gnu</a>
+|
+<a href=/ja/tags/parsing/>Parsing</a></div></div><div class="translation-notice machine-translated"><a href=/gnu-bison/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>GNU Bison は文脈自由文法からパーサーを生成します。Yacc 互換の記法でトークン、非終端記号、意味値、アクションを定義し、
+生成されたパーサーは慣例に従ってスキャナーからトークンを取得します。スケルトンや言語固有のインターフェースについては
+<a href=https://www.gnu.org/software/bison/manual/>GNU Bison マニュアル</a>を参照してください。</p><h2 id=文法セクション値アクション>文法セクション、値、アクション
+<a href=#%e6%96%87%e6%b3%95%e3%82%bb%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3%e5%80%a4%e3%82%a2%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3 class=heading-anchor><span>#</span></a></h2><p>文法は <code>%%</code> で区切られた宣言、生成規則、任意のエピローグコードから成ります。宣言ではトークン、値の型、
+優先順位、パーサー設定、必要なコードを定義します。生成規則では非終端記号とアクションを定義します。</p><div class=jose-wrapper><div class=jose-tools><span>bison</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-bison data-lang=bison>%define api.value.type {int}
+%token NUMBER
+%left &#39;+&#39; &#39;-&#39;
+%%
+expression:
+    NUMBER                 { $$ = $1; }
+  | expression &#39;+&#39; expression { $$ = $1 + $3; }
+  ;
+%%</code></pre></div></div><p>アクションは対応する生成規則が還元されたときに実行されます。<code>$$</code> は結果の意味値を表し、<code>$1</code>、<code>$2</code> などは右辺の値を表します。
+記号が異なる値型を持つ場合は、<code>%union</code> とともに <code>%type</code> および型付き <code>%token</code> 宣言を使うか、
+適切な <code>%define api.value.type</code> 設定を使います。エラー回復中に破棄される値を、デストラクターと所有権規則が確実に処理するようにしてください。</p><h2 id=名前とパーサーインターフェース>名前とパーサーインターフェース
+<a href=#%e5%90%8d%e5%89%8d%e3%81%a8%e3%83%91%e3%83%bc%e3%82%b5%e3%83%bc%e3%82%a4%e3%83%b3%e3%82%bf%e3%83%bc%e3%83%95%e3%82%a7%e3%83%bc%e3%82%b9 class=heading-anchor><span>#</span></a></h2><p>C パーサーは既定で <code>yyparse</code>、<code>yylex</code>、<code>yyerror</code> を使います。<code>%define api.prefix {project_}</code> により生成される外部名に
+固有の接頭辞を付けられるため、1 つのプログラムに複数の生成パーサーをリンクできます。対応する接頭辞とヘッダー契約でスキャナーを設定します。</p><p>既定のプルパーサーは自らレクサーを呼び出します。<code>%define api.push-pull push</code> はトークンを供給する呼び出し側向けの
+プッシュインターフェースを生成し、<code>both</code> はプルとプッシュの両方を提供します。<code>%define api.pure full</code> は再入可能インターフェースから
+パーサーのグローバル状態を除去しますが、並行設計には再入可能なスキャナーと明示的なコンテキスト受け渡しも必要です。
+<code>%parse-param</code> と <code>%lex-param</code> を使って、そのコンテキストをパーサーとレクサーの呼び出しに渡します。</p><h2 id=位置情報優先順位競合>位置情報、優先順位、競合
+<a href=#%e4%bd%8d%e7%bd%ae%e6%83%85%e5%a0%b1%e5%84%aa%e5%85%88%e9%a0%86%e4%bd%8d%e7%ab%b6%e5%90%88 class=heading-anchor><span>#</span></a></h2><p>診断でソース範囲が必要な場合は <code>%locations</code> を有効にします。アクションは左辺と右辺の位置情報を <code>@$</code> と <code>@1</code> で参照できます。
+レクサーは無視される空白を含むすべての入力について、位置フィールドを一貫して設定する必要があります。</p><p><code>%left</code>、<code>%right</code>、<code>%nonassoc</code>、<code>%precedence</code>、<code>%prec</code> は、宣言された優先順位と結合規則に従って選択した
+シフト/還元競合を解決します。それ以外では、Bison はシフト/還元競合ではシフトを優先し、還元/還元競合では先にある規則を使います。
+どちらの既定動作も、意図した言語意味論を保証しません。すべての競合を調査し、利用可能なら <code>-Wcounterexamples</code> で例を取得し、
+<code>%expect</code> は確認済みの競合数を表明する場合にだけ残してください。</p><h2 id=エラー回復>エラー回復
+<a href=#%e3%82%a8%e3%83%a9%e3%83%bc%e5%9b%9e%e5%be%a9 class=heading-anchor><span>#</span></a></h2><p>Bison は回復用生成規則のために <code>error</code> トークンを予約しています。構文エラーが発生すると、
+<code>statement: error ';'</code> のような生成規則で同期トークンまで入力を破棄し、後続の文を解析できます。
+アクションが意図的に回復を終了するときだけ <code>yyerrok</code> を使い、先読みトークンが不適切だと分かっているときだけ <code>yyclearin</code> を使います。</p><p>回復処理では破棄した意味値を解放し、処理を前進させ、連鎖したエラーを独立した根本原因として報告しないようにします。
+回復点は式の内部で任意のトークンを受け入れるのではなく、文、宣言、閉じ区切り文字など安定した文法境界に置きます。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/gnu-bison/ class=language-option data-lang=en>English
+</a><a href=/ja/gnu-bison/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/gnu-bison/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/gnu-bison/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,740 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Ai on cesun.life</title><link>https://example.org/zh-cn/tags/ai/</link><description>Recent content in Ai on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 11 Sep 2026 11:02:01 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/ai/index.xml" rel="self" type="application/rss+xml"/><item><title>agent-browser：面向 AI Agent 的浏览器自动化</title><link>https://example.org/zh-cn/agent-browser/</link><pubDate>Fri, 11 Sep 2026 11:02:01 +0800</pubDate><guid>https://example.org/zh-cn/agent-browser/</guid><description>&lt;p&gt;&lt;a href="https://github.com/vercel-labs/agent-browser"&gt;agent-browser&lt;/a&gt; 是一个面向 AI Agent 设计的 Apache-2.0 浏览器自动化 CLI。它不要求 Agent 生成完整的 Playwright 程序，而是将导航、交互、检查、状态、网络和可观测性操作公开为 Shell 命令。持久化原生守护进程会在这些命令之间保留浏览器实例。&lt;/p&gt;
+&lt;p&gt;该项目结合了以下三个理念：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;紧凑的可访问性快照为模型提供页面的结构化视图，而无需发送完整 DOM。&lt;/li&gt;
+&lt;li&gt;快照引用用于在后续命令中标识元素。&lt;/li&gt;
+&lt;li&gt;长生命周期守护进程将浏览器生命周期与每个 CLI 进程的生命周期分离。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;截至 2026 年 9 月 11 日，当前版本为 0.37.1。项目变化迅速，因此本文中依赖版本的行为均链接到 &lt;a href="https://github.com/vercel-labs/agent-browser/tree/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2"&gt;0.37.1 源代码修订版&lt;/a&gt;。&lt;/p&gt;
+&lt;h2 id="浏览器自动化为何需要面向-agent-的接口"&gt;
+ 浏览器自动化为何需要面向 Agent 的接口
+ &lt;a href="#%e6%b5%8f%e8%a7%88%e5%99%a8%e8%87%aa%e5%8a%a8%e5%8c%96%e4%b8%ba%e4%bd%95%e9%9c%80%e8%a6%81%e9%9d%a2%e5%90%91-agent-%e7%9a%84%e6%8e%a5%e5%8f%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Playwright 及类似库提供了精确的浏览器 API，但由 LLM 驱动的进程直接使用这些 API 时，会产生额外成本：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;生成的源代码会消耗上下文，并且需要运行时。&lt;/li&gt;
+&lt;li&gt;原始 DOM 包含脚本、样式、隐藏节点和框架生成的结构，而这些内容很少有助于下一步操作。&lt;/li&gt;
+&lt;li&gt;根据一次观察生成的 CSS 选择器可能会在重新渲染后失效。&lt;/li&gt;
+&lt;li&gt;独立脚本需要显式管理浏览器和上下文的生命周期。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;agent-browser 改变的是接口，而不是浏览器。Agent 观察紧凑的树，选择一项操作，执行一条命令，然后再次观察：&lt;/p&gt;
+&lt;div class="mermaid"&gt;
+ &lt;div class="mermaid-toolbar" aria-label="Diagram zoom controls" hidden&gt;
+ &lt;button class="mermaid-zoom-out" type="button" aria-label="Zoom out" title="Zoom out" disabled&gt;-&lt;/button&gt;
+ &lt;output class="mermaid-zoom-level" aria-live="polite"&gt;100%&lt;/output&gt;
+ &lt;button class="mermaid-zoom-in" type="button" aria-label="Zoom in" title="Zoom in" disabled&gt;+&lt;/button&gt;
+ &lt;/div&gt;
+ &lt;div class="mermaid-viewport" aria-label="Diagram"&gt;
+ &lt;pre class="mermaid-source"&gt;flowchart LR
+ Goal[User Goal] --&amp;gt; Model[Agent]
+ Model --&amp;gt;|open or snapshot| CLI[agent-browser CLI]
+ CLI --&amp;gt; Daemon[Native Daemon]
+ Daemon --&amp;gt;|CDP or WebDriver| Browser[Browser]
+ Browser --&amp;gt; Daemon
+ Daemon --&amp;gt;|Snapshot and Refs| Model
+ Model --&amp;gt;|click @e2| CLI&lt;/pre&gt;
+ &lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;模型仍然负责决定执行什么，而 CLI 提供稳定的操作词汇并管理浏览器状态。根据&lt;a href="https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/page.mdx"&gt;项目概览&lt;/a&gt;，典型的文本快照约使用 200&amp;ndash;400 个 Token，而完整 DOM 则使用 3,000&amp;ndash;5,000 个 Token。这些数字是项目估算值，而不是独立基准测试结果，但其根本原因很明确：可访问性树省略了 Agent 不需要的大量实现细节。&lt;/p&gt;</description></item><item><title>Ollama：面向个人计算机和小型服务的本地 LLM 推理</title><link>https://example.org/zh-cn/ollama/</link><pubDate>Thu, 20 Aug 2026 11:11:52 +0800</pubDate><guid>https://example.org/zh-cn/ollama/</guid><description>&lt;p&gt;&lt;a href="https://ollama.com/"&gt;Ollama&lt;/a&gt; 将模型获取、本地推理、命令行界面、桌面应用程序和 HTTP API 集成到一个工具中。无需先组装 Python 环境、推理引擎、分词器、提示词模板和 GPU 运行时，它就是下载开放权重模型并在开发者工作站上运行的最简单方式之一。&lt;/p&gt;
+&lt;p&gt;最小会话如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ollama pull qwen3:8b
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ollama run qwen3:8b&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Ollama 会选择合适的本地运行器，存储模型，在需要时启动模型，并应用模型的聊天模板。这种便利性使 Ollama 适合个人计算机、应用程序开发、演示和小型内部服务。但它不会自动将笔记本电脑变成高吞吐量或高可用的生产推理集群。&lt;/p&gt;
+&lt;h2 id="ollama-能做什么"&gt;
+ Ollama 能做什么
+ &lt;a href="#ollama-%e8%83%bd%e5%81%9a%e4%bb%80%e4%b9%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Ollama 可以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;下载、列出、检查、运行、复制和删除模型；&lt;/li&gt;
+&lt;li&gt;提供交互式文本聊天和文本生成；&lt;/li&gt;
+&lt;li&gt;运行受支持的视觉语言、嵌入、工具调用和推理模型；&lt;/li&gt;
+&lt;li&gt;将受支持模型的输出约束为结构化 JSON；&lt;/li&gt;
+&lt;li&gt;导入受支持的模型权重或 GGUF 文件，并通过 &lt;code&gt;Modelfile&lt;/code&gt; 定制模型行为；&lt;/li&gt;
+&lt;li&gt;通过原生 REST API 提供本地模型；&lt;/li&gt;
+&lt;li&gt;提供与 OpenAI API 的部分兼容性；&lt;/li&gt;
+&lt;li&gt;在可用 RAM 或 VRAM 范围内，让一个或多个模型驻留内存并处理并发请求；以及&lt;/li&gt;
+&lt;li&gt;可选地使用 Ollama 托管的云模型，而不是本地硬件。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些是运行时功能，并不是每个模型都具备的能力。纯文本模型不会因为请求采用视觉端点的格式就能理解图像；未针对工具使用进行训练的模型也可能生成质量较差的工具调用。在基于模型构建系统之前，请检查 &lt;a href="https://ollama.com/library"&gt;Ollama model library&lt;/a&gt; 中的模型卡片、许可证、上下文限制和标签。&lt;/p&gt;
+&lt;p&gt;本地服务器通常监听 &lt;code&gt;http://127.0.0.1:11434&lt;/code&gt;。CLI、桌面应用、API 客户端、编辑器扩展和第三方聊天界面都是该服务的客户端：&lt;/p&gt;
+&lt;div
+ class="goat svg-container goat--sized" style="--goat-width: 100%;"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 688 121"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 0,0 L 128,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 176,0 L 304,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 352,0 L 472,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 520,0 L 672,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 136,16 L 168,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 136,32 L 168,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 312,32 L 344,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 480,32 L 512,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 136,48 L 168,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 136,64 L 168,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 352,64 L 472,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 520,64 L 672,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 136,80 L 168,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,96 L 128,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 176,96 L 304,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,0 L 0,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 128,0 L 128,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 176,0 L 176,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 304,0 L 304,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 352,0 L 352,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 472,0 L 472,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 520,0 L 520,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 672,0 L 672,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='176.000000,16.000000 164.000000,10.400000 164.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 168.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='176.000000,32.000000 164.000000,26.400000 164.000000,37.599998' fill='currentColor' transform='rotate(0.000000, 168.000000, 32.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='176.000000,48.000000 164.000000,42.400002 164.000000,53.599998' fill='currentColor' transform='rotate(0.000000, 168.000000, 48.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='176.000000,64.000000 164.000000,58.400002 164.000000,69.599998' fill='currentColor' transform='rotate(0.000000, 168.000000, 64.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='176.000000,80.000000 164.000000,74.400002 164.000000,85.599998' fill='currentColor' transform='rotate(0.000000, 168.000000, 80.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='352.000000,32.000000 340.000000,26.400000 340.000000,37.599998' fill='currentColor' transform='rotate(0.000000, 344.000000, 32.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='520.000000,32.000000 508.000000,26.400000 508.000000,37.599998' fill='currentColor' transform='rotate(0.000000, 512.000000, 32.000000)'&gt;&lt;/polygon&gt;
+&lt;text text-anchor='middle' x='16' y='20' fill='currentColor' style='font-size:1em'&gt;C&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='36' fill='currentColor' style='font-size:1em'&gt;D&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='52' fill='currentColor' style='font-size:1em'&gt;W&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='68' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='84' fill='currentColor' style='font-size:1em'&gt;O&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='20' fill='currentColor' style='font-size:1em'&gt;L&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='68' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='84' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='20' fill='currentColor' style='font-size:1em'&gt;I&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='36' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='52' fill='currentColor' style='font-size:1em'&gt;b&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='68' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='84' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='36' fill='currentColor' style='font-size:1em'&gt;k&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='68' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='84' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='36' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='52' fill='currentColor' style='font-size:1em'&gt;U&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='68' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='84' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='36' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='52' fill='currentColor' style='font-size:1em'&gt;I&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='68' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='84' fill='currentColor' style='font-size:1em'&gt;I&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='36' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='68' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='68' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='84' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='36' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='68' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='84' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='36' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='68' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='84' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='36' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='68' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='84' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='84' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='84' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='36' fill='currentColor' style='font-size:1em'&gt;O&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='36' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='36' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='36' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='36' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='36' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='36' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='36' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='36' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='36' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='36' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='424' y='36' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='432' y='36' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='440' y='36' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='448' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='456' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='536' y='36' fill='currentColor' style='font-size:1em'&gt;C&lt;/text&gt;
+&lt;text text-anchor='middle' x='544' y='36' fill='currentColor' style='font-size:1em'&gt;P&lt;/text&gt;
+&lt;text text-anchor='middle' x='552' y='36' fill='currentColor' style='font-size:1em'&gt;U&lt;/text&gt;
+&lt;text text-anchor='middle' x='560' y='36' fill='currentColor' style='font-size:1em'&gt;,&lt;/text&gt;
+&lt;text text-anchor='middle' x='576' y='36' fill='currentColor' style='font-size:1em'&gt;G&lt;/text&gt;
+&lt;text text-anchor='middle' x='584' y='36' fill='currentColor' style='font-size:1em'&gt;P&lt;/text&gt;
+&lt;text text-anchor='middle' x='592' y='36' fill='currentColor' style='font-size:1em'&gt;U&lt;/text&gt;
+&lt;text text-anchor='middle' x='600' y='36' fill='currentColor' style='font-size:1em'&gt;,&lt;/text&gt;
+&lt;text text-anchor='middle' x='616' y='36' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='624' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='640' y='36' fill='currentColor' style='font-size:1em'&gt;b&lt;/text&gt;
+&lt;text text-anchor='middle' x='648' y='36' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='656' y='36' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='664' y='36' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;h2 id="ollama-不是什么"&gt;
+ Ollama 不是什么
+ &lt;a href="#ollama-%e4%b8%8d%e6%98%af%e4%bb%80%e4%b9%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Ollama 不是：&lt;/p&gt;</description></item><item><title>在 LLM 聊天 UI 中发送消息后会发生什么</title><link>https://example.org/zh-cn/llm-chat-message-lifecycle/</link><pubDate>Thu, 13 Aug 2026 13:13:57 +0800</pubDate><guid>https://example.org/zh-cn/llm-chat-message-lifecycle/</guid><description>&lt;p&gt;聊天界面让人与大型语言模型的交互看起来很简单：
+输入消息，按下 Enter，然后等待回答出现。在这次交互背后，
+运行着一条由浏览器、应用服务器、数据库、策略系统、模型网关、推理工作进程，
+以及工具或检索服务共同参与的分布式请求流水线。&lt;/p&gt;
+&lt;p&gt;在已有会话中，新文本只是模型输入的一部分。应用必须重建足够的会话内容，
+将其与隐藏指令和其他上下文结合，在有限的上下文窗口中容纳全部内容，运行推理，
+流式传输结果，并持久化新的状态。&lt;/p&gt;
+&lt;p&gt;典型路径如下：&lt;/p&gt;
+&lt;div
+ class="goat svg-container goat--sized" style="--goat-width: 60%;"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 432 409"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 0,0 L 168,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 216,0 L 416,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 168,80 L 208,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,112 L 168,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 216,128 L 312,128' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 312,128 L 416,128' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,176 L 168,176' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 216,176 L 416,176' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 176,224 L 216,224' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,256 L 80,256' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,256 L 168,256' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 216,272 L 416,272' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,304 L 240,304' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,384 L 232,384' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,0 L 0,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,176 L 0,256' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,304 L 0,384' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,256 L 80,288' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 168,0 L 168,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 168,80 L 168,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 168,176 L 168,256' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 216,0 L 216,128' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 216,176 L 216,224' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 216,224 L 216,272' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 240,304 L 240,352' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 312,128 L 312,160' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 416,0 L 416,128' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 416,176 L 416,272' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,288 L 80,296' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='96.000000,288.000000 84.000000,282.399994 84.000000,293.600006' fill='currentColor' transform='rotate(90.000000, 80.000000, 288.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='184.000000,224.000000 172.000000,218.399994 172.000000,229.600006' fill='currentColor' transform='rotate(180.000000, 176.000000, 224.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='216.000000,80.000000 204.000000,74.400002 204.000000,85.599998' fill='currentColor' transform='rotate(0.000000, 208.000000, 80.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 312,160 L 312,168' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='328.000000,160.000000 316.000000,154.399994 316.000000,165.600006' fill='currentColor' transform='rotate(90.000000, 312.000000, 160.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 248,368 A 16,16 0 0,1 232,384' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;text text-anchor='middle' x='16' y='52' fill='currentColor' style='font-size:1em'&gt;K&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='68' fill='currentColor' style='font-size:1em'&gt;D&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='84' fill='currentColor' style='font-size:1em'&gt;S&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='228' fill='currentColor' style='font-size:1em'&gt;R&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='244' fill='currentColor' style='font-size:1em'&gt;R&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='356' fill='currentColor' style='font-size:1em'&gt;S&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='372' fill='currentColor' style='font-size:1em'&gt;R&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='68' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='84' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='228' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='244' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='356' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='372' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='52' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='68' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='84' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='228' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='244' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='356' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='372' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='52' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='68' fill='currentColor' style='font-size:1em'&gt;f&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='84' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='228' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='244' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='356' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='372' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='68' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='228' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='244' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='372' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='20' fill='currentColor' style='font-size:1em'&gt;B&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='52' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='84' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='196' fill='currentColor' style='font-size:1em'&gt;B&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='228' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='244' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='356' fill='currentColor' style='font-size:1em'&gt;f&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='372' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='52' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='68' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='84' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='196' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='228' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='356' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='52' fill='currentColor' style='font-size:1em'&gt;k&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='68' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='84' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='196' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='244' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='324' fill='currentColor' style='font-size:1em'&gt;C&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='356' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='72' y='372' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='20' fill='currentColor' style='font-size:1em'&gt;w&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='68' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='84' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='196' fill='currentColor' style='font-size:1em'&gt;w&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='228' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='244' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='324' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='356' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='372' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='68' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='84' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='196' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='228' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='244' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='324' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='356' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='372' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='68' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='84' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='196' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='228' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='244' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='324' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='372' fill='currentColor' style='font-size:1em'&gt;g&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='196' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='228' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='244' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='356' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='372' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='228' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='244' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='324' fill='currentColor' style='font-size:1em'&gt;B&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='356' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='228' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='244' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='324' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='356' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='372' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='324' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='356' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='372' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='244' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='324' fill='currentColor' style='font-size:1em'&gt;k&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='356' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='372' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='244' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='324' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='356' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='244' fill='currentColor' style='font-size:1em'&gt;x&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='324' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='356' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='372' fill='currentColor' style='font-size:1em'&gt;f&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='244' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='324' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='356' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='372' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='356' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='372' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='372' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='356' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='372' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='356' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='372' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='356' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='356' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='372' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='356' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='372' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='356' fill='currentColor' style='font-size:1em'&gt;g&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='372' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='52' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='68' fill='currentColor' style='font-size:1em'&gt;S&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='84' fill='currentColor' style='font-size:1em'&gt;L&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='100' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='116' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='228' fill='currentColor' style='font-size:1em'&gt;R&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='244' fill='currentColor' style='font-size:1em'&gt;P&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='260' fill='currentColor' style='font-size:1em'&gt;D&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='356' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='372' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='52' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='68' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='84' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='100' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='116' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='228' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='244' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='260' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='372' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='68' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='84' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='100' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='116' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='196' fill='currentColor' style='font-size:1em'&gt;I&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='228' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='244' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='260' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='52' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='68' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='84' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='116' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='196' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='228' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='244' fill='currentColor' style='font-size:1em'&gt;f&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='260' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='100' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='116' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='196' fill='currentColor' style='font-size:1em'&gt;f&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='228' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='244' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='260' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='20' fill='currentColor' style='font-size:1em'&gt;C&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='52' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='68' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='84' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='100' fill='currentColor' style='font-size:1em'&gt;b&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='196' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='244' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='260' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='20' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='68' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='84' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='100' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='116' fill='currentColor' style='font-size:1em'&gt;b&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='196' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='228' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='244' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='52' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='68' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='84' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='116' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='196' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='228' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='260' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='52' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='68' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='84' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='116' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='196' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='244' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='260' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='52' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='84' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='100' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='116' fill='currentColor' style='font-size:1em'&gt;g&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='196' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='228' fill='currentColor' style='font-size:1em'&gt;w&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='244' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='260' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='20' fill='currentColor' style='font-size:1em'&gt;B&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='68' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='84' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='116' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='196' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='228' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='244' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='260' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='68' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='116' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='228' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='244' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='260' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='20' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='68' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='84' fill='currentColor' style='font-size:1em'&gt;b&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='196' fill='currentColor' style='font-size:1em'&gt;S&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='228' fill='currentColor' style='font-size:1em'&gt;k&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='244' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='260' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='20' fill='currentColor' style='font-size:1em'&gt;k&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='52' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='68' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='84' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='100' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='116' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='196' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='228' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='244' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='68' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='84' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='116' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='196' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='228' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='260' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='52' fill='currentColor' style='font-size:1em'&gt;q&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='68' fill='currentColor' style='font-size:1em'&gt;g&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='84' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='100' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='116' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='196' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='260' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='52' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='68' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='84' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='196' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='260' fill='currentColor' style='font-size:1em'&gt;k&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='84' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='100' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='116' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='196' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='260' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='52' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='100' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='116' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='196' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='260' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='116' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='260' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='116' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='116' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='408' y='116' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;p&gt;具体产品可能会合并、重新排序或省略其中一些阶段。模型 API 也可能位于应用内部，
+而不是作为独立服务存在。一般原则保持不变：Web 应用拥有会话，而普通的语言模型调用
+则将有界的输入 token 序列转换为输出 token 序列。&lt;/p&gt;</description></item><item><title>LangGraph4j</title><link>https://example.org/zh-cn/langgraph/</link><pubDate>Wed, 22 Apr 2026 22:26:49 +0800</pubDate><guid>https://example.org/zh-cn/langgraph/</guid><description>&lt;p&gt;&lt;a href="https://github.com/langgraph4j/langgraph4j"&gt;LangGraph4j&lt;/a&gt; 是一个用于构建有状态、基于图的 AI 应用的 Java 库。图由执行工作的节点、选择下一个节点的边，以及随图运行而变化的共享状态组成。它的设计受到 LangGraph 启发，并与 &lt;a href="https://docs.langchain4j.dev/"&gt;LangChain4j&lt;/a&gt; 和 &lt;a href="https://example.org/spring-ai/"&gt;Spring AI&lt;/a&gt; 集成，但图节点也可以使用普通 Java 代码。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +------------+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | call model |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +------+-----+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; tool requested?
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; / \
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; yes no
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; / \
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +-------v-------+ +--v--+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | execute tool | | END |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +-------+-------+ +-----+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +----------&amp;gt; call model&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;循环是有意设计的。循环使应用能够进行推理、执行操作、检查结果，然后再次推理。LangGraph4j 将这种控制流及其状态显式化，并提供 reducer、条件路由、检查点、断点、流式处理、图可视化和子图。&lt;/p&gt;
+&lt;p&gt;本教程使用 LangGraph4j 1.8.24 和 Java 17。教程聚焦于核心模块，因此示例不依赖特定的模型提供商或 Web 框架。&lt;/p&gt;
+&lt;h2 id="langgraph4j-解决的问题"&gt;
+ LangGraph4j 解决的问题
+ &lt;a href="#langgraph4j-%e8%a7%a3%e5%86%b3%e7%9a%84%e9%97%ae%e9%a2%98" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一个小型 AI 功能可以是单次请求：&lt;/p&gt;</description></item><item><title>A2A 协议</title><link>https://example.org/zh-cn/a2a-protocol/</link><pubDate>Wed, 18 Mar 2026 19:10:43 +0800</pubDate><guid>https://example.org/zh-cn/a2a-protocol/</guid><description>&lt;blockquote&gt;
+&lt;p&gt;又在重新发明 MCP。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;a href="https://a2a-protocol.org/"&gt;Agent2Agent Protocol&lt;/a&gt;（简称 &lt;strong&gt;A2A&lt;/strong&gt;）是一种用于独立 AI agent 应用之间通信的开放协议。它支持一个 agent 发现另一个 agent 的能力、向其分派工作、继续多轮交互、跟踪长时间运行的任务，并在不了解远程 agent 实现方式的情况下接收结构化结果。&lt;/p&gt;
+&lt;p&gt;A2A 由 Google 发起，后捐赠给 Linux Foundation。它与框架、模型、语言和供应商无关。使用 Java 构建的 A2A 客户端可以与使用不同模型和 agent 框架、以 Python 构建的远程 agent 协作。&lt;/p&gt;
+&lt;p&gt;重要边界如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Agent A 知道 Agent B 提供什么，以及如何与其通信。
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Agent A 不需要知道 Agent B 的提示词、记忆、工具、模型或源代码。&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;本文介绍已发布的 A2A v1.0 数据模型。由于规范仍在演进，生产环境实现应协商并验证远程 Agent Card 声明的协议版本。&lt;/p&gt;
+&lt;h2 id="a2a-解决的问题"&gt;
+ A2A 解决的问题
+ &lt;a href="#a2a-%e8%a7%a3%e5%86%b3%e7%9a%84%e9%97%ae%e9%a2%98" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;假设一个通用助手需要安排商务旅行。它可能需要与以下 agent 协作：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;航班 agent；&lt;/li&gt;
+&lt;li&gt;酒店 agent；&lt;/li&gt;
+&lt;li&gt;雇主差旅政策 agent；&lt;/li&gt;
+&lt;li&gt;地面交通 agent；以及&lt;/li&gt;
+&lt;li&gt;费用管理 agent。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;没有通用协议时，每一对系统都需要定制集成：&lt;/p&gt;</description></item><item><title>检索增强生成</title><link>https://example.org/zh-cn/retrieval-augmented-generation/</link><pubDate>Sat, 06 Sep 2025 00:52:02 +0800</pubDate><guid>https://example.org/zh-cn/retrieval-augmented-generation/</guid><description>&lt;p&gt;&lt;strong&gt;检索增强生成&lt;/strong&gt;，或 &lt;strong&gt;RAG&lt;/strong&gt;，从外部语料库检索信息，并将选定的证据提供给生成
+模型以处理一个请求。&lt;/p&gt;
+&lt;p&gt;一个最小的 RAG 系统包含两个路径：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Indexing path
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;documents -&amp;gt; parse -&amp;gt; normalize -&amp;gt; split -&amp;gt; embed -&amp;gt; index
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Request path
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;question -&amp;gt; retrieve -&amp;gt; rank -&amp;gt; select context -&amp;gt; generate -&amp;gt; answer&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;RAG 不修改语言模型的参数。它改变模型的输入上下文。这使其适用于以下信息：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;仅限组织或用户私有；&lt;/li&gt;
+&lt;li&gt;比模型训练数据更新；&lt;/li&gt;
+&lt;li&gt;太大而无法包含在每个提示中；&lt;/li&gt;
+&lt;li&gt;预期有引用或来源；或&lt;/li&gt;
+&lt;li&gt;频繁更新且不适合重复微调。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;名称可能掩盖了涉及的工程量。生产 RAG 系统主要是搜索、数据处理、授权和评估系
+统，语言模型在最后。添加向量数据库并将前五个结果拼接成提示只是最简单的实现。&lt;/p&gt;
+&lt;h2 id="rag-解决的问题"&gt;
+ RAG 解决的问题
+ &lt;a href="#rag-%e8%a7%a3%e5%86%b3%e7%9a%84%e9%97%ae%e9%a2%98" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;语言模型从其参数中的信息和当前上下文窗口中的标记生成文本。两者都是有限的。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;参数知识&lt;/strong&gt; 是在训练中学习的。更新它需要更多训练，且模型无法可靠地识别每个
+学习事实的来源。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;上下文知识&lt;/strong&gt; 是在当前请求中提供的。它易于更新和引用，但上下文窗口是有限的
+，且对无关文本的注意力是不完美的。&lt;/p&gt;
+&lt;p&gt;RAG 使用外部、非参数化记忆：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;question
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +--&amp;gt; retrieval system --&amp;gt; selected evidence
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +------------------------------+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; language model
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; answer&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;原始 RAG 研究结合了学习密集检索与生成用于知识密集型任务。在应用架构中，该术
+语现在涵盖使用向量搜索、词法搜索、SQL、图查询、网络搜索或多个检索器的更广泛
+系统家族。&lt;/p&gt;</description></item><item><title>OpenAI Chat Completions 与 Spring AI</title><link>https://example.org/zh-cn/openai-chat-completions/</link><pubDate>Sun, 20 Apr 2025 05:43:09 +0800</pubDate><guid>https://example.org/zh-cn/openai-chat-completions/</guid><description>&lt;p&gt;OpenAI Chat Completions API 是一种广泛实现的、基于 JSON over HTTP 的对话式语言模型接口。客户端发送按顺序排列的消息列表和生成选项；服务器返回一条或多条包含元数据和令牌使用量的 assistant 消息。&lt;/p&gt;
+&lt;p&gt;其基本结构如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP client
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; POST /v1/chat/completions
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; request JSON containing messages and options
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; model inference
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &amp;lt;- response JSON containing choices and usage&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;许多网关和模型服务器即使底层模型并非由 OpenAI 托管，也会实现 OpenAI 兼容端点。因此，这种格式可作为事实上的互操作 API，但它不是像 HTTP、JSON-RPC 或 MCP 那样独立的正式标准。不同的兼容提供商可能支持不同的字段、模型、限制、错误格式或扩展。&lt;/p&gt;
+&lt;p&gt;Spring AI 在这种线格式之上为 Java 应用提供了与提供商无关的模型。应用代码使用 &lt;code&gt;Prompt&lt;/code&gt;、&lt;code&gt;Message&lt;/code&gt;、&lt;code&gt;ChatOptions&lt;/code&gt; 和 &lt;code&gt;ChatResponse&lt;/code&gt;；OpenAI 或 OpenAI 兼容适配器负责在这些对象与提供商 JSON 之间进行转换。&lt;/p&gt;
+&lt;h2 id="http-请求"&gt;
+ HTTP 请求
+ &lt;a href="#http-%e8%af%b7%e6%b1%82" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;简化后的请求如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;POST&lt;/span&gt; /v1/chat/completions &lt;span style="color:#66d9ef"&gt;HTTP&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;1.1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Host&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;api.example.com&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Authorization&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;Bearer ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Type&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;application/json&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;{
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;model&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;gpt-4.1&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;messages&amp;#34;&lt;/span&gt;: [
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;role&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;system&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;content&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Answer concisely.&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; },
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;role&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;user&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;content&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Explain optimistic locking.&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ],
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;temperature&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;0.3&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;max_tokens&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;1000&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;stream&amp;#34;&lt;/span&gt;: &lt;span style="color:#66d9ef"&gt;false&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;model&lt;/code&gt; 和 &lt;code&gt;messages&lt;/code&gt; 用于标识应运行的模型以及模型应看到的对话上下文。其余字段控制生成行为。一些网关通过配置、部署名称、URL 或请求头选择模型，而不是要求请求体中包含 &lt;code&gt;model&lt;/code&gt;。&lt;/p&gt;</description></item><item><title>AgentScope</title><link>https://example.org/zh-cn/agentscope/</link><pubDate>Fri, 05 May 2023 11:54:52 +0800</pubDate><guid>https://example.org/zh-cn/agentscope/</guid><description>&lt;p&gt;&lt;a href="https://github.com/agentscope-ai/agentscope"&gt;AgentScope&lt;/a&gt; 是一个用于构建和运行应用程序的开源框架。在这些应用程序中，大语言模型可以进行推理、调用工具、保留状态，并与用户或其他智能体协作。它由阿里巴巴发起，并以独立的 Python 和 Java 项目形式提供。&lt;/p&gt;
+&lt;p&gt;普通的模型调用具有一条由应用程序控制的短路径：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;application -&amp;gt; prompt -&amp;gt; model -&amp;gt; response&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;智能体会增加一个执行循环：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;user goal
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;model reasons -&amp;gt; chooses a tool -&amp;gt; application executes it
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ^ |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +----------- tool result &amp;lt;---------+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;final answer, interruption, or next action&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;模型本身仍不会执行 Java 或 Python 函数。它会输出结构化请求，而 AgentScope 通过其工具系统验证并分发该请求。框架还负责管理围绕这一循环的消息、事件流、权限、会话状态以及重复的模型调用。&lt;/p&gt;
+&lt;p&gt;本文介绍 AgentScope 2.0，重点讨论 &lt;a href="https://github.com/agentscope-ai/agentscope-java"&gt;AgentScope Java&lt;/a&gt; 2.0.0。AgentScope 发展迅速，因此面向早期 1.x API 的示例可能无法直接运行。&lt;/p&gt;
+&lt;h2 id="python-和-java-是独立的实现"&gt;
+ Python 和 Java 是独立的实现
+ &lt;a href="#python-%e5%92%8c-java-%e6%98%af%e7%8b%ac%e7%ab%8b%e7%9a%84%e5%ae%9e%e7%8e%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;AgentScope 这个名称指的是一个生态系统，而不是一个可以在所有语言中原样运行的库。&lt;/p&gt;</description></item></channel></rss>

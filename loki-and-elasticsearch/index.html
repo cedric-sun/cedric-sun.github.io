@@ -1,0 +1,185 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Loki and Elasticsearch</title></head><body><main><article><div class=article-header><h1>Loki and Elasticsearch</h1><div class=aux>Last update: 2024-09-14 12:38:54 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/loki/>Loki</a>
+|
+<a href=/tags/elasticsearch/>Elasticsearch</a>
+|
+<a href=/tags/logs/>Logs</a>
+|
+<a href=/tags/grafana/>Grafana</a>
+|
+<a href=/tags/observability/>Observability</a></div></div><div class=article-content><p>Loki and Elasticsearch can both store and query logs, but they make different
+tradeoffs. Elasticsearch indexes the contents of each document, enabling fast
+and flexible full-text search. Loki primarily indexes labels and leaves the log
+contents compressed in chunks, reducing indexing cost while encouraging queries
+that first select a small set of log streams.</p><p>This article explains Loki, introduces LogQL, and compares Loki with
+Elasticsearch as a log platform.</p><h2 id=where-loki-fits>Where Loki Fits
+<a href=#where-loki-fits class=heading-anchor><span>#</span></a></h2><p>An observability system commonly works with three kinds of telemetry:</p><ul><li><strong>Metrics</strong> describe aggregate numeric behavior. Prometheus stores and queries
+them.</li><li><strong>Logs</strong> record discrete events. Loki or Elasticsearch can store and query
+them.</li><li><strong>Traces</strong> follow requests across services. Tempo, Jaeger, and similar systems
+store and query them.</li></ul><p>Grafana can display all three. A dashboard might use Prometheus for an error-rate
+graph, Loki for the corresponding error messages, and Tempo for traces of the
+failed requests.</p><p>Loki is often described as &ldquo;Prometheus for logs.&rdquo; This does not mean it stores
+logs as Prometheus metrics. It means Loki organizes logs into labeled streams
+and uses a query language whose selection and aggregation model resembles
+PromQL.</p><h2 id=how-loki-organizes-logs>How Loki Organizes Logs
+<a href=#how-loki-organizes-logs class=heading-anchor><span>#</span></a></h2><p>A Loki log stream is identified by a set of labels:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>{cluster=&#34;production&#34;, namespace=&#34;shop&#34;, app=&#34;checkout&#34;}</span></span></code></pre></div></div></div><p>Every log line carrying exactly that label set belongs to the same stream:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>2026-07-17T05:00:01Z request completed status=200 duration=42ms
+</span></span><span style=display:flex><span>2026-07-17T05:00:02Z payment provider timed out status=503</span></span></code></pre></div></div></div><p>Loki indexes the labels and timestamps needed to locate the stream&rsquo;s chunks. It
+does not normally build a full-text index over every word in every line. During
+a query, Loki selects streams through their labels and then scans the matching
+chunks for text or parsed fields.</p><p>This design has two important consequences:</p><ol><li>Storage and indexing can be considerably cheaper than a full-text search
+engine for large log volumes.</li><li>Queries work best when selective labels narrow the search before log content
+is inspected.</li></ol><h2 id=loki-components>Loki Components
+<a href=#loki-components class=heading-anchor><span>#</span></a></h2><p>A production Loki deployment can separate several responsibilities:</p><ul><li><strong>Distributor:</strong> Receives log entries, validates them, and sends them to
+ingesters.</li><li><strong>Ingester:</strong> Builds compressed chunks from incoming streams and persists
+them.</li><li><strong>Query frontend and querier:</strong> Split, schedule, cache, and execute queries.</li><li><strong>Object storage:</strong> Stores durable log chunks and index data.</li><li><strong>Compactor:</strong> Maintains index files and applies retention or deletion rules.</li></ul><p>Loki can also run as a single process for local development or small
+installations. Larger installations split these responsibilities so ingestion
+and querying can scale independently.</p><p>Loki itself does not discover and read application log files. Logs must be
+shipped to it by an agent. Common choices include Grafana Alloy, Fluent Bit,
+Vector, and the OpenTelemetry Collector.</p><h2 id=choosing-labels>Choosing Labels
+<a href=#choosing-labels class=heading-anchor><span>#</span></a></h2><p>Good Loki labels describe bounded infrastructure dimensions:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>cluster
+</span></span><span style=display:flex><span>region
+</span></span><span style=display:flex><span>namespace
+</span></span><span style=display:flex><span>application
+</span></span><span style=display:flex><span>environment
+</span></span><span style=display:flex><span>container
+</span></span><span style=display:flex><span>log_level</span></span></code></pre></div></div></div><p>Avoid labels with numerous or unbounded values:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>request_id
+</span></span><span style=display:flex><span>trace_id
+</span></span><span style=display:flex><span>user_id
+</span></span><span style=display:flex><span>email
+</span></span><span style=display:flex><span>timestamp
+</span></span><span style=display:flex><span>raw_url</span></span></code></pre></div></div></div><p>Every unique label set creates another stream. High-cardinality labels therefore
+produce many small streams, enlarge the index, increase memory use, and make
+ingestion and queries less efficient.</p><p>Values such as request IDs and user IDs can remain in the log body or be
+attached as structured metadata. They can then be filtered after the query has
+selected streams using stable labels.</p><p>The distinction is similar to Prometheus: labels should identify useful,
+bounded dimensions, not individual events.</p><h2 id=querying-logs-with-logql>Querying Logs with LogQL
+<a href=#querying-logs-with-logql class=heading-anchor><span>#</span></a></h2><p>LogQL queries begin with a stream selector:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{cluster=&#34;production&#34;, app=&#34;checkout&#34;}</code></pre></div></div><p>Label matchers use the same operators as PromQL:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{app=&#34;checkout&#34;}                # Equal
+{app!=&#34;checkout&#34;}               # Not equal
+{app=~&#34;checkout|payments&#34;}      # Regular expression match
+{namespace!~&#34;test-.*&#34;}          # Negative regular expression match</code></pre></div></div><p>After selecting streams, add a line filter:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{app=&#34;checkout&#34;} |= &#34;timeout&#34;</code></pre></div></div><p>The available text filters include:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{app=&#34;checkout&#34;} |= &#34;timeout&#34;   # Contains text
+{app=&#34;checkout&#34;} != &#34;health&#34;    # Does not contain text
+{app=&#34;checkout&#34;} |~ &#34;5[0-9]{2}&#34; # Matches a regular expression
+{app=&#34;checkout&#34;} !~ &#34;2[0-9]{2}&#34; # Does not match a regular expression</code></pre></div></div><p>Put inexpensive, selective filters early in the pipeline so later stages
+process fewer lines:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{app=&#34;checkout&#34;} |= &#34;payment&#34; != &#34;health&#34;</code></pre></div></div><h2 id=parsing-structured-logs>Parsing Structured Logs
+<a href=#parsing-structured-logs class=heading-anchor><span>#</span></a></h2><p>Applications should preferably emit structured logs. LogQL can parse JSON:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{app=&#34;checkout&#34;}
+  | json
+  | status &gt;= 500</code></pre></div></div><p>Given this line:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{<span style=color:#f92672>&#34;level&#34;</span>:<span style=color:#e6db74>&#34;error&#34;</span>,<span style=color:#f92672>&#34;route&#34;</span>:<span style=color:#e6db74>&#34;/checkout&#34;</span>,<span style=color:#f92672>&#34;status&#34;</span>:<span style=color:#ae81ff>503</span>,<span style=color:#f92672>&#34;duration_ms&#34;</span>:<span style=color:#ae81ff>1200</span>}</span></span></code></pre></div></div></div><p>the <code>json</code> stage extracts fields that later pipeline stages can filter or
+format:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{app=&#34;checkout&#34;}
+  | json
+  | status &gt;= 500
+  | line_format &#34;{{.status}} {{.route}} took {{.duration_ms}} ms&#34;</code></pre></div></div><p>For logfmt data, use the <code>logfmt</code> parser:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{app=&#34;checkout&#34;}
+  | logfmt
+  | level=&#34;error&#34;</code></pre></div></div><p>For unstructured text, a pattern expression is often clearer and faster to
+maintain than a regular expression:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>{app=&#34;nginx&#34;}
+  | pattern `&lt;ip&gt; - - [&lt;_&gt;] &#34;&lt;method&gt; &lt;uri&gt; &lt;_&gt;&#34; &lt;status&gt; &lt;size&gt;`
+  | status &gt;= 500</code></pre></div></div><p>Parsed fields are query-time values. They do not become permanent indexed
+labels merely because a query extracts them.</p><h2 id=deriving-metrics-from-logs>Deriving Metrics from Logs
+<a href=#deriving-metrics-from-logs class=heading-anchor><span>#</span></a></h2><p>LogQL can turn matching log lines into metric values. Count error lines per
+second:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>sum by (app) (
+  rate({namespace=&#34;shop&#34;} |= &#34;error&#34; [5m])
+)</code></pre></div></div><p>Count the number of errors during a period:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>sum by (app) (
+  count_over_time({namespace=&#34;shop&#34;} |= &#34;error&#34; [1h])
+)</code></pre></div></div><p>Structured numeric fields can also become samples. Calculate the 95th
+percentile of request duration from JSON logs:</p><div class=jose-wrapper><div class=jose-tools><span>logql</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-logql data-lang=logql>quantile_over_time(
+  0.95,
+  {app=&#34;checkout&#34;}
+    | json
+    | unwrap duration_ms
+    | __error__=&#34;&#34; [5m]
+)</code></pre></div></div><p>The <code>unwrap</code> stage turns an extracted field into numeric samples. The
+<code>__error__=""</code> filter excludes lines that could not be parsed or converted.</p><p>Log-based metrics are useful when an application does not expose an equivalent
+metric. However, frequently used service-level indicators should normally be
+instrumented directly as Prometheus metrics. Metrics are cheaper to query and
+do not depend on parsing every matching log line.</p><h2 id=connecting-logs-metrics-and-traces>Connecting Logs, Metrics, and Traces
+<a href=#connecting-logs-metrics-and-traces class=heading-anchor><span>#</span></a></h2><p>Consistent metadata makes telemetry systems work together. Prometheus metrics,
+Loki logs, and traces should use compatible names for fields such as service,
+cluster, namespace, and environment.</p><p>Grafana can then provide links between data sources:</p><ul><li>A Prometheus graph can link to Loki logs for the same service and time range.</li><li>A log containing a trace ID can link to the corresponding trace.</li><li>A trace can link back to logs for the participating service.</li></ul><h2 id=elasticsearch-data-model>Elasticsearch Data Model
+<a href=#elasticsearch-data-model class=heading-anchor><span>#</span></a></h2><p>Elasticsearch stores JSON documents in indices. An index is divided into
+<strong>primary shards</strong>, and each primary can have replica shards. A document is
+routed to one primary shard; replicas provide redundant copies and can serve
+searches. Primary and replica counts affect capacity and recovery, so they
+should be selected from expected data volume and availability requirements,
+rather than from the number of nodes currently available.</p><p>Each field has a mapping. A string field often needs two representations:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;message&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;text&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;fields&#34;</span>: {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;keyword&#34;</span>: { <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;keyword&#34;</span>, <span style=color:#f92672>&#34;ignore_above&#34;</span>: <span style=color:#ae81ff>256</span> }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>The <code>text</code> field is analyzed into terms for full-text search. Its <code>keyword</code>
+multi-field preserves one value for exact filtering, sorting, and aggregations.
+Analysis applies both when indexing and when a query targets that <code>text</code> field;
+use an explicitly selected analyzer when language-specific tokenization is
+required.</p><p>Mappings should be defined before production ingestion. Dynamic mapping can
+create incompatible field types when one producer sends a number and another
+sends a string. Index templates provide a repeatable mapping, settings, and
+index pattern for time-based data streams.</p><h2 id=elasticsearch-queries-and-operations>Elasticsearch Queries and Operations
+<a href=#elasticsearch-queries-and-operations class=heading-anchor><span>#</span></a></h2><p>Use the <code>bool</code> query to separate scoring clauses from filters:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;query&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;bool&#34;</span>: {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;filter&#34;</span>: [
+</span></span><span style=display:flex><span>        { <span style=color:#f92672>&#34;term&#34;</span>: { <span style=color:#f92672>&#34;service.keyword&#34;</span>: <span style=color:#e6db74>&#34;checkout&#34;</span> } },
+</span></span><span style=display:flex><span>        { <span style=color:#f92672>&#34;range&#34;</span>: { <span style=color:#f92672>&#34;@timestamp&#34;</span>: { <span style=color:#f92672>&#34;gte&#34;</span>: <span style=color:#e6db74>&#34;now-15m&#34;</span> } } }
+</span></span><span style=display:flex><span>      ],
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;must&#34;</span>: [{ <span style=color:#f92672>&#34;match&#34;</span>: { <span style=color:#f92672>&#34;message&#34;</span>: <span style=color:#e6db74>&#34;payment timeout&#34;</span> } }]
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>filter</code> clauses do not calculate relevance scores and are cacheable in
+appropriate contexts. <code>match</code> analyzes full-text input, whereas <code>term</code> matches
+the supplied term exactly and therefore belongs with <code>keyword</code>, numeric,
+boolean, date, and similarly exact fields.</p><p>For log retention, use data streams with Index Lifecycle Management. A policy
+can roll over a backing index by size, age, or document count, move it through
+data tiers, and delete it at the retention boundary. Snapshots to a registered
+repository are the supported backup mechanism; replicas do not protect against
+accidental deletion or a cluster-wide fault.</p><p>Elasticsearch is the better fit when search requires arbitrary text retrieval,
+complex aggregations, or document-centric analysis. Loki is the better fit when
+log streams have stable, selective labels and operational queries can narrow
+them before scanning log content.</p><p>Each backend remains optimized for its data model while Grafana can provide a
+common interface.</p><h2 id=loki-compared-with-elasticsearch>Loki Compared with Elasticsearch
+<a href=#loki-compared-with-elasticsearch class=heading-anchor><span>#</span></a></h2><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Area</th><th>Loki</th><th>Elasticsearch</th></tr></thead><tbody><tr><td>Primary model</td><td>Labeled log streams</td><td>Indexed JSON documents</td></tr><tr><td>Content indexing</td><td>Labels are indexed; content is scanned</td><td>Selected document fields and text are indexed</td></tr><tr><td>Query language</td><td>LogQL</td><td>Query DSL, ES|QL, KQL in Kibana, and others</td></tr><tr><td>Typical interface</td><td>Grafana</td><td>Kibana, or Grafana through a data source</td></tr><tr><td>Storage profile</td><td>Compressed chunks, commonly in object storage</td><td>Searchable indexes on Elasticsearch data nodes</td></tr><tr><td>Query strength</td><td>Known time range and labels, followed by filtering</td><td>Flexible field, term, and full-text search</td></tr><tr><td>Operational focus</td><td>Log ingestion and observability</td><td>General distributed search and analytics</td></tr><tr><td>Schema</td><td>Labels plus query-time parsing</td><td>Explicit or dynamically inferred field mappings</td></tr><tr><td>Cardinality concern</td><td>Number of unique log streams</td><td>Number and shape of indexed fields and terms</td></tr><tr><td>Scaling tradeoff</td><td>Favors inexpensive storage and selective scans</td><td>Favors query-time search speed through indexing</td></tr></tbody></table></div></div><p>Neither design is universally better. Loki spends less work indexing log
+content and may scan more data during a content query. Elasticsearch spends
+more resources while ingesting and indexing documents so later searches can
+use those indexes.</p><h2 id=when-to-choose-loki>When to Choose Loki
+<a href=#when-to-choose-loki class=heading-anchor><span>#</span></a></h2><p>Loki is a strong choice when:</p><ul><li>Logs are primarily used for application and infrastructure observability.</li><li>Operators usually begin with a service, cluster, namespace, and time range.</li><li>Prometheus and Grafana are already central to the monitoring stack.</li><li>Large log volumes make full-text indexing unnecessarily expensive.</li><li>Object storage is preferred for durable, scalable retention.</li><li>Correlation among metrics, logs, and traces is more important than
+unrestricted document search.</li></ul><p>Loki is less attractive when most investigations begin with an arbitrary term
+across all historical logs and no useful labels are known. Such queries may
+require scanning a large amount of log data.</p><h2 id=when-to-choose-elasticsearch>When to Choose Elasticsearch
+<a href=#when-to-choose-elasticsearch class=heading-anchor><span>#</span></a></h2><p>Elasticsearch is a strong choice when:</p><ul><li>Fast, flexible full-text search is a primary requirement.</li><li>Users need rich searches across many indexed fields.</li><li>Logs support security analytics, compliance investigations, or other
+document-oriented workloads.</li><li>Existing applications already rely on Elasticsearch and Kibana.</li><li>The organization can operate and tune index mappings, shards, lifecycle
+policies, and data tiers.</li></ul><p>Its flexibility has a cost. Indexing consumes CPU, memory, and storage, and
+poorly controlled dynamic fields can create mapping and performance problems.
+Shard sizing and lifecycle management also require deliberate operational
+planning.</p><h2 id=they-can-coexist>They Can Coexist
+<a href=#they-can-coexist class=heading-anchor><span>#</span></a></h2><p>Adopting Loki does not require replacing Elasticsearch. An organization might:</p><ul><li>Send routine application logs to Loki for economical retention and Grafana
+correlation.</li><li>Keep security or audit events in Elasticsearch for indexed investigation.</li><li>Route a short-retention copy to Loki and a curated subset to Elasticsearch.</li><li>Retain an existing Elasticsearch deployment while using Loki for new
+Kubernetes workloads.</li></ul><p>The right boundary depends on how logs are queried, not merely how many logs are
+generated.</p><h2 id=practical-design-guidelines>Practical Design Guidelines
+<a href=#practical-design-guidelines class=heading-anchor><span>#</span></a></h2><ol><li>Emit structured JSON or logfmt instead of inventing an unstructured format.</li><li>Use stable, bounded Loki labels such as service, environment, and namespace.</li><li>Keep request IDs, trace IDs, user IDs, and raw URLs out of labels.</li><li>Preserve the original event timestamp and use synchronized clocks.</li><li>Avoid logging secrets, credentials, or unnecessary personal data.</li><li>Set retention from operational and compliance needs rather than keeping all
+logs indefinitely.</li><li>Instrument important rates and latency distributions as Prometheus metrics
+instead of repeatedly deriving them from logs.</li><li>Test representative queries before choosing a backend. Ingestion cost alone
+does not reveal whether the system will satisfy investigation workflows.</li></ol><p>Loki treats logs as compressed streams selected by labels, whereas
+Elasticsearch treats logs as searchable documents. Choose Loki when
+observability-oriented stream selection and economical storage fit the
+workload. Choose Elasticsearch when indexed document and full-text search
+justify the additional ingestion and operational cost.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://grafana.com/docs/loki/latest/>Grafana Loki Documentation</a></li><li><a href=https://grafana.com/docs/loki/latest/query/>LogQL Reference</a></li><li><a href=https://grafana.com/docs/loki/latest/configure/storage/>Loki Storage</a></li><li><a href=https://www.elastic.co/docs/manage-data/data-store/mapping>Elasticsearch Mapping</a></li><li><a href=https://www.elastic.co/docs/manage-data/data-store/data-streams>Elasticsearch Data Streams</a></li><li><a href=https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management>Index Lifecycle Management</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/loki-and-elasticsearch/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

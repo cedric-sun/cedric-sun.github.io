@@ -1,0 +1,30 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>CDN 源站路由</title></head><body><main><article><div class=article-header><h1>CDN 源站路由</h1><div class=aux>最后更新: 2021-11-27 08:11:55 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/cdn/>Cdn</a>
+|
+<a href=/zh-cn/tags/http/>Http</a>
+|
+<a href=/zh-cn/tags/networking/>Networking</a></div></div><div class="translation-notice machine-translated"><a href=/cdn-origin-routing/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>CDN 路由包含两个独立决策：客户端连接到哪里，以及边缘节点联系哪个源站。
+DNS 和任播选择边缘位置；该边缘位置的配置选择源站并构造上游请求。
+将这两个决策分开，可以更容易诊断故障。</p><h2 id=边缘节点的请求身份>边缘节点的请求身份
+<a href=#%e8%be%b9%e7%bc%98%e8%8a%82%e7%82%b9%e7%9a%84%e8%af%b7%e6%b1%82%e8%ba%ab%e4%bb%bd class=heading-anchor><span>#</span></a></h2><p>客户端从类似 <code>https://www.example.com/docs</code> 的 URL 开始。DNS 返回边缘地址，
+TLS SNI 在握手期间标识 <code>www.example.com</code>，HTTP 请求携带
+<code>Host: www.example.com</code>（HTTP/2 和 HTTP/3 中则携带等价的 <code>:authority</code> 字段）。
+CDN 使用该主机名和路径选择分发配置及缓存行为。</p><p>单独的 IP 地址不是源站身份。共享反向代理会在一个地址上托管多个域名，因此直接测试必须包含
+预期的主机名：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>curl --resolve www.example.com:443:203.0.113.10 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  https://www.example.com/health</span></span></code></pre></div></div></div><p><code>--resolve</code> 在选择特定地址的同时保留 URL 主机名，以供 SNI 和 HTTP 使用。
+相比只手动提供标头并发送原始 IP URL，这种方式更安全，也更接近实际情况。</p><h2 id=转发正确的上游主机>转发正确的上游主机
+<a href=#%e8%bd%ac%e5%8f%91%e6%ad%a3%e7%a1%ae%e7%9a%84%e4%b8%8a%e6%b8%b8%e4%b8%bb%e6%9c%ba class=heading-anchor><span>#</span></a></h2><p>源站可能使用传入主机选择虚拟主机、生成重定向或应用租户策略。
+CDN 可以保留访问者主机、将其替换为源站主机名，或转发配置的值。应有意选择一种方案：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>viewer:  https://www.example.com/account
+</span></span><span style=display:flex><span>edge:    GET /account  Host: origin.internal.example.net
+</span></span><span style=display:flex><span>origin:  routes by Host and returns a response</span></span></code></pre></div></div></div><p>如果源站 TLS 证书包含 <code>origin.internal.example.net</code>，CDN 应使用该名称进行上游 SNI
+和证书验证。源站需要时仍可将 <code>www.example.com</code> 作为 HTTP <code>Host</code> 转发，
+但不应因此削弱 TLS 验证。</p><h2 id=避免路由和缓存意外>避免路由和缓存意外
+<a href=#%e9%81%bf%e5%85%8d%e8%b7%af%e7%94%b1%e5%92%8c%e7%bc%93%e5%ad%98%e6%84%8f%e5%a4%96 class=heading-anchor><span>#</span></a></h2><p>保持缓存键、源站选择规则和转发标头一致。如果 <code>/api/*</code> 发送到 API 源站而 <code>/*</code> 发送到对象存储，
+应让更具体的规则优先。只有当租户或区域改变响应时，才将其加入缓存键；更清晰时可使用独立主机名
+或行为。</p><p>保护源站免受直接流量影响，记录访问者和上游请求 ID，并通过 CDN 测试重定向、WebSocket、
+健康检查和错误路径。内部网络中可用的源站仍可能在边缘失败，因为 DNS、SNI、防火墙或转发主机存在差异。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cdn-origin-routing/ class=language-option data-lang=en>English
+</a><a href=/ja/cdn-origin-routing/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cdn-origin-routing/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cdn-origin-routing/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

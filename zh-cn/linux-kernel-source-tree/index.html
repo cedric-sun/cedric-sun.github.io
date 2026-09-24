@@ -1,0 +1,64 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux 内核源代码树</title></head><body><main><article><div class=article-header><h1>Linux 内核源代码树</h1><div class=aux>最后更新: 2026-01-28 12:55:15 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/kernel/>Kernel</a>
+|
+<a href=/zh-cn/tags/linux/>Linux</a>
+|
+<a href=/zh-cn/tags/source-code/>Source-Code</a></div></div><div class="translation-notice machine-translated"><a href=/linux-kernel-source-tree/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Linux 源码 tree separates architecture-independent subsystems from
+architecture ports, public 用户空间 interfaces, 生成的 构建 state, tools, and
+tests. Directory names 是 a navigation aid rather than an execution model: Kconfig
+selects configuration, Kbuild selects objects, 和 the selected objects determine
+what reaches a particular 内核 image.</p><h2 id=top-level-directories>顶层子系统边界
+<a href=#top-level-directories class=heading-anchor><span>#</span></a></h2><p>principal 源码 directories are:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Path</th><th>Responsibility</th></tr></thead><tbody><tr><td><code>arch/</code></td><td>Architecture ports, boot code, MMU 和 interrupt entry, 和 low-level ABI support.</td></tr><tr><td><code>block/</code>, <code>fs/</code>, <code>mm/</code>, <code>net/</code></td><td>block layer; VFS 和 filesystem implementations; virtual 和 physical 内存 management; 和 networking stacks.</td></tr><tr><td><code>kernel/</code>, <code>init/</code>, <code>ipc/</code>, <code>security/</code></td><td>Core scheduling, locking, signals, tracing, 和 other 内核 facilities; early initialization; IPC; 和 Linux Security Module infrastructure.</td></tr><tr><td><code>drivers/</code>, <code>sound/</code>, <code>virt/</code></td><td>Device drivers, the sound subsystem, 和 virtualization support such 作为 KVM. 一个 driver need 不 expose a <code>struct file_operations</code>; subsystem-specific buses 和 callbacks 是 also common.</td></tr><tr><td><code>crypto/</code>, <code>lib/</code>, <code>io_uring/</code>, <code>rust/</code></td><td>Shared cryptographic 和 library support, asynchronous I/O, 和 Rust 内核 support.</td></tr><tr><td><code>include/</code>, <code>Documentation/</code>, <code>scripts/</code></td><td>Headers, maintained documentation, 和 Kbuild/Kconfig plus generation 和 maintenance utilities.</td></tr><tr><td><code>tools/</code>, <code>samples/</code>, <code>usr/</code></td><td>Userspace tools such 作为 <code>perf</code>, example programs, 和 built-in initramfs generation.</td></tr></tbody></table></div></div><p>Other top-level material such 作为 <code>certs/</code> 和 <code>LICENSES/</code> 支持 signing,
+licensing, 或 构建 policy. 一个 源码 checkout changes over time, so inspect its
+top-level <code>README</code>, <code>MAINTAINERS</code>, 和 <code>Documentation/</code> instead 的 assuming every
+release 包含 the same directories.</p><h2 id=built-in-a>Kbuild 聚合与最终链接
+<a href=#built-in-a class=heading-anchor><span>#</span></a></h2><p>Kbuild reads <code>Makefile</code> 或 <code>Kbuild</code> files 和 evaluates <code>obj-$(CONFIG_FOO)</code> entries.
+<code>y</code> selects a built-in object, <code>m</code> selects a loadable module, 和 an unset symbol
+selects neither. As the 构建 descends 通过 selected directories, it combines
+<code>obj-y</code> objects 到 a thin <code>built-in.a</code> archive. archives 和 other selected
+objects 是 later linked 到 <code>vmlinux</code>; modules follow a separate link path.</p><p>Order 是 significant because the <a href=https://docs.kernel.org/kbuild/makefiles.html>Kbuild documentation</a>
+defines the archive 和 final-link behavior, including initialization ordering.
+Consequently, a 目录 是 不 a self-contained “module” merely because it has a
+<code>built-in.a</code>: 配置 和 parent Makefiles control whether the 目录 is
+visited 和 whether its objects reach the final image.</p><p>Trace a feature 通过 both 配置 和 构建 rules:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git grep -n <span style=color:#e6db74>&#39;CONFIG_FOO&#39;</span>
+</span></span><span style=display:flex><span>git grep -n <span style=color:#e6db74>&#39;obj-$(CONFIG_FOO)&#39;</span></span></span></code></pre></div></div></div><p>Read the surrounding <code>Kconfig</code> 和 <code>Makefile</code> entries 在……之前 drawing conclusions
+from a symbol search, because conditional compilation, 生成的 headers,
+architecture overrides, 和 link order 可以 select another implementation.</p><h2 id=header-families>头文件族与用户空间 ABI
+<a href=#header-families class=heading-anchor><span>#</span></a></h2><p>Kernel-private, userspace-visible, architecture-specific, 和 生成的 头文件 are
+kept separate:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Path</th><th>Purpose</th></tr></thead><tbody><tr><td><code>include/</code></td><td>Architecture-independent kernel-internal headers.</td></tr><tr><td><code>include/uapi/</code></td><td>Architecture-independent 用户空间 ABI headers.</td></tr><tr><td><code>arch/&lt;arch>/include/</code></td><td>Architecture-specific kernel-internal headers.</td></tr><tr><td><code>arch/&lt;arch>/include/uapi/</code></td><td>Architecture-specific 用户空间 ABI headers.</td></tr><tr><td><code>include/generated/</code> 和 <code>arch/&lt;arch>/include/generated/</code></td><td>Build-generated headers.</td></tr></tbody></table></div></div><p><code>make headers_install</code> exports a sanitized UAPI header set. Applications 应当 use
+the 已安装的 头文件 supplied 由 their operating 系统 或 toolchain, 不 arbitrary
+internal 头文件 来自 a 内核 checkout; structures such 作为 <code>task_struct</code> 是 not
+stable 用户空间 interfaces. <a href=https://docs.kernel.org/kbuild/headers_install.html>header-install documentation</a>
+defines the supported export operation.</p><h2 id=generated-state-and-output-trees>生成状态与输出树
+<a href=#generated-state-and-output-trees class=heading-anchor><span>#</span></a></h2><p>Configuration writes <code>.config</code> 和 produces 生成的 头文件 在……之前 compilation.
+Kbuild 可以 put 生成的 files 和 objects in a separate output directory:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>make O<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PWD<span style=color:#e6db74>/out&#34;</span> defconfig
+</span></span><span style=display:flex><span>make O<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$PWD<span style=color:#e6db74>/out&#34;</span> -j<span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>$(</span>nproc<span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span></span></span></code></pre></div></div></div><p>An out-of-tree 构建 keeps 生成的 state out 的 the checkout, but the 源码 and
+output trees remain coupled 通过 configuration, 生成的 headers, 和 dependency
+metadata. Reconfigure 在……之后 moving 或 partially copying an output 目录 rather
+than relying 在 an incremental build&rsquo;s old 依赖 state.</p><h2 id=finding-implementations>查找代码并准备索引
+<a href=#finding-implementations class=heading-anchor><span>#</span></a></h2><p><code>MAINTAINERS</code> records subsystem ownership 和 preferred patch-routing information.
+Follow the affected subsystem&rsquo;s 进程 和 文档 instead 的 treating the
+tree 作为 one centrally owned program; the
+<a href=https://docs.kernel.org/process/maintainer-handbooks.html>maintainer handbook</a>
+collects subsystem-specific guidance.</p><p>Start 实现 discovery，使用 declarations 和 subsystem documentation, then
+search definitions:</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git grep -n <span style=color:#e6db74>&#39;SYSCALL_DEFINE.*openat&#39;</span>
+</span></span><span style=display:flex><span>git grep -n <span style=color:#e6db74>&#39;struct file_operations&#39;</span></span></span></code></pre></div></div></div><p>An editor index benefits 来自 deliberate exclusions because <code>tools/</code>, generated
+output, 和 构建 products 可以 obscure kernel-space results. For example:</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;C_Cpp.default.includePath&#34;</span>: [<span style=color:#e6db74>&#34;${workspaceFolder}/include&#34;</span>],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;search.exclude&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;**/tools/**&#34;</span>: <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;**/include/generated/**&#34;</span>: <span style=color:#66d9ef>true</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;**/out/**&#34;</span>: <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Do 不 exclude a path blindly 当 investigating a 用户空间 tool 或 generated
+interface. exclusion 是 an indexing choice, 同时 the Kconfig 和 Kbuild path
+remains the evidence 用于 what a 内核 构建 contains.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-kernel-source-tree/ class=language-option data-lang=en>English
+</a><a href=/ja/linux-kernel-source-tree/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/linux-kernel-source-tree/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/linux-kernel-source-tree/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

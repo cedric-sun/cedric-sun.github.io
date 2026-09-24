@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Pthreads on cesun.life</title><link>https://example.org/zh-tw/tags/pthreads/</link><description>Recent content in Pthreads on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Fri, 12 May 2023 06:43:30 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/pthreads/index.xml" rel="self" type="application/rss+xml"/><item><title>POSIX 執行緒</title><link>https://example.org/zh-tw/pthreads/</link><pubDate>Fri, 12 May 2023 06:43:30 +0800</pubDate><guid>https://example.org/zh-tw/pthreads/</guid><description>&lt;p&gt;POSIX 執行緒在單一行程與單一位址空間中提供並行執行。共用位址空間並不代表共用的可變狀態就是安全的：必須透過互斥鎖、條件變數或 C 原子操作建立所有權與記憶體可見性。&lt;/p&gt;
+&lt;h2 id="建立終止與取消"&gt;
+ 建立、終止與取消
+ &lt;a href="#%e5%bb%ba%e7%ab%8b%e7%b5%82%e6%ad%a2%e8%88%87%e5%8f%96%e6%b6%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;pthread_create&lt;/code&gt; 會啟動 &lt;code&gt;void *(*start_routine)(void *)&lt;/code&gt;，並傳入一個指標引數。它會直接回傳錯誤號碼，而不是透過 &lt;code&gt;errno&lt;/code&gt; 回傳。執行緒可以從其啟動常式返回、呼叫 &lt;code&gt;pthread_exit&lt;/code&gt;，或回應取消要求而終止；返回等同於使用該回傳值呼叫 &lt;code&gt;pthread_exit&lt;/code&gt;。呼叫 &lt;code&gt;exit&lt;/code&gt; 或從 &lt;code&gt;main&lt;/code&gt; 返回會終止整個行程，而初始執行緒呼叫 &lt;code&gt;pthread_exit&lt;/code&gt; 時，其他執行緒會繼續執行。&lt;/p&gt;
+&lt;p&gt;可連接的執行緒會保留其結束值與資源，直到另一個執行緒成功呼叫 &lt;code&gt;pthread_join&lt;/code&gt;。分離的執行緒會在終止時釋放這些資源，因此無法被連接。因此，每個已建立的執行緒都需要明確指定由某個執行緒負責連接或分離。執行緒不得連接自身，應用程式邏輯也必須確保只有一個執行緒會連接指定的目標執行緒。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;&lt;span style="color:#a6e22e"&gt;worker&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;arg) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; arg;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;pthread_t&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;thread&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; error &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;pthread_create&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;thread&lt;/span&gt;, NULL, worker, value);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (error &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;result;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; error &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;pthread_join&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;thread&lt;/span&gt;, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;result);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;取消預設為啟用且延遲處理。&lt;code&gt;pthread_cancel&lt;/code&gt; 會要求取消，但不保證立即終止。被指定為取消點的呼叫（包括條件等待）可以處理這項要求。跨越取消點取得資源的程式碼應安裝 &lt;code&gt;pthread_cleanup_push&lt;/code&gt; 處理常式，或以其他方式建立清理規則；對會操作不變量的程式碼而言，非同步取消並不適用。&lt;/p&gt;
+&lt;h2 id="屬性與資源上限"&gt;
+ 屬性與資源上限
+ &lt;a href="#%e5%b1%ac%e6%80%a7%e8%88%87%e8%b3%87%e6%ba%90%e4%b8%8a%e9%99%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;如果建立執行緒時需要非預設行為，請初始化 &lt;code&gt;pthread_attr_t&lt;/code&gt;，並在 &lt;code&gt;pthread_create&lt;/code&gt; 返回後銷毀屬性物件。&lt;code&gt;pthread_attr_setdetachstate&lt;/code&gt; 用來選擇建立可連接或分離的執行緒。&lt;code&gt;pthread_attr_setstacksize&lt;/code&gt;、&lt;code&gt;pthread_attr_setstack&lt;/code&gt; 與 &lt;code&gt;pthread_attr_setguardsize&lt;/code&gt; 控制堆疊配置與防護頁；應用程式提供的堆疊必須持續保持映射狀態，並且在執行緒終止前只能由該執行緒使用。&lt;/p&gt;
+&lt;p&gt;排程繼承、排程原則、優先權參數與競爭範圍也屬於執行緒屬性。是否支援要求的排程原則，以及設定該原則所需的權限，取決於實作。應將 &lt;code&gt;pthread_attr_setaffinity_np&lt;/code&gt; 等 Linux 專用介面隔離在平台邊界之後。每個執行緒都會消耗堆疊位址空間與執行階段中繼資料，因此無限制地為每個要求建立執行緒會造成資源耗盡。&lt;/p&gt;
+&lt;h2 id="互斥鎖與條件變數"&gt;
+ 互斥鎖與條件變數
+ &lt;a href="#%e4%ba%92%e6%96%a5%e9%8e%96%e8%88%87%e6%a2%9d%e4%bb%b6%e8%ae%8a%e6%95%b8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;條件變數代表受互斥鎖保護的述詞發生變更，而不是代表述詞本身。應在持有互斥鎖時檢查述詞，在迴圈中等待，在持有同一個互斥鎖時使述詞變為真或假，然後發出訊號或廣播。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;pthread_mutex_lock&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;mutex);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;while&lt;/span&gt; (&lt;span style="color:#f92672"&gt;!&lt;/span&gt;ready)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;pthread_cond_wait&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;condition, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;mutex);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;consume&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;pthread_mutex_unlock&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;mutex);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;pthread_cond_wait&lt;/code&gt; 會以原子方式釋放互斥鎖，並開始等待另一個取得互斥鎖且向條件發出訊號的執行緒。它會在返回前重新取得互斥鎖。這個原子交接可防止在檢查述詞與進入阻塞之間遺失述詞更新。迴圈仍然必要，因為喚醒可能是虛假的，而且在被喚醒的執行緒重新取得互斥鎖之前，另一個取用者可能會變更述詞。&lt;/p&gt;</description></item></channel></rss>

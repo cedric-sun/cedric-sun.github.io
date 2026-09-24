@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Lzw on cesun.life</title><link>https://example.org/zh-cn/tags/lzw/</link><description>Recent content in Lzw on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 04 Apr 2025 21:50:25 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/lzw/index.xml" rel="self" type="application/rss+xml"/><item><title>Unix compress 和 LZW</title><link>https://example.org/zh-cn/unix-compress/</link><pubDate>Fri, 04 Apr 2025 21:50:25 +0800</pubDate><guid>https://example.org/zh-cn/unix-compress/</guid><description>&lt;p&gt;历史上的 Unix &lt;code&gt;compress&lt;/code&gt; 工具会写入通常命名为
+&lt;code&gt;.Z&lt;/code&gt; 的文件。它使用 LZW 系列字典编码器，而不是 DEFLATE。&lt;code&gt;uncompress&lt;/code&gt; 和
+&lt;code&gt;zcat&lt;/code&gt; 在提供该格式的系统上公开兼容的命令行接口。&lt;/p&gt;
+&lt;h2 id="lzw-初始化与同步"&gt;
+ LZW 初始化与同步
+ &lt;a href="#lzw-%e5%88%9d%e5%a7%8b%e5%8c%96%e4%b8%8e%e5%90%8c%e6%ad%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;LZW 编码器从单字节字母表的条目开始。它维护当前短语 &lt;code&gt;w&lt;/code&gt;，读取下一个字节
+&lt;code&gt;k&lt;/code&gt;，并在 &lt;code&gt;w + k&lt;/code&gt; 位于字典中时继续处理。当该短语不存在时，它输出
+&lt;code&gt;w&lt;/code&gt; 的代码，添加 &lt;code&gt;w + k&lt;/code&gt;，并从 &lt;code&gt;k&lt;/code&gt; 开始。解码器输出每个代码对应的字符串；在第一个代码之后，它会添加前一个解码字符串与当前字符串的第一个字节。输入耗尽后，编码器输出其最终短语。因此，编码器和解码器会相差一个代码地添加相同的条目。&lt;/p&gt;
+&lt;p&gt;常见的 &lt;code&gt;KwKwK&lt;/code&gt; 情况发生在某个代码等于下一个字典索引时：解码器会将其展开为
+&lt;code&gt;previous + first(previous)&lt;/code&gt;。拒绝这种情况会拒绝有效的数据流；接受任何超过下一个索引的代码则会导致字典失去同步。&lt;/p&gt;
+&lt;h2 id="z-位流"&gt;
+ &lt;code&gt;.Z&lt;/code&gt; 位流
+ &lt;a href="#z-%e4%bd%8d%e6%b5%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;.Z&lt;/code&gt; 数据流以 &lt;code&gt;1f 9d&lt;/code&gt; 和一个标志字节开头。低五位指定最大代码宽度，通常为 9 至 16 位。第 7 位启用块模式；其余保留位必须根据实现的兼容性规则进行处理。代码从 9 位开始，当字典达到当前宽度的容量时逐步增加宽度。在块模式下，代码 256 表示 &lt;code&gt;CLEAR&lt;/code&gt;：编码器可以输出该代码以丢弃条目，并使用初始字母表重新开始。解码器必须在同一位置重置，然后恢复使用 9 位代码。非块模式数据流没有该重置代码。&lt;/p&gt;
+&lt;p&gt;代码宽度转换规则属于 &lt;code&gt;.Z&lt;/code&gt; 方言的一部分，因此读取器应遵循格式规定的时序，而不是根据下一个代码进行猜测。历史实现对边界情况的处理存在差异；应使用目标 &lt;code&gt;compress&lt;/code&gt; 实现进行互操作性测试。&lt;/p&gt;
+&lt;h2 id="兼容性与操作"&gt;
+ 兼容性与操作
+ &lt;a href="#%e5%85%bc%e5%ae%b9%e6%80%a7%e4%b8%8e%e6%93%8d%e4%bd%9c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;LZW 专利曾影响 &lt;code&gt;compress&lt;/code&gt; 的部署；相关专利已经到期，但旧归档和特定于平台的解码器仍然构成兼容性约束。对于新数据，应使用协议选定的格式。&lt;code&gt;tar&lt;/code&gt; 存储文件名和元数据，而压缩器转换的是字节流，因此 &lt;code&gt;.tar.Z&lt;/code&gt; 表示使用 &lt;code&gt;.Z&lt;/code&gt; 压缩的 tar 归档。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Source-Code on cesun.life</title><link>https://example.org/zh-tw/tags/source-code/</link><description>Recent content in Source-Code on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 07 May 2026 03:47:31 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/source-code/index.xml" rel="self" type="application/rss+xml"/><item><title>glibc 原始碼內部與系統呼叫包裝器</title><link>https://example.org/zh-tw/glibc-syscall-wrappers/</link><pubDate>Thu, 07 May 2026 03:47:31 +0800</pubDate><guid>https://example.org/zh-tw/glibc-syscall-wrappers/</guid><description>&lt;p&gt;glibc 暴露 &lt;code&gt;read(2)&lt;/code&gt; 與 &lt;code&gt;write(2)&lt;/code&gt; 等 C 函式，而 Linux 暴露架構特定的系統呼叫進入慣例。包裝器連接這些層：它接受公開 C ABI，遵循選定架構的系統呼叫 ABI，轉譯核心錯誤，並可能實作 POSIX 執行緒取消行為。&lt;/p&gt;
+&lt;p&gt;以下範例描述目前的上游原始碼樹。已發布的 glibc 可能選取不同檔案或巨集定義，因此檢查原始碼必須從正在建置的發布版本與目標三元組開始。&lt;/p&gt;
+&lt;h2 id="sysdeps"&gt;
+ &lt;code&gt;sysdeps/&lt;/code&gt; 選取
+ &lt;a href="#sysdeps" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href="https://sourceware.org/git/?p=glibc.git;a=tree;f=sysdeps;hb=HEAD"&gt;&lt;code&gt;sysdeps/&lt;/code&gt; 樹&lt;/a&gt; 保存依作業系統、CPU、ABI、字組大小與功能選取的實作。通用程式碼是後備方案；更具體的目錄可以使用相同相對名稱取代檔案。對 Linux 建置而言，相關路徑包括 &lt;code&gt;sysdeps/unix/sysv/linux/&lt;/code&gt;；架構還可以提供 Linux 特定進入程式碼或 ABI 特定變體。&lt;/p&gt;
+&lt;p&gt;glibc 的設定與建置機制會建立適用系統相依目錄的有序清單。建置規則搜尋該清單，使選取的實作優先於通用後備方案。因此，這種配置不是每個檔案都恰好具有一個維度的分類法：作業系統目錄可能依賴架構標頭，而架構目錄可能包含與作業系統無關的程式碼。不要從單一目錄名稱推論行為，應檢查 &lt;code&gt;config.make&lt;/code&gt;、已設定的建置目錄與選取的原始碼路徑。&lt;/p&gt;
+&lt;h2 id="syscalls-list-and-make-syscalls-sh"&gt;
+ 產生的精簡包裝器
+ &lt;a href="#syscalls-list-and-make-syscalls-sh" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;部分精簡組合語言包裝器會從 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/syscalls.list;hb=HEAD"&gt;&lt;code&gt;syscalls.list&lt;/code&gt;&lt;/a&gt; 產生。每筆記錄會命名輸出、Linux 系統呼叫、引數簽章、強符號，以及選用的弱符號或版本化名稱。建置會呼叫 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/make-syscalls.sh;hb=HEAD"&gt;&lt;code&gt;make-syscalls.sh&lt;/code&gt;&lt;/a&gt;，它會：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;移除被較高優先級 &lt;code&gt;sysdeps&lt;/code&gt; 目錄覆寫的項目；&lt;/li&gt;
+&lt;li&gt;透過目標的 &lt;code&gt;sysdep.h&lt;/code&gt; 解析 &lt;code&gt;SYS_&lt;/code&gt; 編號；&lt;/li&gt;
+&lt;li&gt;從簽章推導參數數量與特殊引數處理；以及&lt;/li&gt;
+&lt;li&gt;使用 &lt;code&gt;syscall-template.S&lt;/code&gt; 產生規則，並在清單要求時包含別名與相容性符號。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;syscalls.list&lt;/code&gt; 不會定義每個公開函式。具有驗證、後備邏輯、取消處理、時間寬度轉換或其他政策的包裝器通常是手寫的。目前 glibc 的 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/write.c;hb=HEAD"&gt;&lt;code&gt;write.c&lt;/code&gt;&lt;/a&gt; 中的 &lt;code&gt;write&lt;/code&gt; 就是這類手寫 C 包裝器；因此它可與產生路徑形成有用對照。&lt;/p&gt;
+&lt;h2 id="write"&gt;
+ &lt;code&gt;write&lt;/code&gt; 與可感知取消的分派
+ &lt;a href="#write" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;概念上，Linux &lt;code&gt;write&lt;/code&gt; 包裝器會執行以下操作：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ssize_t&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;write&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; fd, &lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;buffer, &lt;span style="color:#66d9ef"&gt;size_t&lt;/span&gt; count)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;{
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;cancellation_aware_syscall&lt;/span&gt;(SYS_write, fd, buffer, count);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;實際原始碼會呼叫 &lt;code&gt;SYSCALL_CANCEL (write, fd, buf, nbytes)&lt;/code&gt;。當不需要檢查取消時，該巨集會選取內嵌系統呼叫路徑；否則會暫時變更執行緒的取消型別，發出呼叫，然後還原先前的型別。&lt;code&gt;write&lt;/code&gt; 是 POSIX 取消點，因此此邊界讓待處理的取消得以執行，而不會將每個內部系統呼叫都視為取消點。&lt;/p&gt;</description></item><item><title>Linux 核心原始碼樹</title><link>https://example.org/zh-tw/linux-kernel-source-tree/</link><pubDate>Wed, 28 Jan 2026 12:55:15 +0800</pubDate><guid>https://example.org/zh-tw/linux-kernel-source-tree/</guid><description>&lt;p&gt;Linux 原始碼樹將與架構無關的子系統、架構移植、公開使用者空間介面、產生的建置狀態、工具與測試分開。目錄名稱是導覽輔助，而非執行模型：Kconfig 選取設定，Kbuild 選取物件，而所選物件決定哪些內容會進入特定核心映像。&lt;/p&gt;
+&lt;h2 id="top-level-directories"&gt;
+ 頂層子系統邊界
+ &lt;a href="#top-level-directories" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;主要原始碼目錄如下：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;路徑&lt;/th&gt;
+ &lt;th&gt;職責&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;arch/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;架構移植、開機程式碼、MMU 與中斷進入，以及低階 ABI 支援。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;block/&lt;/code&gt;、&lt;code&gt;fs/&lt;/code&gt;、&lt;code&gt;mm/&lt;/code&gt;、&lt;code&gt;net/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;區塊層；VFS 與檔案系統實作；虛擬與實體記憶體管理；以及網路堆疊。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;kernel/&lt;/code&gt;、&lt;code&gt;init/&lt;/code&gt;、&lt;code&gt;ipc/&lt;/code&gt;、&lt;code&gt;security/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;核心排程、鎖定、訊號、追蹤與其他核心功能；早期初始化；IPC；以及 Linux Security Module 基礎結構。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;drivers/&lt;/code&gt;、&lt;code&gt;sound/&lt;/code&gt;、&lt;code&gt;virt/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;裝置驅動程式、聲音子系統與 KVM 等虛擬化支援。驅動程式不一定公開 &lt;code&gt;struct file_operations&lt;/code&gt;；子系統特定的匯流排與回呼也很常見。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;crypto/&lt;/code&gt;、&lt;code&gt;lib/&lt;/code&gt;、&lt;code&gt;io_uring/&lt;/code&gt;、&lt;code&gt;rust/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;共用密碼編譯與函式庫支援、非同步 I/O，以及 Rust 核心支援。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;include/&lt;/code&gt;、&lt;code&gt;Documentation/&lt;/code&gt;、&lt;code&gt;scripts/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;標頭、維護中的文件，以及 Kbuild/Kconfig 加上產生與維護工具。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;tools/&lt;/code&gt;、&lt;code&gt;samples/&lt;/code&gt;、&lt;code&gt;usr/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;perf&lt;/code&gt; 等使用者空間工具、範例程式，以及內建 initramfs 產生。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;其他頂層內容，例如 &lt;code&gt;certs/&lt;/code&gt; 與 &lt;code&gt;LICENSES/&lt;/code&gt;，支援簽署、授權或建置原則。原始碼檢出內容會隨時間變更，因此請檢查其中的頂層 &lt;code&gt;README&lt;/code&gt;、&lt;code&gt;MAINTAINERS&lt;/code&gt; 與 &lt;code&gt;Documentation/&lt;/code&gt;，不要假設每個版本都包含相同目錄。&lt;/p&gt;
+&lt;h2 id="built-in-a"&gt;
+ Kbuild 彙總與最終連結
+ &lt;a href="#built-in-a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Kbuild 讀取 &lt;code&gt;Makefile&lt;/code&gt; 或 &lt;code&gt;Kbuild&lt;/code&gt; 檔案，並評估 &lt;code&gt;obj-$(CONFIG_FOO)&lt;/code&gt; 項目。&lt;code&gt;y&lt;/code&gt; 選取內建物件，&lt;code&gt;m&lt;/code&gt; 選取可載入模組，未設定的符號則兩者皆不選。當建置向下進入所選目錄時，會將 &lt;code&gt;obj-y&lt;/code&gt; 物件組合成精簡的 &lt;code&gt;built-in.a&lt;/code&gt; 封存。這些封存與其他所選物件之後會連結至 &lt;code&gt;vmlinux&lt;/code&gt;；模組則遵循分開的連結路徑。&lt;/p&gt;</description></item><item><title>Sudo 原始碼指南</title><link>https://example.org/zh-tw/sudo-source-code-guide/</link><pubDate>Thu, 25 Jul 2024 00:00:00 +0000</pubDate><guid>https://example.org/zh-tw/sudo-source-code-guide/</guid><description>&lt;p&gt;sudo 原始碼樹將前端程式、外掛程式實作、可重用函式庫、產生的語言剖析器與可攜性支援分開。請從可執行檔的進入點開始，再追蹤外掛程式介面；單純依目錄名稱閱讀會模糊政策邊界。&lt;/p&gt;</description></item></channel></rss>

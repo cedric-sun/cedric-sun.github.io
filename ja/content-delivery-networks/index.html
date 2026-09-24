@@ -1,0 +1,40 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>コンテンツ配信ネットワーク</title></head><body><main><article><div class=article-header><h1>コンテンツ配信ネットワーク</h1><div class=aux>最終更新: 2025-07-10 20:16:44 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/cdn/>Cdn</a>
+|
+<a href=/ja/tags/dns/>Dns</a>
+|
+<a href=/ja/tags/networking/>Networking</a></div></div><div class="translation-notice machine-translated"><a href=/content-delivery-networks/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>コンテンツ配信ネットワーク（CDN）は、ユーザーに近いエッジロケーションからコンテンツを
+配信します。静的アセットをキャッシュでき、プロバイダーによっては動的トラフィックを
+プロキシし、TLS を終端し、攻撃をフィルタリングし、接続を最適化できます。オリジンは
+権威あるアプリケーションであり続け、CDN は明示的なキャッシュおよびルーティング
+ポリシーを持つ仲介者です。</p><h2 id=ドメインを-cdn-に接続する>ドメインを CDN に接続する
+<a href=#%e3%83%89%e3%83%a1%e3%82%a4%e3%83%b3%e3%82%92-cdn-%e3%81%ab%e6%8e%a5%e7%b6%9a%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>運用者は <code>https://origin.example.net</code> などのオリジンを設定し、<code>www.example.com</code> 用の
+CDN ディストリビューションを作成します。プロバイダーは <code>example.cdnprovider.net</code>
+などのホスト名を提供します。運用者はその後、通常は CNAME として <code>www.example.com</code>
+をそこへ向ける DNS レコードを作成します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>www.example.com.  CNAME  example.cdnprovider.net.</span></span></code></pre></div></div></div><p>エッジでは、CDN が要求されたホスト名を使ってディストリビューションを識別し、適切な
+<code>Host</code> ヘッダーをオリジンへ転送します。TLS SNI と HTTP の <code>Host</code> ヘッダーが意図した
+仮想ホストを識別するため、多数のサイトでエッジ IP アドレスを共有できます。</p><p>DNS apex には SOA レコードと NS レコードも保持する必要があるため、通常 CNAME を
+含められません。プロバイダーは A/AAAA エイリアス機能、対応している場合の
+ANAME/ALIAS レコード、または委任 DNS でこれに対応します。正確な動作は DNS
+プロバイダーによって異なります。</p><h2 id=キャッシュ動作を意図的に選択する>キャッシュ動作を意図的に選択する
+<a href=#%e3%82%ad%e3%83%a3%e3%83%83%e3%82%b7%e3%83%a5%e5%8b%95%e4%bd%9c%e3%82%92%e6%84%8f%e5%9b%b3%e7%9a%84%e3%81%ab%e9%81%b8%e6%8a%9e%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>キャッシュキーには通常、ホスト名、パス、選択したクエリパラメーター、選択した
+リクエストヘッダーまたは Cookie が含まれます。すべての Cookie を含めると
+キャッシュ効率が失われ、レスポンスを変える値を省略すると、あるユーザーのコンテンツが
+別のユーザーに開示される可能性があります。</p><p>HTTP キャッシュディレクティブを明示的に設定します。バージョン付きアセットは通常、
+長期間キャッシュできます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Cache-Control: public, max-age=31536000, immutable</span></span></code></pre></div></div></div><p>HTML と個人化されたレスポンスには、より短い有効期間、再検証、または
+<code>private</code>/<code>no-store</code> が必要になることがよくあります。パージ操作は例外的な修正に
+便利ですが、コンテンツアドレス付きファイル名と予測可能な TTL の方が、日常的な
+無効化メカニズムとして信頼できます。</p><h2 id=tlsオリジンセキュリティ>TLS、オリジン、セキュリティ
+<a href=#tls%e3%82%aa%e3%83%aa%e3%82%b8%e3%83%b3%e3%82%bb%e3%82%ad%e3%83%a5%e3%83%aa%e3%83%86%e3%82%a3 class=heading-anchor><span>#</span></a></h2><p>CDN 証明書は訪問者向けホスト名を対象にする必要があります。CDN からオリジンへの
+通信にも HTTPS を使用し、オリジン証明書を検証し、攻撃者がエッジの制御を迂回できない
+ようオリジンへのアクセスを制限します。プラットフォームによっては、公開された CDN
+の送信元範囲へのファイアウォール、相互 TLS、署名付きオリジンリクエストの要求を
+意味します。</p><p>アクセス判断でクライアントが提供する転送ヘッダーに依存しないでください。CDN が
+信頼できるヘッダーを設定するよう構成し、オリジンが CDN からのものだけを受け入れる
+ようにします。起動前に、認証パス、パージ認可、オリジンタイムアウト、エラー
+キャッシュのキャッシュルールを確認します。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/content-delivery-networks/ class=language-option data-lang=en>English
+</a><a href=/ja/content-delivery-networks/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/content-delivery-networks/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/content-delivery-networks/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

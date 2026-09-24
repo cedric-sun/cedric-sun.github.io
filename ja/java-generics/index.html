@@ -1,0 +1,47 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java Generics</title></head><body><main><article><div class=article-header><h1>Java Generics</h1><div class=aux>最終更新: 2025-02-02 05:23:41 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/generics/>Generics</a>
+|
+<a href=/ja/tags/java/>Java</a></div></div><div class="translation-notice machine-translated"><a href=/java-generics/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Java ジェネリクスは、ジェネリクス導入前のバイトコードとの互換性を保ちながら、
+コンパイル時の型チェックを提供します。コンパイラーは型引数を消去し、必要な場所に
+キャストを挿入し、消去後もオーバーライドを維持するためブリッジメソッドを生成する
+ことがあります。その結果、<code>List&lt;String></code> と <code>List&lt;Integer></code> は実行時に同じクラスを
+持ち、オブジェクトからジェネリック型引数を確実に復元することはできません。</p><h2 id=不変性と境界>不変性と境界
+<a href=#%e4%b8%8d%e5%a4%89%e6%80%a7%e3%81%a8%e5%a2%83%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>ジェネリッククラスは不変です。<code>List&lt;Integer></code> は <code>List&lt;Number></code> ではありません。
+後者を許すと <code>Double</code> を挿入できてしまうためです。ワイルドカードは API 境界で
+変性を表現します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>double</span> <span style=color:#a6e22e>sum</span>(List<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>extends</span> Number<span style=color:#f92672>&gt;</span> values) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> values.<span style=color:#a6e22e>stream</span>().<span style=color:#a6e22e>mapToDouble</span>(Number::doubleValue).<span style=color:#a6e22e>sum</span>();
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>addDefaults</span>(List<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>super</span> Integer<span style=color:#f92672>&gt;</span> destination) {
+</span></span><span style=display:flex><span>    destination.<span style=color:#a6e22e>add</span>(0);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>呼び出し側が読み取る producer には <strong>extends</strong> を、呼び出し側が書き込む consumer
+には <strong>super</strong> を使用します。<code>List&lt;? extends Number></code> は <code>Number</code> 値を生成できますが、
+null 以外の値を受け付けません。<code>List&lt;? super Integer></code> は <code>Integer</code> 値を受け付けますが、
+生成できるのは <code>Object</code> だけです。「読み取り専用」と「書き込み専用」は簡略表現で
+あって能力規則ではありません。どちらのリストも、実装が許せば照会、クリア、<code>null</code>
+の受け取りが可能です。</p><h2 id=キャプチャと推論>キャプチャと推論
+<a href=#%e3%82%ad%e3%83%a3%e3%83%97%e3%83%81%e3%83%a3%e3%81%a8%e6%8e%a8%e8%ab%96 class=heading-anchor><span>#</span></a></h2><p>各ワイルドカードは、未知のキャプチャ型を表します。ワイルドカードコンテナーでは、
+独立した 2 つのワイルドカード値が同じ型であることを表現できません。その関係が
+重要な場合は、ジェネリックヘルパーを使用します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>reverse</span>(List<span style=color:#f92672>&lt;?&gt;</span> list) { reverseCaptured(list); }
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>reverseCaptured</span>(List<span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> list) {
+</span></span><span style=display:flex><span>    Collections.<span style=color:#a6e22e>reverse</span>(list);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>メソッド推論は、引数の制約、ターゲット型、宣言された境界を組み合わせます。
+ダイヤモンド演算子はコンストラクター呼び出しの型引数を推論しますが、raw 型を安全に
+するものではありません。境界によって能力を要求できます。
+<code>&lt;T extends Comparable&lt;? super T>> T max(List&lt;? extends T> values)</code>.
+交差型境界には、1 つのクラスに続けてインターフェイスを含められます。</p><h2 id=型消去下での構築>型消去下での構築
+<a href=#%e5%9e%8b%e6%b6%88%e5%8e%bb%e4%b8%8b%e3%81%a7%e3%81%ae%e6%a7%8b%e7%af%89 class=heading-anchor><span>#</span></a></h2><p><code>new T()</code>、<code>new T[n]</code>、<code>T.class</code> は使用できません。型消去では、実行時に必要な
+コンストラクター、コンポーネント型、クラスリテラルが保持されないためです。代わりに
+ファクトリを渡します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> T <span style=color:#a6e22e>create</span>(Supplier<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>extends</span> T<span style=color:#f92672>&gt;</span> factory) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> factory.<span style=color:#a6e22e>get</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>リフレクション統合では <code>Class&lt;T></code> を受け取り、検査対象のリフレクション例外を処理
+します。ただし、呼び出し側が構築を担当する場合は <code>Supplier&lt;T></code> を優先します。
+ジェネリック配列には引き続き制限があります。配列は具象化され共変である一方、
+ジェネリック型は消去され不変だからです。</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-4.html>JLS §4.5–§4.6, Parameterized Types and Erasure</a></li><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.10>JLS §5.1.10, Capture Conversion</a></li><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-18.html>JLS §18, Type Inference</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-generics/ class=language-option data-lang=en>English
+</a><a href=/ja/java-generics/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/java-generics/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/java-generics/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

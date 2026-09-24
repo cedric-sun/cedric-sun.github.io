@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Transactions on cesun.life</title><link>https://example.org/zh-tw/tags/transactions/</link><description>Recent content in Transactions on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 03 Sep 2026 15:56:43 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/transactions/index.xml" rel="self" type="application/rss+xml"/><item><title>MySQL 交易、隔離與並行</title><link>https://example.org/zh-tw/mysql-transactions/</link><pubDate>Thu, 03 Sep 2026 15:56:43 +0800</pubDate><guid>https://example.org/zh-tw/mysql-transactions/</guid><description>&lt;p&gt;InnoDB 交易透過以原子方式提交相關變更，並控制並行執行的陳述式如何觀察這些變更，來保護資料庫不變量。隔離性不能取代條件約束：對於結構描述能夠表達的不變量，請使用主鍵、唯一條件約束、外部索引鍵條件約束和檢查條件約束，然後針對多陳述式決策選擇交易與鎖定模式。&lt;/p&gt;
+&lt;h2 id="交易邊界與自動提交"&gt;
+ 交易邊界與自動提交
+ &lt;a href="#%e4%ba%a4%e6%98%93%e9%82%8a%e7%95%8c%e8%88%87%e8%87%aa%e5%8b%95%e6%8f%90%e4%ba%a4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL 預設啟用自動提交，因此明確交易之外的每個陳述式都會作為一個交易提交或回復。請明確啟動多陳述式單位，並保持其簡短：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;START&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;-&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;84&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;COMMIT&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在為目的地入帳之前，先檢查第一個更新所影響的資料列數。任何不變量或陳述式失敗時都使用 &lt;code&gt;ROLLBACK&lt;/code&gt;。連線集區在歸還連線之前，必須還原自動提交、隔離層級、存取模式及其他工作階段狀態，因為這些屬性會在交易之間持續存在。&lt;/p&gt;
+&lt;p&gt;許多資料定義陳述式和帳戶管理陳述式會隱含提交。原子 DDL 可使受支援的結構描述陳述式具備當機安全性，但不會使該陳述式成為周圍應用程式交易的一部分。&lt;/p&gt;
+&lt;h2 id="隔離設定"&gt;
+ 隔離設定
+ &lt;a href="#%e9%9a%94%e9%9b%a2%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 在 MySQL 8.4 中的預設值是 &lt;code&gt;REPEATABLE READ&lt;/code&gt;。使用 &lt;code&gt;--transaction-isolation&lt;/code&gt; 或 &lt;code&gt;transaction_isolation&lt;/code&gt; 設定伺服器預設值，並且只在明確指定的範圍內覆寫：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;COMMITTED&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;REPEATABLE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SERIALIZABLE&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.transaction_isolation;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;GLOBAL&lt;/code&gt; 會為新工作階段建立預設值。&lt;code&gt;SESSION&lt;/code&gt; 會套用到該連線上的後續交易。不含限定詞的 &lt;code&gt;SET TRANSACTION&lt;/code&gt; 會套用到下一個交易。也可以在相同陳述式中選取 &lt;code&gt;READ ONLY&lt;/code&gt; 和 &lt;code&gt;READ WRITE&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="mvcc-與一致性讀取"&gt;
+ MVCC 與一致性讀取
+ &lt;a href="#mvcc-%e8%88%87%e4%b8%80%e8%87%b4%e6%80%a7%e8%ae%80%e5%8f%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;只要作用中的快照仍可能需要，InnoDB 就會在 undo 資料中保留較早的資料列版本。一般 &lt;code&gt;SELECT&lt;/code&gt; 通常會執行非鎖定一致性讀取：&lt;/p&gt;</description></item><item><title>Spring 概覽與交易</title><link>https://example.org/zh-tw/spring-overview-and-transactions/</link><pubDate>Sun, 25 May 2025 03:36:19 +0800</pubDate><guid>https://example.org/zh-tw/spring-overview-and-transactions/</guid><description>&lt;p&gt;Spring Framework 提供依賴注入容器，以及面向 AOP、資料存取、交易、訊息傳遞和 Web 應用程式的專用模組。交易管理展現了該框架的整合模型：應用程式程式碼宣告邊界，而攔截器則協調特定資源的 &lt;code&gt;PlatformTransactionManager&lt;/code&gt; 或反應式交易管理器。&lt;/p&gt;
+&lt;h2 id="基於代理的宣告式交易"&gt;
+ 基於代理的宣告式交易
+ &lt;a href="#%e5%9f%ba%e6%96%bc%e4%bb%a3%e7%90%86%e7%9a%84%e5%ae%a3%e5%91%8a%e5%bc%8f%e4%ba%a4%e6%98%93" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在預設的 advice 模式下，Spring 會使用 AOP 代理包裝符合條件的 Bean。進入符合 &lt;code&gt;@Transactional&lt;/code&gt; 的方法之呼叫會經過 &lt;code&gt;TransactionInterceptor&lt;/code&gt;，由它讀取交易中繼資料、啟動交易或加入既有交易、呼叫目標物件，然後提交或回復。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Service&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OrderService&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; OrderRepository orders;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; PaymentGateway payments;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Transactional&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; Order &lt;span style="color:#a6e22e"&gt;place&lt;/span&gt;(CreateOrder command) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Order order &lt;span style="color:#f92672"&gt;=&lt;/span&gt; orders.&lt;span style="color:#a6e22e"&gt;insert&lt;/span&gt;(command);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; payments.&lt;span style="color:#a6e22e"&gt;reserve&lt;/span&gt;(order);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; order;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;代理存在實務上的限制。呼叫必須經由代理進入，而且方法必須能由所選的代理機制攔截。以介面為基礎的 JDK 代理會公開介面方法；以類別為基礎的代理會繼承目標類別，因此無法對 &lt;code&gt;final&lt;/code&gt; 方法套用 advice。&lt;/p&gt;
+&lt;h2 id="自我呼叫"&gt;
+ 自我呼叫
+ &lt;a href="#%e8%87%aa%e6%88%91%e5%91%bc%e5%8f%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;this.reprice()&lt;/code&gt; 這類呼叫會停留在目標物件內部，不會重新進入其代理。因此，若只能透過自我呼叫到達 &lt;code&gt;reprice()&lt;/code&gt;，該方法上的交易中繼資料會被忽略：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;importOrders&lt;/span&gt;(List&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Order&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; batch) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; batch.&lt;span style="color:#a6e22e"&gt;forEach&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;this&lt;/span&gt;::storeOne); &lt;span style="color:#75715e"&gt;// 略過 storeOne 上的交易 advice&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果交易操作代表實際的邊界，請將它移至另一個注入式服務。程式化交易管理或 AspectJ weaving 也可作為替代方案；注入 Bean 自身的代理會讓領域程式碼與容器機制耦合，並增加測試難度。&lt;/p&gt;</description></item></channel></rss>

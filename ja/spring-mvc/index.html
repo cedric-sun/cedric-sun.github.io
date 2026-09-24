@@ -1,0 +1,76 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring MVC</title></head><body><main><article><div class=article-header><h1>Spring MVC</h1><div class=aux>最終更新: 2023-11-03 17:36:24 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/java/>Java</a>
+|
+<a href=/ja/tags/spring/>Spring</a>
+|
+<a href=/ja/tags/spring-mvc/>Spring-Mvc</a>
+|
+<a href=/ja/tags/web/>Web</a></div></div><div class="translation-notice machine-translated"><a href=/spring-mvc/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Spring MVC は Spring Framework の Servlet ベース Web フレームワークです。フロント
+コントローラーである <code>DispatcherServlet</code> は、リクエストマッピング、引数解決、
+コントローラー呼び出し、戻り値処理、例外変換を調整します。Spring WebFlux は異なる
+リアクティブランタイムとスレッドモデルを使用するため、両フレームワークを交換可能
+なものとして扱ってはなりません。</p><h2 id=ブートストラップとディスパッチ>ブートストラップとディスパッチ
+<a href=#%e3%83%96%e3%83%bc%e3%83%88%e3%82%b9%e3%83%88%e3%83%a9%e3%83%83%e3%83%97%e3%81%a8%e3%83%87%e3%82%a3%e3%82%b9%e3%83%91%e3%83%83%e3%83%81 class=heading-anchor><span>#</span></a></h2><p>Boot ではない Servlet アプリケーションは、<code>WebApplicationInitializer</code> を通じて Web
+アプリケーションコンテキストとディスパッチャーを登録できます。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>WebInitializer</span> <span style=color:#66d9ef>implements</span> WebApplicationInitializer {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Override</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>onStartup</span>(ServletContext servletContext) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> context <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> AnnotationConfigWebApplicationContext();
+</span></span><span style=display:flex><span>        context.<span style=color:#a6e22e>register</span>(WebConfiguration.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> servlet <span style=color:#f92672>=</span> servletContext.<span style=color:#a6e22e>addServlet</span>(
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;mvc&#34;</span>, <span style=color:#66d9ef>new</span> DispatcherServlet(context));
+</span></span><span style=display:flex><span>        servlet.<span style=color:#a6e22e>setLoadOnStartup</span>(1);
+</span></span><span style=display:flex><span>        servlet.<span style=color:#a6e22e>addMapping</span>(<span style=color:#e6db74>&#34;/&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring Boot は MVC アプリケーションに対して同等の登録を行います。ディスパッチャーを
+<code>/</code> にマッピングすると、Servlet コンテナーは静的リソースと JSP の特別な処理を維持
+できます。<code>/*</code> ではそれらのディスパッチも捕捉します。</p><p>各リクエストで、ディスパッチャーは次を行います。</p><ol><li>順序付けられた <code>HandlerMapping</code> 実装にハンドラーとインターセプターを要求する。</li><li>そのハンドラーを呼び出せる <code>HandlerAdapter</code> を選択する。</li><li>pre-handle インターセプターとハンドラーを呼び出す。</li><li>戻り値をレスポンスボディ、ビュー、非同期結果、その他の対応形式として処理する。</li><li>例外リゾルバーと完了インターセプターを実行する。</li></ol><p>MVC の戦略オブジェクトはディスパッチャーコンテキストの Bean です。
+<code>@EnableWebMvc</code> は通常の Spring アプリケーション向け標準設定をインポートします。
+Spring Boot では、自動設定を完全に引き取る <code>@EnableWebMvc</code> を追加する代わりに、
+<code>WebMvcConfigurer</code> を実装して Boot の設定を拡張します。</p><h2 id=リクエストマッピングバインディング検証>リクエストマッピング、バインディング、検証
+<a href=#%e3%83%aa%e3%82%af%e3%82%a8%e3%82%b9%e3%83%88%e3%83%9e%e3%83%83%e3%83%94%e3%83%b3%e3%82%b0%e3%83%90%e3%82%a4%e3%83%b3%e3%83%87%e3%82%a3%e3%83%b3%e3%82%b0%e6%a4%9c%e8%a8%bc class=heading-anchor><span>#</span></a></h2><p>アノテーション付きコントローラーは、パス、HTTP メソッド、パラメーター、ヘッダー、
+消費するメディア型、生成するメディア型でマッピングします。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@PostMapping</span>(
+</span></span><span style=display:flex><span>    path <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;/orders&#34;</span>,
+</span></span><span style=display:flex><span>    consumes <span style=color:#f92672>=</span> MediaType.<span style=color:#a6e22e>APPLICATION_JSON_VALUE</span>,
+</span></span><span style=display:flex><span>    produces <span style=color:#f92672>=</span> MediaType.<span style=color:#a6e22e>APPLICATION_JSON_VALUE</span>)
+</span></span><span style=display:flex><span>ResponseEntity<span style=color:#f92672>&lt;</span>OrderView<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>create</span>(<span style=color:#a6e22e>@Valid</span> <span style=color:#a6e22e>@RequestBody</span> CreateOrder request) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> ResponseEntity.<span style=color:#a6e22e>status</span>(HttpStatus.<span style=color:#a6e22e>CREATED</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>body</span>(orderService.<span style=color:#a6e22e>create</span>(request));
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>HandlerMethodArgumentResolver</code> 実装は、パス変数、クエリパラメーター、ヘッダー、
+Cookie、プリンシパル、Servlet オブジェクト、モデル属性、リクエストボディを提供します。
+単純なテキスト値には変換とフォーマットが使われます。<code>@ModelAttribute</code> は
+<code>WebDataBinder</code> を通じて名前付きプロパティをバインドします。バインディングは入力
+セキュリティ境界であるため、許可フィールドを定義するか専用コマンド型を使います。
+<code>@RequestBody</code> はメディアデコードを <code>HttpMessageConverter</code> に委譲します。</p><p><code>@Valid</code> は Jakarta Bean Validation を適用し、<code>@Validated</code> は検証グループも選択できます。
+モデル属性バインディングでは、バインドされた引数の直後に <code>BindingResult</code> パラメーター
+を置くことで、コントローラーが変換エラーと検証エラーを確認できます。ローカル処理
+がなければ、MVC は例外解決チェーンを通じて検証例外を変換します。</p><h2 id=戻り値とコンテンツネゴシエーション>戻り値とコンテンツネゴシエーション
+<a href=#%e6%88%bb%e3%82%8a%e5%80%a4%e3%81%a8%e3%82%b3%e3%83%b3%e3%83%86%e3%83%b3%e3%83%84%e3%83%8d%e3%82%b4%e3%82%b7%e3%82%a8%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3 class=heading-anchor><span>#</span></a></h2><p><code>HandlerMethodReturnValueHandler</code> 実装は、<code>ModelAndView</code>、ビュー名、<code>ResponseEntity</code>、
+<code>ProblemDetail</code>、<code>@ResponseBody</code> が付いたオブジェクトなどの値を処理します。レスポンス
+ボディの値は <code>HttpMessageConverter</code> がエンコードします。</p><p>コンテンツネゴシエーションは、ハンドラーの <code>produces</code> 条件、リクエストが受け入れ
+可能なメディア型、コンバーターの能力を比較します。サポートされない <code>Content-Type</code>
+のリクエストボディは 415 を生成し、受け入れ可能なレスポンス表現がない場合は 406
+を生成します。パス拡張子ネゴシエーションより、<code>Accept</code> ヘッダーと明示的なデフォルト
+を優先します。</p><h2 id=例外解決>例外解決
+<a href=#%e4%be%8b%e5%a4%96%e8%a7%a3%e6%b1%ba class=heading-anchor><span>#</span></a></h2><p><code>HandlerExceptionResolver</code> は失敗をモデル、ステータス、レスポンスに変換します。
+標準のアノテーション設定には次が含まれます。</p><ul><li><code>ExceptionHandlerExceptionResolver</code> for controller and
+<code>@ControllerAdvice</code> exception methods;</li><li><code>ResponseStatusExceptionResolver</code> for <code>@ResponseStatus</code> and
+<code>ResponseStatusException</code>; and</li><li><code>DefaultHandlerExceptionResolver</code> for framework exceptions.</li></ul><p>中央アドバイスは、ドメインの失敗を安定したステータスコードと一貫したエラー
+スキーマへマッピングします。Spring Framework 6 は <code>ProblemDetail</code> と <code>ErrorResponse</code>
+を導入しました。Spring 6.1 のドキュメントは、RFC 7807 を置き換えた RFC 9457 に
+基づいて問題詳細サポートを説明しています。</p><h2 id=スレッド非同期リクエストコンテキスト>スレッド、非同期リクエスト、コンテキスト
+<a href=#%e3%82%b9%e3%83%ac%e3%83%83%e3%83%89%e9%9d%9e%e5%90%8c%e6%9c%9f%e3%83%aa%e3%82%af%e3%82%a8%e3%82%b9%e3%83%88%e3%82%b3%e3%83%b3%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88 class=heading-anchor><span>#</span></a></h2><p>同期 MVC 処理は Servlet コンテナースレッドで実行されます。ブロッキングするデータ
+ベースまたは HTTP 呼び出しは完了までそのスレッドを保持するため、コネクターから
+すべての下流依存関係まで、期限と容量を設定します。</p><p>コントローラーは <code>Callable</code>、<code>DeferredResult</code>、<code>WebAsyncTask</code> を返せます。MVC は
+Servlet 非同期処理を開始し、コンテナースレッドを解放し、結果の準備ができた後に
+<code>ASYNC</code> ディスパッチを実行します。非同期 MVC はブロッキングコードをノンブロッキング
+にするのではなく、別のエグゼキューターへ作業を移します。そのエグゼキューター、
+タイムアウト、キャンセル、過負荷動作を明示的に設定します。</p><p>スレッドローカルのロギング、ロケール、セキュリティ、オブザベーション状態は任意の
+エグゼキュータータスクへ自動的には引き継がれません。対応するインターセプターまたは
+タスクデコレーターを使うか、コンテキストを明示的に渡し、復元した状態を必ず消去します。</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-servlet.html>Spring MVC <code>DispatcherServlet</code></a></li><li><a href=https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller.html>Annotated controllers</a></li><li><a href=https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-async.html>Spring MVC asynchronous requests</a></li><li><a href=https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html>Spring MVC error responses</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-mvc/ class=language-option data-lang=en>English
+</a><a href=/ja/spring-mvc/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/spring-mvc/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/spring-mvc/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

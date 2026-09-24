@@ -1,0 +1,49 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MySQL のテーブルとビュー</title></head><body><main><article><div class=article-header><h1>MySQL のテーブルとビュー</h1><div class=aux>最終更新: 2021-09-09 08:09:41 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/mysql/>Mysql</a>
+|
+<a href=/ja/tags/sql/>Sql</a>
+|
+<a href=/ja/tags/databases/>Databases</a></div></div><div class="translation-notice machine-translated"><a href=/mysql-tables-and-views/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>ベーステーブルは行を永続化します。ビューはクエリ定義を永続化し、その結果を
+テーブルのようなオブジェクトとして提示します。<code>SHOW FULL TABLES</code> で両者を区別でき、
+<code>INFORMATION_SCHEMA.TABLES.TABLE_TYPE</code> は <code>BASE TABLE</code> または <code>VIEW</code> を返します。</p><h2 id=innodb-の行フォーマット>InnoDB の行フォーマット
+<a href=#innodb-%e3%81%ae%e8%a1%8c%e3%83%95%e3%82%a9%e3%83%bc%e3%83%9e%e3%83%83%e3%83%88 class=heading-anchor><span>#</span></a></h2><p>InnoDB は <code>REDUNDANT</code>、<code>COMPACT</code>、<code>DYNAMIC</code>、<code>COMPRESSED</code> の各行フォーマットを
+サポートします。現在のデフォルトは <code>DYNAMIC</code> です。可変長カラムでは、InnoDB は
+長い値をオーバーフローページに格納し、クラスタ化レコード内に参照を保持できます。
+インラインとオーバーフローの厳密な動作は、行フォーマット、ページサイズ、カラム型、
+値の長さによって異なります。そのため、スキーマ設計では <code>TEXT</code> または <code>BLOB</code> の値が
+行内で固定サイズを占めると仮定すべきではありません。</p><p>テーブルに適用されている設定を確認します。</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SHOW</span> <span style=color:#66d9ef>TABLE</span> STATUS <span style=color:#66d9ef>LIKE</span> <span style=color:#e6db74>&#39;orders&#39;</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SHOW</span> <span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>TABLE</span> orders;</span></span></code></pre></div></div></div><h2 id=ビュー>ビュー
+<a href=#%e3%83%93%e3%83%a5%e3%83%bc class=heading-anchor><span>#</span></a></h2><p>安定した明示的なカラムリストを指定してビューを作成します。</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>VIEW</span> active_customer_orders <span style=color:#66d9ef>AS</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> o.id, o.customer_id, o.created_at, o.total
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> orders <span style=color:#66d9ef>AS</span> o
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> o.status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;active&#39;</span>;</span></span></code></pre></div></div></div><p>デフォルトでは、ビューは別個のテーブルを格納しません。オプティマイザーは、
+マージ可能なビューを外側のクエリにマージできます。一方、集約、<code>DISTINCT</code>、
+一部の派生テーブル操作など、定義上必要な場合は一時テーブルを実体化できます。
+<code>ALGORITHM = MERGE</code> と <code>ALGORITHM = TEMPTABLE</code> は優先する方式を表しますが、
+ビュー定義は選択したアルゴリズムの制約を満たす必要があります。</p><p>影響を受ける各行が単一のベーステーブルに明確に対応する場合、一部のビューは
+更新可能です。集約、<code>GROUP BY</code>、<code>DISTINCT</code>、ウィンドウ関数、集合演算、
+または更新不可能な結合を含むビューは更新できません。ビューの更新動作が
+必須インターフェイスの一部でない場合は、書き込みにベーステーブルを使用します。</p><p><code>DEFINER</code> アカウントと <code>SQL SECURITY</code> 設定によって、ビュー実行時に誰の権限を
+適用するかが決まります。ビューで制限された射影をアプリケーションアカウントに
+公開する場合は、両方を確認してください。</p><p><code>WITH CHECK OPTION</code> は、更新可能なビューを介した書き込みによって、そのビューから
+参照できない行が作成されることを防ぎます。<code>CASCADED</code> はビューと基になるビューの
+条件を検査し、<code>LOCAL</code> は現在のビューの条件のみを検査します。</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>SQL</span> <span style=color:#66d9ef>SECURITY</span> <span style=color:#66d9ef>INVOKER</span> <span style=color:#66d9ef>VIEW</span> active_customer_orders <span style=color:#66d9ef>AS</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> id, customer_id, created_at, total, status
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> orders
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;active&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WITH</span> <span style=color:#66d9ef>CASCADED</span> <span style=color:#66d9ef>CHECK</span> <span style=color:#66d9ef>OPTION</span>;</span></span></code></pre></div></div></div><p>MySQL はビュー定義をデータディクショナリに格納し、ビューの実行時に参照先
+オブジェクトを解決します。ただし、スキーマ変更によってビューが無効になる場合が
+あります。依存テーブルを変更した後は <code>SHOW CREATE VIEW</code> と <code>CHECK TABLE</code> を使用し、
+呼び出し元から互換性のない定義が見えないようにマイグレーションの順序を決めます。</p><p>MySQL には、自動的に維持されるネイティブなマテリアライズドビューオブジェクトは
+ありません。事前計算が必要な場合は、スケジュールされたトランザクション、
+変更データパイプライン、またはアプリケーションジョブによってデータを投入する
+ベーステーブルを使用します。更新の原子性と鮮度を明示的に定義してください。
+そのテーブルの入れ替えや更新は、通常のビューに対するクエリとは、整合性と
+メタデータロックの動作が異なります。</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-row-format.html>InnoDB の行フォーマット</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/view-algorithms.html>ビュー処理アルゴリズム</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/view-updatability.html>更新可能なビューとチェックオプション</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mysql-tables-and-views/ class=language-option data-lang=en>English
+</a><a href=/ja/mysql-tables-and-views/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/mysql-tables-and-views/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/mysql-tables-and-views/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,49 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Git の改行コード変換</title></head><body><main><article><div class=article-header><h1>Git の改行コード変換</h1><div class=aux>最終更新: 2026-04-29 00:23:56 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/git/>Git</a>
+|
+<a href=/ja/tags/version-control/>Version-Control</a></div></div><div class="translation-notice machine-translated"><a href=/git-line-ending-conversion/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Git は、リポジトリ境界でテキストを LF に正規化しつつ、ワークツリーでは LF または
+CRLF として提示できます。安定した <code>.gitattributes</code> ポリシーにより、
+プラットフォーム依存のコミットを回避し、エディターにはチェックアウトされた形式の
+管理だけを担わせることができます。</p><h2 id=headインデックスワークツリーのバイト列を区別する>HEAD、インデックス、ワークツリーのバイト列を区別する
+<a href=#head%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9%e3%83%af%e3%83%bc%e3%82%af%e3%83%84%e3%83%aa%e3%83%bc%e3%81%ae%e3%83%90%e3%82%a4%e3%83%88%e5%88%97%e3%82%92%e5%8c%ba%e5%88%a5%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>追跡対象のパスには、関連する表現が 3 つあります。</p><ol><li><code>HEAD</code> は現在のコミットに格納された blob を指します。</li><li>インデックスは次のコミットに含める予定の blob を保持します。</li><li>ワークツリーはエディターやビルドツールが使用するバイト列を保持します。</li></ol><p>正規化対象のテキストでは、<code>git add</code> が CRLF から LF への clean 変換を実行します。
+チェックアウト時には、インデックス内の LF から選択されたワークツリーの改行コード
+への smudge 変換が実行されます。既存のコミットは書き換えられません。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git ls-files --eol -- path/to/file
+</span></span><span style=display:flex><span>git show HEAD:path/to/file | od -An -t x1
+</span></span><span style=display:flex><span>git check-attr -a -- path/to/file</span></span></code></pre></div></div></div><p><code>git ls-files --eol</code> は、インデックス、ワークツリー、および実効属性の形式を
+報告します。変換警告に対処する前に、それらの形式を確認してください。</p><h2 id=gitattributes-でリポジトリポリシーを宣言する><code>.gitattributes</code> でリポジトリポリシーを宣言する
+<a href=#gitattributes-%e3%81%a7%e3%83%aa%e3%83%9d%e3%82%b8%e3%83%88%e3%83%aa%e3%83%9d%e3%83%aa%e3%82%b7%e3%83%bc%e3%82%92%e5%ae%a3%e8%a8%80%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>すべての clone でポリシーを共有できるように、属性をコミットします。</p><div class=jose-wrapper><div class=jose-tools><span>gitattributes</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-gitattributes data-lang=gitattributes>*       text=auto
+*.sh    text eol=lf
+*.py    text eol=lf
+*.bat   text eol=crlf
+*.png   binary
+*.pdf   binary</code></pre></div></div><p><code>text=auto</code> を指定すると、Git が未指定のパスを分類します。<code>text</code> は正規化を強制し、
+<code>-text</code> は正規化を無効にします。また、<code>binary</code> は <code>-diff -merge -text</code> を表す
+組み込み属性マクロです。明示的な <code>eol=lf</code> または <code>eol=crlf</code> はパスをテキストとして
+指定し、チェックアウト時の形式を制御します。変換によってバイト列が変化するため、
+アーカイブ、画像、生成されたバイナリ形式、署名済み成果物は非テキストとして
+指定してください。</p><h2 id=設定はフォールバックとしてのみ使用する>設定はフォールバックとしてのみ使用する
+<a href=#%e8%a8%ad%e5%ae%9a%e3%81%af%e3%83%95%e3%82%a9%e3%83%bc%e3%83%ab%e3%83%90%e3%83%83%e3%82%af%e3%81%a8%e3%81%97%e3%81%a6%e3%81%ae%e3%81%bf%e4%bd%bf%e7%94%a8%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p><code>core.autocrlf</code> と <code>core.eol</code> は、属性によってより具体的な処理が決まらないパスに
+影響します。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>core.autocrlf</code></th><th>インデックスへの clean</th><th>インデックスからのチェックアウト</th></tr></thead><tbody><tr><td><code>false</code></td><td>autocrlf 変換なし</td><td>autocrlf 変換なし</td></tr><tr><td><code>input</code></td><td>CRLF を LF に変換</td><td>LF のまま維持</td></tr><tr><td><code>true</code></td><td>CRLF を LF に変換</td><td>LF を CRLF に変換</td></tr></tbody></table></div></div><p><code>core.eol</code> は、明示的な <code>eol</code> 属性がない正規化対象テキストに対して、<code>lf</code>、<code>crlf</code>、
+または <code>native</code> を選択します。<code>core.safecrlf=true</code> は不可逆な変換を拒否し、
+<code>warn</code> はそれを報告します。どちらの設定も、コミットされた属性ポリシーの代わりには
+なりません。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git config --show-origin --get core.autocrlf
+</span></span><span style=display:flex><span>git config --show-origin --get core.eol
+</span></span><span style=display:flex><span>git config --show-origin --get core.safecrlf</span></span></code></pre></div></div></div><h2 id=安全に再正規化する>安全に再正規化する
+<a href=#%e5%ae%89%e5%85%a8%e3%81%ab%e5%86%8d%e6%ad%a3%e8%a6%8f%e5%8c%96%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>属性を追加または修正した後は、クリーンなワークツリーから始めるか、未コミットの
+作業を退避します。その後、意図した正規化をステージし、内容を確認します。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git add --renormalize .
+</span></span><span style=display:flex><span>git diff --cached --check
+</span></span><span style=display:flex><span>git diff --cached</span></span></code></pre></div></div></div><p>改行コードの正規化は、セマンティックな編集とは別にコミットしてください。
+専用のコミットに分けることで、レビュー、blame、ロールバックの精度を維持できます。
+この操作はインデックスを更新しますが、無視対象または未追跡のファイルは変更しません。</p><p>特に CRLF を強制するファイルでは、エディターの設定をチェックアウトポリシーに
+合わせてください。エディター設定はワークツリーのバイト列に影響し、
+<code>.gitattributes</code> はバージョン管理の境界を定義します。実験目的で、重要な
+未コミットファイルに対して追加とチェックアウトを繰り返さないでください。
+先に実効属性を確認し、作業を保存してください。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/git-line-ending-conversion/ class=language-option data-lang=en>English
+</a><a href=/ja/git-line-ending-conversion/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/git-line-ending-conversion/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/git-line-ending-conversion/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

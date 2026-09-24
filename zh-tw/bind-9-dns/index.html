@@ -1,0 +1,65 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>BIND 9 權威與遞迴 DNS</title></head><body><main><article><div class=article-header><h1>BIND 9 權威與遞迴 DNS</h1><div class=aux>最後更新: 2026-01-15 18:06:05 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/bind/>Bind</a>
+|
+<a href=/zh-tw/tags/dns/>Dns</a>
+|
+<a href=/zh-tw/tags/networking/>Networking</a></div></div><div class="translation-notice machine-translated"><a href=/bind-9-dns/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>BIND 9 會執行 <code>named</code> 名稱伺服器。其設定決定它是否以權威方式回答、提供遞迴、傳送區域，或接受動態更新。將這些角色分開處理，因為面向網際網路的權威伺服器不應成為開放的遞迴解析器。</p><h2 id=伺服器設定>伺服器設定
+<a href=#%e4%bc%ba%e6%9c%8d%e5%99%a8%e8%a8%ad%e5%ae%9a class=heading-anchor><span>#</span></a></h2><p><code>named.conf</code> 定義全域選項、存取控制清單、區域與記錄。最小的權威設定會限制遞迴與區域傳送：</p><div class=jose-wrapper><div class=jose-tools><span>named</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-named data-lang=named>acl trusted-recursors { 192.0.2.0/24; 2001:db8:1::/48; };
+
+options {
+    directory &#34;/var/named&#34;;
+    listen-on { any; };
+    listen-on-v6 { any; };
+    recursion no;
+    allow-transfer { none; };
+    minimal-responses yes;
+};
+
+zone &#34;example.net&#34; {
+    type primary;
+    file &#34;zones/example.net&#34;;
+    allow-transfer { 192.0.2.53; };
+};</code></pre></div></div><p>遞迴解析器需要 <code>recursion yes</code>，以及限制於其用戶端的 <code>allow-recursion</code> 或 <code>allow-query-cache</code> ACL。除非部署明確提供具有濫用控制的公開解析器，否則絕不要讓不受信任的網路使用遞迴。</p><p>ACL 可以由 <code>allow-query</code>、<code>allow-recursion</code>、<code>allow-query-cache</code>、<code>allow-transfer</code> 與 <code>match-clients</code> 重複使用。BIND <code>view</code> 陳述式會依來源位址、目的位址或 TSIG 身分，呈現不同的區域與遞迴政策：</p><div class=jose-wrapper><div class=jose-tools><span>named</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-named data-lang=named>view &#34;internal&#34; {
+    match-clients { trusted-recursors; };
+    recursion yes;
+    allow-recursion { trusted-recursors; };
+
+    zone &#34;example.net&#34; {
+        type primary;
+        file &#34;zones/internal/example.net&#34;;
+    };
+};
+
+view &#34;external&#34; {
+    match-clients { any; };
+    recursion no;
+
+    zone &#34;example.net&#34; {
+        type primary;
+        file &#34;zones/external/example.net&#34;;
+    };
+};</code></pre></div></div><p>啟用 view 時，請在適用的 view 中定義每個用戶端可見的區域。將最具體的 <code>match-clients</code> 規則放在前面，因為 BIND 會選取第一個相符的 view。</p><h2 id=區域檔案>區域檔案
+<a href=#%e5%8d%80%e5%9f%9f%e6%aa%94%e6%a1%88 class=heading-anchor><span>#</span></a></h2><p>區域檔案記錄遵循：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>owner [TTL] [class] type rdata</span></span></code></pre></div></div></div><p><code>$ORIGIN</code> 提供相對名稱的後綴；<code>$TTL</code> 提供預設 TTL。<code>@</code> owner 表示目前的 origin。區域頂點需要 SOA 記錄與 NS 記錄。缺少結尾句點的名稱會相對於 <code>$ORIGIN</code>。</p><div class=jose-wrapper><div class=jose-tools><span>zone</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-zone data-lang=zone><span style=display:flex><span><span style=color:#a6e22e>$ORIGIN</span> example.net.
+</span></span><span style=display:flex><span><span style=color:#a6e22e>$TTL</span> <span style=color:#e6db74>3600</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@</span> <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>SOA</span> ns1.example.net. hostmaster.example.net. (
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>2026080701</span> <span style=color:#e6db74>7200</span> <span style=color:#e6db74>900</span> <span style=color:#e6db74>1209600</span> <span style=color:#e6db74>300</span> )
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>NS</span> ns1.example.net.
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>NS</span> ns2.example.net.
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ns1</span> <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>A</span> <span style=color:#ae81ff>192.0.2.53</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>www</span> <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>A</span> <span style=color:#ae81ff>192.0.2.80</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>docs</span> <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>CNAME</span> <span style=color:#960050;background-color:#1e0010>www</span></span></span></code></pre></div></div></div><p>每次發布區域變更都要遞增 SOA 序號。次要伺服器會使用序號判斷是否需要傳送。使用明確 ACL 設定傳送，並在適當時以 TSIG 驗證。</p><p><code>A</code> 或 <code>AAAA</code> 記錄會將名稱對映到位址。<code>CNAME</code> 使其 owner 成為別名，且不能與該 owner 的一般資料共存。在父區域使用 NS RRset 委派子區域；當被委派的名稱伺服器位於被委派名稱下方時，將同屬委派範圍的 A 或 AAAA glue 放入父區域：</p><div class=jose-wrapper><div class=jose-tools><span>zone</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-zone data-lang=zone><span style=display:flex><span><span style=color:#a6e22e>child</span>       <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>NS</span> <span style=color:#a6e22e>ns1.child</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ns1.child</span>   <span style=color:#66d9ef>IN</span> <span style=color:#66d9ef>A</span> <span style=color:#ae81ff>192.0.2.91</span></span></span></code></pre></div></div></div><h2 id=驗證與作業>驗證與作業
+<a href=#%e9%a9%97%e8%ad%89%e8%88%87%e4%bd%9c%e6%a5%ad class=heading-anchor><span>#</span></a></h2><p>重新載入前先驗證：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>named-checkconf /etc/named.conf
+</span></span><span style=display:flex><span>named-checkzone example.net /var/named/zones/example.net
+</span></span><span style=display:flex><span>rndc reload example.net
+</span></span><span style=display:flex><span>dig @127.0.0.1 www.example.net A +norecurse</span></span></code></pre></div></div></div><p>變更區域宣告後使用 <code>rndc reconfig</code>，變更區域資料後使用 <code>rndc reload</code>。使用 <code>dig</code> 分別查詢權威與遞迴路徑，檢查狀態旗標與權威區段，並在防火牆行為不同時測試 UDP 與 TCP。</p><p>DNSSEC 加入已簽署的 RRset、DNSKEY 發布與從父區域開始的 DS 鏈。BIND 可以透過 <code>dnssec-policy</code> 維護簽章與金鑰；金鑰檔案、輪替狀態、父區域 DS 更新與時鐘同步會成為作業相依性。使用 <code>dig +dnssec</code> 驗證已簽署的回答，並透過驗證解析器測試，而不要將存在 RRSIG 視為有效鏈的證明。</p><p>以專用的非特權服務帳戶執行 <code>named</code>，並確保工作目錄、金鑰、日誌檔案與區域檔案具有所需權限。使用 <code>named -g</code> 執行前景診斷，正常操作則使用服務管理器。在降低權限前先繫結特權連接埠，限制可寫入的目錄，並只讓服務與獲授權的管理員讀取控制通道金鑰。</p><h2 id=參考資料>參考資料
+<a href=#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://bind9.readthedocs.io/>BIND 9 管理員參考手冊</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1035>RFC 1035：主檔案格式</a></li><li><a href=https://bind9.readthedocs.io/en/latest/dnssec-guide.html>BIND 9 DNSSEC 指南</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/bind-9-dns/ class=language-option data-lang=en>English
+</a><a href=/ja/bind-9-dns/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/bind-9-dns/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/bind-9-dns/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

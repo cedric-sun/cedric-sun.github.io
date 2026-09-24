@@ -1,0 +1,36 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Kubernetes を一から構築する</title></head><body><main><article><div class=article-header><h1>Kubernetes を一から構築する</h1><div class=aux>最終更新: 2022-05-30 07:31:00 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/etcd/>Etcd</a>
+|
+<a href=/ja/tags/kubernetes/>Kubernetes</a>
+|
+<a href=/ja/tags/linux/>Linux</a></div></div><div class="translation-notice machine-translated"><a href=/kubernetes-from-scratch/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Kubernetes をソースからビルドする方法は、コンポーネントの学習や、パッチを適用した
+コンポーネントのテストに適している。本番クラスターには、サポートされたアップグレード手順、
+証明書のローテーション、バックアップからの復旧、ネットワーク、ストレージ、監視、
+インシデント対応手順も必要になる。</p><h2 id=オブジェクトモデルと-api-パス>オブジェクトモデルと API パス
+<a href=#%e3%82%aa%e3%83%96%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88%e3%83%a2%e3%83%87%e3%83%ab%e3%81%a8-api-%e3%83%91%e3%82%b9 class=heading-anchor><span>#</span></a></h2><p>Kubernetes は、クラスターの操作をリソースに対する CRUD としてモデル化する。各オブジェクトは、
+UID、型、その型の中で一意な名前、インデックスを利用した選択のためのラベル、および
+識別には使われないメタデータのためのアノテーションを持つ。</p><p>リソースは API グループに分類される。</p><ul><li>コアグループは <code>/api/v1</code> 以下で公開される。</li><li>名前付きグループは <code>/apis/&lt;group>/&lt;version></code> 以下で公開される。</li></ul><p><code>GET /api</code>、<code>GET /apis</code>、<code>/openapi/v3</code> などのディスカバリーエンドポイントは、
+クラスターがサポートするリソースを記述する。リソース一覧の各エントリーは、
+正規名、<code>kind</code>、名前空間のスコープ、verb、および <code>pvc</code> などの短縮名を公開する。</p><p>一般的な verb は次のように HTTP メソッドに対応する。</p><ul><li><code>get</code>、<code>list</code>、<code>watch</code> は <code>GET</code> を使用する。</li><li><code>create</code> は <code>POST</code> を使用する。</li><li><code>update</code> は <code>PUT</code> を使用する。</li><li><code>patch</code> は <code>PATCH</code> を使用する。</li><li><code>delete</code> と <code>deletecollection</code> は <code>DELETE</code> を使用する。</li></ul><p>このオブジェクトモデルにより、<code>Service</code> は多数の Pod をバックエンドとする安定した
+エンドポイントになる一方、Pod 自体は一時的な存在であり、再作成されると新しい
+ネットワーク ID を取得する。</p><h2 id=バイナリのビルドと記録>バイナリのビルドと記録
+<a href=#%e3%83%90%e3%82%a4%e3%83%8a%e3%83%aa%e3%81%ae%e3%83%93%e3%83%ab%e3%83%89%e3%81%a8%e8%a8%98%e9%8c%b2 class=heading-anchor><span>#</span></a></h2><p>ドキュメントで指定された Go ツールチェーンを使い、タグが付けられた Kubernetes の
+ソースリビジョンからビルドする。すべてのバイナリについて、ソースコミット、
+ツールチェーンのバージョン、ビルドフラグ、チェックサムを記録する。選択したコマンドは
+<code>make WHAT=...</code> でビルドするか、リリース用ビルドプロセスを使用する。
+コントロールプレーンのホストに出所不明のバイナリをダウンロードしてはならない。</p><h2 id=コントロールプレーンの構築>コントロールプレーンの構築
+<a href=#%e3%82%b3%e3%83%b3%e3%83%88%e3%83%ad%e3%83%bc%e3%83%ab%e3%83%97%e3%83%ac%e3%83%bc%e3%83%b3%e3%81%ae%e6%a7%8b%e7%af%89 class=heading-anchor><span>#</span></a></h2><p>奇数台で構成した etcd クォーラムに API の状態を保存する。ピア間およびクライアントとの
+通信を TLS で保護し、スナップショットからの復元をテストし、クライアントからの直接アクセスを
+制限する。依存関係に従い、次の順序でコントロールプレーンを起動する。</p><ol><li>etcd、証明書、サービスアカウント署名鍵、ネットワーク到達性を確立する。</li><li>サーバー証明書、etcd クライアント認証情報、Service CIDR、Admission 設定、
+監査ポリシーを指定して <code>kube-apiserver</code> を起動する。</li><li>個別の ID を使って <code>kube-controller-manager</code> と <code>kube-scheduler</code> を起動する。</li><li>初期ブートストラップ専用の管理用 kubeconfig を設定する。</li><li>CNI 実装をインストールしてから、kubelet を参加させる。</li></ol><p>kubelet には、ノード ID、API エンドポイント、CRI 互換ランタイム、CNI 設定、および
+整合する Pod CIDR の前提が必要である。Service のルーティングは、kube-proxy または
+代替データプレーンによって実装される。</p><p>コントロールプレーンの各コンポーネントには、個別の役割がある。</p><ul><li><code>etcd</code> はクラスターの状態を保存する。</li><li><code>kube-apiserver</code> は認証済みのすべてのリクエストを受け付ける窓口である。</li><li><code>kube-controller-manager</code> は望ましい状態を実際の状態へと調整する。</li><li><code>kube-scheduler</code> は保留中の Pod を配置するノードを選択する。</li><li><code>kubelet</code> は各ノードを API サーバーの状態と一致させる。</li><li><code>kube-proxy</code> は各ノードで Service のルーティングを実装する。</li></ul><h2 id=api-リクエストの保護>API リクエストの保護
+<a href=#api-%e3%83%aa%e3%82%af%e3%82%a8%e3%82%b9%e3%83%88%e3%81%ae%e4%bf%9d%e8%ad%b7 class=heading-anchor><span>#</span></a></h2><p>API サーバーは HTTPS リクエストを受け付ける。リクエストは次の段階をたどる。</p><ol><li>認証。クライアント証明書、サービスアカウントトークン、または OIDC を通じて、
+リクエストをユーザー名、UID、グループ、任意の追加属性に関連付ける。</li><li>認可。ID、verb、リソース、名前空間、名前を評価する。</li><li>Admission。リクエストを検証または変更する。</li><li>リクエストによってクラスターの状態が変化する場合、etcd に永続化する。</li></ol><p>意図的に設計された代替方式がない限り、<code>Node</code> と <code>RBAC</code> による認可を有効にする。
+匿名アクセスを無効化し、静的トークンファイルを避け、コンポーネントごとに ID を分離し、
+秘密鍵をソース管理の対象外に置く。クラスターが運用可能であると判断する前に、
+<code>/readyz</code>、DNS、Service のルーティング、リソース制限、ノード障害、証明書の更新、
+etcd からの復元を検証する。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/kubernetes-from-scratch/ class=language-option data-lang=en>English
+</a><a href=/ja/kubernetes-from-scratch/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/kubernetes-from-scratch/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/kubernetes-from-scratch/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

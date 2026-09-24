@@ -1,0 +1,80 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Kconfig</title></head><body><main><article><div class=article-header><h1>Linux Kconfig</h1><div class=aux>最終更新: 2022-07-06 20:06:54 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/kconfig/>Kconfig</a>
+|
+<a href=/ja/tags/kernel/>Kernel</a>
+|
+<a href=/ja/tags/linux/>Linux</a></div></div><div class="translation-notice machine-translated"><a href=/linux-kconfig/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Kconfig は Linux カーネル設定を構築するための選択肢を記述します。カーネル開発者は <code>Kconfig</code> ファイルを編集してシンボルとその関係を定義し、
+ユーザーは <code>make menuconfig</code>、<code>make nconfig</code>、<code>make xconfig</code>、または <code>olddefconfig</code> などの非対話的ターゲットで値を選択します。</p><p>生成された <code>.config</code> は Kbuild への入力であり、完全なビルドスクリプトではありません。設定同期は Make と C が消費するファイルを生成し、
+<code>include/config/auto.conf</code> と <code>include/generated/autoconf.h</code> もその中に含まれます。</p><h2 id=ルートファイルから-1-つの設定へ>ルートファイルから 1 つの設定へ
+<a href=#%e3%83%ab%e3%83%bc%e3%83%88%e3%83%95%e3%82%a1%e3%82%a4%e3%83%ab%e3%81%8b%e3%82%89-1-%e3%81%a4%e3%81%ae%e8%a8%ad%e5%ae%9a%e3%81%b8 class=heading-anchor><span>#</span></a></h2><p>解析はトップレベルの <code>Kconfig</code> から始まります。<code>source</code> 文がサブシステムファイルを含め、アーキテクチャ選択が <code>arch/$(SRCARCH)/Kconfig</code> を取り込みます。
+その他のインクルード形式は次のとおりです。</p><ul><li><code>rsource</code>: パスがインクルード元ファイルからの相対になる。</li><li><code>osource</code>: ファイルがない場合に無視する。</li><li><code>orsource</code>: 相対指定と任意指定を組み合わせる。</li></ul><p><code>mainmenu</code> はフロントエンドのタイトルを設定します。<code>menu</code>/<code>endmenu</code>、<code>if</code>/<code>endif</code>、<code>choice</code>/<code>endchoice</code>、<code>comment</code>、<code>config</code>、<code>menuconfig</code> がエントリー構造を構築します。</p><p>同じシンボルを複数のインクルードファイルで定義できます。Kconfig はシンボルのプロパティを結合し、アーキテクチャローカル変数を作成しません。
+定義は一貫した型を使い、依存関係節は累積し、既定値の順序は依然として重要です。
+そのため共通ファイルが不可視の機能を宣言し、アーキテクチャ定義がそれを select できます。</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig># lib/Kconfig
+config HAVE_FAST_CHECKSUM
+    bool
+
+config FAST_CHECKSUM
+    bool &#34;Use the generic fast checksum implementation&#34;
+    depends on HAVE_FAST_CHECKSUM
+
+# arch/example/Kconfig
+config EXAMPLE
+    bool
+    select HAVE_FAST_CHECKSUM</code></pre></div></div><p><code>HAVE_*</code> symbols express implementation capability. A user-visible feature then depends on that capability, which avoids using <code>select</code> to bypass the feature&rsquo;s real dependencies.</p><h2 id=マクロとプリプロセッサー層>マクロとプリプロセッサー層
+<a href=#%e3%83%9e%e3%82%af%e3%83%ad%e3%81%a8%e3%83%97%e3%83%aa%e3%83%97%e3%83%ad%e3%82%bb%e3%83%83%e3%82%b5%e3%83%bc%e5%b1%a4 class=heading-anchor><span>#</span></a></h2><p>Kconfig はメニューエントリー言語が行を消費する前にテキスト展開を行います。変数構文は Make に似ています。</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span>immediate <span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>deferred <span style=color:#f92672>=</span> <span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>message <span style=color:#f92672>=</span> architecture <span style=color:#66d9ef>$(</span>1<span style=color:#66d9ef>)</span>, compiler <span style=color:#66d9ef>$(</span>2<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>$(</span>info,configuring <span style=color:#66d9ef>$(</span>immediate<span style=color:#66d9ef>))</span>
+</span></span><span style=display:flex><span>label <span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>message,<span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span>,<span style=color:#66d9ef>$(</span>CC<span style=color:#66d9ef>))</span>
+</span></span></code></pre></div></div></div><ul><li><code>:=</code> は右辺を直ちに展開する。</li><li><code>=</code> は再帰展開される値を保存する。</li><li><code>+=</code> は変数の既存の展開形式に従って追加する。</li><li><code>$(name)</code> は変数を展開する。</li><li><code>$(name,arg1,arg2)</code> はパラメーター化変数を展開し、<code>$(1)</code>、<code>$(2)</code> などが位置引数になる。</li></ul><p>Make と異なり、パラメーター化された Kconfig 変数は直接呼び出し、<code>$(call ...)</code> はありません。コンマが関数引数を区切ります。
+組み込み関数には <code>shell</code>、<code>info</code>、<code>warning-if</code>、<code>error-if</code>、<code>filename</code>、<code>lineno</code> があります。
+カーネルは Kconfig 関数機構を通じてコンパイラーオプション検査などの関数を追加します。</p><p>Macro expansion is textual, so quoting and whitespace remain significant to the language that receives the result. Use preprocessing for small repeated expressions and feature probes rather than generating large, difficult-to-audit menu fragments.</p><h2 id=シンボル型プロンプト>シンボル、型、プロンプト
+<a href=#%e3%82%b7%e3%83%b3%e3%83%9c%e3%83%ab%e5%9e%8b%e3%83%97%e3%83%ad%e3%83%b3%e3%83%97%e3%83%88 class=heading-anchor><span>#</span></a></h2><p><code>config NAME</code> は <code>NAME</code> というシンボルを定義し、<code>.config</code> と C では <code>CONFIG_NAME</code> として公開します。
+<code>menuconfig</code> は同じ種類のシンボルを定義しますが、対応するフロントエンドにそのエントリーがサブメニューを含むことを伝えます。</p><p>利用できるシンボル型は 5 つです。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>型</th><th><code>.config</code> の例</th><th>生成される C 形式</th></tr></thead><tbody><tr><td><code>bool</code></td><td><code>CONFIG_FOO=y</code> または <code># CONFIG_FOO is not set</code></td><td><code>#define CONFIG_FOO 1</code> または不在</td></tr><tr><td><code>tristate</code></td><td><code>CONFIG_FOO=y</code>、<code>CONFIG_FOO=m</code>、または未設定</td><td><code>CONFIG_FOO</code>、<code>CONFIG_FOO_MODULE</code>、またはいずれもなし</td></tr><tr><td><code>string</code></td><td><code>CONFIG_FOO="value"</code></td><td>引用符付き文字列マクロ</td></tr><tr><td><code>int</code></td><td><code>CONFIG_FOO=42</code></td><td>整数マクロ</td></tr><tr><td><code>hex</code></td><td><code>CONFIG_FOO=0x2a</code></td><td>16 進整数マクロ</td></tr></tbody></table></div></div><p><code>bool "Enable foo"</code> and <code>tristate "Build foo"</code> combine a type with a <code>prompt</code>. A symbol without a visible prompt is not editable in a configuration front end, although defaults, <code>select</code>, or other expressions can still give it a value.</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig>config FOO
+    tristate &#34;Foo transport&#34;
+    depends on NET
+    default m if MODULES
+    help
+      Build support for the Foo transport.</code></pre></div></div><p><code>def_bool EXPR</code> and <code>def_tristate EXPR</code> are shorthands for a type plus <code>default EXPR</code>. <code>range MIN MAX</code> limits an <code>int</code> or <code>hex</code> symbol when its optional condition is true.</p><h2 id=tristate-式>tristate 式
+<a href=#tristate-%e5%bc%8f class=heading-anchor><span>#</span></a></h2><p>論理 Kconfig 式は順序付きの値 <code>n = 0</code>、<code>m = 1</code>、<code>y = 2</code> を使います。したがって、</p><ul><li><code>A && B</code> は 2 値の最小値。</li><li><code>A || B</code> は最大値。</li><li><code>!A</code> は <code>2 - A</code>。</li></ul><p>Comparisons produce a tristate result. Parentheses control grouping, and quoted literals represent string values. A <code>bool</code> cannot retain <code>m</code>; module-related expressions collapse according to the symbol type and whether modules are enabled.</p><p>Direct dependencies impose an upper bound:</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig>config USB_WIDGET
+    tristate &#34;USB widget&#34;
+    depends on USB &amp;&amp; HAS_IOMEM</code></pre></div></div><p>If <code>USB=m</code>, <code>USB_WIDGET</code> cannot become <code>y</code>. The optional condition on a prompt affects whether the prompt is visible, while the symbol&rsquo;s direct dependencies constrain its value regardless of front-end presentation.</p><h2 id=既定値逆依存関係可視性>既定値、逆依存関係、可視性
+<a href=#%e6%97%a2%e5%ae%9a%e5%80%a4%e9%80%86%e4%be%9d%e5%ad%98%e9%96%a2%e4%bf%82%e5%8f%af%e8%a6%96%e6%80%a7 class=heading-anchor><span>#</span></a></h2><p>プロパティは異なる問題を解決します。</p><ul><li><code>default VALUE if CONDITION</code> はユーザーがまだ設定していない場合にだけ値を提供する。複数の既定値が可視なら最初の可視値が勝つ。
+既存 <code>.config</code> から保持された値を既定値が上書きすることはない。</li><li><code>depends on EXPR</code> はシンボルの最大値とプロンプトの可視性を制限する。</li><li><code>select TARGET if CONDITION</code> は逆依存関係を作り、<code>TARGET</code> を選択式の値以上に引き上げる。<code>TARGET</code> 自身の直接依存関係は尊重しないため、
+前提条件が保証された単純で不可視のシンボルだけを select する。</li><li><code>imply TARGET if CONDITION</code> は弱い逆依存関係である。可視のユーザー選択で減らせる下限を提供し、ターゲットの直接依存関係は結果を引き続き上限設定する。</li><li><code>visible if EXPR</code> は内部のシンボル値を変更せずに <code>menu</code> ブロックの可視性を制限する。</li></ul><p>For example:</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig>config DRIVER_FOO
+    tristate &#34;Foo device&#34;
+    depends on PCI
+    select CRC32
+    imply FW_LOADER</code></pre></div></div><p><code>CRC32</code> should be an internal helper with no unmet dependencies. <code>FW_LOADER</code> is merely encouraged because the driver can operate without it. Adding <code>select</code> to repair a dependency cycle is incorrect because Kconfig rejects recursive dependencies and does not use a SAT solver to infer a preferred solution.</p><h2 id=メニュー位置は依存関係グラフではない>メニュー位置は依存関係グラフではない
+<a href=#%e3%83%a1%e3%83%8b%e3%83%a5%e3%83%bc%e4%bd%8d%e7%bd%ae%e3%81%af%e4%be%9d%e5%ad%98%e9%96%a2%e4%bf%82%e3%82%b0%e3%83%a9%e3%83%95%e3%81%a7%e3%81%af%e3%81%aa%e3%81%84 class=heading-anchor><span>#</span></a></h2><p>Source order and explicit containers determine most displayed positions:</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig>menu &#34;Network drivers&#34;
+    visible if NET
+
+config NET_VENDOR_EXAMPLE
+    bool &#34;Example devices&#34;
+
+if NET_VENDOR_EXAMPLE
+source &#34;drivers/net/ethernet/example/Kconfig&#34;
+endif
+
+endmenu</code></pre></div></div><p>Front ends also infer an implicit submenu when a later entry depends on the preceding entry strongly enough that the child cannot be visible unless the parent is visible. The language documentation describes the precise prompt-dependency rule.</p><p>依存関係がエントリーを別の場所へ移動させることはありません。シンボルは別セクションに表示されたシンボルへ依存でき、
+<code>select</code> もターゲットをセレクターの下に表示しません。したがってメニューレイアウトはナビゲーションを伝え、
+依存関係式は有効な値を伝えます。一方を他方の描画として扱うと、分かりにくい Kconfig ファイルになります。</p><h2 id=生成される設定アーティファクト>生成される設定アーティファクト
+<a href=#%e7%94%9f%e6%88%90%e3%81%95%e3%82%8c%e3%82%8b%e8%a8%ad%e5%ae%9a%e3%82%a2%e3%83%bc%e3%83%86%e3%82%a3%e3%83%95%e3%82%a1%e3%82%af%e3%83%88 class=heading-anchor><span>#</span></a></h2><p>フロントエンドが <code>.config</code> を書き込んだ後、Kbuild は生成入力を同期します。重要な表現は次のとおりです。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>.config
+</span></span><span style=display:flex><span>include/config/auto.conf
+</span></span><span style=display:flex><span>include/generated/autoconf.h</span></span></code></pre></div></div></div><p><code>.config</code> は永続的なユーザー向け割り当てファイルです。<code>auto.conf</code> は Make に割り当てを提示するため、規則は次のような式を使えます。</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span>obj-$(CONFIG_USB_WIDGET) <span style=color:#f92672>+=</span> usb-widget.o
+</span></span></code></pre></div></div></div><p><code>autoconf.h</code> は有効なシンボルを C プリプロセッサーに提示します。カーネル C コードは <code>autoconf.h</code> を直接 include せず通常のカーネルヘッダーを含めます。
+<code>IS_ENABLED(CONFIG_FOO)</code> などのヘルパーは、すべてのプリプロセッサー組み合わせを手書きせず、組み込みとモジュールの形式を処理します。</p><p>Configuration updates can add symbols introduced by a newer tree. <code>make oldconfig</code> asks about new choices, whereas <code>make olddefconfig</code> accepts their defaults. <code>make savedefconfig</code> writes a minimal defconfig relative to defaults; it is not interchangeable with archiving the full <code>.config</code>.</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.kernel.org/kbuild/kconfig-language.html>Kernel Documentation: Kconfig Language</a></li><li><a href=https://docs.kernel.org/kbuild/kconfig-macro-language.html>Kernel Documentation: Kconfig Macro Language</a></li><li><a href=https://docs.kernel.org/kbuild/kconfig.html>Kernel Documentation: Kconfig Hints</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-kconfig/ class=language-option data-lang=en>English
+</a><a href=/ja/linux-kconfig/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/linux-kconfig/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/linux-kconfig/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

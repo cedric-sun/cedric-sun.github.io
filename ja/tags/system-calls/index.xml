@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>System-Calls on cesun.life</title><link>https://example.org/ja/tags/system-calls/</link><description>Recent content in System-Calls on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 07 May 2026 03:47:31 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/system-calls/index.xml" rel="self" type="application/rss+xml"/><item><title>glibc Source Internals and System-Call Wrappers</title><link>https://example.org/ja/glibc-syscall-wrappers/</link><pubDate>Thu, 07 May 2026 03:47:31 +0800</pubDate><guid>https://example.org/ja/glibc-syscall-wrappers/</guid><description>&lt;p&gt;glibc は &lt;code&gt;read(2)&lt;/code&gt; や &lt;code&gt;write(2)&lt;/code&gt; などの C 関数を公開し、Linux はアーキテクチャ固有のシステムコール入口規約を公開します。
+ラッパーはこれらの層を橋渡しします。公開 C ABI を受け入れ、選択したアーキテクチャのシステムコール ABI に従い、
+カーネルエラーを変換し、POSIX スレッドキャンセルの動作を実装する場合があります。&lt;/p&gt;
+&lt;p&gt;以下の例は現在の上流ソースツリーを説明します。リリース版 glibc は異なるファイルやマクロ定義を選択できるため、
+ソースを調べるときは、対象のリリースとビルドするターゲットトリプルを最初に確認します。&lt;/p&gt;
+&lt;h2 id="sysdeps"&gt;
+ &lt;code&gt;sysdeps/&lt;/code&gt; の選択
+ &lt;a href="#sysdeps" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href="https://sourceware.org/git/?p=glibc.git;a=tree;f=sysdeps;hb=HEAD"&gt;&lt;code&gt;sysdeps/&lt;/code&gt; ツリー&lt;/a&gt; には、オペレーティングシステム、
+CPU、ABI、ワードサイズ、機能に基づいて選択される実装があります。汎用コードはフォールバックであり、
+より具体的なディレクトリが同じ相対名のファイルを置き換えられます。Linux ビルドでは &lt;code&gt;sysdeps/unix/sysv/linux/&lt;/code&gt; などが関係し、
+アーキテクチャが Linux 固有の入口コードや ABI 固有の変種をさらに提供する場合があります。&lt;/p&gt;
+&lt;p&gt;glibc の configure とビルド機構は、適用可能なシステム依存ディレクトリの順序付きリストを構築します。
+ビルドルールはそのリストを検索し、選択された実装が汎用フォールバックより優先されるようにします。
+したがって、この構造は各ファイルが正確に 1 つの軸だけを持つ分類体系ではありません。
+OS ディレクトリがアーキテクチャヘッダーに依存することも、アーキテクチャディレクトリが OS 非依存コードを含むこともあります。
+1 つのディレクトリ名から動作を推測せず、&lt;code&gt;config.make&lt;/code&gt;、設定済みビルドディレクトリ、選択されたソースパスを調べます。&lt;/p&gt;
+&lt;h2 id="syscalls-list-and-make-syscalls-sh"&gt;
+ 生成される薄いラッパー
+ &lt;a href="#syscalls-list-and-make-syscalls-sh" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一部の薄いアセンブリラッパーは
+&lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/syscalls.list;hb=HEAD"&gt;&lt;code&gt;syscalls.list&lt;/code&gt;&lt;/a&gt;.
+各レコードは出力、Linux システムコール、引数シグネチャ、強シンボル、任意の弱シンボルまたはバージョン付き名前を指定します。
+ビルドは
+&lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/make-syscalls.sh;hb=HEAD"&gt;&lt;code&gt;make-syscalls.sh&lt;/code&gt;&lt;/a&gt;,
+を呼び出します。このスクリプトは次を行います。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;優先度の高い &lt;code&gt;sysdeps&lt;/code&gt; ディレクトリで上書きされたエントリを削除する。&lt;/li&gt;
+&lt;li&gt;ターゲットの &lt;code&gt;sysdep.h&lt;/code&gt; を通じて &lt;code&gt;SYS_&lt;/code&gt; 番号を解決する。&lt;/li&gt;
+&lt;li&gt;シグネチャから引数個数と特殊な引数処理を導出する。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;syscall-template.S&lt;/code&gt; を使う規則を出力し、リストが要求する場合はエイリアスと互換性
+シンボルも含める。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;syscalls.list&lt;/code&gt; がすべての公開関数を定義するわけではありません。検証、フォールバックロジック、
+キャンセル処理、時間幅変換、その他のポリシーを持つラッパーは、手書きであることがよくあります。
+現在の glibc では &lt;code&gt;write&lt;/code&gt; がそのような手書き C ラッパーの 1 つです。
+&lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/write.c;hb=HEAD"&gt;&lt;code&gt;write.c&lt;/code&gt;&lt;/a&gt;;
+そのため、生成経路との比較に適しています。&lt;/p&gt;</description></item><item><title>Linux システムコール</title><link>https://example.org/ja/linux-system-calls/</link><pubDate>Mon, 15 Jul 2024 08:53:17 +0800</pubDate><guid>https://example.org/ja/linux-system-calls/</guid><description>&lt;p&gt;Linux システムコールは、プロセスとカーネルの間にある、アーキテクチャ固有のバイナリインターフェースを形成します。アプリケーションコードは通常、代わりに C ライブラリ API を対象にします。これは、ライブラリが型、feature-test マクロ、互換性動作、およびマシン固有のエントリシーケンスを提供するためです。&lt;/p&gt;
+&lt;h2 id="ライブラリ-api-とカーネル-abi"&gt;
+ ライブラリ API とカーネル ABI
+ &lt;a href="#%e3%83%a9%e3%82%a4%e3%83%96%e3%83%a9%e3%83%aa-api-%e3%81%a8%e3%82%ab%e3%83%bc%e3%83%8d%e3%83%ab-abi" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;open(path, flags)&lt;/code&gt; のようなソースレベルの呼び出しは、&lt;code&gt;open&lt;/code&gt; という名前のカーネルシステムコールを実行することを保証するものではありません。glibc はこれを &lt;code&gt;openat&lt;/code&gt; で実装したり、キャンセルチェックを追加したり、時間幅互換のエントリポイントを選択したりできます。&lt;code&gt;clock_gettime&lt;/code&gt; のような関数は、カーネルに入らずに vDSO 内で実行できます。逆に Linux は、古い C ライブラリがラッパーを提供していなかった &lt;code&gt;gettid&lt;/code&gt; のようなシステムコールを公開しています。&lt;/p&gt;
+&lt;p&gt;カーネル ABI は次の要素で構成されます。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;プロセスのアーキテクチャおよび ABI に対応するシステムコール番号;&lt;/li&gt;
+&lt;li&gt;レジスタで表現される引数。一部の ABI では、引数の一部がスタック上に置かれます;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;syscall&lt;/code&gt;、&lt;code&gt;int $0x80&lt;/code&gt;、&lt;code&gt;svc&lt;/code&gt;、または &lt;code&gt;ecall&lt;/code&gt; のようなエントリ命令; および&lt;/li&gt;
+&lt;li&gt;成功およびエラーを表す生の戻り規約。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;&amp;lt;sys/syscall.h&amp;gt;&lt;/code&gt; の &lt;code&gt;SYS_name&lt;/code&gt; 定数は、対象ビルド ABI における番号を識別します。これらはアーキテクチャ間で安定していません。x86-64 の &lt;code&gt;write&lt;/code&gt; は 1 ですが、i386 の &lt;code&gt;write&lt;/code&gt; は 4 です。Compat および x32 のプロセスは、同じカーネル上でも別のテーブルを使用できます。カーネルは、その ABI の syscall table を通じて番号をディスパッチし、通常は &lt;code&gt;SYSCALL_DEFINE*&lt;/code&gt; マクロで宣言された実装を呼び出します。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,433 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Language on cesun.life</title><link>https://example.org/zh-tw/tags/language/</link><description>Recent content in Language on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Mon, 01 Dec 2025 21:05:41 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/language/index.xml" rel="self" type="application/rss+xml"/><item><title>C++ 語言與函式庫筆記</title><link>https://example.org/zh-tw/cpp-language-notes/</link><pubDate>Mon, 01 Dec 2025 21:05:41 +0800</pubDate><guid>https://example.org/zh-tw/cpp-language-notes/</guid><description>&lt;p&gt;這份有限範圍的彙編收集不需要獨立文章的語言與工具鏈規則。每個區段都說明控制該功能的邊界，因為外觀相似的 C++ 寫法可能具有不同的擁有權、查找或生命週期效果。&lt;/p&gt;
+&lt;h2 id="資源擁有權與選用狀態"&gt;
+ 資源擁有權與選用狀態
+ &lt;a href="#%e8%b3%87%e6%ba%90%e6%93%81%e6%9c%89%e6%ac%8a%e8%88%87%e9%81%b8%e7%94%a8%e7%8b%80%e6%85%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;擁有權是適時釋放資源的責任。使用 RAII 建模：在建構時取得、在解構時釋放，並讓物件的不變量跨越例外控制流程保持成立。當 &lt;code&gt;std::unique_ptr&lt;/code&gt; 或 &lt;code&gt;std::vector&lt;/code&gt; 等成員已實作資源政策時，優先使用零法則。直接管理原始資源的型別必須定義一致的解構、複製政策、移動政策與失敗政策。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;std::make_unique&amp;lt;T&amp;gt;(args...)&lt;/code&gt; 表達唯一擁有權，而不暴露獨立的 &lt;code&gt;new&lt;/code&gt;；自 C++14 起可用。&lt;code&gt;std::make_shared&amp;lt;T&amp;gt;(args...)&lt;/code&gt; 可能合併控制區塊與物件配置。合併配置不一定適用：&lt;code&gt;weak_ptr&lt;/code&gt; 可以在物件銷毀後讓該配置保持存活，而自訂刪除或既有原始指標可能需要直接建構。需要直接建構時，在同一個完整運算式中建立智慧指標擁有者。在 C++17 強化函式引數評估順序之前，在較大的呼叫中將配置與擁有權分開，如果另一個引數拋出例外，也可能造成洩漏。&lt;/p&gt;
+&lt;p&gt;依擁有權與身分選擇選用子物件的表示法：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;具有有效空狀態的直接成員沒有間接層，但該狀態必須明確。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::optional&amp;lt;T&amp;gt;&lt;/code&gt; 將可能不存在的 &lt;code&gt;T&lt;/code&gt; 儲存在包含物件中；&lt;code&gt;emplace&lt;/code&gt; 在不另行配置的情況下開始被包含物件的生命週期。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::unique_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 表示獨立物件的專屬擁有權，支援不完整或多型型別，但代價是間接層與可為 null 的控制代碼。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;optional&lt;/code&gt; 與堆積配置都不能讓物件超過擁有者存活。參照、指標或 &lt;code&gt;std::reference_wrapper&amp;lt;T&amp;gt;&lt;/code&gt; 是不擁有的控制代碼；被參照物件必須超過所有使用存活。當容器或 &lt;code&gt;std::bind&lt;/code&gt; 等以值為導向的介面必須攜帶參照時，&lt;code&gt;std::ref&lt;/code&gt; 與 &lt;code&gt;std::cref&lt;/code&gt; 很有用。&lt;/p&gt;
+&lt;h2 id="介面運算子與物件模型"&gt;
+ 介面、運算子與物件模型
+ &lt;a href="#%e4%bb%8b%e9%9d%a2%e9%81%8b%e7%ae%97%e5%ad%90%e8%88%87%e7%89%a9%e4%bb%b6%e6%a8%a1%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;對稱二元運算子通常應是非成員，讓兩個運算元都能考慮轉換。宣告為 &lt;code&gt;friend&lt;/code&gt; 會授予範圍狹窄的私有存取；友元不會使它成為成員。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Quantity&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;explicit&lt;/span&gt; Quantity(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value) &lt;span style="color:#f92672"&gt;:&lt;/span&gt; value_{value} {}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;friend&lt;/span&gt; Quantity &lt;span style="color:#66d9ef"&gt;operator&lt;/span&gt;&lt;span style="color:#f92672"&gt;+&lt;/span&gt;(Quantity left, &lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Quantity&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; right) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; left.value_ &lt;span style="color:#f92672"&gt;+=&lt;/span&gt; right.value_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; left;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;private&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;多型類別具有虛擬函式。標準規定虛擬分派行為，但不規定 &lt;code&gt;vptr&lt;/code&gt;、&lt;code&gt;vtable&lt;/code&gt;、它們的配置或 ABI。許多實作使用隱藏指標與函式指標表，但多重繼承與編譯器選項會使對該模型的假設失效。應用程式程式碼必須依賴虛擬函式，而不是表示細節。&lt;/p&gt;</description></item><item><title>C++ 宣告、定義與連結</title><link>https://example.org/zh-tw/cpp-declarations/</link><pubDate>Fri, 27 Jun 2025 06:42:46 +0800</pubDate><guid>https://example.org/zh-tw/cpp-declarations/</guid><description>&lt;p&gt;宣告會引入名稱並描述其型別。定義會提供程式所使用的實體。連結決定不同作用域或轉譯單元中的宣告是否表示相同實體，而儲存期決定物件存在多久。將這四個問題分開，可讓複雜的 C 與 C++ 宣告更容易推理。&lt;/p&gt;
+&lt;h2 id="從名稱讀取宣告子"&gt;
+ 從名稱讀取宣告子
+ &lt;a href="#%e5%be%9e%e5%90%8d%e7%a8%b1%e8%ae%80%e5%8f%96%e5%ae%a3%e5%91%8a%e5%ad%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;宣告由宣告指定子後接一個或多個宣告子組成。宣告子中的運算子依照語法規則繫結：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;後置的 &lt;code&gt;()&lt;/code&gt; 和 &lt;code&gt;[]&lt;/code&gt; 會在前置的 &lt;code&gt;*&lt;/code&gt;、&lt;code&gt;&amp;amp;&lt;/code&gt; 和 &lt;code&gt;&amp;amp;&amp;amp;&lt;/code&gt; 之前繫結；&lt;/li&gt;
+&lt;li&gt;括號會覆寫這種繫結；&lt;/li&gt;
+&lt;li&gt;每個逗號都會開始一個獨立的宣告子，因此 &lt;code&gt;*&lt;/code&gt; 不屬於基礎型別。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;從宣告的識別字開始，套用相鄰的運算子，然後向外讀取：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pointer;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pointer_to_const &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; const_pointer &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; (&lt;span style="color:#f92672"&gt;*&lt;/span&gt;pointer_to_array)[&lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;] &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;array_of_pointers[&lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;] &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; (&lt;span style="color:#f92672"&gt;*&lt;/span&gt;binary_operation)(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;) &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;這些宣告表示：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;名稱&lt;/th&gt;
+ &lt;th&gt;型別&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;pointer_to_const&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;指向 &lt;code&gt;const int&lt;/code&gt; 的指標&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;const_pointer&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;指向 &lt;code&gt;int&lt;/code&gt; 的 const 指標&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;pointer_to_array&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;指向包含 42 個 &lt;code&gt;int&lt;/code&gt; 物件之陣列的指標&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;array_of_pointers&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;包含 42 個指向 &lt;code&gt;int&lt;/code&gt; 之指標的陣列&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;binary_operation&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;指向函式的指標；該函式接受兩個 &lt;code&gt;int&lt;/code&gt; 值並回傳 &lt;code&gt;int&lt;/code&gt;&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;寫在基礎型別前後的 &lt;code&gt;const&lt;/code&gt; 具有相同意義：&lt;code&gt;const int&lt;/code&gt; 與 &lt;code&gt;int const&lt;/code&gt; 等價。&lt;code&gt;*&lt;/code&gt; 後面的 cv 限定詞則限定指標本身。當原始宣告子會隱藏重要差異時，別名可以讓公開介面更清楚：&lt;/p&gt;</description></item><item><title>C++複製省略與回傳值</title><link>https://example.org/zh-tw/cpp-copy-elision/</link><pubDate>Sun, 03 Nov 2024 19:25:13 +0800</pubDate><guid>https://example.org/zh-tw/cpp-copy-elision/</guid><description>&lt;p&gt;複製省略允許實作即使複製建構函式或移動建構函式具有可觀察的副作用，也省略複製建構或移動建構。C++17之前，所有複製省略情況都獲得允許，但不是必要的。C++17改變了prvalue的語義，使先前屬於暫時物件省略的若干情況改為直接建構。&lt;/p&gt;
+&lt;h2 id="回傳的prvalue與具名區域變數"&gt;
+ 回傳的prvalue與具名區域變數
+ &lt;a href="#%e5%9b%9e%e5%82%b3%e7%9a%84prvalue%e8%88%87%e5%85%b7%e5%90%8d%e5%8d%80%e5%9f%9f%e8%ae%8a%e6%95%b8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;自C++17起，從函式回傳函式回傳型別的prvalue時，會直接建構結果物件。因此，即使複製建構函式和移動建構函式已被刪除，也不會阻止這種形式；不過，在return陳述式處，回傳型別的解構函式仍必須可存取且未被刪除：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Token&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Token();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Token(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Token&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;) &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;delete&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Token(Token&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt;) &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;delete&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Token &lt;span style="color:#a6e22e"&gt;make_token&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; Token{}; &lt;span style="color:#75715e"&gt;// 自C++17起保證直接建構
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;具名回傳值最佳化（NRVO）仍然是選擇性的，包括C++17及後續版本：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Widget&lt;/span&gt; {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Widget &lt;span style="color:#a6e22e"&gt;make_named_widget&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget widget;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; widget; &lt;span style="color:#75715e"&gt;// 可能套用NRVO；需要可行的複製或移動操作
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;當NRVO不適用時，return陳述式中的符合條件的區域變數會在多載解析中被視為右值。不要僅為了要求這種行為而寫 &lt;code&gt;return std::move(token);&lt;/code&gt;。這可能抑制NRVO，並將運算式從符合NRVO條件的名稱改變為xvalue。請直接回傳具名區域變數。&lt;/p&gt;
+&lt;h2 id="介面與生命週期設計"&gt;
+ 介面與生命週期設計
+ &lt;a href="#%e4%bb%8b%e9%9d%a2%e8%88%87%e7%94%9f%e5%91%bd%e9%80%b1%e6%9c%9f%e8%a8%ad%e8%a8%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;當呼叫端接收獨立結果時，優先回傳已完成的值：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string make_label(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; id) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;item-&amp;#34;&lt;/span&gt; &lt;span style="color:#f92672"&gt;+&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;to_string(id);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;回傳值不是對區域物件的參照。只有在被參照物件的生命週期長於呼叫，且借用或別名存取是預期契約時，回傳參照才是正確的：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Config&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; active_config(); &lt;span style="color:#75715e"&gt;// 參照生命週期較長的儲存空間
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;絕不要回傳對自動區域變數的左值參照或右值參照。右值參照不會將區域物件的生命週期延長至return之後；它只傳達參照類別。相反地，將暫時物件繫結至區域的 &lt;code&gt;const T&amp;amp;&lt;/code&gt; 或 &lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt; 會將該暫時物件的生命週期延長至該區域參照的生命週期，但不會延長至函式所回傳參照的生命週期。&lt;/p&gt;</description></item><item><title>C++ 類別與特殊成員函式</title><link>https://example.org/zh-tw/cpp-classes/</link><pubDate>Wed, 28 Aug 2024 06:08:01 +0800</pubDate><guid>https://example.org/zh-tw/cpp-classes/</guid><description>&lt;p&gt;C++ 類別定義表示、不變條件，以及建立和維持這些不變條件的操作。建構函式建立物件的不變條件，成員函式維持該不變條件，而解構函式釋放物件所擁有的資源。應先設計所有權策略，因為它決定編譯器產生的特殊成員是否正確。&lt;/p&gt;
+&lt;h2 id="建構與解構"&gt;
+ 建構與解構
+ &lt;a href="#%e5%bb%ba%e6%a7%8b%e8%88%87%e8%a7%a3%e6%a7%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;建構函式具有類別名稱且沒有回傳型別。預設建構函式不接受參數，或其所有參數都有預設值。複製建構函式和移動建構函式分別從同一類別的左值或右值初始化新物件；複製指定和移動指定則更新現有物件。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;utility&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Connection&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;explicit&lt;/span&gt; Connection(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string endpoint) &lt;span style="color:#f92672"&gt;:&lt;/span&gt; endpoint_(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(endpoint)) {}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;private&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string endpoint_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;成員&lt;strong&gt;不會&lt;/strong&gt;按照建構函式初始化器清單中的文字順序初始化。建構會依照以下順序進行：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;建構最衍生物件時的虛擬基底。&lt;/li&gt;
+&lt;li&gt;按照基底指定子順序建構直接基底。&lt;/li&gt;
+&lt;li&gt;按照宣告順序建構非靜態資料成員。&lt;/li&gt;
+&lt;li&gt;建構函式本體。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;因此，應按照宣告順序撰寫初始化器，並且不要使用後宣告的成員來初始化其他成員：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Valid&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; first;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; second;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Valid(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value) &lt;span style="color:#f92672"&gt;:&lt;/span&gt; first(value), second(first &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;) {}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;解構會逆序執行已完成的建構。應讓自動儲存期物件和RAII所有者執行正常解構；明確呼叫解構函式只適用於受控儲存管理，而且必須已確立物件生命週期以及之後對儲存空間的重複使用。&lt;/p&gt;
+&lt;h2 id="特殊成員函式與rule-of-zero"&gt;
+ 特殊成員函式與Rule of Zero
+ &lt;a href="#%e7%89%b9%e6%ae%8a%e6%88%90%e5%93%a1%e5%87%bd%e5%bc%8f%e8%88%87rule-of-zero" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;特殊成員函式包括預設建構函式、複製建構函式、移動建構函式、複製指定運算子、移動指定運算子和解構函式。實作會隱含宣告類別尚未由使用者宣告的操作，並在需要時定義這些操作。函式可以被隱含宣告、明確預設或明確刪除；具有使用者撰寫定義的函式稱為使用者提供函式。&lt;/p&gt;
+&lt;p&gt;以下抑制規則需要刻意檢查：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;操作&lt;/th&gt;
+ &lt;th&gt;重要規則&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;預設建構函式&lt;/td&gt;
+ &lt;td&gt;使用者宣告的建構函式或建構函式範本會抑制它。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;移動建構函式和移動指定&lt;/td&gt;
+ &lt;td&gt;使用者宣告的複製建構函式、複製指定、移動操作或解構函式會抑制兩個隱含移動操作。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;複製建構函式和複製指定&lt;/td&gt;
+ &lt;td&gt;未由使用者宣告時會被隱含宣告，但基底或成員無法執行所需操作時，可能會被定義為已刪除。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;參照成員和不適用的&lt;code&gt;const&lt;/code&gt;成員通常會導致隱含指定被刪除。宣告任一移動操作會使兩個隱含宣告的複製操作都被定義為已刪除。基底或成員中不可存取、已刪除或不可使用的操作，可能會刪除其他隱含特殊成員。當基底和成員符合標準的結構要求時，編譯器產生的函式也可能是trivial的；trivial性是型別屬性，而不是所有權策略。&lt;/p&gt;
+&lt;p&gt;優先採用Rule of Zero：組合具有正確所有權行為的型別，並且不要在領域型別中宣告特殊成員。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;utility&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;vector&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Document&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;explicit&lt;/span&gt; Document(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string title) &lt;span style="color:#f92672"&gt;:&lt;/span&gt; title_(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(title)) {}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;private&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string title_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;vector&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; paragraphs_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;自訂資源所有者需要明確且一致的策略。只能移動的所有者會刪除複製操作，只釋放一次資源；當轉移不會失敗時，應將移動操作標記為&lt;code&gt;noexcept&lt;/code&gt;。定義傳統「Rule of Three」中的任一操作，或定義任一移動操作，都應觸發對所有複製、移動和解構行為的檢查，而不是自動實作五個函式。&lt;/p&gt;</description></item><item><title>C++ 例外與例外安全</title><link>https://example.org/zh-tw/cpp-exceptions/</link><pubDate>Tue, 28 May 2024 17:55:25 +0800</pubDate><guid>https://example.org/zh-tw/cpp-exceptions/</guid><description>&lt;p&gt;例外會將失敗操作的回報與傳播至能夠回應的邊界分開。例外會將控制權轉移至相符的處理常式；控制權向外傳遞時，C++ 會依反向建構順序，摧毀每個離開其範圍且已完整建構的自動物件。因此，資源取得即初始化（RAII）會讓一般與例外清理路徑相同。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;load_configuration&lt;/span&gt;(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;filesystem&lt;span style="color:#f92672"&gt;::&lt;/span&gt;path path) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;ifstream input{path}; &lt;span style="color:#75715e"&gt;// Closed during unwinding.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (&lt;span style="color:#f92672"&gt;!&lt;/span&gt;input) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;throw&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;runtime_error{&lt;span style="color:#e6db74"&gt;&amp;#34;cannot open configuration&amp;#34;&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#75715e"&gt;// Parsing may throw; input still closes.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;try&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; load_configuration(&lt;span style="color:#e6db74"&gt;&amp;#34;app.conf&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;} &lt;span style="color:#66d9ef"&gt;catch&lt;/span&gt; (&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;exception&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; error) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; report(error.what());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;請以值擲出例外物件，並以 &lt;code&gt;const&lt;/code&gt; 參照捕捉多型例外型別。以值捕捉基底例外會切割衍生物件。&lt;code&gt;catch (...)&lt;/code&gt; 只應位於能恢復不變量、轉譯錯誤或刻意終止的邊界；不得在狀態損壞時靜默繼續。&lt;/p&gt;
+&lt;h2 id="展開與-raii"&gt;
+ 展開與 RAII
+ &lt;a href="#%e5%b1%95%e9%96%8b%e8%88%87-raii" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;擲出例外的建構函式不會產生完成的物件，但其已完整建構的基底與成員子物件仍會執行解構函式。解構函式不得在另一個例外作用中讓例外逸出，因為這會呼叫 &lt;code&gt;std::terminate&lt;/code&gt;。因此，解構函式、智慧指標刪除器與回復防護應不擲出例外。清理可能失敗時，請公開一個在解構前回報失敗的明確操作。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Transaction&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;explicit&lt;/span&gt; Transaction(Database&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; db) &lt;span style="color:#f92672"&gt;:&lt;/span&gt; db_{db} { db_.begin(); }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;commit&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; db_.commit();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; committed_ &lt;span style="color:#f92672"&gt;=&lt;/span&gt; true;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;~&lt;/span&gt;Transaction() &lt;span style="color:#66d9ef"&gt;noexcept&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (&lt;span style="color:#f92672"&gt;!&lt;/span&gt;committed_) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; db_.rollback_noexcept();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;private&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Database&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; db_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; committed_ &lt;span style="color:#f92672"&gt;=&lt;/span&gt; false;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;解構函式只會嘗試回復；&lt;code&gt;commit()&lt;/code&gt; 仍是可以回報錯誤的操作。每個公開操作都必須定義其失敗後保留的狀態。&lt;/p&gt;</description></item><item><title>C++ 語言規則與具名要求</title><link>https://example.org/zh-tw/cpp-language-rules/</link><pubDate>Sat, 23 Sep 2023 12:23:05 +0800</pubDate><guid>https://example.org/zh-tw/cpp-language-rules/</guid><description>&lt;p&gt;C++ 語言規則決定程式是否為良構，以及其執行具有何種意義。函式庫的具名要求與概念則為泛型程式碼增添契約。相似術語可能掩蓋一項重要差異：編譯器可以檢查運算式與型別，卻無法證明型別承諾的所有語意、複雜度、有效性或相等性。&lt;/p&gt;
+&lt;h2 id="定義與單一定義規則"&gt;
+ 定義與單一定義規則
+ &lt;a href="#%e5%ae%9a%e7%be%a9%e8%88%87%e5%96%ae%e4%b8%80%e5%ae%9a%e7%be%a9%e8%a6%8f%e5%89%87" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每個經 ODR 使用的非行內函式或變數，在程式中都需要一個定義。相容的宣告可以重複，因此能夠使用前向宣告。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Node&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Node&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Node&lt;span style="color:#f92672"&gt;*&lt;/span&gt; next &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;型別、範本、行內函式與行內變數只有在符合一致性要求時，才能於多個翻譯單元中具有定義。標頭防護可防止同一翻譯單元內的重複引入；它無法修復翻譯單元之間內容不同的定義。程式即使違反 ODR，仍可能通過編譯與連結，但其行為並不可靠。&lt;/p&gt;
+&lt;h2 id="具名要求與概念"&gt;
+ 具名要求與概念
+ &lt;a href="#%e5%85%b7%e5%90%8d%e8%a6%81%e6%b1%82%e8%88%87%e6%a6%82%e5%bf%b5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在 C++20 以前，標準函式庫的泛型契約以 &lt;code&gt;LegacyInputIterator&lt;/code&gt; 等具名要求表示。C++20 概念則將其中許多語法部分表示為條件約束。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;concepts&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;iterator&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;input_iterator Iterator&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; consume(Iterator first, Iterator last);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;受約束的宣告會拒絕不符合必要運算式及關聯型別關係的型別。符合約束並不代表語意行為成立。某個型別可以讓 &lt;code&gt;++i&lt;/code&gt;、&lt;code&gt;*i&lt;/code&gt; 與 &lt;code&gt;i == j&lt;/code&gt; 成為良構，卻仍違反多趟走訪、相等性保持或指定的複雜度界限。相同界線也適用於均勻隨機位元產生器：型別檢查無法證明其輸出呈均勻分布。&lt;/p&gt;
+&lt;h2 id="撰寫泛型契約"&gt;
+ 撰寫泛型契約
+ &lt;a href="#%e6%92%b0%e5%af%ab%e6%b3%9b%e5%9e%8b%e5%a5%91%e7%b4%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;以分層方式規範泛型 API：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;說明必要的運算式與關聯型別，並優先使用標準概念或專案概念。&lt;/li&gt;
+&lt;li&gt;說明語意不變量：操作的意義、哪些運算式會保持相等性，以及值在呼叫後是否仍然有效。&lt;/li&gt;
+&lt;li&gt;說明複雜度、迭代器失效、所有權與並行保證。&lt;/li&gt;
+&lt;li&gt;說明執行階段呼叫端必須遵守或觀察的前置條件與後置條件。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;例如，用作鍵值述詞的相等關係，必須對演算法接受的值構成等價關係。與該述詞搭配的雜湊，必須對相等的鍵值產生相同結果。任何 &lt;code&gt;requires&lt;/code&gt; 運算式都無法證明這兩項性質。&lt;/p&gt;
+&lt;p&gt;有效性也是執行階段性質。某個迭代器型別可在語法上符合 &lt;code&gt;std::input_iterator&lt;/code&gt;，但該型別的特定迭代器可能已因容器操作而失效。除了型別要求，也要記載哪些操作會使現有迭代器、指標或參考失效。&lt;/p&gt;
+&lt;h2 id="編譯期指定詞具有不同契約"&gt;
+ 編譯期指定詞具有不同契約
+ &lt;a href="#%e7%b7%a8%e8%ad%af%e6%9c%9f%e6%8c%87%e5%ae%9a%e8%a9%9e%e5%85%b7%e6%9c%89%e4%b8%8d%e5%90%8c%e5%a5%91%e7%b4%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;當呼叫與運算元符合適用規則時，&lt;code&gt;constexpr&lt;/code&gt; 允許實體或函式參與常數求值。&lt;code&gt;consteval&lt;/code&gt; 讓立即函式呼叫必須進行常數求值。&lt;code&gt;constinit&lt;/code&gt; 適用於具有靜態或執行緒儲存期的變數，並要求常數初始化；它不會讓變數不可變，也不會讓變數可用作常數運算式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;square&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value) { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value &lt;span style="color:#f92672"&gt;*&lt;/span&gt; value; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;consteval&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;checked_port&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value) { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value &lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; value : &lt;span style="color:#66d9ef"&gt;throw&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;port&amp;#34;&lt;/span&gt;; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;constinit &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; process_generation &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;應根據這些指定詞各自聲明的保證使用它們，而不要視為可互換的「編譯期」註記。&lt;code&gt;const&lt;/code&gt; 物件可以在執行階段初始化；&lt;code&gt;constinit&lt;/code&gt; 物件若未同時宣告為 &lt;code&gt;const&lt;/code&gt;，之後仍可修改。&lt;/p&gt;</description></item><item><title>C++ 初始化</title><link>https://example.org/zh-tw/cpp-initialization/</link><pubDate>Thu, 23 Jun 2022 04:19:15 +0800</pubDate><guid>https://example.org/zh-tw/cpp-initialization/</guid><description>&lt;p&gt;初始化會為實體提供第一個值，或建立參照繫結。指派會修改已經存在的物件。由於建構函式只參與初始化，而指派運算子只會在生命週期開始後參與，因此兩者的區別會影響多載解析、不變量和效能。&lt;/p&gt;</description></item><item><title>C++ 值類別與移動語意</title><link>https://example.org/zh-tw/cpp-move-semantics/</link><pubDate>Mon, 25 Jan 2021 02:14:28 +0800</pubDate><guid>https://example.org/zh-tw/cpp-move-semantics/</guid><description>&lt;p&gt;移動語意是多載選擇與型別定義的狀態轉移，不是自動的擁有權轉移。請先從運算式的值類別開始，再選擇能描述擁有權與生命週期的參數型別。&lt;/p&gt;
+&lt;h2 id="運算式類別"&gt;
+ 運算式類別
+ &lt;a href="#%e9%81%8b%e7%ae%97%e5%bc%8f%e9%a1%9e%e5%88%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每個非 &lt;code&gt;void&lt;/code&gt; 運算式恰好屬於下列其中一種類別：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;左值&lt;/strong&gt;識別物件、函式或位元欄位。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;將亡值&lt;/strong&gt;識別其資源可以重複使用的物件。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;純右值&lt;/strong&gt;計算值或初始化物件。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;左值與將亡值是&lt;strong&gt;廣義左值&lt;/strong&gt;；純右值與將亡值是&lt;strong&gt;右值&lt;/strong&gt;。具名變數即使型別為 &lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt;，仍是左值運算式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; counter();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; cache_slot();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;counter() &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;; &lt;span style="color:#75715e"&gt;// The call is an lvalue.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; slot &lt;span style="color:#f92672"&gt;=&lt;/span&gt; cache_slot();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;consume(slot); &lt;span style="color:#75715e"&gt;// `slot` is an lvalue expression.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;consume(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(slot)); &lt;span style="color:#75715e"&gt;// Casts it to an xvalue.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;回傳 &lt;code&gt;T&lt;/code&gt; 的呼叫是純右值，回傳 &lt;code&gt;T&amp;amp;&lt;/code&gt; 的呼叫是左值，回傳 &lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt; 的呼叫是將亡值。&lt;code&gt;std::move&lt;/code&gt; 執行將亡值轉型；它不會移動資料，也不會結束來源物件的生命週期。&lt;/p&gt;
+&lt;h2 id="移動建構是多載選擇"&gt;
+ 移動建構是多載選擇
+ &lt;a href="#%e7%a7%bb%e5%8b%95%e5%bb%ba%e6%a7%8b%e6%98%af%e5%a4%9a%e8%bc%89%e9%81%b8%e6%93%87" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;參照繫結提供相關區別：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;T&amp;amp;&lt;/code&gt; 繫結相容的左值。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;const T&amp;amp;&lt;/code&gt; 繫結左值、將亡值與純右值。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt; 繫結將亡值與純右值。&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string source &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;payload&amp;#34;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string destination &lt;span style="color:#f92672"&gt;=&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(source); &lt;span style="color:#75715e"&gt;// Selects a move constructor when viable.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;選取的建構函式定義轉移方式。它可能轉移配置、複製小型表示，或產生與複製無法區別的效果。依值回傳區域變數時通常應使用 &lt;code&gt;return local;&lt;/code&gt;：複製省略可能直接建構結果，而不適用省略時，符合資格的區域變數可以在多載選擇中被視為將亡值。&lt;code&gt;return std::move(local);&lt;/code&gt; 可能抑制具名回傳值最佳化。&lt;/p&gt;</description></item></channel></rss>

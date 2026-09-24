@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Libxcrypt on cesun.life</title><link>https://example.org/zh-tw/tags/libxcrypt/</link><description>Recent content in Libxcrypt on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Fri, 08 Aug 2025 11:46:18 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/libxcrypt/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 上的密碼雜湊</title><link>https://example.org/zh-tw/password-hashing-on-linux/</link><pubDate>Fri, 08 Aug 2025 11:46:18 +0800</pubDate><guid>https://example.org/zh-tw/password-hashing-on-linux/</guid><description>&lt;p&gt;密碼儲存使用單向密碼雜湊函式，而非加密。驗證程式會使用儲存值中內嵌的設定對提交的密碼進行雜湊，並比較編碼後的結果。設計並不包含復原明文密碼；取得資料庫的攻擊者會改為離線測試候選密碼。因此，現代密碼雜湊需要為每組密碼使用隨機鹽值，並採用刻意提高運算成本且受支援的演算法。&lt;/p&gt;
+&lt;h2 id="crypt-編碼雜湊"&gt;
+ &lt;code&gt;crypt&lt;/code&gt; 編碼雜湊
+ &lt;a href="#crypt-%e7%b7%a8%e7%a2%bc%e9%9b%9c%e6%b9%8a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;歷史悠久的 &lt;code&gt;crypt(3)&lt;/code&gt; 介面接受密碼和設定。其模組化格式常見形式如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;$id$parameters$salt$checksum&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;識別碼和參數語法會選擇演算法；鹽值讓相同密碼產生不同的儲存值；校驗碼則是驗證值。驗證時會將完整的儲存字串作為設定提供，因此應用程式必須原樣保留該字串。傳統 DES &lt;code&gt;crypt&lt;/code&gt; 改用兩個字元的鹽值，並不適合用於新的密碼雜湊。&lt;/p&gt;
+&lt;p&gt;glibc 過去的 &lt;code&gt;libcrypt&lt;/code&gt; 記載了 &lt;code&gt;$1$&lt;/code&gt;（MD5）、&lt;code&gt;$5$&lt;/code&gt;（SHA-256）和 &lt;code&gt;$6$&lt;/code&gt;（SHA-512）；SHA 格式接受 &lt;code&gt;rounds=N&lt;/code&gt;。這些格式具備歷史相容性，並不表示 MD5 或 DES 適合新的部署。可用的方法和接受的識別碼取決於實作和建置組態，而非可攜的 POSIX 密碼格式。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;crypt&lt;/code&gt; 回傳靜態儲存空間，因此無法安全地並行呼叫。&lt;code&gt;crypt_r&lt;/code&gt; 使用呼叫端提供的 &lt;code&gt;struct crypt_data&lt;/code&gt;；該結構必須按照實作要求初始化，且不得由多個執行緒共用。比較前應檢查失敗情況：實作可能回傳 &lt;code&gt;NULL&lt;/code&gt; 或無效值。應用程式自行處理雜湊比較時，請使用常數時間比較，並在 API 允許後立即清除密碼資料。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; crypt_data data &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;candidate &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;crypt_r&lt;/span&gt;(password, stored_hash, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;data);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (candidate &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; NULL &lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;constant_time_equal&lt;/span&gt;(candidate, stored_hash)) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#75715e"&gt;/* authenticated */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;此範例說明驗證機制，而非登入架構。支援 PAM 的程式應將驗證委派給 PAM，而非自行讀取帳戶資料庫或實作提示和節流機制。&lt;/p&gt;
+&lt;h2 id="glibc-與-libxcrypt-相容性"&gt;
+ glibc 與 libxcrypt 相容性
+ &lt;a href="#glibc-%e8%88%87-libxcrypt-%e7%9b%b8%e5%ae%b9%e6%80%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;crypt&lt;/code&gt; 是選用的 POSIX XSI 介面。glibc 2.39 已移除其內建的 &lt;code&gt;libcrypt&lt;/code&gt;；Linux 發行版現多由 &lt;a href="https://github.com/besser82/libxcrypt"&gt;libxcrypt&lt;/a&gt; 提供此功能。libxcrypt 可以提供具有 glibc 相容符號版本的 &lt;code&gt;libcrypt.so.1&lt;/code&gt;，使連結至 glibc 歷史函式庫的既有 Linux 二進位檔得以繼續載入。未設定此相容性的系統會安裝不同的 ABI 名稱，因此必須分別檢查建置和執行階段相容性。&lt;/p&gt;</description></item></channel></rss>

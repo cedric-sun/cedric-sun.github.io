@@ -1,0 +1,120 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>JUnit 5 架構、Maven 設定與 JUnit 4 遷移</title></head><body><main><article><div class=article-header><h1>JUnit 5 架構、Maven 設定與 JUnit 4 遷移</h1><div class=aux>最後更新: 2026-08-17 10:18:23 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/java/>Java</a>
+|
+<a href=/zh-tw/tags/junit/>Junit</a>
+|
+<a href=/zh-tw/tags/maven/>Maven</a>
+|
+<a href=/zh-tw/tags/testing/>Testing</a></div></div><div class="translation-notice machine-translated"><a href=/junit-5/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>JUnit 5 將撰寫測試所使用的 API，與探索及執行測試的基礎設施分開。這項分離讓 Maven、IDE 與自訂啟動器能透過單一介面執行數種測試模型。</p><p>範例以 JUnit 5.13.4 為目標。JUnit 6 保留相同架構，但必須維持在 JUnit 5 的專案應使用<a href=https://docs.junit.org/5.13.4/user-guide/>版本化的 JUnit 5 文件</a>。</p><h2 id=platformjupiter-與-vintage>Platform、Jupiter 與 Vintage
+<a href=#platformjupiter-%e8%88%87-vintage class=heading-anchor><span>#</span></a></h2><p>JUnit 5 由三個元件組成：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>元件</th><th>責任</th></tr></thead><tbody><tr><td>JUnit Platform</td><td>探索測試並啟動已註冊的測試引擎。Maven Surefire 與 IDE 在此層級整合。</td></tr><tr><td>JUnit Jupiter</td><td>定義 JUnit 5 程式設計模型、擴充 API 與測試引擎。</td></tr><tr><td>JUnit Vintage</td><td>在遷移期間於 Platform 上執行 JUnit 3 與 JUnit 4 測試。</td></tr></tbody></table></div></div><p>Jupiter 測試從 <code>org.junit.jupiter.api</code> 匯入 <code>@Test</code> 與判斷。Surefire 要求 Platform 探索測試，接著由 <code>junit-jupiter-engine</code> 執行探索到的方法。應用程式程式碼不依賴任何 JUnit 元件，因為測試相依性使用 Maven 的 <code>test</code> 範圍。</p><h2 id=最小-maven-專案>最小 Maven 專案
+<a href=#%e6%9c%80%e5%b0%8f-maven-%e5%b0%88%e6%a1%88 class=heading-anchor><span>#</span></a></h2><p>以下配置將正式類別與測試類別分開：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>junit-hello/
+</span></span><span style=display:flex><span>├── pom.xml
+</span></span><span style=display:flex><span>└── src
+</span></span><span style=display:flex><span>    ├── main/java/com/example/Greeter.java
+</span></span><span style=display:flex><span>    └── test/java/com/example/GreeterTest.java</span></span></code></pre></div></div></div><p>最小且可維護的 POM 使用 <code>org.junit.jupiter:junit-jupiter</code>。該成品彙總 Jupiter API、參數化測試支援與執行階段引擎。</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;project</span> <span style=color:#a6e22e>xmlns=</span><span style=color:#e6db74>&#34;http://maven.apache.org/POM/4.0.0&#34;</span>
+</span></span><span style=display:flex><span>         <span style=color:#a6e22e>xmlns:xsi=</span><span style=color:#e6db74>&#34;http://www.w3.org/2001/XMLSchema-instance&#34;</span>
+</span></span><span style=display:flex><span>         <span style=color:#a6e22e>xsi:schemaLocation=</span><span style=color:#e6db74>&#34;http://maven.apache.org/POM/4.0.0
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                             https://maven.apache.org/xsd/maven-4.0.0.xsd&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;modelVersion&gt;</span>4.0.0<span style=color:#f92672>&lt;/modelVersion&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>com.example<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>junit-hello<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>1.0-SNAPSHOT<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;properties&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;maven.compiler.release&gt;</span>17<span style=color:#f92672>&lt;/maven.compiler.release&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;junit.version&gt;</span>5.13.4<span style=color:#f92672>&lt;/junit.version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/properties&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.junit.jupiter<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>junit-jupiter<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>${junit.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;build&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;plugins&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;plugin&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.maven.plugins<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;artifactId&gt;</span>maven-surefire-plugin<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;version&gt;</span>3.5.4<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;/plugin&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/plugins&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/build&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/project&gt;</span></span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>package</span> com.example;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Greeter</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> String <span style=color:#a6e22e>greet</span>(String name) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (name <span style=color:#f92672>==</span> <span style=color:#66d9ef>null</span> <span style=color:#f92672>||</span> name.<span style=color:#a6e22e>isBlank</span>()) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> IllegalArgumentException(<span style=color:#e6db74>&#34;name must not be blank&#34;</span>);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#e6db74>&#34;Hello, &#34;</span> <span style=color:#f92672>+</span> name;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>package</span> com.example;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertThrows;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreeterTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> Greeter greeter <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Greeter();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>greetsByName</span>() {
+</span></span><span style=display:flex><span>        assertEquals(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>, greeter.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>rejectsBlankNames</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> error <span style=color:#f92672>=</span> assertThrows(
+</span></span><span style=display:flex><span>                IllegalArgumentException.<span style=color:#a6e22e>class</span>,
+</span></span><span style=display:flex><span>                () <span style=color:#f92672>-&gt;</span> greeter.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34; &#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(<span style=color:#e6db74>&#34;name must not be blank&#34;</span>, error.<span style=color:#a6e22e>getMessage</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>透過 Maven 執行測試：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>mvn test</span></span></code></pre></div></div></div><p>Jupiter 測試類別與方法可以使用套件私有可見性。測試方法不得是 <code>private</code> 或 <code>static</code>，但生命週期與擴充規則允許在特定位置使用 <code>static</code>。</p><h2 id=選擇-junit-成品>選擇 JUnit 成品
+<a href=#%e9%81%b8%e6%93%87-junit-%e6%88%90%e5%93%81 class=heading-anchor><span>#</span></a></h2><p>只有在需要額外能力時才加入另一個成品：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>成品</th><th>加入時機</th></tr></thead><tbody><tr><td><code>junit-jupiter</code></td><td>應用程式測試套件優先使用彙總相依性。它已包含 API、參數與引擎。</td></tr><tr><td><code>junit-jupiter-api</code></td><td>在分開管理執行階段引擎時，針對 API 編譯測試或擴充。</td></tr><tr><td><code>junit-jupiter-engine</code></td><td>不使用 <code>junit-jupiter</code> 而採用細粒度相依性時，執行 Jupiter 測試。使用測試執行階段範圍。</td></tr><tr><td><code>junit-jupiter-params</code></td><td>對細粒度設定加入 <code>@ParameterizedTest</code> 支援。彙總相依性已包含它。</td></tr><tr><td><code>junit-vintage-engine</code></td><td>透過 Platform 執行未變更的 JUnit 3 或 JUnit 4 測試。</td></tr><tr><td><code>junit-jupiter-migrationsupport</code></td><td>轉換至 Jupiter 時，暫時調整選定的 JUnit 4 規則與 <code>@Ignore</code>。</td></tr><tr><td><code>junit-platform-suite</code></td><td>使用 Platform 套件註解宣告套件。</td></tr><tr><td><code>junit-platform-launcher</code></td><td>以程式探索並執行測試，或實作測試工具。應用程式測試套件不需要直接使用它。</td></tr><tr><td><code>junit-platform-console-standalone</code></td><td>從單一可執行 JAR 在 Maven 或 IDE 外執行測試。將 JAR 保留在專案 POM 外。</td></tr></tbody></table></div></div><p>當建置宣告多個 JUnit 成品時，匯入 JUnit BOM，因為 BOM 會讓 Platform、Jupiter 與 Vintage 版本保持相容：</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.junit<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>junit-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>${junit.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span></span></span></code></pre></div></div></div><p>BOM 涵蓋的成品宣告可以省略 <code>&lt;version></code>。</p><p>在 3.0 之前的 Surefire 發行版本中，明確的 <code>junit-platform-launcher</code> 相依性是必要的。目前 Surefire 3.x 發行版會在測試執行階段類別路徑上，讓啟動器與 Platform 對齊，因此對一般測試套件加入啟動器只會增加另一個需要管理的版本，不會增加測試能力。</p><h2 id=jupiter-程式設計模型>Jupiter 程式設計模型
+<a href=#jupiter-%e7%a8%8b%e5%bc%8f%e8%a8%ad%e8%a8%88%e6%a8%a1%e5%9e%8b class=heading-anchor><span>#</span></a></h2><p>Jupiter 為常見測試結構提供聚焦的註解：</p><ul><li><code>@BeforeEach</code> 與 <code>@AfterEach</code> 建立每次測試的固定裝置。</li><li><code>@BeforeAll</code> 與 <code>@AfterAll</code> 建立類別層級的固定裝置。</li><li><code>@ParameterizedTest</code> 使用 <code>@ValueSource</code>、<code>@CsvSource</code>、<code>@MethodSource</code> 或其他引數來源的資料，執行一個測試本體。</li><li><code>@Nested</code> 在保留生命週期語意的同時，將相關案例分組。</li><li><code>@Tag</code> 將測試分類，以便在建置時納入或排除。</li><li><code>@ExtendWith</code> 為參數解析、回呼、條件執行及其他橫切行為註冊擴充。</li></ul><p>測試應斷言可觀察結果，而不是執行順序。Jupiter 不保證從方法名稱可明確推知順序，而有順序的測試會共享狀態，使失敗取決於先前案例。</p><h2 id=不變更地執行-junit-4-測試>不變更地執行 JUnit 4 測試
+<a href=#%e4%b8%8d%e8%ae%8a%e6%9b%b4%e5%9c%b0%e5%9f%b7%e8%a1%8c-junit-4-%e6%b8%ac%e8%a9%a6 class=heading-anchor><span>#</span></a></h2><p>Vintage 提供風險最低的第一個遷移步驟，因為 Jupiter 與 JUnit 4 使用不同 Java 套件，且可以共存於一個模組：</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>junit<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>junit<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>4.13.2<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.junit.vintage<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>junit-vintage-engine<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>${junit.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>Surefire 接著透過 Platform 探索 Jupiter 與 JUnit 4 測試。只要仍有舊測試，就保留 Vintage，因為成功的 Vintage 執行不會測試 Jupiter 的程式設計或擴充模型。</p><h2 id=轉換-junit-4-測試>轉換 JUnit 4 測試
+<a href=#%e8%bd%89%e6%8f%9b-junit-4-%e6%b8%ac%e8%a9%a6 class=heading-anchor><span>#</span></a></h2><p>常見的來源對應如下：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>JUnit 4</th><th>Jupiter</th></tr></thead><tbody><tr><td><code>@Before</code> / <code>@After</code></td><td><code>@BeforeEach</code> / <code>@AfterEach</code></td></tr><tr><td><code>@BeforeClass</code> / <code>@AfterClass</code></td><td><code>@BeforeAll</code> / <code>@AfterAll</code></td></tr><tr><td><code>@Ignore</code></td><td><code>@Disabled</code></td></tr><tr><td><code>@Category</code></td><td><code>@Tag</code></td></tr><tr><td><code>@RunWith</code></td><td>一個或多個 <code>@ExtendWith</code> 擴充</td></tr><tr><td><code>@Rule</code> / <code>@ClassRule</code></td><td>擴充或 Jupiter 原生固定裝置</td></tr><tr><td><code>@Test(expected = E.class)</code></td><td><code>assertThrows(E.class, executable)</code></td></tr></tbody></table></div></div><p><code>@RunWith</code> 到 <code>@ExtendWith</code> 是概念對應，而不是機械式重新命名，因為 JUnit 4 類別可以有一個執行器，而 Jupiter 會組合多個擴充。</p><p>JUnit 4 將選用的判斷訊息放在最前面：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>assertEquals(<span style=color:#e6db74>&#34;unexpected greeting&#34;</span>, expected, actual);</span></span></code></pre></div></div></div><p>Jupiter 將訊息放在最後：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>assertEquals(expected, actual, <span style=color:#e6db74>&#34;unexpected greeting&#34;</span>);</span></span></code></pre></div></div></div><p>現有的 <code>org.junit.Assert</code> 呼叫可以保留，同時將註解與生命週期程式碼移至 Jupiter。分開轉換判斷可以減少每次遷移變更的規模。</p><p>規則需要個別處理。<code>junit-jupiter-migrationsupport</code> 成品會調整 <code>ExternalResource</code>、<code>Verifier</code> 與 <code>ExpectedException</code> 規則系列；<code>@EnableRuleMigrationSupport</code> 會啟用這些配接器。<code>@EnableJUnit4MigrationSupport</code> 也會辨識 JUnit 4 <code>@Ignore</code>。其他自訂規則需要 Jupiter 擴充或直接重寫固定裝置。</p><p>因此，受控遷移遵循三個階段：</p><ol><li>加入 Vintage，建立一個以 Platform 為基礎的測試命令。</li><li>將類別轉換至 Jupiter，根據執行器與規則的行為，而不是名稱，替換它們。</li><li>當建置不再包含 JUnit 3 或 JUnit 4 測試後，移除 Vintage、JUnit 4 與遷移支援。</li></ol><h2 id=參考資料>參考資料
+<a href=#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.junit.org/5.13.4/user-guide/>JUnit 5 User Guide</a></li><li><a href=https://maven.apache.org/surefire/maven-surefire-plugin/examples/junit-platform.html>Maven Surefire: Using JUnit 5 Platform</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/junit-5/ class=language-option data-lang=en>English
+</a><a href=/ja/junit-5/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/junit-5/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/junit-5/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,41 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>DEFLATE 和 Gzip 格式</title></head><body><main><article><div class=article-header><h1>DEFLATE 和 Gzip 格式</h1><div class=aux>最后更新: 2023-09-27 03:10:18 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/compression/>Compression</a>
+|
+<a href=/zh-cn/tags/deflate/>Deflate</a>
+|
+<a href=/zh-cn/tags/gzip/>Gzip</a></div></div><div class="translation-notice machine-translated"><a href=/deflate-and-gzip/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>DEFLATE 是 RFC 1951 定义的位流格式。它将 LZ77 滑动窗口与霍夫曼编码
+结合起来。“zlib”和“gzip”通常指包含 DEFLATE 的文件，但它们分别是
+围绕原始位流的不同封装格式。</p><h2 id=块边界和-btype>块边界和 BTYPE
+<a href=#%e5%9d%97%e8%be%b9%e7%95%8c%e5%92%8c-btype class=heading-anchor><span>#</span></a></h2><p>DEFLATE 流由一系列块组成。每个块都从当前位位置开始，依次包含
+<code>BFINAL</code>（1 位）和 <code>BTYPE</code>（2 位）：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>BTYPE</code></th><th>含义</th></tr></thead><tbody><tr><td><code>00</code></td><td>未进行霍夫曼编码的存储字节</td></tr><tr><td><code>01</code></td><td>使用固定霍夫曼编码压缩</td></tr><tr><td><code>10</code></td><td>使用动态霍夫曼编码压缩</td></tr><tr><td><code>11</code></td><td>保留值，无效</td></tr></tbody></table></div></div><p>只有最后一个块的 <code>BFINAL</code> 为 1。当字面量/长度流发出块结束符
+（EOB）符号 256 时，压缩块结束。下一个块头会紧接在下一个位处出现；
+压缩块不会填充到字节边界。存储块是例外：读取其头部后，解码器会丢弃
+当前字节中的剩余位，读取小端序的 <code>LEN</code> 和 <code>NLEN</code>（<code>LEN</code> 的按位取反），
+然后准确复制 <code>LEN</code> 个字节。<code>LEN</code> 为 16 位，因此单个存储块最多容纳
+65,535 个字节。</p><h2 id=lz77-符号和霍夫曼编码>LZ77 符号和霍夫曼编码
+<a href=#lz77-%e7%ac%a6%e5%8f%b7%e5%92%8c%e9%9c%8d%e5%a4%ab%e6%9b%bc%e7%bc%96%e7%a0%81 class=heading-anchor><span>#</span></a></h2><p>压缩数据字母表包含字面量字节 0–255、EOB 256，以及长度符号 257–285。
+长度符号选择一个基础长度和额外位数。随后出现的距离符号选择一个基础
+距离和额外位数。由此得到的二元组会从已经生成的输出中复制字节，向后
+最多 32 KiB，长度最多 258 个字节；复制区域重叠是有效的。</p><p>固定块使用 RFC 1951 规定的编码长度。动态块包含 <code>HLIT</code>（5 位）、
+<code>HDIST</code>（5 位）和 <code>HCLEN</code>（4 位），随后按照规定的排列传输编码长度
+字母表。该字母表描述字面量/长度编码和距离编码的编码长度，其中包括用于
+表示连续零或重复长度的重复符号。通过规范重建，可以将这些长度转换为
+实际编码。</p><p>DEFLATE 在每个字节内从最低有效位向最高有效位打包数据元素。数值型
+额外位字段采用最低有效位优先顺序。霍夫曼编码以规范值分配，但会按照
+该格式规定的位反转约定发出。解析器必须维护位游标，而不能将每个字段
+都作为字节对齐的整数读取。</p><h2 id=zlib-和-gzip-封装格式>zlib 和 gzip 封装格式
+<a href=#zlib-%e5%92%8c-gzip-%e5%b0%81%e8%a3%85%e6%a0%bc%e5%bc%8f class=heading-anchor><span>#</span></a></h2><p>原始 DEFLATE 没有头部或尾部。zlib 封装格式（RFC 1950）以 <code>CMF</code> 和
+<code>FLG</code> 开始，其中 <code>FCHECK</code> 确保 16 位头部可被 31 整除。如果设置了
+<code>FDICT</code>，其后会跟随一个四字节的 Adler-32 字典标识符。流以未压缩数据
+的大端序 Adler-32 结束。</p><p>gzip 封装格式（RFC 1952）是一系列成员。每个成员都包含魔数节 <code>1f 8b</code>、
+压缩方法 8、标志、修改时间、额外标志和操作系统字段。标志可以添加
+额外字段、原始文件名、注释和头部 CRC。尾部存储未压缩成员的小端序
+CRC-32，以及 <code>ISIZE</code>，即其大小对 2³² 取模的结果。元数据不能替代
+对尾部的验证。</p><p>协议文档必须明确表示形式。HTTP <code>Content-Encoding: gzip</code> 携带 gzip
+格式，而使用 method 8 的 ZIP 条目通常携带原始 DEFLATE 流。不能仅因为
+某个负载被描述为“compressed”，就安全地选择 zlib 解码器。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc1951>RFC 1951: DEFLATE</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1950>RFC 1950: zlib Format</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1952>RFC 1952: gzip Format</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/deflate-and-gzip/ class=language-option data-lang=en>English
+</a><a href=/ja/deflate-and-gzip/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/deflate-and-gzip/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/deflate-and-gzip/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

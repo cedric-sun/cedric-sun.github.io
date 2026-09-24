@@ -1,0 +1,96 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Docker 基礎</title></head><body><main><article><div class=article-header><h1>Docker 基礎</h1><div class=aux>最後更新: 2022-01-28 15:44:22 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/containers/>Containers</a>
+|
+<a href=/zh-tw/tags/docker/>Docker</a></div></div><div class="translation-notice machine-translated"><a href=/docker-fundamentals/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>Docker 是仍依賴核心、CPU 指令集架構及其 x86-64 <code>syscall</code> 的容器系統。
+在 Docker 容器中執行的應用程式稱為容器化應用程式。</p><h2 id=元件概覽>元件概覽
+<a href=#%e5%85%83%e4%bb%b6%e6%a6%82%e8%a6%bd class=heading-anchor><span>#</span></a></h2><h3 id=docker-enginedockerd>Docker Engine：<code>dockerd</code>
+<a href=#docker-enginedockerd class=heading-anchor><span>#</span></a></h3><p><code>dockerd</code> 是管理本機系統已安裝容器的 CLI 常駐程式。
+其品牌名稱為 <em>Docker Engine</em> 或 Docker CE（Community Edition），而且是開放原始碼的免費軟體。</p><p><code>dockerd</code> 常駐程式會在 UNIX 網域通訊端 <code>/var/run/docker.sock</code> 上監聽傳入的用戶端。
+執行 Docker 用戶端的使用者必須能夠讀取此通訊端檔案，才能建立通訊端連線（以傳送 HTTP 請求）。
+若透過 Linux 發行版的套件管理員安裝 Docker Engine，此通訊端檔案可能只允許 <code>root</code> 或 Docker 專用的特殊使用者群組（例如 <code>docker</code>）讀取。
+你可以選擇將自己加入該使用者群組，或在每次使用 <code>docker</code> 用戶端時直接切換為 <code>root</code>。
+使用 <code>docker info</code> 檢查 <code>dockerd</code> 是否正在執行，以及用戶端是否具備權限。</p><p><code>dockerd</code> 常駐程式公開管理容器的 HTTP API，任何程式都能使用。
+官方用戶端程式是 <code>docker</code> CLI 程式。</p><h3 id=docker-desktop>Docker Desktop
+<a href=#docker-desktop class=heading-anchor><span>#</span></a></h3><p>Docker Desktop 是專有的 GUI 用戶端程式，會與 <code>dockerd</code> 通訊並執行容器維護作業。
+不一定要使用 Docker Desktop 應用程式。</p><h3 id=docker-compose>Docker Compose
+<a href=#docker-compose class=heading-anchor><span>#</span></a></h3><p><a href=https://docs.docker.com/compose/>https://docs.docker.com/compose/</a></p><p>Docker Compose 是另一個與 <code>dockerd</code> 通訊的 CLI 用戶端，其執行檔為 <code>docker-compose</code>。
+它使用 <code>docker-compose.yml</code> 檔案指定容器屬性，無須反覆輸入 <code>docker run</code> 選項。
+此方式適合設定經常使用及／或設定複雜的週期性服務。</p><h2 id=映像檔>映像檔
+<a href=#%e6%98%a0%e5%83%8f%e6%aa%94 class=heading-anchor><span>#</span></a></h2><p>Docker 映像檔由多層檔案系統內容組成，每一層都會在上一層加入一些檔案。
+若某個映像檔的第一層依賴另一個映像檔的所有層，就稱此前者以後者為基礎。</p><p>映像檔具有易讀的名稱 <code>REPOSITORY</code> 與易讀的 <code>TAG</code>（通常是版本號，但並非必要）。
+稱為 <code>IMAGE ID</code> 的 SHA256 雜湊值可唯一識別映像檔。</p><p>若要建置自己的映像檔，請建立 <code>Dockerfile</code>，以簡單語法定義建立映像檔所需的步驟。
+<em>Dockerfile 中的每項指令都會在映像檔中建立一層。</em>
+修改 Dockerfile 並需要重新建置映像檔時，只會重新建置已變更的層。</p><p>例如，<code>esolang/vim:latest</code> 映像檔包含 10 層。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># $ Docker Pull Esolang/vim</span>
+</span></span><span style=display:flex><span>Using default tag: latest
+</span></span><span style=display:flex><span>latest: Pulling from esolang/vim
+</span></span><span style=display:flex><span>4abcf2066143: Downloading  2.951MB/3.409MB
+</span></span><span style=display:flex><span>e7609a7fad9e: Download complete
+</span></span><span style=display:flex><span>a891a2921638: Download complete
+</span></span><span style=display:flex><span>6ea6322cdcb0: Download complete
+</span></span><span style=display:flex><span>729f825b6ae6: Download complete
+</span></span><span style=display:flex><span>e6cb43f5f474: Downloading  2.618MB/31.24MB
+</span></span><span style=display:flex><span>c12ed1c2e19b: Download complete
+</span></span><span style=display:flex><span>6928286dd6f6: Download complete
+</span></span><span style=display:flex><span>05de04103836: Download complete
+</span></span><span style=display:flex><span>b5a8264627eb: Download complete</span></span></code></pre></div></div></div><p>Docker 不會將 <code>Dockerfile</code> 儲存在建置完成的映像檔中，因此要檢查映像檔的建置方式會稍微困難。</p><p>原因在於，也可以透過執行容器、進行修改，再提交結果來建立映像檔。
+事實上，可以將 <code>Dockerfile</code> 視為將「執行、修改、提交」流程自動化的指令碼。</p><h3 id=最小映像檔>最小映像檔
+<a href=#%e6%9c%80%e5%b0%8f%e6%98%a0%e5%83%8f%e6%aa%94 class=heading-anchor><span>#</span></a></h3><p>建置一個沒有基礎映像檔，也不含任何檔案系統內容（除了一個最小的 hello world 執行檔）的最小 Docker 映像檔：</p><div class=jose-wrapper><div class=jose-tools><span>asm</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#75715e>; linux_syscall call_no, arg0, arg1, arg2, arg3, arg4, arg5
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>%</span><span style=color:#a6e22e>macro</span> <span style=color:#66d9ef>linux_syscall</span> <span style=color:#ae81ff>1</span>-<span style=color:#ae81ff>7</span> <span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rax</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rdi</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rsi</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>3</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>rdx</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>4</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r10</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>5</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r8</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>6</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>mov</span> <span style=color:#66d9ef>r9</span>, <span style=color:#960050;background-color:#1e0010>%</span><span style=color:#ae81ff>7</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>syscall</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>%</span><span style=color:#a6e22e>endmacro</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>SECTION</span> <span style=color:#66d9ef>.data</span>
+</span></span><span style=display:flex><span>msg:    <span style=color:#a6e22e>db</span> <span style=color:#960050;background-color:#1e0010>`</span><span style=color:#66d9ef>hello</span> <span style=color:#66d9ef>world</span><span style=color:#960050;background-color:#1e0010>\</span><span style=color:#66d9ef>n</span><span style=color:#960050;background-color:#1e0010>`</span>
+</span></span><span style=display:flex><span>msglen: <span style=color:#a6e22e>equ</span> <span style=color:#66d9ef>$-msg</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>GLOBAL</span> <span style=color:#66d9ef>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>SECTION</span> <span style=color:#66d9ef>.text</span>
+</span></span><span style=display:flex><span>main:
+</span></span><span style=display:flex><span>    <span style=color:#75715e>; write to stdout a string
+</span></span></span><span style=display:flex><span>    <span style=color:#a6e22e>linux_syscall</span> <span style=color:#ae81ff>1</span>,<span style=color:#ae81ff>1</span>,<span style=color:#66d9ef>msg</span>,<span style=color:#66d9ef>msglen</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>; exit the process with code 42
+</span></span></span><span style=display:flex><span>    <span style=color:#a6e22e>linux_syscall</span> <span style=color:#ae81ff>0x3c</span>, <span style=color:#ae81ff>42</span></span></span></code></pre></div></div></div><p>使用 <code>make</code> 建置執行檔：</p><div class=jose-wrapper><div class=jose-tools><span>Makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Makefile data-lang=Makefile><span style=display:flex><span><span style=color:#a6e22e>main</span><span style=color:#f92672>:</span> main.o
+</span></span><span style=display:flex><span>	<span style=color:#75715e># -N: don&#39;t align data segment on a new memory page, thus makes the executable as small as possible</span>
+</span></span><span style=display:flex><span>	ld -N -e manbaout -omain main.o
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>main.o</span><span style=color:#f92672>:</span> main.asm
+</span></span><span style=display:flex><span>	nasm -f elf64 -o main.o main.asm
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>clean</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>	rm *.o main
+</span></span></code></pre></div></div></div><p>使用下列 Dockerfile 建置映像檔：</p><div class=jose-wrapper><div class=jose-tools><span>Dockerfile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-Dockerfile data-lang=Dockerfile><span style=display:flex><span>FROM    scratch<span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>ADD</span>     main    /</span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker build -t foo .</span></span></code></pre></div></div></div><p>在我的電腦上，這會產生僅 904 位元組的 Docker 映像檔（由 <code>docker image ls</code> 回報）。從該映像檔執行容器：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker run foo ./main</span></span></code></pre></div></div></div><h2 id=容器>容器
+<a href=#%e5%ae%b9%e5%99%a8 class=heading-anchor><span>#</span></a></h2><p>容器是映像檔的執行中執行個體。容器的生命週期從 <code>docker container create &lt;image></code> 命令開始，接著執行 <code>docker start &lt;container></code>。<code>docker run &lt;image></code> 是同時執行兩者的簡寫；若本機不存在 <code>&lt;image></code>，它還會從設定的登錄檔（預設為 Docker Hub）下載映像檔。<code>docker run</code> 一律會從指定映像檔建立全新容器，然後啟動該容器。</p><p>若要使用既有但未啟用（已退出或暫停）的容器，請再次使用 <code>docker start</code>。</p><p>在任一特定時間點，Docker 容器會處於下列 6 種可能狀態之一。</p><ol><li>created：完整；容器建立後從未啟動。</li><li>running：ENTRYPOINT 程序正在執行（精確而言，對它執行 <code>wait(2)</code> 會阻塞）。</li><li>Restarting：</li><li>Exited(num)：ENTRYPOINT 程序以 num 退出。</li><li>Paused：</li><li>Dead：</li></ol><h2 id=dockerfile>Dockerfile
+<a href=#dockerfile class=heading-anchor><span>#</span></a></h2><p>Dockerfile 僅定義了 17 項指令：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>名稱</th><th></th></tr></thead><tbody><tr><td>ADD</td><td>加入本機或遠端檔案與目錄。</td></tr><tr><td>ARG</td><td>使用建置階段變數。</td></tr><tr><td>CMD</td><td>指定預設命令。</td></tr><tr><td>COPY</td><td>複製檔案與目錄。</td></tr><tr><td>ENTRYPOINT</td><td>指定預設執行檔。</td></tr><tr><td>ENV</td><td>設定環境變數。</td></tr><tr><td>EXPOSE</td><td>說明應用程式監聽的連接埠。</td></tr><tr><td>FROM</td><td>從基礎映像檔建立新的建置階段。</td></tr><tr><td>HEALTHCHECK</td><td>在啟動時檢查容器的健康狀態。</td></tr><tr><td>LABEL</td><td>為映像檔加入中繼資料。</td></tr><tr><td>MAINTAINER</td><td>指定映像檔作者。</td></tr><tr><td>ONBUILD</td><td>指定映像檔用於建置時所執行的指令。</td></tr><tr><td>RUN</td><td>執行建置命令。</td></tr><tr><td>SHELL</td><td>設定映像檔的預設 shell。</td></tr><tr><td>STOPSIGNAL</td><td>指定退出容器所用的系統呼叫訊號。</td></tr><tr><td>USER</td><td>設定使用者與群組 ID。</td></tr><tr><td>VOLUME</td><td>建立磁碟區掛載。</td></tr><tr><td>WORKDIR</td><td>變更工作目錄。</td></tr></tbody></table></div></div><p>只有 RUN、COPY 與 ADD 指令會建立並保留在結果映像檔中的層。</p><p>多數指令會指示 <code>docker image build</code> 命令如何在結果的靜態映像檔中加入新的一層。</p><ul><li><code>RUN</code> 命令是例外，它會在建置時立即執行外部命令。</li></ul><p>務必區分在 <code>docker image build</code> 執行時立即執行的指令，以及指示 Docker 在從所建立映像檔實例化容器後應如何運作的指令。</p><h2 id=cli-速查表>CLI 速查表
+<a href=#cli-%e9%80%9f%e6%9f%a5%e8%a1%a8 class=heading-anchor><span>#</span></a></h2><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># Show Active Container</span>
+</span></span><span style=display:flex><span>docker container ls
+</span></span><span style=display:flex><span><span style=color:#75715e># Show All Container Includes Dead One</span>
+</span></span><span style=display:flex><span>docker container ls -a
+</span></span><span style=display:flex><span><span style=color:#75715e># Stop Certain Containers</span>
+</span></span><span style=display:flex><span>docker stop &lt;cid1&gt; &lt;cid2&gt; ...
+</span></span><span style=display:flex><span><span style=color:#75715e># Stop All Active Containers</span>
+</span></span><span style=display:flex><span>docker stop <span style=color:#66d9ef>$(</span>docker container ls –aq<span style=color:#66d9ef>)</span></span></span></code></pre></div></div></div></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/docker-fundamentals/ class=language-option data-lang=en>English
+</a><a href=/ja/docker-fundamentals/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/docker-fundamentals/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/docker-fundamentals/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

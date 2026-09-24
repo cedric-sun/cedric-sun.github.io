@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Deflate on cesun.life</title><link>https://example.org/zh-tw/tags/deflate/</link><description>Recent content in Deflate on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Wed, 03 Apr 2024 14:47:29 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/deflate/index.xml" rel="self" type="application/rss+xml"/><item><title>zlib 串流 API</title><link>https://example.org/zh-tw/zlib/</link><pubDate>Wed, 03 Apr 2024 14:47:29 +0800</pubDate><guid>https://example.org/zh-tw/zlib/</guid><description>&lt;p&gt;zlib 是實作 DEFLATE 及其常見包裝格式的 C 函式庫。其串流 API 使用 &lt;code&gt;z_stream&lt;/code&gt;，因此應用程式可以在有界緩衝區中處理輸入與輸出，而不必假設一次呼叫會消耗或產生完整訊息。&lt;/p&gt;
+&lt;h2 id="串流狀態與初始化"&gt;
+ 串流狀態與初始化
+ &lt;a href="#%e4%b8%b2%e6%b5%81%e7%8b%80%e6%85%8b%e8%88%87%e5%88%9d%e5%a7%8b%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;應用程式提供 &lt;code&gt;next_in&lt;/code&gt;／&lt;code&gt;avail_in&lt;/code&gt; 與 &lt;code&gt;next_out&lt;/code&gt;／&lt;code&gt;avail_out&lt;/code&gt;。呼叫後，zlib 會前移指標並減少可用計數；&lt;code&gt;total_in&lt;/code&gt; 與 &lt;code&gt;total_out&lt;/code&gt; 提供累計計數器。應用程式必須消耗產生的位元組，並在下一次呼叫前補充緩衝區，同時將其他狀態欄位交由 zlib 管理。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;deflateInit()&lt;/code&gt; 會產生 zlib 包裝的串流。&lt;code&gt;deflateInit2()&lt;/code&gt; 使用負的 &lt;code&gt;windowBits&lt;/code&gt; 選取原始 DEFLATE，或使用 &lt;code&gt;windowBits + 16&lt;/code&gt; 選取 gzip。初始化前先設定配置器欄位，並在每個成功初始化的串流上呼叫 &lt;code&gt;deflateEnd()&lt;/code&gt;，包括錯誤路徑。壓縮器可以使用 &lt;code&gt;deflateSetDictionary()&lt;/code&gt; 預先載入共用歷史。zlib 包裝會攜帶 Adler-32 字典識別碼，並讓 &lt;code&gt;inflate()&lt;/code&gt; 回傳 &lt;code&gt;Z_NEED_DICT&lt;/code&gt;；原始 DEFLATE 要求外層協定識別字典。gzip 包裝不定義預設字典訊號。&lt;/p&gt;
+&lt;h2 id="正確的-deflate-迴圈"&gt;
+ 正確的 Deflate 迴圈
+ &lt;a href="#%e6%ad%a3%e7%a2%ba%e7%9a%84-deflate-%e8%bf%b4%e5%9c%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一般輸入使用 &lt;code&gt;Z_NO_FLUSH&lt;/code&gt;；頻繁清空會降低壓縮率。只要仍有輸入或輸出待處理，就持續呼叫 &lt;code&gt;deflate()&lt;/code&gt;。要完成時停止提供輸入，並以 &lt;code&gt;deflate(..., Z_FINISH)&lt;/code&gt; 呼叫到回傳 &lt;code&gt;Z_STREAM_END&lt;/code&gt;，在呼叫之間擴大或排空輸出緩衝區。以下有界輸入草圖假設 &lt;code&gt;input_len&lt;/code&gt; 符合 zlib 的 &lt;code&gt;uInt&lt;/code&gt; 計數：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;z_stream strm &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (&lt;span style="color:#a6e22e"&gt;deflateInit&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm, Z_DEFAULT_COMPRESSION) &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; Z_OK) &lt;span style="color:#a6e22e"&gt;fail&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;strm.next_in &lt;span style="color:#f92672"&gt;=&lt;/span&gt; input;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;strm.avail_in &lt;span style="color:#f92672"&gt;=&lt;/span&gt; (uInt)input_len;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;for&lt;/span&gt; (;;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; strm.next_out &lt;span style="color:#f92672"&gt;=&lt;/span&gt; out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; strm.avail_out &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt; out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; uInt input_before &lt;span style="color:#f92672"&gt;=&lt;/span&gt; strm.avail_in;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; flush &lt;span style="color:#f92672"&gt;=&lt;/span&gt; strm.avail_in &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; Z_FINISH : Z_NO_FLUSH;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; rc &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;deflate&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm, flush);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;size_t&lt;/span&gt; produced &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt; out &lt;span style="color:#f92672"&gt;-&lt;/span&gt; strm.avail_out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;write_bytes&lt;/span&gt;(out, produced);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (rc &lt;span style="color:#f92672"&gt;==&lt;/span&gt; Z_STREAM_END) &lt;span style="color:#66d9ef"&gt;break&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (rc &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; Z_OK) &lt;span style="color:#a6e22e"&gt;fail&lt;/span&gt;(rc);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (input_before &lt;span style="color:#f92672"&gt;==&lt;/span&gt; strm.avail_in &lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; produced &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;) &lt;span style="color:#a6e22e"&gt;fail_no_progress&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;deflateEnd&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;實際程式碼必須在下一次 &lt;code&gt;Z_NO_FLUSH&lt;/code&gt; 呼叫前補充 &lt;code&gt;next_in&lt;/code&gt;，並追蹤兩個游標的進度。&lt;code&gt;Z_BUF_ERROR&lt;/code&gt; 可能表示因緩衝區為空或已滿而無法取得進度；它本身不代表資料損毀。&lt;code&gt;Z_SYNC_FLUSH&lt;/code&gt; 會讓解碼器取得資料但不結束串流，而 &lt;code&gt;Z_FINISH&lt;/code&gt; 會結束串流。&lt;/p&gt;</description></item><item><title>DEFLATE 與 Gzip 格式</title><link>https://example.org/zh-tw/deflate-and-gzip/</link><pubDate>Wed, 27 Sep 2023 03:10:18 +0800</pubDate><guid>https://example.org/zh-tw/deflate-and-gzip/</guid><description>&lt;p&gt;DEFLATE 是 RFC 1951 定義的位元流格式。它結合 LZ77 滑動視窗與霍夫曼
+編碼。「zlib」和「gzip」通常指包含 DEFLATE 的檔案，但兩者分別是包覆
+原始位元流的不同封裝格式。&lt;/p&gt;
+&lt;h2 id="區塊邊界與-btype"&gt;
+ 區塊邊界與 BTYPE
+ &lt;a href="#%e5%8d%80%e5%a1%8a%e9%82%8a%e7%95%8c%e8%88%87-btype" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;DEFLATE 串流由一連串區塊組成。每個區塊都從目前的位元位置開始，包含
+&lt;code&gt;BFINAL&lt;/code&gt;（1 位元）和 &lt;code&gt;BTYPE&lt;/code&gt;（2 位元）：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;&lt;code&gt;BTYPE&lt;/code&gt;&lt;/th&gt;
+ &lt;th&gt;意義&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;00&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;未使用霍夫曼編碼的儲存位元組&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;01&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;使用固定霍夫曼編碼壓縮&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;10&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;使用動態霍夫曼編碼壓縮&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;11&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;保留值，無效&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;只有最後一個區塊的 &lt;code&gt;BFINAL&lt;/code&gt; 為 1。當文字/長度串流輸出區塊結束
+（EOB）符號 256 時，壓縮區塊就會結束。下一個區塊標頭會緊接在下一個
+位元處；壓縮區塊不會填補到位元組邊界。儲存區塊是例外：讀取標頭後，
+解碼器會捨棄目前位元組中的剩餘位元，讀取小端序的 &lt;code&gt;LEN&lt;/code&gt; 和 &lt;code&gt;NLEN&lt;/code&gt;
+（&lt;code&gt;LEN&lt;/code&gt; 的一補數），然後正好複製 &lt;code&gt;LEN&lt;/code&gt; 個位元組。&lt;code&gt;LEN&lt;/code&gt; 為 16 位元，
+因此單一儲存區塊最多可容納 65,535 個位元組。&lt;/p&gt;
+&lt;h2 id="lz77-符號與霍夫曼編碼"&gt;
+ LZ77 符號與霍夫曼編碼
+ &lt;a href="#lz77-%e7%ac%a6%e8%99%9f%e8%88%87%e9%9c%8d%e5%a4%ab%e6%9b%bc%e7%b7%a8%e7%a2%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;壓縮資料字母表包含文字位元組 0–255、EOB 256，以及長度符號 257–285。
+長度符號會選取基礎長度與額外位元數。接續的距離符號會選取基礎距離與
+額外位元數。產生的配對會從已產生的輸出向後複製位元組，最遠 32 KiB，
+長度最多 258 個位元組；重疊是有效的。&lt;/p&gt;
+&lt;p&gt;固定區塊使用 RFC 1951 規定的編碼長度。動態區塊包含 &lt;code&gt;HLIT&lt;/code&gt;（5 位元）、
+&lt;code&gt;HDIST&lt;/code&gt;（5 位元）和 &lt;code&gt;HCLEN&lt;/code&gt;（4 位元），接著依指定排列傳送編碼長度
+字母表。該字母表描述文字/長度編碼與距離編碼的編碼長度，包括用於表示
+連續零或重複長度的重複符號。透過正規重建，可將這些長度轉換為實際編碼。&lt;/p&gt;</description></item></channel></rss>

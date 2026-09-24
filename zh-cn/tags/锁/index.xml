@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>锁 on cesun.life</title><link>https://example.org/zh-cn/tags/%E9%94%81/</link><description>Recent content in 锁 on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Tue, 26 Nov 2024 05:37:18 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/%E9%94%81/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 内核锁</title><link>https://example.org/zh-cn/linux-kernel-locking/</link><pubDate>Tue, 26 Nov 2024 05:37:18 +0800</pubDate><guid>https://example.org/zh-cn/linux-kernel-locking/</guid><description>&lt;p&gt;内核锁定从执行上下文开始。对进程上下文调用方正确的锁，当同一数据从软中断、硬中断或不可屏蔽中断（NMI）访问时可能死锁。原语及其后缀必须匹配访问受保护状态的所有上下文。&lt;/p&gt;
+&lt;h2 id="自旋锁语义"&gt;
+ 自旋锁语义
+ &lt;a href="#%e8%87%aa%e6%97%8b%e9%94%81%e8%af%ad%e4%b9%89" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用以下方式声明并初始化普通自旋锁：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;DEFINE_SPINLOCK&lt;/span&gt;(queue_lock);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; queue {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;spinlock_t&lt;/span&gt; lock;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;spin_lock_init&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;queue&lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt;lock);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在非 PREEMPT_RT 的 SMP 内核上，&lt;code&gt;spin_lock()&lt;/code&gt; 禁止本地 CPU 上的抢占，并旋转等待获取独占所有权。它不会禁用本地中断或软中断。持有者不得睡眠、显式调度、执行阻塞分配，或调用可能获取睡眠锁的代码。&lt;/p&gt;
+&lt;p&gt;在单处理器非 RT 构建中，由于没有其他 CPU 竞争，部分实现可能编译为抢占和编译器控制。正确性不能依赖该优化；同一源代码必须在 SMP 上仍然有效。&lt;/p&gt;
+&lt;p&gt;PREEMPT_RT 会改变 &lt;code&gt;spinlock_t&lt;/code&gt; 和 &lt;code&gt;rwlock_t&lt;/code&gt; 的语义，使其使用基于 RT-mutex 的实现并保持可抢占。需要在 RT 和非 RT 内核之间真正自旋、不可抢占锁的代码使用 &lt;code&gt;raw_spinlock_t&lt;/code&gt;，但原始临界区必须保持很小，且不能调用在 RT 上会变为睡眠的代码。替换在锁头文件和核心代码内部实现；应用程序代码不应使用配置条件重复实现。&lt;/p&gt;
+&lt;h2 id="匹配进程软中断和硬中断上下文"&gt;
+ 匹配进程、软中断和硬中断上下文
+ &lt;a href="#%e5%8c%b9%e9%85%8d%e8%bf%9b%e7%a8%8b%e8%bd%af%e4%b8%ad%e6%96%ad%e5%92%8c%e7%a1%ac%e4%b8%ad%e6%96%ad%e4%b8%8a%e4%b8%8b%e6%96%87" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;选择能够阻止同一 CPU 重新进入的最窄变体：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;数据访问来源&lt;/th&gt;
+ &lt;th&gt;进程上下文获取&lt;/th&gt;
+ &lt;th&gt;中断侧获取&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;仅进程上下文&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;不适用&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;进程上下文和软中断/tasklet&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_bh()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;软中断中使用 &lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;进程上下文和硬中断&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_irqsave()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;处理程序中使用 &lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;已知 IRQ 状态的硬中断上下文&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_irq()&lt;/code&gt; 或 &lt;code&gt;spin_lock_irqsave()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;根据调用方状态&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;spin_lock_bh()&lt;/code&gt; 在获取锁前禁用本地下半部。&lt;code&gt;spin_lock_irq()&lt;/code&gt; 禁用本地可屏蔽中断。&lt;code&gt;spin_lock_irqsave(lock, flags)&lt;/code&gt; 还会保存之前的中断状态，而 &lt;code&gt;spin_unlock_irqrestore(lock, flags)&lt;/code&gt; 恢复该确切状态：&lt;/p&gt;</description></item></channel></rss>

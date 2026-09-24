@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Kerberos on cesun.life</title><link>https://example.org/zh-cn/tags/kerberos/</link><description>Recent content in Kerberos on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 31 Jul 2026 20:08:54 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/kerberos/index.xml" rel="self" type="application/rss+xml"/><item><title>Kerberos</title><link>https://example.org/zh-cn/kerberos/</link><pubDate>Fri, 31 Jul 2026 20:08:54 +0800</pubDate><guid>https://example.org/zh-cn/kerberos/</guid><description>&lt;p&gt;Kerberos 是一种面向受统一管理系统的网络身份验证协议。用户向受信任的密钥分发中心（KDC）进行身份验证，然后获取面向各个服务的限时票据。服务无需接收用户密码即可验证用户身份，客户端还可以请求证明某个服务持有预期的秘密。&lt;/p&gt;
+&lt;p&gt;Kerberos 主要使用对称密码学。对称密码学使 KDC 成为集中式信任锚点：如果 KDC 或其数据库遭到入侵，那么 KDC 控制其长期密钥的所有主体都可能受到入侵。因此，Kerberos 以集中式身份管理、高效的票据签发以及领域内的单点登录，换取了对分散式信任的依赖。&lt;/p&gt;
+&lt;h2 id="信任模型和核心对象"&gt;
+ 信任模型和核心对象
+ &lt;a href="#%e4%bf%a1%e4%bb%bb%e6%a8%a1%e5%9e%8b%e5%92%8c%e6%a0%b8%e5%bf%83%e5%af%b9%e8%b1%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;**领域（realm）**是一个管理上的身份验证域，通常使用大写形式书写，例如 &lt;code&gt;EXAMPLE.COM&lt;/code&gt;。领域名称通常类似于 DNS 域，但两者属于不同的命名空间。配置或 DNS 发现机制会将主机名和域名映射到 Kerberos 领域。&lt;/p&gt;
+&lt;p&gt;**主体（principal）**表示一个身份：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;alice@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP/web.example.com@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;主体名称由一个或多个组件以及后面的领域组成。&lt;code&gt;alice&lt;/code&gt; 是用户主体。&lt;code&gt;HTTP/web.example.com&lt;/code&gt; 是服务主体，其第一个组件表示服务，第二个组件表示主机。尽管领域、用户和主机组件的运维约定可能不同，主体字符串仍区分大小写。&lt;/p&gt;
+&lt;p&gt;每个主体都在 KDC 中注册一个或多个长期密钥。不同类型的主体以不同方式获取这些密钥：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;人类主体通常通过与加密类型相关的 string-to-key 函数和盐值，从密码派生密钥。&lt;/li&gt;
+&lt;li&gt;服务主体通常接收由管理员生成的随机密钥。&lt;/li&gt;
+&lt;li&gt;领域的 &lt;code&gt;krbtgt/REALM&lt;/code&gt; 主体拥有用于加密票据授予票据（TGT）的密钥。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;keytab&lt;/strong&gt; 保存主体名称、密钥版本号（KVNO）、加密类型和长期密钥。守护进程使用 keytab，因为无人值守的服务无法输入密码。keytab 是一种凭据，而不是公钥证书；任何能够读取可用服务密钥的人员都可以冒充该服务，并解密为其主体签发的票据。&lt;/p&gt;
+&lt;p&gt;KDC 提供两个逻辑服务：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;**身份验证服务（AS）**在初始身份验证后签发 TGT。&lt;/li&gt;
+&lt;li&gt;**票据授予服务（TGS）**将有效 TGT 兑换为面向特定服务的票据。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;两个服务通常运行在同一个 KDC 进程中，并使用同一个领域数据库。生产领域会部署冗余 KDC，因为否则票据获取会依赖单台主机；数据库管理和复制则需要额外的控制措施。&lt;/p&gt;
+&lt;h2 id="协议流程"&gt;
+ 协议流程
+ &lt;a href="#%e5%8d%8f%e8%ae%ae%e6%b5%81%e7%a8%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;假设 &lt;code&gt;alice@EXAMPLE.COM&lt;/code&gt; 希望访问 &lt;code&gt;HTTP/web.example.com@EXAMPLE.COM&lt;/code&gt;。需要通过三次交换来建立所需的凭据。下面的名称描述的是 Kerberos 协议消息，而不是应用特定的数据包。&lt;/p&gt;
+&lt;h3 id="初始身份验证as-req-和-as-rep"&gt;
+ 初始身份验证：AS-REQ 和 AS-REP
+ &lt;a href="#%e5%88%9d%e5%a7%8b%e8%ba%ab%e4%bb%bd%e9%aa%8c%e8%af%81as-req-%e5%92%8c-as-rep" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;客户端发送 &lt;strong&gt;AS-REQ&lt;/strong&gt;，请求获取面向 &lt;code&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/code&gt; 的 TGT。请求包含客户端主体、请求的有效期和标志、nonce、支持的加密类型，以及在需要时包含的预身份验证数据。&lt;/p&gt;</description></item></channel></rss>

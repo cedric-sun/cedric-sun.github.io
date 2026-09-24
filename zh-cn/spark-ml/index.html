@@ -1,0 +1,229 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spark ML</title></head><body><main><article><div class=article-header><h1>Spark ML</h1><div class=aux>最后更新: 2026-08-06 17:32:00 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/spark/>Spark</a>
+|
+<a href=/zh-cn/tags/machine-learning/>Machine-Learning</a>
+|
+<a href=/zh-cn/tags/mllib/>Mllib</a>
+|
+<a href=/zh-cn/tags/java/>Java</a></div></div><div class="translation-notice machine-translated"><a href=/spark-ml/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Spark 包含一个名为 <strong>MLlib</strong> 的机器学习库。“Spark
+ML”通常用于指代 MLlib 基于 DataFrame 的 API，因为其 Java 和 Scala 类位于
+<code>org.apache.spark.ml</code> 下，而 Python 类位于 <code>pyspark.ml</code> 下。</p><p>以下名称容易混淆：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>名称</th><th>含义</th></tr></thead><tbody><tr><td>MLlib</td><td>Spark 的完整机器学习库</td></tr><tr><td><code>spark.ml</code></td><td>主要的、基于 DataFrame 的 MLlib API</td></tr><tr><td><code>spark.mllib</code></td><td>较旧的、基于 RDD 的 API，目前处于维护模式</td></tr><tr><td>Spark ML</td><td><code>spark.ml</code> API 的非正式名称</td></tr></tbody></table></div></div><p><code>spark.mllib</code> 并未被移除，但新应用代码通常应使用
+<code>spark.ml</code>。DataFrame API 与 Spark SQL 集成，具有一致的流水线模型，并在 Java、Scala
+和 Python 之间提供相似的 API。</p><p>Spark ML 提供分布式特征准备、模型拟合、评估、超参数调优和批量推理。当训练数据或评分
+数据已经足够大、能够从 Spark 中获益时，Spark ML 最有用。它不是通用的深度学习框架，
+也不会仅仅因为在集群上运行，就自动使每种算法都变得高效。</p><h2 id=spark-ml-提供的功能>Spark ML 提供的功能
+<a href=#spark-ml-%e6%8f%90%e4%be%9b%e7%9a%84%e5%8a%9f%e8%83%bd class=heading-anchor><span>#</span></a></h2><p>该库涵盖多个类别：</p><ul><li><strong>分类：</strong> 逻辑回归、决策树、随机森林、梯度提升树、朴素贝叶斯、线性支持向量机和
+多层感知器</li><li><strong>回归：</strong> 线性回归和广义线性回归、决策树、随机森林、梯度提升树、生存回归、保序
+回归和因子分解机</li><li><strong>聚类：</strong> K-means、二分 K-means、高斯混合、潜在狄利克雷分配和幂迭代聚类</li><li><strong>推荐：</strong> 交替最小二乘法</li><li><strong>频繁模式：</strong> FP-growth 和 prefix-span</li><li><strong>特征工程：</strong> 分词、类别编码、特征组装、缩放、哈希、TF-IDF、离散化、插补、多项式
+扩展、降维和特征选择</li><li><strong>统计：</strong> 相关性、假设检验和向量摘要</li><li><strong>工作流：</strong> 流水线、评估器、交叉验证、训练验证拆分、参数网格和模型持久化</li></ul><p>Java、Scala、Python 和 R 之间的算法支持和参数存在差异。不要假设所有绑定都具有完全
+相同的覆盖范围，应查阅集群所使用 Spark 版本的 API 文档。</p><h2 id=作为-ml-数据集的-dataframe>作为 ML 数据集的 DataFrame
+<a href=#%e4%bd%9c%e4%b8%ba-ml-%e6%95%b0%e6%8d%ae%e9%9b%86%e7%9a%84-dataframe class=heading-anchor><span>#</span></a></h2><p>Spark ML 消费并生成 DataFrame。监督学习数据集通常包含以下结构：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>+-----+-------------------+
+</span></span><span style=display:flex><span>|label|features           |
+</span></span><span style=display:flex><span>+-----+-------------------+
+</span></span><span style=display:flex><span>|1.0  |[2.1, 0.0, 3.4]    |
+</span></span><span style=display:flex><span>|0.0  |(3,[0,2],[1.2,4.1])|
+</span></span><span style=display:flex><span>+-----+-------------------+</span></span></code></pre></div></div></div><p><code>label</code> 通常是 <code>Double</code>，而 <code>features</code> 是
+<code>org.apache.spark.ml.linalg.Vector</code>。向量可以是：</p><ul><li><strong>Dense：</strong> 存储每个值。</li><li><strong>Sparse：</strong> 存储向量大小，以及非零索引和对应的值。</li></ul><p>对于独热编码类别和哈希文本等高维数据，稀疏向量不可或缺。将其展开为稠密数组可能会
+显著增加内存和网络使用量。</p><p>默认列名只是约定。大多数算法允许调用方修改这些名称：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>new</span> LogisticRegression()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setLabelCol</span>(<span style=color:#e6db74>&#34;isFraud&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setFeaturesCol</span>(<span style=color:#e6db74>&#34;modelFeatures&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setPredictionCol</span>(<span style=color:#e6db74>&#34;predictedFraud&#34;</span>);</span></span></code></pre></div></div></div><p>其他常见输出列包括：</p><ul><li><code>rawPrediction</code>：未归一化的模型分数</li><li><code>probability</code>：模型提供时的类别概率</li><li><code>prediction</code>：选定的类别或回归值</li></ul><p>DataFrame schema 使流水线阶段可以组合，但检查发生在运行时。Spark 会在阶段拟合或转换
+时验证所需列是否存在，并且类型是否兼容。</p><h2 id=transformer-与-estimator>Transformer 与 Estimator
+<a href=#transformer-%e4%b8%8e-estimator class=heading-anchor><span>#</span></a></h2><p>Spark ML 围绕两个抽象统一算法。</p><p><strong>Transformer</strong> 将一个 DataFrame 转换为另一个 DataFrame：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>input DataFrame --transform()--&gt; output DataFrame</span></span></code></pre></div></div></div><p>它通常会保留输入列，同时追加新列。特征 Transformer 和训练好的模型都是 Transformer。
+例如，<code>Tokenizer</code> 将文本列转换为单词数组，而 <code>LogisticRegressionModel</code> 将特征向量
+转换为预测列。</p><p><strong>Estimator</strong> 从 DataFrame 中学习并生成模型：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>training DataFrame --fit()--&gt; Model</span></span></code></pre></div></div></div><p>Model 是 Transformer：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>test DataFrame --model.transform()--&gt; predictions</span></span></code></pre></div></div></div><p>例如：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>LogisticRegression trainer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> LogisticRegression()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setMaxIter</span>(50)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setRegParam</span>(0.<span style=color:#a6e22e>01</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>LogisticRegressionModel model <span style=color:#f92672>=</span> trainer.<span style=color:#a6e22e>fit</span>(training);
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(test);</span></span></code></pre></div></div></div><p><code>fit()</code> 和 <code>transform()</code> 返回描述分布式 DataFrame 工作的对象。Spark SQL 在可能的情况
+下保持惰性；<code>write</code>、<code>evaluate</code>、<code>count</code> 或 <code>collect</code> 等 action 会触发作业执行。</p><h2 id=参数>参数
+<a href=#%e5%8f%82%e6%95%b0 class=heading-anchor><span>#</span></a></h2><p>每个 Estimator 和 Transformer 都实现通用参数 API。参数属于特定的阶段实例：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>LogisticRegression lr <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> LogisticRegression()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setMaxIter</span>(50)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setRegParam</span>(0.<span style=color:#a6e22e>01</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setElasticNetParam</span>(0.<span style=color:#a6e22e>5</span>);</span></span></code></pre></div></div></div><p>可以使用以下代码检查支持的参数及其默认值：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(lr.<span style=color:#a6e22e>explainParams</span>());
+</span></span><span style=display:flex><span>System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(lr.<span style=color:#a6e22e>extractParamMap</span>());</span></span></code></pre></div></div></div><p>传递给 <code>fit()</code> 或 <code>transform()</code> 的 <code>ParamMap</code> 会覆盖之前在实例上设置的值：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ParamMap override <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ParamMap()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>put</span>(lr.<span style=color:#a6e22e>maxIter</span>(), 100)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>put</span>(lr.<span style=color:#a6e22e>regParam</span>(), 0.<span style=color:#a6e22e>05</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>LogisticRegressionModel model <span style=color:#f92672>=</span> lr.<span style=color:#a6e22e>fit</span>(training, override);</span></span></code></pre></div></div></div><p>由于参数绑定到阶段实例，因此一个参数网格中的两个逻辑回归阶段可以拥有相互独立的值。</p><h2 id=特征工程>特征工程
+<a href=#%e7%89%b9%e5%be%81%e5%b7%a5%e7%a8%8b class=heading-anchor><span>#</span></a></h2><p>大多数算法要求一个数值向量列，但源数据通常包含数值、类别、布尔值和文本列。特征
+Transformer 将这些列转换为可用向量。</p><h3 id=数值特征>数值特征
+<a href=#%e6%95%b0%e5%80%bc%e7%89%b9%e5%be%81 class=heading-anchor><span>#</span></a></h3><p><code>VectorAssembler</code> 组合标量列和向量列：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>VectorAssembler assembler <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> VectorAssembler()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCols</span>(<span style=color:#66d9ef>new</span> String<span style=color:#f92672>[]</span> {<span style=color:#e6db74>&#34;age&#34;</span>, <span style=color:#e6db74>&#34;income&#34;</span>, <span style=color:#e6db74>&#34;accountAgeDays&#34;</span>})
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;rawFeatures&#34;</span>);</span></span></code></pre></div></div></div><p>缺失值必须被有意处理。<code>Imputer</code> 可以使用均值、中位数或众数替换缺失数值。它不会让
+缺失本身在语义上无害；所选策略必须适合数据。</p><p><code>StandardScaler</code>、<code>MinMaxScaler</code> 和 <code>MaxAbsScaler</code> 会重新缩放向量。对于基于距离和基于
+梯度的算法，缩放很重要；而决策树通常不需要缩放。</p><p>对稀疏向量进行中心化时需要谨慎。减去非零均值会使隐式零值变为非零值，从而可能使稀疏
+数据集变为稠密数据集。</p><h3 id=类别特征>类别特征
+<a href=#%e7%b1%bb%e5%88%ab%e7%89%b9%e5%be%81 class=heading-anchor><span>#</span></a></h3><p><code>StringIndexer</code> 将类别字符串转换为数值索引：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>StringIndexer countryIndexer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StringIndexer()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCol</span>(<span style=color:#e6db74>&#34;country&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;countryIndex&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setHandleInvalid</span>(<span style=color:#e6db74>&#34;keep&#34;</span>);</span></span></code></pre></div></div></div><p><code>OneHotEncoder</code> 将索引转换为稀疏指示向量：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>OneHotEncoder countryEncoder <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> OneHotEncoder()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCol</span>(<span style=color:#e6db74>&#34;countryIndex&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;countryVector&#34;</span>);</span></span></code></pre></div></div></div><p>Indexer 必须只在训练数据上拟合。在测试数据或生产数据上独立拟合，可能会为相同类别
+分配不同索引。将两个阶段放入已拟合的 Pipeline 中，可以保留训练时的映射。</p><p><code>handleInvalid</code> 控制收到 null 或未见过的值时的行为。静默选择错误策略可能导致生产评分
+失败，或掩盖数据质量问题。</p><h3 id=文本特征>文本特征
+<a href=#%e6%96%87%e6%9c%ac%e7%89%b9%e5%be%81 class=heading-anchor><span>#</span></a></h3><p>基本的文本流水线可以使用：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>text
+</span></span><span style=display:flex><span>  -&gt; RegexTokenizer
+</span></span><span style=display:flex><span>  -&gt; StopWordsRemover
+</span></span><span style=display:flex><span>  -&gt; HashingTF or CountVectorizer
+</span></span><span style=display:flex><span>  -&gt; IDF
+</span></span><span style=display:flex><span>  -&gt; feature vector</span></span></code></pre></div></div></div><p><code>HashingTF</code> 不需要学习词汇表，但允许发生哈希冲突。<code>CountVectorizer</code> 学习显式词汇表，
+更容易检查，但需要存储和分发该词汇表。</p><p>Spark ML 内置的文本特征适用于经典模型。它们不能替代现代语言模型分词器、嵌入或面向
+GPU 的深度学习框架。</p><h2 id=流水线>流水线
+<a href=#%e6%b5%81%e6%b0%b4%e7%ba%bf class=heading-anchor><span>#</span></a></h2><p>Pipeline 将特征准备和训练记录为一个有序工作流：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>raw data
+</span></span><span style=display:flex><span>  -&gt; StringIndexer
+</span></span><span style=display:flex><span>  -&gt; OneHotEncoder
+</span></span><span style=display:flex><span>  -&gt; VectorAssembler
+</span></span><span style=display:flex><span>  -&gt; StandardScaler
+</span></span><span style=display:flex><span>  -&gt; LogisticRegression</span></span></code></pre></div></div></div><p>Transformer 阶段调用 <code>transform()</code>。Estimator 阶段调用 <code>fit()</code> 生成 Model，然后该 Model
+转换后续阶段的数据。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>StringIndexer indexer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StringIndexer()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCol</span>(<span style=color:#e6db74>&#34;country&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;countryIndex&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setHandleInvalid</span>(<span style=color:#e6db74>&#34;keep&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>OneHotEncoder encoder <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> OneHotEncoder()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCol</span>(<span style=color:#e6db74>&#34;countryIndex&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;countryVector&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>VectorAssembler assembler <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> VectorAssembler()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setInputCols</span>(<span style=color:#66d9ef>new</span> String<span style=color:#f92672>[]</span> {<span style=color:#e6db74>&#34;age&#34;</span>, <span style=color:#e6db74>&#34;income&#34;</span>, <span style=color:#e6db74>&#34;countryVector&#34;</span>})
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setOutputCol</span>(<span style=color:#e6db74>&#34;features&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>LogisticRegression classifier <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> LogisticRegression()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setLabelCol</span>(<span style=color:#e6db74>&#34;label&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setFeaturesCol</span>(<span style=color:#e6db74>&#34;features&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Pipeline pipeline <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Pipeline().<span style=color:#a6e22e>setStages</span>(<span style=color:#66d9ef>new</span> PipelineStage<span style=color:#f92672>[]</span> {
+</span></span><span style=display:flex><span>    indexer,
+</span></span><span style=display:flex><span>    encoder,
+</span></span><span style=display:flex><span>    assembler,
+</span></span><span style=display:flex><span>    classifier
+</span></span><span style=display:flex><span>});
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>PipelineModel model <span style=color:#f92672>=</span> pipeline.<span style=color:#a6e22e>fit</span>(training);
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(test);</span></span></code></pre></div></div></div><p><code>Pipeline.fit()</code> 本身是 Estimator 操作，并返回作为 Transformer 的 <code>PipelineModel</code>。
+原始 Pipeline 中的每个 Estimator 都会在该模型中变为已拟合的 Transformer。</p><p>这不只是语法上的便利。它保证验证数据和生产数据使用从训练数据学习的特征映射。在拆分
+数据集之前拟合特征，会将验证数据的信息泄漏到训练过程中，从而产生过于乐观的评估结果。</p><p>Pipeline 阶段虽然以线性方式列出，但可以通过输入列和输出列形成 DAG。阶段必须按拓扑顺序
+排列，并且应使用唯一实例，因为每个阶段都有一个参数系统使用的唯一 ID。</p><h2 id=完整的训练流程>完整的训练流程
+<a href=#%e5%ae%8c%e6%95%b4%e7%9a%84%e8%ae%ad%e7%bb%83%e6%b5%81%e7%a8%8b class=heading-anchor><span>#</span></a></h2><p>可靠的监督学习作业通常遵循以下顺序：</p><ol><li>使用显式 schema 读取原始数据。</li><li>验证标签、范围、null 处理和行标识。</li><li>将数据拆分为训练集、验证集和最终测试集。</li><li>只使用训练数据拟合完整的特征与模型 Pipeline。</li><li>使用训练数据和验证数据选择参数。</li><li>仅在未接触的测试数据上对选定模型评估一次。</li><li>保存已拟合的 PipelineModel 及其运行元数据。</li></ol><p>例如：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;[]</span> split <span style=color:#f92672>=</span> input.<span style=color:#a6e22e>randomSplit</span>(
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>new</span> <span style=color:#66d9ef>double</span><span style=color:#f92672>[]</span> {0.<span style=color:#a6e22e>8</span>, 0.<span style=color:#a6e22e>2</span>},
+</span></span><span style=display:flex><span>    12345L
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> training <span style=color:#f92672>=</span> split<span style=color:#f92672>[</span>0<span style=color:#f92672>]</span>.<span style=color:#a6e22e>cache</span>();
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> test <span style=color:#f92672>=</span> split<span style=color:#f92672>[</span>1<span style=color:#f92672>]</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>PipelineModel model <span style=color:#f92672>=</span> pipeline.<span style=color:#a6e22e>fit</span>(training);
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(test);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>BinaryClassificationEvaluator evaluator <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>new</span> BinaryClassificationEvaluator()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setLabelCol</span>(<span style=color:#e6db74>&#34;label&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setRawPredictionCol</span>(<span style=color:#e6db74>&#34;rawPrediction&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>setMetricName</span>(<span style=color:#e6db74>&#34;areaUnderROC&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>double</span> areaUnderRoc <span style=color:#f92672>=</span> evaluator.<span style=color:#a6e22e>evaluate</span>(predictions);</span></span></code></pre></div></div></div><p>在 API 支持时设置种子，但不要假设分布式作业具有逐位确定性。分区方式、浮点归约顺序、
+输入文件布局和算法实现都可能影响结果。</p><p>对于时间相关数据，随机拆分通常是错误的。应使用较早的事件进行训练、较晚的事件进行
+验证，以避免从未来学习。分组实体可能还需要按组拆分，以确保同一用户或设备的事件
+不会出现在两侧。</p><h2 id=评估>评估
+<a href=#%e8%af%84%e4%bc%b0 class=heading-anchor><span>#</span></a></h2><p>选择与任务匹配的 Evaluator：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>任务</th><th>常用 Evaluator</th></tr></thead><tbody><tr><td>二分类</td><td><code>BinaryClassificationEvaluator</code></td></tr><tr><td>多分类</td><td><code>MulticlassClassificationEvaluator</code></td></tr><tr><td>多标签分类</td><td><code>MultilabelClassificationEvaluator</code></td></tr><tr><td>回归</td><td><code>RegressionEvaluator</code></td></tr><tr><td>排名</td><td><code>RankingEvaluator</code></td></tr><tr><td>聚类</td><td><code>ClusteringEvaluator</code></td></tr></tbody></table></div></div><p>对于类别不平衡的分类问题，仅看准确率可能产生误导。应根据业务成本检查精确率、召回率、
+F-measure、精确率-召回率曲线下面积、校准结果和混淆矩阵。排名性能良好的模型仍然可能
+需要单独选择决策阈值。</p><p>RMSE、MAE 和 \(R^2\) 等回归指标回答不同问题。应根据错误成本选择指标，而不是选择看起来
+最好的数字。</p><p>评估是分布式 Spark 作业，但某些摘要最终会向 driver 返回小型矩阵、历史记录或标量指标。
+不要仅为了计算 Spark 可以在集群中聚合的指标，就收集整个预测 DataFrame。</p><h2 id=超参数调优>超参数调优
+<a href=#%e8%b6%85%e5%8f%82%e6%95%b0%e8%b0%83%e4%bc%98 class=heading-anchor><span>#</span></a></h2><p>Spark ML 提供两个模型选择 Estimator：</p><ul><li><code>CrossValidator</code> 在多个 fold 上评估每个参数映射。</li><li><code>TrainValidationSplit</code> 使用一次训练/验证拆分评估每个参数映射，成本更低，但统计稳健性
+较弱。</li></ul><p>两者都需要：</p><ol><li>一个 Estimator，通常是完整的 Pipeline</li><li>一个参数映射数组</li><li>一个 Evaluator</li></ol><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ParamMap<span style=color:#f92672>[]</span> grid <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ParamGridBuilder()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>addGrid</span>(classifier.<span style=color:#a6e22e>regParam</span>(), <span style=color:#66d9ef>new</span> <span style=color:#66d9ef>double</span><span style=color:#f92672>[]</span> {0.<span style=color:#a6e22e>001</span>, 0.<span style=color:#a6e22e>01</span>, 0.<span style=color:#a6e22e>1</span>})
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>addGrid</span>(classifier.<span style=color:#a6e22e>elasticNetParam</span>(), <span style=color:#66d9ef>new</span> <span style=color:#66d9ef>double</span><span style=color:#f92672>[]</span> {0.<span style=color:#a6e22e>0</span>, 0.<span style=color:#a6e22e>5</span>, 1.<span style=color:#a6e22e>0</span>})
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>CrossValidator cv <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> CrossValidator()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setEstimator</span>(pipeline)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setEvaluator</span>(<span style=color:#66d9ef>new</span> BinaryClassificationEvaluator())
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setEstimatorParamMaps</span>(grid)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setNumFolds</span>(3)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setParallelism</span>(3)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>setSeed</span>(12345L);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>CrossValidatorModel selectedModel <span style=color:#f92672>=</span> cv.<span style=color:#a6e22e>fit</span>(training);</span></span></code></pre></div></div></div><p>示例会训练：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>3 regParam values
+</span></span><span style=display:flex><span>x 3 elasticNetParam values
+</span></span><span style=display:flex><span>x 3 folds
+</span></span><span style=display:flex><span>= 27 model fits</span></span></code></pre></div></div></div><p>选择最佳参数后，交叉验证会在完整输入数据上再次拟合该配置。因此，大型网格会消耗大量
+CPU、executor 内存、存储 I/O 和时间。</p><p><code>parallelism</code> 允许并发评估参数配置。它不会产生免费的容量：过高的并行度可能使多个
+训练作业竞争相同的 executor，导致性能下降。</p><p>当特征阶段参数也是问题的一部分时，应调优完整的 Pipeline。这样还会在每个 fold 内分别
+拟合有状态的特征 Transformer，从而避免验证泄漏。</p><h2 id=分布式执行>分布式执行
+<a href=#%e5%88%86%e5%b8%83%e5%bc%8f%e6%89%a7%e8%a1%8c class=heading-anchor><span>#</span></a></h2><p>driver 创建 Pipeline 阶段，分析 DataFrame 计划，提交拟合和转换作业，并保存生成的模型
+元数据。executor 扫描分区，计算特征转换，计算分布式统计量和梯度，构建部分树统计量，
+并对行进行评分。</p><p>具体执行模式取决于算法：</p><ul><li>特征转换通常使用分区上的普通 DataFrame 操作。</li><li>迭代算法反复运行作业并聚合更新。</li><li>树算法交换直方图和分裂统计量。</li><li>ALS 对用户因子和物品因子进行分区，并反复交换所需的因子块。</li><li>部分已学习的模型状态会被收集到 driver，然后分发以进行预测。</li></ul><p>“分布式”并不意味着每个 executor 独立训练一个模型对象。driver 协调一次拟合操作，而
+executor 执行其分区级工作。</p><p>模型大小仍然重要。系数、树、词汇表、类别映射以及其他拟合状态可能需要驻留在 driver
+上、被序列化或发送到 executor。数据集能够放入集群，并不意味着任意大的模型都能放入。</p><p>如果重复拟合模型会导致训练数据被重复读取和计算，应缓存重复使用的训练数据：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> training <span style=color:#f92672>=</span> preparedTraining.<span style=color:#a6e22e>cache</span>();
+</span></span><span style=display:flex><span>training.<span style=color:#a6e22e>count</span>();</span></span></code></pre></div></div></div><p>该 action 会在调优开始前物化缓存。在最后一次拟合后取消持久化：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>training.<span style=color:#a6e22e>unpersist</span>();</span></span></code></pre></div></div></div><p>缓存每个中间 DataFrame 会浪费内存，并可能增加 spill。只持久化会被多个 action 重用的
+高成本数据。</p><h2 id=保存和加载模型>保存和加载模型
+<a href=#%e4%bf%9d%e5%ad%98%e5%92%8c%e5%8a%a0%e8%bd%bd%e6%a8%a1%e5%9e%8b class=heading-anchor><span>#</span></a></h2><p>大多数 Spark ML Estimator、Model、Pipeline 和 PipelineModel 都实现 Spark 的 ML
+持久化 API：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>model.<span style=color:#a6e22e>write</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>overwrite</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>save</span>(<span style=color:#e6db74>&#34;hdfs:///models/fraud/2026-07-20&#34;</span>);</span></span></code></pre></div></div></div><p>稍后加载：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>PipelineModel model <span style=color:#f92672>=</span> PipelineModel.<span style=color:#a6e22e>load</span>(
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;hdfs:///models/fraud/2026-07-20&#34;</span>
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(input);</span></span></code></pre></div></div></div><p>保存的 PipelineModel 包含已拟合的特征阶段和训练好的模型。但它不会自动包含重现训练
+运行所需的全部运维事实。应额外存储以下元数据：</p><ul><li>Spark 和应用程序版本</li><li>源代码修订版本</li><li>训练数据快照或版本</li><li>特征和标签定义</li><li>拆分方法和随机种子</li><li>评估指标和选定阈值</li><li>参数映射</li><li>预期输入和输出 schema</li></ul><p>Spark 致力于保证小版本和补丁版本之间的持久化兼容性。跨主要 Spark 版本的兼容性仅为
+尽力而为，并不保证。升级生产推理作业前，应验证加载和预测行为。</p><h2 id=批量推理>批量推理
+<a href=#%e6%89%b9%e9%87%8f%e6%8e%a8%e7%90%86 class=heading-anchor><span>#</span></a></h2><p>最简单的推理作业是加载模型并转换 DataFrame：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>PipelineModel model <span style=color:#f92672>=</span> PipelineModel.<span style=color:#a6e22e>load</span>(modelPath);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> predictions <span style=color:#f92672>=</span> model.<span style=color:#a6e22e>transform</span>(input)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>select</span>(<span style=color:#e6db74>&#34;recordId&#34;</span>, <span style=color:#e6db74>&#34;probability&#34;</span>, <span style=color:#e6db74>&#34;prediction&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>predictions.<span style=color:#a6e22e>write</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>mode</span>(SaveMode.<span style=color:#a6e22e>Overwrite</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>parquet</span>(outputPath);</span></span></code></pre></div></div></div><p>转换是惰性的。输出 action 运行时，executor 执行评分。</p><p>Spark ML 天然适合批量推理。低延迟在线服务是不同的工作负载。为每个请求启动 Spark
+作业并不合适，在每个 Web 服务实例中嵌入 Spark driver 通常也会带来较高运维成本。</p><p>在线服务可以采用以下方法：</p><ul><li>在面向服务的运行时中复现兼容模型；</li><li>将支持的模型类型导出为可互操作格式；</li><li>使用专用模型服务器；或</li><li>在延迟要求允许时，以微批次对请求进行评分。</li></ul><p>并非每个 Pipeline 阶段都有可移植表示。在部署独立的服务代码前，应测试离线 Spark
+特征与在线特征之间的一致性。</p><h2 id=自定义-transformer-和-estimator>自定义 Transformer 和 Estimator
+<a href=#%e8%87%aa%e5%ae%9a%e4%b9%89-transformer-%e5%92%8c-estimator class=heading-anchor><span>#</span></a></h2><p>自定义 Transformer 可以将应用特定的特征逻辑封装为 Pipeline 阶段。它必须定义参数、
+输入/输出 schema 行为、<code>transform()</code> 以及复制/持久化语义。</p><p>优先使用原生 Spark SQL 表达式，而不是逐行 UDF：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Dataset<span style=color:#f92672>&lt;</span>Row<span style=color:#f92672>&gt;</span> prepared <span style=color:#f92672>=</span> input.<span style=color:#a6e22e>withColumn</span>(
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;amountLog&#34;</span>,
+</span></span><span style=display:flex><span>    functions.<span style=color:#a6e22e>log1p</span>(functions.<span style=color:#a6e22e>col</span>(<span style=color:#e6db74>&#34;amount&#34;</span>))
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>原生表达式可以参与 Catalyst 优化和代码生成。Java 或 Scala UDF 会引入不透明的调用边界；
+Python UDF 除此之外还会跨越 JVM/Python 边界，除非存在向量化执行路径。</p><p>如果需要从数据中学习自定义状态，应实现一个返回对应 Model 的 Estimator。除非需要持久化、
+调优和流水线复用，否则，一次性的 DataFrame 转换序列可能比自定义阶段更简单。</p><h2 id=spark-ml-与其他-ml-系统的比较>Spark ML 与其他 ML 系统的比较
+<a href=#spark-ml-%e4%b8%8e%e5%85%b6%e4%bb%96-ml-%e7%b3%bb%e7%bb%9f%e7%9a%84%e6%af%94%e8%be%83 class=heading-anchor><span>#</span></a></h2><p>Spark ML 在以下情况下最具优势：</p><ul><li>训练数据存储在分布式数据湖中；</li><li>特征准备需要大型连接、聚合或扫描；</li><li>经典算法能够满足建模要求；</li><li>批量训练和批量推理符合产品需求；并且</li><li>组织已经能够可靠地运行 Spark。</li></ul><p>以下情况下吸引力较低：</p><ul><li>准备好的数据集可以轻松放入一台机器；</li><li>需要基于 GPU 的深度学习；</li><li>所需算法尚未实现；</li><li>极低延迟在线推理是主要工作负载；或</li><li>实验迭代主要受集群启动和调度支配。</li></ul><p>对于小型和中型表格数据集，scikit-learn、XGBoost、LightGBM 或单机统计软件包可能更
+简单、更快。PyTorch 和 TensorFlow 等深度学习框架提供更丰富的神经网络和 GPU 支持。
+Spark 仍然可以准备它们的数据集，但使用 Spark 进行特征工程并不要求最终模型也使用
+Spark ML。</p><h2 id=常见错误>常见错误
+<a href=#%e5%b8%b8%e8%a7%81%e9%94%99%e8%af%af class=heading-anchor><span>#</span></a></h2><ol><li><strong>新代码使用 <code>spark.mllib</code>。</strong> 除非维护现有 RDD 应用，否则优先使用基于 DataFrame 的
+<code>spark.ml</code> API。</li><li><strong>在拆分数据前拟合特征阶段。</strong> 这会将信息泄漏到验证集和测试集。</li><li><strong>将训练数据或预测数据收集到 driver。</strong> 将分布式数据保留为 DataFrame，并在 executor
+上聚合。</li><li><strong>从稀疏数据创建稠密向量。</strong> 内存和 shuffle 大小可能大幅增长。</li><li><strong>忽略未知类别和 null。</strong> 通过阶段参数和数据质量检查定义明确的生产行为。</li><li><strong>为类别不平衡问题选择准确率。</strong> 评估与业务成本一致的指标。</li><li><strong>启动巨大的参数网格。</strong> 模型数量是参数值数量与 fold 数量的笛卡尔积。</li><li><strong>假设每个阶段都能线性扩展。</strong> 模型状态、driver 聚合、迭代、数据倾斜和 shuffle
+仍可能成为瓶颈。</li><li><strong>逐行记录日志或执行远程调用。</strong> 这些副作用会在 executor 上并行执行，且难以安全重试。</li><li><strong>将保存的模型视为完整的血缘信息。</strong> 单独记录数据、代码、参数、schema 和指标。</li></ol><p>Spark ML 提供了一种在分布式 DataFrame 上表达经典机器学习工作流的一致方式。其核心抽象
+不是单个算法，而是一个同时携带特征准备和预测能力的已拟合 PipelineModel。只有在分布式
+数据处理确实属于问题的一部分时才使用它，并在整个工作流中关注评估、模型大小、服务需求
+和数据泄漏。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spark-ml/ class=language-option data-lang=en>English
+</a><a href=/ja/spark-ml/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/spark-ml/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/spark-ml/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

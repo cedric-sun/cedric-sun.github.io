@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Idioms on cesun.life</title><link>https://example.org/ja/tags/idioms/</link><description>Recent content in Idioms on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sun, 01 Dec 2024 10:50:38 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/idioms/index.xml" rel="self" type="application/rss+xml"/><item><title>C++ の実装イディオム</title><link>https://example.org/ja/cpp-idioms/</link><pubDate>Sun, 01 Dec 2024 10:50:38 +0800</pubDate><guid>https://example.org/ja/cpp-idioms/</guid><description>&lt;p&gt;実装イディオムは、所有権、ライフタイム、または依存関係の境界を明示する必要があります。簡潔な構文が有用なのは、関連する無効化規則と計算量が読み手に明確に伝わる場合に限られます。&lt;/p&gt;
+&lt;h2 id="シーケンスコンテナーでの-erase-remove"&gt;
+ シーケンスコンテナーでの Erase-Remove
+ &lt;a href="#%e3%82%b7%e3%83%bc%e3%82%b1%e3%83%b3%e3%82%b9%e3%82%b3%e3%83%b3%e3%83%86%e3%83%8a%e3%83%bc%e3%81%a7%e3%81%ae-erase-remove" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::remove&lt;/code&gt; と &lt;code&gt;std::remove_if&lt;/code&gt; はアルゴリズムです。保持する要素が範囲の先頭部分を占めるように並べ替え、新しい論理的な終端を返します。要素を消去することも、コンテナーのサイズを変更することもありません。コンテナーが範囲を受け取る erase オーバーロードを提供している場合は、直ちに末尾部分を消去してください。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;vector&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; values{&lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;3&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;4&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;values.erase(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;remove(values.begin(), values.end(), &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;), values.end());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;values.erase(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;remove_if(values.begin(), values.end(), is_invalid), values.end());&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;C++20 以降では、&lt;code&gt;std::erase(values, value)&lt;/code&gt; と &lt;code&gt;std::erase_if(values, predicate)&lt;/code&gt; により、それらをサポートする標準コンテナーに対する一連の操作を表現できます。プロジェクトの言語およびライブラリのベースラインで利用できる場合は、これらのオーバーロードを優先してください。&lt;/p&gt;
+&lt;p&gt;削除アルゴリズムは保持する要素をムーブまたは代入する場合があるため、位置が変化した値への参照とイテレーターは、同じ値を指さなくなります。後続の &lt;code&gt;erase&lt;/code&gt; には、コンテナーの無効化規則が適用されます。&lt;code&gt;std::vector&lt;/code&gt; では、消去によって消去位置以降のイテレーター、ポインター、参照が無効になるため、コードはそれらを取得し直す必要があります。ノードベースのコンテナーには異なる規則があるため、vector に関する前提を &lt;code&gt;std::list&lt;/code&gt;、&lt;code&gt;std::map&lt;/code&gt;、&lt;code&gt;std::unordered_map&lt;/code&gt; に適用しないでください。&lt;/p&gt;
+&lt;h2 id="pimpl-による表現の境界"&gt;
+ Pimpl による表現の境界
+ &lt;a href="#pimpl-%e3%81%ab%e3%82%88%e3%82%8b%e8%a1%a8%e7%8f%be%e3%81%ae%e5%a2%83%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Pointer to implementation イディオムは、非公開の表現を公開ヘッダーから切り離します。クライアントはすべての非公開メンバー型ではなく、安定したインターフェースに対してコンパイルされます。そのため、表現の変更による再ビルドを減らせます。また、公開 ABI のほかの部分も制御されていれば、ABI の境界を維持できます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// widget.hpp
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Widget&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;~&lt;/span&gt;Widget();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget(Widget&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;noexcept&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;operator&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;(Widget&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;noexcept&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Widget&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;operator&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Widget&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;private&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Implementation&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;unique_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Implementation&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; implementation_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// widget.cpp
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Widget&lt;/span&gt;&lt;span style="color:#f92672"&gt;::&lt;/span&gt;Implementation {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#75715e"&gt;// Private state and dependencies.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Widget&lt;span style="color:#f92672"&gt;::~&lt;/span&gt;Widget() &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;std::unique_ptr&amp;lt;Implementation&amp;gt;&lt;/code&gt; を使用するとヘッダー内で前方宣言できますが、デリーターがインスタンス化される時点では、デストラクターによる破棄のために &lt;code&gt;Implementation&lt;/code&gt; が完全型である必要があります。&lt;code&gt;Implementation&lt;/code&gt; の定義後にデストラクターをアウトオブラインで定義すると、その完全性を確保できます。&lt;code&gt;unique_ptr&lt;/code&gt; はコピー不可であるため、コピー操作には明示的なディープコピー方針が必要です。&lt;code&gt;Widget&lt;/code&gt; を意図的にムーブ専用にする場合は、コピー操作を省略してください。&lt;/p&gt;</description></item></channel></rss>

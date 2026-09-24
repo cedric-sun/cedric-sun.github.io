@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Annotations on cesun.life</title><link>https://example.org/zh-tw/tags/annotations/</link><description>Recent content in Annotations on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 25 Sep 2025 03:47:26 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/annotations/index.xml" rel="self" type="application/rss+xml"/><item><title>Spring 註解處理</title><link>https://example.org/zh-tw/spring-annotation-processing/</link><pubDate>Thu, 25 Sep 2025 03:47:26 +0800</pubDate><guid>https://example.org/zh-tw/spring-annotation-processing/</guid><description>&lt;p&gt;Spring 將註解用作宣告式中繼資料，用於元件探索、組態、相依性注入、交易、Web 要求對映，以及其他框架服務。Java 反射公開原始註解；Spring 則增加了用於組合註解、別名、搜尋策略，以及無需載入類別即可讀取中繼資料的一致模型。&lt;/p&gt;
+&lt;h2 id="java-註解語意"&gt;
+ Java 註解語意
+ &lt;a href="#java-%e8%a8%bb%e8%a7%a3%e8%aa%9e%e6%84%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;註解宣告本身是介面，其隱含的超級介面是
+&lt;code&gt;java.lang.annotation.Annotation&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Retention&lt;/span&gt;(RetentionPolicy.&lt;span style="color:#a6e22e"&gt;RUNTIME&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Target&lt;/span&gt;(ElementType.&lt;span style="color:#a6e22e"&gt;TYPE&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Audited {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;當類別上直接存在&lt;code&gt;@Audited&lt;/code&gt;時，執行階段反射可以檢查它。&lt;code&gt;@Retention&lt;/code&gt;、&lt;code&gt;@Target&lt;/code&gt;和&lt;code&gt;@Documented&lt;/code&gt;等中繼註解用來描述註解宣告，但不會導致任意的傳遞式查詢。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;SOURCE&lt;/code&gt;、&lt;code&gt;CLASS&lt;/code&gt;和&lt;code&gt;RUNTIME&lt;/code&gt;保留策略決定中繼資料只保留在原始碼中、保留在類別檔案中，或可透過反射取得。&lt;code&gt;@Target&lt;/code&gt;限制宣告位置或型別使用位置。可重複註解透過&lt;code&gt;@Repeatable&lt;/code&gt;指定容器；反射和Spring可以公開邏輯上的重複註解，也可以公開其實體容器。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;@Inherited&lt;/code&gt;是一個範圍有限的例外。當註解宣告帶有&lt;code&gt;@Inherited&lt;/code&gt;時，某些&lt;code&gt;Class&lt;/code&gt;查詢方法可以在超類別上找到繼承的註解。此規則不適用於介面，也不涵蓋方法或欄位，並且不同於Spring的組合註解模型。&lt;/p&gt;
+&lt;h2 id="組合註解"&gt;
+ 組合註解
+ &lt;a href="#%e7%b5%84%e5%90%88%e8%a8%bb%e8%a7%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Spring會解譯放置在其他註解宣告上的註解。例如，&lt;code&gt;@Service&lt;/code&gt;使用&lt;code&gt;@Component&lt;/code&gt;作為中繼註解：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Component&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Service {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@AliasFor&lt;/span&gt;(annotation &lt;span style="color:#f92672"&gt;=&lt;/span&gt; Component.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; String &lt;span style="color:#a6e22e"&gt;value&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;&amp;#34;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此，使用&lt;code&gt;@Service&lt;/code&gt;註解的類別會成為元件候選者，儘管一般反射不會回報該類別直接存在&lt;code&gt;@Component&lt;/code&gt;。應用程式可以使用相同機制建立領域專用註解：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Target&lt;/span&gt;(ElementType.&lt;span style="color:#a6e22e"&gt;TYPE&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Retention&lt;/span&gt;(RetentionPolicy.&lt;span style="color:#a6e22e"&gt;RUNTIME&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Service&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Transactional&lt;/span&gt;(readOnly &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;true&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; ReadOnlyService {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;這是一種程式設計模型，而不是Java語言規則。Spring程式碼必須執行走訪、循環偵測、篩選和屬性合成。&lt;/p&gt;
+&lt;h2 id="合併註解"&gt;
+ 合併註解
+ &lt;a href="#%e5%90%88%e4%bd%b5%e8%a8%bb%e8%a7%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;MergedAnnotations&lt;/code&gt;是Spring用於直接存在、繼承存在和中繼存在註解的核心查詢模型。它的&lt;code&gt;SearchStrategy&lt;/code&gt;控制要走訪哪些型別關係：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DIRECT&lt;/code&gt;僅檢查元素上直接宣告的註解。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;INHERITED_ANNOTATIONS&lt;/code&gt;遵循Java的&lt;code&gt;@Inherited&lt;/code&gt;規則。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;SUPERCLASS&lt;/code&gt;搜尋超類別階層。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;TYPE_HIERARCHY&lt;/code&gt;搜尋超類別和已實作的介面。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;應使用與框架功能相符的最窄策略。廣泛的階層搜尋可能產生僅憑Java反射無法公開的中繼資料。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;MergedAnnotation&amp;lt;T&amp;gt;&lt;/code&gt;表示一個已探索的註解，以及它的距離、彙總位置、來源和合成屬性。合成處理會解析透過&lt;code&gt;@AliasFor&lt;/code&gt;宣告的Spring別名關係。因此，它可以在組合註解及其中繼註解之間呈現一致的屬性檢視。&lt;/p&gt;
+&lt;p&gt;別名宣告必須保持一致。在同一個註解內，互為別名的屬性必須具有相容的回傳型別和預設值。跨註解別名必須識別中繼註解階層中可到達的屬性。&lt;/p&gt;
+&lt;h2 id="中繼資料抽象"&gt;
+ 中繼資料抽象
+ &lt;a href="#%e4%b8%ad%e7%b9%bc%e8%b3%87%e6%96%99%e6%8a%bd%e8%b1%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Spring將一般的帶註解元素中繼資料與類別層級和方法層級專用中繼資料分離：&lt;/p&gt;
+&lt;div
+ class="goat svg-container"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 384 137"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 112,0 L 304,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 112,32 L 208,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 208,32 L 304,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,80 L 184,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 200,80 L 208,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 224,80 L 232,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,80 L 352,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,112 L 232,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,112 L 368,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,80 L 80,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 112,0 L 112,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 232,96 L 232,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,96 L 248,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 304,0 L 304,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 368,96 L 368,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 192,80 L 208,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 224,48 L 240,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 232,88 L 232,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,88 L 248,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='204.000000,80.000000 192.000000,74.400002 192.000000,85.599998' fill='currentColor' transform='rotate(120.000000, 192.000000, 80.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='252.000000,80.000000 240.000000,74.400002 240.000000,85.599998' fill='currentColor' transform='rotate(60.000000, 240.000000, 80.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 352,80 A 16,16 0 0,1 368,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;text text-anchor='middle' x='88' y='100' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='20' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='100' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='20' fill='currentColor' style='font-size:1em'&gt;T&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='20' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='20' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='20' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='100' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;AnnotatedTypeMetadata&lt;/code&gt;公開型別和方法共用的註解查詢。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;AnnotationMetadata&lt;/code&gt;增加類別資訊以及對帶註解方法的存取。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;MethodMetadata&lt;/code&gt;增加宣告類別、回傳型別和方法屬性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;以反射為基礎的實作會檢查已載入的類別。類別讀取實作使用位元組碼中繼資料，使元件掃描和組態解析等基礎設施能夠在不初始化類別的情況下檢查類別。避免載入類別可以防止靜態初始化副作用，並允許在所有選用相依性都可解析之前探索中繼資料。&lt;/p&gt;</description></item><item><title>Java 註解</title><link>https://example.org/zh-tw/java-annotations/</link><pubDate>Sun, 10 Jan 2021 11:11:46 +0800</pubDate><guid>https://example.org/zh-tw/java-annotations/</guid><description>&lt;p&gt;註解是附加至宣告或型別使用位置的中繼資料。它不是通用的物件常值：註解型別是一種特殊介面，其成員描述允許使用的中繼資料。&lt;/p&gt;
+&lt;h2 id="宣告註解型別"&gt;
+ 宣告註解型別
+ &lt;a href="#%e5%ae%a3%e5%91%8a%e8%a8%bb%e8%a7%a3%e5%9e%8b%e5%88%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;註解成員沒有參數或型別參數，也不得宣告 &lt;code&gt;throws&lt;/code&gt; 子句。成員型別僅限於基本型別、&lt;code&gt;String&lt;/code&gt;、&lt;code&gt;Class&lt;/code&gt;、列舉型別、註解型別，或上述型別之一的一維陣列。值必須是編譯時期常數、類別常值、列舉常數、註解或其陣列。&lt;code&gt;null&lt;/code&gt; 永遠不能作為註解元素值。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Retention&lt;/span&gt;(RetentionPolicy.&lt;span style="color:#a6e22e"&gt;RUNTIME&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Target&lt;/span&gt;({ElementType.&lt;span style="color:#a6e22e"&gt;TYPE&lt;/span&gt;, ElementType.&lt;span style="color:#a6e22e"&gt;METHOD&lt;/span&gt;})
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Retry {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;attempts&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt; 3;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Class&lt;span style="color:#f92672"&gt;&amp;lt;?&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;extends&lt;/span&gt; Throwable&lt;span style="color:#f92672"&gt;&amp;gt;[]&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;retryOn&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt; {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;@Target&lt;/code&gt; 限制註解可以出現的位置；相關位置包括宣告、型別使用位置、型別參數、模組和記錄元件。如果缺少該中繼註解，註解可以寫在任意宣告內容中，但不能寫在型別內容中。&lt;code&gt;@Retention&lt;/code&gt; 控制編譯器是否捨棄註解（&lt;code&gt;SOURCE&lt;/code&gt;）、將其記錄在類別檔案中（&lt;code&gt;CLASS&lt;/code&gt;，預設值），或將其記錄供反射使用（&lt;code&gt;RUNTIME&lt;/code&gt;）。&lt;code&gt;@Inherited&lt;/code&gt; 只會影響針對 &lt;code&gt;Class&lt;/code&gt; 的查詢、類別上的註解，以及沿著超類別鏈進行的查詢。它不會從介面、方法、欄位、參數或型別使用位置繼承註解。&lt;/p&gt;
+&lt;p&gt;預設值會編譯到註解型別中，而不是複製到每個使用位置。因此，當舊用戶端類別檔案與新的註解型別一起執行時，修改預設值可能會改變用戶端觀察到的結果。&lt;/p&gt;
+&lt;h2 id="反射與存取邊界"&gt;
+ 反射與存取邊界
+ &lt;a href="#%e5%8f%8d%e5%b0%84%e8%88%87%e5%ad%98%e5%8f%96%e9%82%8a%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;Class&lt;/code&gt;、&lt;code&gt;Method&lt;/code&gt;、&lt;code&gt;Field&lt;/code&gt;、&lt;code&gt;Constructor&lt;/code&gt;、&lt;code&gt;Parameter&lt;/code&gt;、&lt;code&gt;Package&lt;/code&gt; 和 &lt;code&gt;Module&lt;/code&gt; 都實作了 &lt;code&gt;AnnotatedElement&lt;/code&gt;。&lt;code&gt;getDeclared*&lt;/code&gt; 方法會檢查直接存在於該元素上的註解。非 &lt;code&gt;getDeclared&lt;/code&gt; 方法可能包含繼承的類別註解；&lt;code&gt;getAnnotationsByType&lt;/code&gt; 和 &lt;code&gt;getDeclaredAnnotationsByType&lt;/code&gt; 也會解開可重複註解的容器。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Retry&lt;span style="color:#f92672"&gt;[]&lt;/span&gt; policies &lt;span style="color:#f92672"&gt;=&lt;/span&gt; operation.&lt;span style="color:#a6e22e"&gt;getAnnotationsByType&lt;/span&gt;(Retry.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;執行時期保留會讓中繼資料可見；它不會授予成員存取權，也不會使公開私有狀態變得安全。反射仍必須通過 Java 語言存取檢查；對具名模組而言，還必須通過強封裝檢查。只有在套件已對呼叫端開放時，&lt;code&gt;trySetAccessible&lt;/code&gt; 才能抑制適用的語言存取檢查；命令列 &lt;code&gt;--add-opens&lt;/code&gt; 是部署決策，而不是函式庫契約。傳統的 &lt;code&gt;SecurityManager&lt;/code&gt; 已被棄用並計畫移除，因此安全設計應使用模組邊界、處理程序權限、輸入驗證和明確 API，而不應假定存在全域反射原則。&lt;/p&gt;
+&lt;p&gt;不應僅使用檢查操作作為初始化機制。反射式建構和呼叫可能會初始化類別，而存取註解成員可能需要解析已連結的型別。應讓靜態初始化不依賴必要設定，也不產生對外可見的副作用。&lt;/p&gt;
+&lt;h2 id="可重複註解"&gt;
+ 可重複註解
+ &lt;a href="#%e5%8f%af%e9%87%8d%e8%a4%87%e8%a8%bb%e8%a7%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;@Repeatable&lt;/code&gt; 指定一個容器註解，其唯一的必要成員是重複註解型別的陣列。容器的保留策略至少必須與重複型別一樣長，且必須具有相容的目標。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Repeatable&lt;/span&gt;(Labels.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Label { String &lt;span style="color:#a6e22e"&gt;value&lt;/span&gt;(); }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Labels { Label&lt;span style="color:#f92672"&gt;[]&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;value&lt;/span&gt;(); }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Label&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;read&amp;#34;&lt;/span&gt;) &lt;span style="color:#a6e22e"&gt;@Label&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;write&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Permission&lt;/span&gt; {}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;對於多個出現位置，語言會將宣告建模為一個隱含宣告的容器；因此，類別檔案取用者看到的容器形式，與明確的 &lt;code&gt;@Labels({ ... })&lt;/code&gt; 宣告相同。單一 &lt;code&gt;@Label&lt;/code&gt; 通常不會與單元素的明確容器逐位元組等價。&lt;code&gt;getAnnotation(Label.class)&lt;/code&gt; 不會解開容器，而 &lt;code&gt;getAnnotationsByType(Label.class)&lt;/code&gt; 會解開。&lt;/p&gt;</description></item></channel></rss>

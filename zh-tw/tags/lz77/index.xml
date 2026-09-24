@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Lz77 on cesun.life</title><link>https://example.org/zh-tw/tags/lz77/</link><description>Recent content in Lz77 on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sat, 03 Aug 2024 21:49:43 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/lz77/index.xml" rel="self" type="application/rss+xml"/><item><title>LZ77 滑動視窗壓縮</title><link>https://example.org/zh-tw/lz77/</link><pubDate>Sat, 03 Aug 2024 21:49:43 +0800</pubDate><guid>https://example.org/zh-tw/lz77/</guid><description>&lt;p&gt;LZ77 是一系列無失真壓縮器，會將重複的輸入替換為指向有限歷史視窗的參照。原始的 1977 年設計使用滑動字典；實務格式會自行選擇 token 語法、比對尋找器與熵編碼器。&lt;/p&gt;
+&lt;h2 id="文字歷史與比對"&gt;
+ 文字、歷史與比對
+ &lt;a href="#%e6%96%87%e5%ad%97%e6%ad%b7%e5%8f%b2%e8%88%87%e6%af%94%e5%b0%8d" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在輸入位置上，編碼器會在先前輸出的位元組中尋找相符的前綴。不存在有用的比對時會輸出文字，否則會輸出至少包含距離與長度的回溯參照。有些格式會在每次比對後加入文字；另一些則輸出由獨立文字與比對組成的串流。解碼器會從目前輸出位置之前 &lt;code&gt;distance&lt;/code&gt; 個位元組處複製 &lt;code&gt;length&lt;/code&gt; 個位元組。&lt;/p&gt;
+&lt;p&gt;複製來源可能重疊。如果歷史以 &lt;code&gt;a&lt;/code&gt; 結尾，距離為 1、長度為 5 的比對會產生 &lt;code&gt;aaaaa&lt;/code&gt;：每個複製的位元組都會成為下一個位元組的來源。解碼器必須依正向位元組順序複製，或使用具備等效連鎖語意的迴圈。&lt;code&gt;memcpy&lt;/code&gt; 與快照式的 &lt;code&gt;memmove&lt;/code&gt; 都無法實作每一種有效的重疊比對。&lt;/p&gt;
+&lt;h2 id="比對搜尋與剖析"&gt;
+ 比對搜尋與剖析
+ &lt;a href="#%e6%af%94%e5%b0%8d%e6%90%9c%e5%b0%8b%e8%88%87%e5%89%96%e6%9e%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;較大的視窗能找到更遠的重複內容，但會消耗更多記憶體，且需要更多距離位元。雜湊鏈、二元樹、後綴結構與有界候選搜尋，會在壓縮率與 CPU 時間之間取捨。&lt;/p&gt;
+&lt;p&gt;貪婪剖析器會選擇目前位置的最長比對。延遲剖析器會先記錄候選比對，檢查下一個位置是否有更好的比對，並在這能改善總成本時改為輸出文字。動態規劃可以搜尋更大的剖析空間，但需要更多 CPU 與記憶體。這些編碼器選擇都不會影響解碼器正確性，因為 token 串流是自包含的。&lt;/p&gt;
+&lt;h2 id="界限與防禦式解碼"&gt;
+ 界限與防禦式解碼
+ &lt;a href="#%e7%95%8c%e9%99%90%e8%88%87%e9%98%b2%e7%a6%a6%e5%bc%8f%e8%a7%a3%e7%a2%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每種格式都會定義自己的最小比對長度、最大長度、視窗大小與距離編碼。例如，DEFLATE 允許最遠 32 KiB 的距離，以及最長 258 位元組的長度。解碼器必須拒絕大於目前可用歷史的距離、無效的長度或距離碼、計算輸出位置時的整數溢位，以及超出呼叫者限制的輸出。資源限制應同時涵蓋總輸出量與工作量，因為小型輸入可能展開成非常大的輸出串流。&lt;/p&gt;
+&lt;h2 id="deflate-與相關格式"&gt;
+ DEFLATE 與相關格式
+ &lt;a href="#deflate-%e8%88%87%e7%9b%b8%e9%97%9c%e6%a0%bc%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;DEFLATE 使用 Huffman 樹對文字／長度與距離符號進行熵編碼，接著使用 LZ77 視窗取得參照的位元組。LZ4 在相同的複製操作周圍使用精簡 token 格式，而 Zstandard 將視窗式 LZ 比對階段與不同的熵編碼器結合。LZ78 與 LZW 則維護片語的明確字典；它們的字典更新規則不能取代 LZ77 歷史參照。&lt;/p&gt;
+&lt;h2 id="參考資料"&gt;
+ 參考資料
+ &lt;a href="#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;J. Ziv and A. Lempel, “&lt;a href="https://doi.org/10.1109/TIT.1977.1055714"&gt;A Universal Algorithm for Sequential Data Compression&lt;/a&gt;,” &lt;em&gt;IEEE Transactions on Information Theory&lt;/em&gt;, 1977.&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.rfc-editor.org/rfc/rfc1951"&gt;RFC 1951: DEFLATE&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.rfc-editor.org/rfc/rfc7932"&gt;RFC 7932: Brotli Compressed Data Format&lt;/a&gt;, 另一種視窗式 LZ 設計。&lt;/li&gt;
+&lt;/ul&gt;</description></item></channel></rss>

@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Git on cesun.life</title><link>https://example.org/zh-tw/tags/git/</link><description>Recent content in Git on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Wed, 29 Apr 2026 00:23:56 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/git/index.xml" rel="self" type="application/rss+xml"/><item><title>Git 行尾轉換</title><link>https://example.org/zh-tw/git-line-ending-conversion/</link><pubDate>Wed, 29 Apr 2026 00:23:56 +0800</pubDate><guid>https://example.org/zh-tw/git-line-ending-conversion/</guid><description>&lt;p&gt;Git 可以在儲存庫邊界將文字正規化為 LF，同時在工作目錄中呈現 LF 或
+CRLF。穩定的 &lt;code&gt;.gitattributes&lt;/code&gt; 政策可避免受平台影響的提交，並讓編輯器
+只負責簽出後的形式。&lt;/p&gt;
+&lt;h2 id="區分-head索引與工作目錄的位元組"&gt;
+ 區分 HEAD、索引與工作目錄的位元組
+ &lt;a href="#%e5%8d%80%e5%88%86-head%e7%b4%a2%e5%bc%95%e8%88%87%e5%b7%a5%e4%bd%9c%e7%9b%ae%e9%8c%84%e7%9a%84%e4%bd%8d%e5%85%83%e7%b5%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一個受追蹤路徑有三種相關的表示形式：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;HEAD&lt;/code&gt; 指向目前提交所儲存的 blob。&lt;/li&gt;
+&lt;li&gt;索引保存預計納入下一次提交的 blob。&lt;/li&gt;
+&lt;li&gt;工作目錄保存供編輯器和建置工具使用的位元組。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;對於經過正規化的文字，&lt;code&gt;git add&lt;/code&gt; 會執行從 CRLF 到 LF 的清理轉換。
+簽出則會執行塗抹轉換，將索引中的 LF 轉成所選的工作目錄行尾。
+既有提交不會被重寫。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git ls-files --eol -- path/to/file
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git show HEAD:path/to/file | od -An -t x1
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git check-attr -a -- path/to/file&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;git ls-files --eol&lt;/code&gt; 會回報索引、工作目錄及實際套用的屬性形式。
+在處理轉換警告前，請先檢查這些形式。&lt;/p&gt;
+&lt;h2 id="使用-gitattributes-宣告儲存庫政策"&gt;
+ 使用 &lt;code&gt;.gitattributes&lt;/code&gt; 宣告儲存庫政策
+ &lt;a href="#%e4%bd%bf%e7%94%a8-gitattributes-%e5%ae%a3%e5%91%8a%e5%84%b2%e5%ad%98%e5%ba%ab%e6%94%bf%e7%ad%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;請提交屬性設定，因為如此每個複製出的儲存庫都會共用該政策：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;gitattributes&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-gitattributes" data-lang="gitattributes"&gt;* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.bat text eol=crlf
+*.png binary
+*.pdf binary&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;text=auto&lt;/code&gt; 讓 Git 對未指定的路徑進行分類。&lt;code&gt;text&lt;/code&gt; 強制正規化；
+&lt;code&gt;-text&lt;/code&gt; 停用正規化；&lt;code&gt;binary&lt;/code&gt; 則是 &lt;code&gt;-diff -merge -text&lt;/code&gt; 的內建屬性巨集。
+明確指定 &lt;code&gt;eol=lf&lt;/code&gt; 或 &lt;code&gt;eol=crlf&lt;/code&gt; 會將路徑標記為文字，並控制其簽出形式。
+請將封存檔、影像、產生的二進位格式和已簽署成品標記為非文字，因為轉換會
+改變其位元組。&lt;/p&gt;</description></item><item><title>Git 認證資料管理</title><link>https://example.org/zh-tw/git-credential-management/</link><pubDate>Tue, 07 Oct 2025 11:26:05 +0800</pubDate><guid>https://example.org/zh-tw/git-credential-management/</guid><description>&lt;p&gt;Git 將 HTTP(S) 驗證委派給認證資料輔助程式。SSH 遠端則改用 SSH 金鑰與 agent，因此 &lt;code&gt;credential.helper&lt;/code&gt; 不會管理它們的私密金鑰。&lt;/p&gt;
+&lt;h2 id="選取認證資料輔助程式"&gt;
+ 選取認證資料輔助程式
+ &lt;a href="#%e9%81%b8%e5%8f%96%e8%aa%8d%e8%ad%89%e8%b3%87%e6%96%99%e8%bc%94%e5%8a%a9%e7%a8%8b%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;列出已設定的輔助程式，以及設定它們的設定檔：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git config --show-origin --get-all credential.helper
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git help -a | grep credential-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Git 會依設定順序要求輔助程式填入缺少的認證資料欄位。輔助程式可以拒絕或傳回部分資料，之後 Git 可能查詢另一個輔助程式，或提示使用者。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;輔助程式&lt;/th&gt;
+ &lt;th&gt;儲存方式&lt;/th&gt;
+ &lt;th&gt;適用用途&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;cache&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;本機 daemon 中的記憶體&lt;/td&gt;
+ &lt;td&gt;短期開發工作階段&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;store&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;純文字 &lt;code&gt;~/.git-credentials&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;僅在可接受純文字儲存風險時&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;osxkeychain&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;macOS Keychain&lt;/td&gt;
+ &lt;td&gt;macOS 開發&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;Git Credential Manager&lt;/td&gt;
+ &lt;td&gt;平台安全儲存與瀏覽器登入&lt;/td&gt;
+ &lt;td&gt;支援的桌面平台&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;例如，使用有期限的記憶體快取：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git config --global credential.helper &lt;span style="color:#e6db74"&gt;&amp;#39;cache --timeout=3600&amp;#39;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;相較於 &lt;code&gt;store&lt;/code&gt;，優先使用平台金鑰鏈或 Git Credential Manager。本機儲存庫可以省略 &lt;code&gt;--global&lt;/code&gt; 來覆寫全域輔助程式。&lt;/p&gt;
+&lt;h2 id="限定權杖範圍與使用者名稱"&gt;
+ 限定權杖範圍與使用者名稱
+ &lt;a href="#%e9%99%90%e5%ae%9a%e6%ac%8a%e6%9d%96%e7%af%84%e5%9c%8d%e8%88%87%e4%bd%bf%e7%94%a8%e8%80%85%e5%90%8d%e7%a8%b1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;除非啟用路徑比對，否則 Git 會依通訊協定與主機比對認證資料。當不同儲存庫使用不同帳戶或權杖時，請包含 HTTP 路徑：&lt;/p&gt;</description></item><item><title>Git 內部機制與歷史編輯</title><link>https://example.org/zh-tw/git-internals-and-history-editing/</link><pubDate>Thu, 07 Mar 2024 13:17:55 +0800</pubDate><guid>https://example.org/zh-tw/git-internals-and-history-editing/</guid><description>&lt;p&gt;Git 儲存不可變物件，並在它們之間移動小型參照。日常工作應使用 porcelain 命令，而儲存模型能說明為何重寫會建立新歷史，以及為何在一段期間內仍能復原。&lt;/p&gt;
+&lt;h2 id="檢查儲存庫資料庫"&gt;
+ 檢查儲存庫資料庫
+ &lt;a href="#%e6%aa%a2%e6%9f%a5%e5%84%b2%e5%ad%98%e5%ba%ab%e8%b3%87%e6%96%99%e5%ba%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;.git&lt;/code&gt; 目錄包含儲存庫本機狀態：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;路徑&lt;/th&gt;
+ &lt;th&gt;用途&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;HEAD&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;已簽出的分支符號名稱，或分離的物件 ID&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;config&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;儲存庫設定&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;index&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;下一次提交的提議快照&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;objects/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;鬆散物件與封裝檔&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;refs/&lt;/code&gt; 與 &lt;code&gt;packed-refs&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;分支、標籤與遠端追蹤名稱&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;logs/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;參照的本機 reflog&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;hooks/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;用戶端 hook 範例與已安裝的 hook&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;modules/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;已初始化子模組的 Git 目錄&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;工作樹保存已簽出的檔案。索引記錄候選樹。提交指向一棵樹以及父代 ID 與中繼資料。分支是指向提交的可移動參照，而不是可變的提交容器。&lt;/p&gt;
+&lt;p&gt;不必手動解碼檔案即可檢查名稱與物件型別：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git rev-parse --git-dir
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git show-ref --head
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git cat-file -t HEAD
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git cat-file -p HEAD
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git count-objects -vH&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="物件模型與內容定址"&gt;
+ 物件模型與內容定址
+ &lt;a href="#%e7%89%a9%e4%bb%b6%e6%a8%a1%e5%9e%8b%e8%88%87%e5%85%a7%e5%ae%b9%e5%ae%9a%e5%9d%80" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Git 會對標準位元組序列雜湊，以識別物件：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&amp;lt;type&amp;gt;&amp;lt;space&amp;gt;&amp;lt;decimal-size&amp;gt;&amp;lt;NUL&amp;gt;&amp;lt;content&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;SHA-1 儲存庫使用 160 位元物件 ID。新儲存庫可以使用 SHA-256。物件 ID 識別內容與結構；它不編碼時間或序號。&lt;/p&gt;</description></item></channel></rss>

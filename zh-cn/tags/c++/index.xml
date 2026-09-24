@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>C++ on cesun.life</title><link>https://example.org/zh-cn/tags/c++/</link><description>Recent content in C++ on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Wed, 21 Jan 2026 08:29:00 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/c++/index.xml" rel="self" type="application/rss+xml"/><item><title>SFINAE 与模板重载解析</title><link>https://example.org/zh-cn/cpp-sfinae/</link><pubDate>Wed, 21 Jan 2026 08:29:00 +0800</pubDate><guid>https://example.org/zh-cn/cpp-sfinae/</guid><description>&lt;p&gt;C++ 在形成函数模板候选项时替换模板实参。&lt;strong&gt;替换失败不是错误&lt;/strong&gt;（SFINAE）意味着：如果替换的&lt;em&gt;直接上下文&lt;/em&gt;中出现无效的依赖类型或表达式，该候选项会被移除；它不会使任意无效的模板代码都变得安全。&lt;/p&gt;
+&lt;h2 id="候选项形成和直接上下文"&gt;
+ 候选项形成和直接上下文
+ &lt;a href="#%e5%80%99%e9%80%89%e9%a1%b9%e5%bd%a2%e6%88%90%e5%92%8c%e7%9b%b4%e6%8e%a5%e4%b8%8a%e4%b8%8b%e6%96%87" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;重载解析从形成候选项开始。对于函数模板，模板实参推导或显式提供的实参可能需要替换到其函数类型和模板形参声明中。如果直接声明上下文无效，则会丢弃该特化，随后可能选择另一个可行重载。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;cstddef&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;concepts&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;type_traits&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; element_count(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; T&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; value) &lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;decltype&lt;/span&gt;(value.size()) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value.size();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;, std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;size_t N&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;size_t element_count(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; T (&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;)[N]) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; N;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;对于数组，第一个候选项失败，因为数组没有 &lt;code&gt;size()&lt;/code&gt; 成员。失败发生在其尾置返回类型中，因此数组重载仍然可用。非模板重载在匹配更佳时也可以胜出。&lt;/p&gt;
+&lt;p&gt;候选项被选中后，如果其函数体编译失败，SFINAE 不会仅仅因为这一点而生效：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; broken(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; T&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value.missing_member(); &lt;span style="color:#75715e"&gt;// hard error if this specialization is instantiated
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;应将检测放在会被替换的声明上下文中，而不是实现函数体中。&lt;/p&gt;
+&lt;h2 id="已建立的检测技术"&gt;
+ 已建立的检测技术
+ &lt;a href="#%e5%b7%b2%e5%bb%ba%e7%ab%8b%e7%9a%84%e6%a3%80%e6%b5%8b%e6%8a%80%e6%9c%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::enable_if_t&lt;/code&gt; 有条件地提供一个类型，因此适合用于模板形参、形参类型或返回类型。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;enable_if_t&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;is_integral_v&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;T twice(T value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value &lt;span style="color:#f92672"&gt;*&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;decltype&lt;/code&gt; 用于测试表达式是否良构。&lt;code&gt;std::void_t&lt;/code&gt; 支持检测惯用法，因为当所有提供的类型都有效时它会变为 &lt;code&gt;void&lt;/code&gt;。&lt;/p&gt;</description></item><item><title>C++20 概念和约束</title><link>https://example.org/zh-cn/cpp-concepts/</link><pubDate>Tue, 23 Dec 2025 21:51:39 +0800</pubDate><guid>https://example.org/zh-cn/cpp-concepts/</guid><description>&lt;p&gt;C++20 概念允许模板声明在其接口中表达可由编译器检查的要求。只有满足关联约束时，受约束候选项才参与重载解析。因此，约束可以用公开预期操作集的声明替代许多 &lt;code&gt;std::enable_if&lt;/code&gt; SFINAE 用法；但它们不能证明 API 所记录的语义要求。&lt;/p&gt;
+&lt;h2 id="声明约束"&gt;
+ 声明约束
+ &lt;a href="#%e5%a3%b0%e6%98%8e%e7%ba%a6%e6%9d%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;概念是命名空间作用域、类似变量的模板，其定义是 &lt;code&gt;bool&lt;/code&gt; 常量表达式：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;concepts&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;concept&lt;/span&gt; Addable &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;requires&lt;/span&gt;(T value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; { value &lt;span style="color:#f92672"&gt;+&lt;/span&gt; value } &lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;convertible_to&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;可以通过 requires 子句、受约束模板参数或缩写函数模板使用概念：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;requires&lt;/span&gt; Addable&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;T sum(T left, T right) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; left &lt;span style="color:#f92672"&gt;+&lt;/span&gt; right;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;integral &lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; increment(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;integral &lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每个 &lt;code&gt;std::integral auto&lt;/code&gt; 都引入一个不同的模板参数。当两个实参必须具有相同的推导类型时，应使用显式参数。当约束跟在声明器之后时，尾置 requires 子句很有用，包括作为模板类成员时：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Buffer&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;compact&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;requires&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;movable&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;非模板自由函数不能出现 requires 子句。多个声明位置的约束使用 &lt;code&gt;&amp;amp;&amp;amp;&lt;/code&gt; 组合；应将前置条件放在依赖该前置条件的要求之前。&lt;/p&gt;</description></item><item><title>C++ 模板特化</title><link>https://example.org/zh-cn/cpp-template-specialization/</link><pubDate>Sat, 08 Feb 2025 22:23:52 +0800</pubDate><guid>https://example.org/zh-cn/cpp-template-specialization/</guid><description>&lt;p&gt;特化为特定模板实参列表提供定义，或者对于类模板和变量模板，为更具体的实参模式提供定义。只有在基于类型的分派适合作为接口时才选择特化；函数特定的分派应使用普通重载，行为资格应使用概念。&lt;/p&gt;
+&lt;h2 id="全特化"&gt;
+ 全特化
+ &lt;a href="#%e5%85%a8%e7%89%b9%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;全特化命名每个实参，并以 &lt;code&gt;template &amp;lt;&amp;gt;&lt;/code&gt; 开始。函数、类和变量模板都可以进行全特化。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;formatter&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt;&lt;span style="color:#f92672"&gt;*&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;name&lt;/span&gt;() { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;other&amp;#34;&lt;/span&gt;; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;formatter&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt;&lt;span style="color:#f92672"&gt;*&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;name&lt;/span&gt;() { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;int&amp;#34;&lt;/span&gt;; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;全特化是独立实体。它不会从主模板继承成员、定义或默认模板实参；应定义它所需的一切。在每个使用它的翻译单元中，在首次使用可能隐式实例化该特化之前声明全特化。&lt;/p&gt;
+&lt;h2 id="偏特化"&gt;
+ 偏特化
+ &lt;a href="#%e5%81%8f%e7%89%b9%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;类模板和变量模板可以进行偏特化。偏特化匹配一个模式，编译器通过偏序选择匹配的最专用模式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;type_traits&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;is_pointer_like&lt;/span&gt; &lt;span style="color:#f92672"&gt;:&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;false_type {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;is_pointer_like&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;*&amp;gt;&lt;/span&gt; &lt;span style="color:#f92672"&gt;:&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;true_type {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;inline&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; is_pointer_like_v &lt;span style="color:#f92672"&gt;=&lt;/span&gt; is_pointer_like&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;::&lt;/span&gt;value;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;偏特化需要主模板声明。其实参列表必须比主模板更具体，并且必须根据语言规则保持可推导。如果匹配的偏特化彼此不可比较，使用该模板会产生歧义并导致编译失败。&lt;/p&gt;
+&lt;p&gt;函数模板不能偏特化。可以添加重载函数模板、对其施加约束，或通过特化的类/变量特征进行分派。&lt;/p&gt;
+&lt;h2 id="排序和库边界"&gt;
+ 排序和库边界
+ &lt;a href="#%e6%8e%92%e5%ba%8f%e5%92%8c%e5%ba%93%e8%be%b9%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;如果调用方可能隐式实例化适用的特化，应将主模板和特化声明放在头文件中。只有当声明在每个潜在隐式实例化点之前可见，并且相应安排了链接时，才应仅在一个翻译单元中定义特化。&lt;/p&gt;
+&lt;p&gt;特化特征可以建立清晰的分派边界：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;LocalPacket&lt;/span&gt; {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;inline&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; uses_fast_path_v &lt;span style="color:#f92672"&gt;=&lt;/span&gt; false;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;inline&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; uses_fast_path_v&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;LocalPacket&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; true;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;程序拥有 &lt;code&gt;LocalPacket&lt;/code&gt; 和该特征，因此契约是明确的。不要使用特化绕过访问控制或改变无关语义。&lt;/p&gt;</description></item><item><title>C++ 实现惯用法</title><link>https://example.org/zh-cn/cpp-idioms/</link><pubDate>Sun, 01 Dec 2024 10:50:38 +0800</pubDate><guid>https://example.org/zh-cn/cpp-idioms/</guid><description>&lt;p&gt;实现惯用法应明确所有权、生命周期或依赖边界。只有在相关的失效和复杂性规则对读者仍然可见时，简洁语法才有价值。&lt;/p&gt;
+&lt;h2 id="序列容器的-erase-remove"&gt;
+ 序列容器的 Erase-Remove
+ &lt;a href="#%e5%ba%8f%e5%88%97%e5%ae%b9%e5%99%a8%e7%9a%84-erase-remove" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::remove&lt;/code&gt; 和 &lt;code&gt;std::remove_if&lt;/code&gt; 是算法；它们重新排列范围，使保留元素占据前缀，并返回新的逻辑末端。它们既不会擦除元素，也不会改变容器大小。当容器提供范围擦除重载时，应立即擦除后缀。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;vector&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; values{&lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;3&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;4&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;values.erase(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;remove(values.begin(), values.end(), &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;), values.end());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;values.erase(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;remove_if(values.begin(), values.end(), is_invalid), values.end());&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;从 C++20 开始，&lt;code&gt;std::erase(values, value)&lt;/code&gt; 和 &lt;code&gt;std::erase_if(values, predicate)&lt;/code&gt; 为支持它们的标准容器表达完整操作。当项目的语言和库基线提供这些重载时，应优先使用它们。&lt;/p&gt;
+&lt;p&gt;移除算法可能移动或赋值保留元素，因此指向位置发生变化的值的引用和迭代器不再标识同一个值。后续 &lt;code&gt;erase&lt;/code&gt; 遵循容器的失效规则。对于 &lt;code&gt;std::vector&lt;/code&gt;，擦除位置及其之后的迭代器、指针和引用都会失效；代码必须重新获取它们。节点容器具有不同规则，因此不要将 vector 的假设转用于 &lt;code&gt;std::list&lt;/code&gt;、&lt;code&gt;std::map&lt;/code&gt; 或 &lt;code&gt;std::unordered_map&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="pimpl-定义表示边界"&gt;
+ Pimpl 定义表示边界
+ &lt;a href="#pimpl-%e5%ae%9a%e4%b9%89%e8%a1%a8%e7%a4%ba%e8%be%b9%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;指向实现的惯用法将私有表示从公共头文件中移出。客户端针对稳定接口编译，而不是针对每个私有成员类型编译，因此表示更改可以减少重新构建；当其余公共 ABI 也受到控制时，还可以保持 ABI 边界。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// widget.hpp
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Widget&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;~&lt;/span&gt;Widget();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget(Widget&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;noexcept&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;operator&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;(Widget&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;noexcept&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Widget&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;operator&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Widget&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;private&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Implementation&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;unique_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Implementation&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; implementation_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// widget.cpp
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Widget&lt;/span&gt;&lt;span style="color:#f92672"&gt;::&lt;/span&gt;Implementation {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#75715e"&gt;// Private state and dependencies.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Widget&lt;span style="color:#f92672"&gt;::~&lt;/span&gt;Widget() &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;std::unique_ptr&amp;lt;Implementation&amp;gt;&lt;/code&gt; 允许在头文件中使用前置声明，但销毁需要在实例化删除器的位置使 &lt;code&gt;Implementation&lt;/code&gt; 完整。在 &lt;code&gt;Implementation&lt;/code&gt; 定义之后将析构函数定义移到类外，可以提供这种完整性。复制操作需要显式的深拷贝策略，因为 &lt;code&gt;unique_ptr&lt;/code&gt; 不可复制；如果 &lt;code&gt;Widget&lt;/code&gt; 有意设计为仅可移动，则省略复制操作。&lt;/p&gt;</description></item><item><title>GCC 驱动程序和工具链</title><link>https://example.org/zh-cn/gcc-toolchain/</link><pubDate>Mon, 21 Jun 2021 17:17:24 +0800</pubDate><guid>https://example.org/zh-cn/gcc-toolchain/</guid><description>&lt;p&gt;&lt;code&gt;gcc&lt;/code&gt; 和 &lt;code&gt;g++&lt;/code&gt; 是 GCC 驱动程序。它们根据输入后缀和选项选择语言前端，运行预处理和编译，调用汇编器，并协调链接器。&lt;a href="https://gcc.gnu.org/onlinedocs/gcc/"&gt;GCC 手册&lt;/a&gt;具有权威性，因为确切默认值取决于配置的目标和 GCC 版本。&lt;/p&gt;
+&lt;h2 id="驱动程序阶段和语言默认值"&gt;
+ 驱动程序阶段和语言默认值
+ &lt;a href="#%e9%a9%b1%e5%8a%a8%e7%a8%8b%e5%ba%8f%e9%98%b6%e6%ae%b5%e5%92%8c%e8%af%ad%e8%a8%80%e9%bb%98%e8%ae%a4%e5%80%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;对于源文件，驱动程序可以在预处理（&lt;code&gt;-E&lt;/code&gt;）、编译为汇编（&lt;code&gt;-S&lt;/code&gt;）或汇编为目标文件（&lt;code&gt;-c&lt;/code&gt;）后停止。不使用停止选项时，它会链接生成的目标文件和库。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;g++ -std&lt;span style="color:#f92672"&gt;=&lt;/span&gt;c++20 -O2 -Wall -Wextra -c source.cc -o source.o
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;g++ source.o -o program&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;g++&lt;/code&gt; 会为相关输入选择 C++ 处理，并在链接时自动添加 C++ 运行时库。因此，即使目标文件是分别编译的，也应使用 &lt;code&gt;g++&lt;/code&gt; 完成 C++ 程序的最终链接。&lt;code&gt;gcc&lt;/code&gt; 是面向 C 的驱动程序；传递 &lt;code&gt;-x c++&lt;/code&gt; 会更改输入语言，但不会自行提供 &lt;code&gt;g++&lt;/code&gt; 的 C++ 链接默认值。&lt;/p&gt;
+&lt;p&gt;执行时使用 &lt;code&gt;-v&lt;/code&gt; 打印驱动程序活动。使用 &lt;code&gt;-###&lt;/code&gt; 打印驱动程序将执行的命令，但不实际运行。&lt;code&gt;-print-prog-name=cc1plus&lt;/code&gt;、&lt;code&gt;-print-search-dirs&lt;/code&gt; 和 &lt;code&gt;-dumpspecs&lt;/code&gt; 可用于诊断，显示已配置的程序、搜索路径和驱动程序规范，不应作为可移植构建逻辑。&lt;/p&gt;
+&lt;h2 id="依赖关系和中间文件"&gt;
+ 依赖关系和中间文件
+ &lt;a href="#%e4%be%9d%e8%b5%96%e5%85%b3%e7%b3%bb%e5%92%8c%e4%b8%ad%e9%97%b4%e6%96%87%e4%bb%b6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;从编译器生成头文件依赖：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;make&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-make" data-lang="make"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;CPPFLAGS &lt;span style="color:#f92672"&gt;+=&lt;/span&gt; -MMD -MP
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;OBJECTS &lt;span style="color:#f92672"&gt;:=&lt;/span&gt; main.o parse.o
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;-include $(OBJECTS&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;.o=.d)&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;-MMD&lt;/code&gt; 生成用户头文件依赖，同时省略系统头文件；&lt;code&gt;-MP&lt;/code&gt; 为之后可能被删除的头文件添加伪目标。使用 &lt;code&gt;-MF&lt;/code&gt; 选择依赖文件，使用 &lt;code&gt;-MT&lt;/code&gt; 或 &lt;code&gt;-MQ&lt;/code&gt; 控制其目标。需要检查某个阶段时，&lt;code&gt;-save-temps&lt;/code&gt; 会保留预处理和汇编中间文件。&lt;/p&gt;</description></item><item><title>C++ 值类别和移动语义</title><link>https://example.org/zh-cn/cpp-move-semantics/</link><pubDate>Mon, 25 Jan 2021 02:14:28 +0800</pubDate><guid>https://example.org/zh-cn/cpp-move-semantics/</guid><description>&lt;p&gt;移动语义是重载选择和由类型定义的状态转移，而不是自动转移所有权。应先确定表达式的值类别，再选择描述所有权和生命周期的参数类型。&lt;/p&gt;
+&lt;h2 id="表达式类别"&gt;
+ 表达式类别
+ &lt;a href="#%e8%a1%a8%e8%be%be%e5%bc%8f%e7%b1%bb%e5%88%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每个非 &lt;code&gt;void&lt;/code&gt; 表达式恰好属于以下类别之一：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;左值&lt;/strong&gt;标识一个对象、函数或位域。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;亡值&lt;/strong&gt;标识一个资源可以重用的对象。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;纯右值&lt;/strong&gt;计算一个值或初始化一个对象。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;左值和亡值是&lt;strong&gt;泛左值&lt;/strong&gt;；纯右值和亡值是&lt;strong&gt;右值&lt;/strong&gt;。即使命名变量的类型为 &lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt;，它仍然是左值表达式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; counter();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; cache_slot();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;counter() &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;; &lt;span style="color:#75715e"&gt;// The call is an lvalue.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; slot &lt;span style="color:#f92672"&gt;=&lt;/span&gt; cache_slot();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;consume(slot); &lt;span style="color:#75715e"&gt;// `slot` is an lvalue expression.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;consume(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(slot)); &lt;span style="color:#75715e"&gt;// Casts it to an xvalue.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;返回 &lt;code&gt;T&lt;/code&gt; 的调用是纯右值，返回 &lt;code&gt;T&amp;amp;&lt;/code&gt; 的调用是左值，返回 &lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt; 的调用是亡值。&lt;code&gt;std::move&lt;/code&gt; 执行亡值转换；它既不移动数据，也不结束源对象的生命周期。&lt;/p&gt;
+&lt;h2 id="移动构造是重载选择"&gt;
+ 移动构造是重载选择
+ &lt;a href="#%e7%a7%bb%e5%8a%a8%e6%9e%84%e9%80%a0%e6%98%af%e9%87%8d%e8%bd%bd%e9%80%89%e6%8b%a9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;引用绑定提供了相关区别：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;T&amp;amp;&lt;/code&gt; 绑定兼容的左值。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;const T&amp;amp;&lt;/code&gt; 绑定左值、亡值和纯右值。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt; 绑定亡值和纯右值。&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string source &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;payload&amp;#34;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string destination &lt;span style="color:#f92672"&gt;=&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(source); &lt;span style="color:#75715e"&gt;// Selects a move constructor when viable.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;选定的构造函数定义转移行为。它可能转移一次分配、复制小型表示，或产生与复制无法区分的效果。按值返回局部变量时通常应使用 &lt;code&gt;return local;&lt;/code&gt;：复制省略可能直接构造结果；不适用省略时，可行的局部变量可以在重载选择中被视为亡值。&lt;code&gt;return std::move(local);&lt;/code&gt; 可能抑制具名返回值优化。&lt;/p&gt;</description></item></channel></rss>

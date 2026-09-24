@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Api on cesun.life</title><link>https://example.org/ja/tags/api/</link><description>Recent content in Api on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sun, 20 Apr 2025 05:43:09 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/api/index.xml" rel="self" type="application/rss+xml"/><item><title>OpenAI Chat Completions と Spring AI</title><link>https://example.org/ja/openai-chat-completions/</link><pubDate>Sun, 20 Apr 2025 05:43:09 +0800</pubDate><guid>https://example.org/ja/openai-chat-completions/</guid><description>&lt;p&gt;OpenAI Chat Completions API は、会話型言語モデル向けに広く実装されている JSON over HTTP インターフェースです。クライアントはメッセージと生成オプションの順序付きリストを送信し、サーバーはメタデータとトークン使用量を含む 1 つ以上のアシスタントメッセージを返します。&lt;/p&gt;
+&lt;p&gt;基本的な構造は次のとおりです。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP client
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; POST /v1/chat/completions
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; request JSON containing messages and options
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; model inference
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &amp;lt;- response JSON containing choices and usage&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;多くのゲートウェイやモデルサーバーは、基盤モデルが OpenAI でホストされていない場合でも、OpenAI 互換エンドポイントを実装しています。そのため、この形式は事実上の相互運用 API として有用ですが、HTTP、JSON-RPC、MCP のような独立した正式標準ではありません。互換プロバイダーによって、サポートするフィールド、モデル、制限、エラー形式、拡張機能が異なる場合があります。&lt;/p&gt;
+&lt;p&gt;Spring AI は、このワイヤー形式の上に、Java アプリケーション向けのプロバイダー中立なモデルを提供します。アプリケーションコードは &lt;code&gt;Prompt&lt;/code&gt;、&lt;code&gt;Message&lt;/code&gt;、&lt;code&gt;ChatOptions&lt;/code&gt;、&lt;code&gt;ChatResponse&lt;/code&gt; を扱い、OpenAI または OpenAI 互換アダプターがこれらのオブジェクトとプロバイダーの JSON の相互変換を行います。&lt;/p&gt;
+&lt;h2 id="http-リクエスト"&gt;
+ HTTP リクエスト
+ &lt;a href="#http-%e3%83%aa%e3%82%af%e3%82%a8%e3%82%b9%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;簡略化したリクエストは次のとおりです。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;POST&lt;/span&gt; /v1/chat/completions &lt;span style="color:#66d9ef"&gt;HTTP&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;1.1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Host&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;api.example.com&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Authorization&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;Bearer ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Type&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;application/json&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;{
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;model&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;gpt-4.1&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;messages&amp;#34;&lt;/span&gt;: [
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;role&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;system&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;content&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Answer concisely.&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; },
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;role&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;user&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;content&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Explain optimistic locking.&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ],
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;temperature&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;0.3&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;max_tokens&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;1000&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;stream&amp;#34;&lt;/span&gt;: &lt;span style="color:#66d9ef"&gt;false&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;model&lt;/code&gt; と &lt;code&gt;messages&lt;/code&gt; は、実行対象と、そのモデルが参照する会話コンテキストを識別します。残りのフィールドは生成を制御します。一部のゲートウェイでは、リクエスト本文で &lt;code&gt;model&lt;/code&gt; を要求する代わりに、設定、デプロイメント名、URL、またはヘッダーによってモデルを選択します。&lt;/p&gt;</description></item><item><title>Swagger と OpenAPI</title><link>https://example.org/ja/swagger-and-openapi/</link><pubDate>Tue, 21 Jan 2025 00:13:14 +0800</pubDate><guid>https://example.org/ja/swagger-and-openapi/</guid><description>&lt;h2 id="概要-openapidefinition"&gt;
+ 概要: @OpenAPIDefinition
+ &lt;a href="#%e6%a6%82%e8%a6%81-openapidefinition" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;任意のクラス（通常は @SpringBootApplication クラス）に付与し、アプリケーション API の概要を提供します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;info = info/Info.class
+&lt;ul&gt;
+&lt;li&gt;contact = info/Contact.class&lt;/li&gt;
+&lt;li&gt;license = info/License.class&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;ExternalDocumentation.class&lt;/li&gt;
+&lt;li&gt;servers/Server.class
+&lt;ul&gt;
+&lt;li&gt;servers/Servers.class&lt;/li&gt;
+&lt;li&gt;servers/ServerVariable.class&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;tags/Tag.class
+&lt;ul&gt;
+&lt;li&gt;tags/Tags.class&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;security/SecurityRequirement.class
+&lt;ul&gt;
+&lt;li&gt;security/SecurityRequirements.class&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="operation"&gt;
+ @Operation:
+ &lt;a href="#operation" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;tags: @Tag
+externalDocs: @ExternalDocumentation
+parameters: @Parameter
+responses: @ApiResponse
+requestBody: @RequestBody
+security: @SecurityRequirement
+servers: @Server
+extensions: @Extension
+hidden: @Hidden&lt;/p&gt;
+&lt;h2 id="その他"&gt;
+ その他
+ &lt;a href="#%e3%81%9d%e3%81%ae%e4%bb%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Hidden.class
+OpenAPI31.class&lt;/p&gt;
+&lt;p&gt;StringToClassMapItem.class
+Webhook.class
+Webhooks.class&lt;/p&gt;
+&lt;p&gt;callbacks/Callback.class
+callbacks/Callbacks.class&lt;/p&gt;
+&lt;p&gt;enums/Explode.class
+enums/ParameterIn.class
+enums/ParameterStyle.class
+enums/SecuritySchemeIn.class
+enums/SecuritySchemeType.class&lt;/p&gt;
+&lt;p&gt;extensions/Extension.class
+extensions/ExtensionProperty.class
+extensions/Extensions.class&lt;/p&gt;
+&lt;p&gt;headers/Header.class&lt;/p&gt;
+&lt;p&gt;links/Link.class
+links/LinkParameter.class
+media/ArraySchema.class
+media/Content.class
+media/DependentRequired.class
+media/DependentRequiredMap.class
+media/DependentSchema.class
+media/DependentSchemas.class
+media/DiscriminatorMapping.class
+media/Encoding.class
+media/ExampleObject.class
+media/PatternProperties.class
+media/PatternProperty.class
+media/Schema.class
+media/Schema.class
+media/Schema.class
+media/Schema.class
+media/Schema.class
+media/SchemaProperties.class
+media/SchemaProperty.class&lt;/p&gt;</description></item></channel></rss>

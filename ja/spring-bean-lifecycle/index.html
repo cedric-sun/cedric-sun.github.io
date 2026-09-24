@@ -1,0 +1,64 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring Beanのライフサイクルとプロトタイプスコープ</title></head><body><main><article><div class=article-header><h1>Spring Beanのライフサイクルとプロトタイプスコープ</h1><div class=aux>最終更新: 2025-11-17 23:19:46 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/dependency-injection/>Dependency-Injection</a>
+|
+<a href=/ja/tags/java/>Java</a>
+|
+<a href=/ja/tags/spring/>Spring</a></div></div><div class="translation-notice machine-translated"><a href=/spring-bean-lifecycle/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>SpringはBeanのメタデータとBeanインスタンスを分離します。<code>BeanDefinition</code>は
+オブジェクトの作成方法を記述し、<code>BeanFactory</code>はオブジェクトが要求されたときに
+その定義を適用します。<code>ApplicationContext</code>は、協調的な起動、
+後処理、イベント、リソース読み込み、シャットダウンを追加します。</p><h2 id=コンテキストのリフレッシュ中に行われる処理>コンテキストのリフレッシュ中に行われる処理
+<a href=#%e3%82%b3%e3%83%b3%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88%e3%81%ae%e3%83%aa%e3%83%95%e3%83%ac%e3%83%83%e3%82%b7%e3%83%a5%e4%b8%ad%e3%81%ab%e8%a1%8c%e3%82%8f%e3%82%8c%e3%82%8b%e5%87%a6%e7%90%86 class=heading-anchor><span>#</span></a></h2><p><code>AbstractApplicationContext.refresh()</code>は、アプリケーションのシングルトンを
+利用可能にする前に、環境とBeanファクトリを準備します。主なステージは次のとおりです。</p><ol><li><code>BeanFactory</code>を準備または取得し、Bean定義を読み込む。</li><li>定義をまだ変更できる段階で、設定クラスの処理を含む
+<code>BeanFactoryPostProcessor</code>sを呼び出す。</li><li><code>BeanPostProcessor</code>sを検出して登録する。</li><li>メッセージ解決、イベント、コンテキスト固有のリソースなどの
+コンテキスト基盤を初期化する。</li><li>残りの非遅延初期化シングルトンBeanをインスタンス化する。</li><li>リフレッシュ済みの状態と<code>ContextRefreshedEvent</code>を公開する。</li></ol><p><code>BeanFactoryPostProcessor</code>はメタデータを変更します。一方、
+<code>BeanPostProcessor</code>はインスタンスを認識し、フィールドを注入したり、
+ライフサイクルアノテーションを呼び出したり、Beanをプロキシに置き換えたりできます。
+すべてのポストプロセッサが登録される前にインスタンス化される可能性があるため、
+ファクトリポストプロセッサから通常のアプリケーションBeanを作成するのは安全ではありません。</p><h2 id=依存関係の順序とdepends-on>依存関係の順序と<code>depends-on</code>
+<a href=#%e4%be%9d%e5%ad%98%e9%96%a2%e4%bf%82%e3%81%ae%e9%a0%86%e5%ba%8f%e3%81%a8depends-on class=heading-anchor><span>#</span></a></h2><p>コンテナは、依存するBeanより前に、そのBeanのコンストラクタ依存関係と
+プロパティ依存関係を作成します。したがって、コンストラクタインジェクションは
+必須の関係と作成順序の両方を表します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Component</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReportService</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> ReportRepository repository;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReportService(ReportRepository repository) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>repository</span> <span style=color:#f92672>=</span> repository;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>@DependsOn("schemaInitializer")</code>またはXMLの<code>depends-on</code>は、共有外部リソースの
+初期化など、インジェクション関係が存在しない場合に順序を追加します。
+シングルトンBeanの場合、破棄順序も逆転します。つまり、依存するBeanは、
+それが依存するBeanより先に破棄されます。<code>depends-on</code>はクラスが使用するものを
+隠してしまうため、実際の型付き依存関係の代わりに使用すべきではありません。</p><h2 id=インスタンスの初期化>インスタンスの初期化
+<a href=#%e3%82%a4%e3%83%b3%e3%82%b9%e3%82%bf%e3%83%b3%e3%82%b9%e3%81%ae%e5%88%9d%e6%9c%9f%e5%8c%96 class=heading-anchor><span>#</span></a></h2><p>通常のBeanに対して、Springは次の処理を行います。</p><ol><li>通常はコンストラクタまたはファクトリメソッドを呼び出して、オブジェクトをインスタンス化する。</li><li>プロパティとフィールドを解決して注入する。</li><li><code>BeanNameAware</code>、<code>BeanFactoryAware</code>、<code>ApplicationContextAware</code>などの
+awareコールバックを呼び出す。</li><li>初期化前に各<code>BeanPostProcessor</code>を呼び出す。</li><li><code>@PostConstruct</code>、続いて<code>InitializingBean.afterPropertiesSet()</code>、
+さらに設定されたカスタムinitメソッドを呼び出す。</li><li>初期化後に各<code>BeanPostProcessor</code>を呼び出す。</li></ol><p>Springの基盤は、ポストプロセッサを通じてこのシーケンスの一部を実装します。
+そのため、カスタムプロセッサは順序に関する契約を遵守する必要があります。
+初期化後のプロセッサは、元のオブジェクトではなくプロキシを返す場合があります。
+呼び出し元が準備済みの、場合によってはアドバイスされたオブジェクトを受け取るのは、
+チェーン全体が完了した後だけです。</p><p>必須の不変条件を確立する場所としては、コンストラクタインジェクションが最も安全です。
+<code>@PostConstruct</code>は、初期化が注入されたプロパティや、コンストラクタでは利用できない
+コンテナサービスに依存する場合に適しています。</p><h2 id=破棄とコンテキストのシャットダウン>破棄とコンテキストのシャットダウン
+<a href=#%e7%a0%b4%e6%a3%84%e3%81%a8%e3%82%b3%e3%83%b3%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88%e3%81%ae%e3%82%b7%e3%83%a3%e3%83%83%e3%83%88%e3%83%80%e3%82%a6%e3%83%b3 class=heading-anchor><span>#</span></a></h2><p>設定可能なコンテキストを閉じると、管理対象のシングルトンが破棄されます。
+各Beanについて、Springは<code>@PreDestroy</code>、<code>DisposableBean.destroy()</code>、
+設定されたカスタムdestroyメソッドを呼び出します。ただし、アダプタの重複メソッド
+チェックが適用されます。<code>SmartLifecycle</code>は、協調的なシャットダウンを必要とする
+コンポーネント向けに、フェーズ付きの停止コールバックを追加します。</p><p>アプリケーションは、手動で作成したコンテキストを閉じるか、
+<code>registerShutdownHook()</code>でシャットダウンフックを登録する必要があります。
+Spring Bootは、通常のプロセスシャットダウンの一環としてアプリケーションコンテキストを閉じます。
+プロセスの突然の終了ではコールバックが保証されないため、永続的な正しさを
+コールバックだけに依存してはなりません。</p><h2 id=プロトタイプの所有権>プロトタイプの所有権
+<a href=#%e3%83%97%e3%83%ad%e3%83%88%e3%82%bf%e3%82%a4%e3%83%97%e3%81%ae%e6%89%80%e6%9c%89%e6%a8%a9 class=heading-anchor><span>#</span></a></h2><p>プロトタイプスコープでは、コンテナへのリクエストごとに新しいインスタンスが生成されます。
+プロトタイプをシングルトンに直接注入すると、解決はシングルトンの作成時に一度だけ行われ、
+そのフィールドには同じプロトタイプインスタンスが保持されます。各操作で新しいインスタンスが
+必要な場合は、<code>ObjectProvider&lt;T></code>、Jakartaの<code>Provider&lt;T></code>、メソッドインジェクション、
+またはスコーププロキシを使用します。</p><p>Springはプロトタイプを完全に初期化して呼び出し元に返しますが、インスタンスを保持せず、
+後で破棄コールバックを呼び出すこともありません。したがって、所有権は受け取り側に移ります。
+ファイル、ソケット、またはエグゼキュータを保持するプロトタイプを取得するコードは、
+それを明示的に閉じる必要があります。集中管理されたクリーンアップが必要な場合は、
+カスタム<code>BeanPostProcessor</code>でそのようなインスタンスを追跡できますが、
+明示的なリソース所有権の方が明確です。</p><h2 id=主要なリファレンス>主要なリファレンス
+<a href=#%e4%b8%bb%e8%a6%81%e3%81%aa%e3%83%aa%e3%83%95%e3%82%a1%e3%83%ac%e3%83%b3%e3%82%b9 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html>Spring Beanのライフサイクルコールバック</a></li><li><a href=https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html>Spring Beanのスコープ</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/context/support/AbstractApplicationContext.html#refresh%28%29><code>AbstractApplicationContext.refresh()</code>のJavadoc</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-bean-lifecycle/ class=language-option data-lang=en>English
+</a><a href=/ja/spring-bean-lifecycle/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/spring-bean-lifecycle/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/spring-bean-lifecycle/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

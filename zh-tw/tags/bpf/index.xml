@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Bpf on cesun.life</title><link>https://example.org/zh-tw/tags/bpf/</link><description>Recent content in Bpf on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Tue, 09 Jun 2026 02:54:06 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/bpf/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux eBPF</title><link>https://example.org/zh-tw/linux-ebpf/</link><pubDate>Tue, 09 Jun 2026 02:54:06 +0800</pubDate><guid>https://example.org/zh-tw/linux-ebpf/</guid><description>&lt;p&gt;eBPF 是 Linux 核心中的驗證執行環境。應用程式載入程式與映射，將程式附加至核心定義的掛鉤，並透過檔案描述元交換資料。網路處理仍是重要用途，但追蹤、安全性原則與效能分析不再依賴封包擷取。&lt;/p&gt;
+&lt;h2 id="從封包過濾器到-linux-socket-過濾器"&gt;
+ 從封包過濾器到 Linux Socket 過濾器
+ &lt;a href="#%e5%be%9e%e5%b0%81%e5%8c%85%e9%81%8e%e6%bf%be%e5%99%a8%e5%88%b0-linux-socket-%e9%81%8e%e6%bf%be%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;這條設計脈絡始於 DEC 為 ULTRIX 和 DIGITAL UNIX 等系統提供的封包過濾器。程序開啟封包過濾裝置、選取介面、使用 &lt;code&gt;ioctl()&lt;/code&gt; 安裝 &lt;code&gt;enfilter&lt;/code&gt; 指令序列，並讀取接受的鏈路層封包。過濾器使用堆疊機器，而多個取用者依優先順序排列。&lt;/p&gt;
+&lt;p&gt;Steven McCanne 與 Van Jacobson 設計 Berkeley Packet Filter（BPF），以降低封包複製與解譯成本。他們 1993 年的論文描述了兩項至今仍可辨識的變更：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;以暫存器為基礎的虛擬機器決定是否接受封包，以及要複製多少位元組；&lt;/li&gt;
+&lt;li&gt;每個開啟的 &lt;code&gt;/dev/bpf&lt;/code&gt; 執行個體都有自己的過濾器與封包緩衝區，因此封包擷取是以裝置執行個體表示，而不是 DEC 的優先順序鏈。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;傳統 BPF（現在稱為 cBPF）具有 32 位元累加器 &lt;code&gt;A&lt;/code&gt;、索引暫存器 &lt;code&gt;X&lt;/code&gt;、16 個暫存字、封包載入指令、條件跳躍、算術運算與回傳值。Linux 將此指令格式用於 Linux Socket Filtering（LSF），但會將過濾器直接附加到 socket，而不要求使用 &lt;code&gt;/dev/bpf&lt;/code&gt;。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; sock_filter code[] &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;BPF_STMT&lt;/span&gt;(BPF_LD &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_B &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_ABS, &lt;span style="color:#ae81ff"&gt;9&lt;/span&gt;), &lt;span style="color:#75715e"&gt;/* IPv4 protocol byte */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;BPF_JUMP&lt;/span&gt;(BPF_JMP &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_JEQ &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_K, IPPROTO_TCP, &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;BPF_STMT&lt;/span&gt;(BPF_RET &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_K, &lt;span style="color:#ae81ff"&gt;0xffff&lt;/span&gt;),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;BPF_STMT&lt;/span&gt;(BPF_RET &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_K, &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; sock_fprog program &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .len &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;(code) &lt;span style="color:#f92672"&gt;/&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;(code[&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;]),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .filter &lt;span style="color:#f92672"&gt;=&lt;/span&gt; code,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;setsockopt&lt;/span&gt;(fd, SOL_SOCKET, SO_ATTACH_FILTER,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;program, &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;(program));&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;此範例假設 socket 的資料從 IPv4 標頭開始，因此第 9 個位元組是其通訊協定欄位。封包配置取決於 socket 系列與掛鉤。對於 socket 過濾器，回傳值是要保留的封包位元組數；零表示拒絕封包。核心會在安裝指令序列前檢查它。&lt;code&gt;SO_LOCK_FILTER&lt;/code&gt; 可以防止過濾器被取代或移除，讓程序能夠附加過濾器後再放棄權限。libpcap 與 &lt;code&gt;tcpdump&lt;/code&gt; 會將高階擷取運算式編譯成此指令模型。&lt;/p&gt;</description></item></channel></rss>

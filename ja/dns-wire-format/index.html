@@ -1,0 +1,57 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>DNS ワイヤーフォーマット</title></head><body><main><article><div class=article-header><h1>DNS ワイヤーフォーマット</h1><div class=aux>最終更新: 2025-05-29 15:04:54 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/dns/>Dns</a>
+|
+<a href=/ja/tags/networking/>Networking</a>
+|
+<a href=/ja/tags/protocols/>Protocols</a></div></div><div class="translation-notice machine-translated"><a href=/dns-wire-format/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>DNS のクエリと応答は、12 バイトのヘッダーに続いて Question、Answer、
+Authority、Additional の各セクションで構成されます。複数オクテットの整数
+フィールドはすべてネットワークバイトオーダーを使用します。RFC 1035 は基本
+フォーマットを定義しており、EDNS、DNSSEC、および後続の拡張は、基本ヘッダーを
+変更せずにレコードとヘッダーのセマンティクスを追加します。</p><h2 id=ヘッダー>ヘッダー
+<a href=#%e3%83%98%e3%83%83%e3%83%80%e3%83%bc class=heading-anchor><span>#</span></a></h2><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>フィールド</th><th style=text-align:right>ビット数</th><th>目的</th></tr></thead><tbody><tr><td>ID</td><td style=text-align:right>16</td><td>クライアントが選択し、応答でエコーバックされる識別子</td></tr><tr><td>QR</td><td style=text-align:right>1</td><td>クエリ（<code>0</code>）または応答（<code>1</code>）</td></tr><tr><td>Opcode</td><td style=text-align:right>4</td><td>操作。<code>QUERY</code> はゼロ</td></tr><tr><td>AA</td><td style=text-align:right>1</td><td>応答における権威ある回答の指示</td></tr><tr><td>TC</td><td style=text-align:right>1</td><td>メッセージが切り詰められたことを示す</td></tr><tr><td>RD</td><td style=text-align:right>1</td><td>クライアントが再帰処理を要求</td></tr><tr><td>RA</td><td style=text-align:right>1</td><td>サーバーが再帰処理を提供</td></tr><tr><td>Z</td><td style=text-align:right>3</td><td>予約済みの基本ビット。拡張では AD と CD を使用</td></tr><tr><td>RCODE</td><td style=text-align:right>4</td><td>基本応答コード</td></tr><tr><td>QDCOUNT</td><td style=text-align:right>16</td><td>Question の数</td></tr><tr><td>ANCOUNT</td><td style=text-align:right>16</td><td>Answer レコード数</td></tr><tr><td>NSCOUNT</td><td style=text-align:right>16</td><td>Authority レコード数</td></tr><tr><td>ARCOUNT</td><td style=text-align:right>16</td><td>Additional レコード数</td></tr></tbody></table></div></div><p><code>RD</code> は、受信サーバーに再帰処理を実行するよう要求します。<code>RA</code> は、
+サーバーが再帰処理を実行できることを通知します。<code>AA</code> は、応答サーバーが
+回答に対して権威を持つことを示しますが、メッセージ内のすべてのレコードが
+権威あるものだという意味ではありません。<code>TC</code> は、切り詰められた応答では
+不十分な場合に、クライアントが TCP または別のサポートされているトランスポート
+で再試行する必要があることを通知します。</p><h2 id=名前と-question>名前と Question
+<a href=#%e5%90%8d%e5%89%8d%e3%81%a8-question class=heading-anchor><span>#</span></a></h2><p>ドメイン名はラベルの並びです。通常の各ラベルは 0 から 63 までのオクテット長
+で始まり、長さ 0 のルートラベルが名前を終端します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>03 www 07 example 03 com 00</span></span></code></pre></div></div></div><p>長さオクテットとルートラベルを含む完全なエンコード済みの名前は、255 オクテット
+に制限されます。Question には <code>QNAME</code>、16 ビットの <code>QTYPE</code>、16 ビットの
+<code>QCLASS</code> が含まれます。インターネットクラス（<code>IN</code>）の値は 1 です。</p><p>繰り返し現れるサフィックスを避けるため、名前では圧縮ポインターを使用できます。
+ポインターの最初の 2 ビットは <code>11</code> で、残りの 14 ビットはメッセージ開始位置
+からのオフセットです。ポインターは前方の位置だけを指せます。DNS メッセージは
+信頼できない入力であるため、パーサーはポインターの深さに上限を設け、オフセット
+を検証し、ループを検出しなければなりません。</p><h2 id=resource-record>Resource Record
+<a href=#resource-record class=heading-anchor><span>#</span></a></h2><p>Answer、Authority、Additional の各セクションには Resource Record が格納されます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>NAME | TYPE | CLASS | TTL | RDLENGTH | RDATA</span></span></code></pre></div></div></div><p><code>TTL</code> は 32 ビットフィールドとしてエンコードされ、RFC 2181 に基づき、実効範囲
+が 0 から \(2^{31}-1\) までの非負のキャッシュ存続期間として扱われます。
+<code>RDLENGTH</code> は、タイプ固有の RDATA バイト列の範囲を定めます。RRset は、同じ
+owner name、class、type を持つレコードの集合です。DNSSEC は個々のレコード
+ではなく RRset に署名します。</p><p>一般的な RDATA には、4 バイトの IPv4 アドレス（<code>A</code>）、16 バイトの IPv6
+アドレス（<code>AAAA</code>）、ドメイン名（<code>NS</code>、<code>CNAME</code>、<code>PTR</code>）、および <code>MX</code> の
+preference と exchange name の組み合わせや <code>SOA</code> のタイマーなどの構造化された
+値が含まれます。RDATA 内の名前も、適用される RFC が許可している場合は圧縮を
+使用できます。</p><p>EDNS は Additional セクション内の <code>OPT</code> pseudo-record を使用して、UDP ペイロード
+サイズ、拡張 RCODE ビット、フラグ、およびオプションを通知します。EDNS が
+ネゴシエーション済みの場合、サーバーは UDP DNS が 512 バイトに制限されている
+と仮定してはなりません。ただし、クライアントは引き続き切り詰めに対応し、
+再試行しなければなりません。</p><h2 id=安全な解析>安全な解析
+<a href=#%e5%ae%89%e5%85%a8%e3%81%aa%e8%a7%a3%e6%9e%90 class=heading-anchor><span>#</span></a></h2><p>受信したデータグラムまたはストリームフレームだけを有効なバイト範囲として扱います。
+各固定幅フィールド、ラベル、ポインター、または RDATA 値を読み取る前に、その
+フィールド全体が範囲内に収まることを検証します。セクションのカウントは信頼
+できないため、指定されたレコード数を格納できない場合は停止します。</p><p>名前の伸長には 2 つの位置が必要です。1 つは呼び出し元が次に読み取るオフセット、
+もう 1 つは名前の再構成に使用するポインター追跡後のオフセットです。ポインター
+のホップ数を数えるか、訪問済みオフセットを追跡してサイクルを拒否し、予約済みの
+ラベルプレフィックスを拒否し、63 オクテットのラベル制限と 255 オクテットの
+伸長後の名前制限を適用します。また、メッセージ外部のポインター先を決して解釈
+してはなりません。</p><p>TCP および TLS トランスポートでは、2 オクテットの長さプレフィックスが各 DNS
+メッセージをフレーム化しますが、DNS ヘッダーの一部ではありません。解析する前に、
+その長さのバイトを正確に読み取ります。OPT レコードでは、TTL フィールドの拡張
+RCODE と基本ヘッダーの RCODE を組み合わせ、各オプションを <code>RDLENGTH</code> と
+メッセージ範囲の両方の内部で解析します。</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc1035>RFC 1035: DNS Implementation and Specification</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc6891>RFC 6891: EDNS</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc2181>RFC 2181: Clarifications to the DNS Specification</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/dns-wire-format/ class=language-option data-lang=en>English
+</a><a href=/ja/dns-wire-format/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/dns-wire-format/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/dns-wire-format/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

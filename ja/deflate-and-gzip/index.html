@@ -1,0 +1,52 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>DEFLATE と gzip の形式</title></head><body><main><article><div class=article-header><h1>DEFLATE と gzip の形式</h1><div class=aux>最終更新: 2023-09-27 03:10:18 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/compression/>Compression</a>
+|
+<a href=/ja/tags/deflate/>Deflate</a>
+|
+<a href=/ja/tags/gzip/>Gzip</a></div></div><div class="translation-notice machine-translated"><a href=/deflate-and-gzip/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>DEFLATE は RFC 1951 で定義されたビットストリーム形式です。LZ77 の
+スライディングウィンドウとハフマン符号を組み合わせています。「zlib」と
+「gzip」は DEFLATE を含むファイルを指すことが多いですが、それぞれ raw
+ビットストリームに対する異なるラッパーです。</p><h2 id=ブロック境界と-btype>ブロック境界と BTYPE
+<a href=#%e3%83%96%e3%83%ad%e3%83%83%e3%82%af%e5%a2%83%e7%95%8c%e3%81%a8-btype class=heading-anchor><span>#</span></a></h2><p>DEFLATE ストリームは一連のブロックで構成されます。各ブロックは現在の
+ビット位置から <code>BFINAL</code>（1 ビット）と <code>BTYPE</code>（2 ビット）で始まります。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>BTYPE</code></th><th>意味</th></tr></thead><tbody><tr><td><code>00</code></td><td>ハフマン符号化を行わない格納バイト</td></tr><tr><td><code>01</code></td><td>固定ハフマン符号で圧縮</td></tr><tr><td><code>10</code></td><td>動的ハフマン符号で圧縮</td></tr><tr><td><code>11</code></td><td>予約済みで無効</td></tr></tbody></table></div></div><p>最後のブロックだけ <code>BFINAL</code> が 1 になります。圧縮ブロックは、その
+リテラル/長さストリームがブロック終端（EOB）であるシンボル 256 を出力
+すると終了します。次のブロックヘッダーは次のビットから直ちに続くため、
+圧縮ブロックはバイト境界までパディングされません。格納ブロックは例外
+です。ヘッダーの後、デコーダーは現在のバイトに残っているビットを破棄し、
+リトルエンディアンの <code>LEN</code> と <code>NLEN</code>（<code>LEN</code> の 1 の補数）を読み取り、
+ちょうど <code>LEN</code> バイトをコピーします。<code>LEN</code> は 16 ビットなので、1 つの
+格納ブロックに格納できるのは最大 65,535 バイトです。</p><h2 id=lz77-シンボルとハフマン符号>LZ77 シンボルとハフマン符号
+<a href=#lz77-%e3%82%b7%e3%83%b3%e3%83%9c%e3%83%ab%e3%81%a8%e3%83%8f%e3%83%95%e3%83%9e%e3%83%b3%e7%ac%a6%e5%8f%b7 class=heading-anchor><span>#</span></a></h2><p>圧縮データのアルファベットには、リテラルバイト 0–255、EOB 256、および
+長さシンボル 257–285 が含まれます。長さシンボルは基準長と追加ビット数を
+選択します。続く距離シンボルは基準距離と追加ビット数を選択します。その
+結果得られるペアは、生成済み出力から最大 32 KiB 後方、最大 258 バイトの
+長さでバイトをコピーします。重複は有効です。</p><p>固定ブロックでは、RFC 1951 で規定された符号長を使用します。動的ブロック
+には <code>HLIT</code>（5 ビット）、<code>HDIST</code>（5 ビット）、<code>HCLEN</code>（4 ビット）が含まれ、
+指定された順列で符号長アルファベットを伝送します。このアルファベットは、
+ゼロの連続や繰り返される長さに対する繰り返し符号を含め、リテラル/長さ
+符号と距離符号の符号長を記述します。正準的な再構成によって、これらの
+長さから実際の符号が生成されます。</p><p>DEFLATE は各バイト内で最下位ビットから上位ビットへデータ要素を詰めます。
+数値の追加ビットフィールドは最下位ビットから先に並びます。ハフマン符号は
+正準値として割り当てられますが、形式で定められたビット反転規則に従って
+出力されます。パーサーはすべてのフィールドをバイト境界にそろえた整数
+として読み取るのではなく、ビットカーソルを保持する必要があります。</p><h2 id=zlib-と-gzip-のラッパー>zlib と gzip のラッパー
+<a href=#zlib-%e3%81%a8-gzip-%e3%81%ae%e3%83%a9%e3%83%83%e3%83%91%e3%83%bc class=heading-anchor><span>#</span></a></h2><p>raw DEFLATE にはヘッダーもトレーラーもありません。zlib ラッパー
+（RFC 1950）は <code>CMF</code> と <code>FLG</code> で始まり、<code>FCHECK</code> によって 16 ビットの
+ヘッダーが 31 で割り切れるようになっています。<code>FDICT</code> が設定されている
+場合は、4 バイトの Adler-32 辞書識別子が続きます。ストリームは、展開
+されたデータのビッグエンディアン Adler-32 で終了します。</p><p>gzip ラッパー（RFC 1952）はメンバーのシーケンスです。各メンバーには、
+マジックバイト <code>1f 8b</code>、圧縮方式 8、フラグ、変更時刻、追加フラグ、および
+オペレーティングシステムの各フィールドがあります。フラグによって、追加
+フィールド、元のファイル名、コメント、ヘッダー CRC を追加できます。
+トレーラーには、展開されたメンバーのリトルエンディアン CRC-32 と、
+サイズを 2³² で割った剰余である <code>ISIZE</code> が格納されます。メタデータは
+トレーラーの検証の代わりにはなりません。</p><p>プロトコルのドキュメントでは、表現形式を明示する必要があります。HTTP の
+<code>Content-Encoding: gzip</code> は gzip 形式を運びますが、method 8 を使用する
+ZIP エントリは通常 raw DEFLATE ストリームを運びます。ペイロードが
+「compressed」と記述されているという理由だけで、zlib デコーダーを安全に
+選択することはできません。</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc1951>RFC 1951: DEFLATE</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1950>RFC 1950: zlib Format</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1952>RFC 1952: gzip Format</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/deflate-and-gzip/ class=language-option data-lang=en>English
+</a><a href=/ja/deflate-and-gzip/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/deflate-and-gzip/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/deflate-and-gzip/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

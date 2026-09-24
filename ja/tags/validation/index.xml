@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Validation on cesun.life</title><link>https://example.org/ja/tags/validation/</link><description>Recent content in Validation on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Tue, 28 Nov 2023 10:33:04 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/validation/index.xml" rel="self" type="application/rss+xml"/><item><title>Springの変換とバリデーション</title><link>https://example.org/ja/spring-conversion-and-validation/</link><pubDate>Tue, 28 Nov 2023 10:33:04 +0800</pubDate><guid>https://example.org/ja/spring-conversion-and-validation/</guid><description>&lt;p&gt;Springでは、変換、表示用フォーマット、オブジェクトバインディング、バリデーションを別々の操作として扱います。そのため、リクエストパラメーターを型付きプロパティに変換しながら、ドメインオブジェクトをWebコントローラーに結合せずに、構造化されたエラーを生成できます。&lt;/p&gt;
+&lt;h2 id="変換とフォーマット"&gt;
+ 変換とフォーマット
+ &lt;a href="#%e5%a4%89%e6%8f%9b%e3%81%a8%e3%83%95%e3%82%a9%e3%83%bc%e3%83%9e%e3%83%83%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;ConversionService&lt;/code&gt;は、型変換のファサードです。変換が利用可能かどうかを最初に確認し、その後、rawクラスまたは&lt;code&gt;TypeDescriptor&lt;/code&gt;によって変換できます。&lt;code&gt;TypeDescriptor&lt;/code&gt;はアノテーションとネストされたジェネリック情報を保持します。&lt;/p&gt;
+&lt;p&gt;拡張インターフェースは、それぞれ異なる要件に対応します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;Converter&amp;lt;S, T&amp;gt;&lt;/code&gt;は、1つの強く型付けされた変換を実装します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ConverterFactory&amp;lt;S, R&amp;gt;&lt;/code&gt;は、ターゲットのサブタイプ群に対応するコンバーターを生成します。たとえば、&lt;code&gt;String&lt;/code&gt;から任意のenum型への変換です。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;GenericConverter&lt;/code&gt;は、変換可能なソース/ターゲットの組み合わせの集合を宣言し、コンテキスト依存の変換のために&lt;code&gt;TypeDescriptor&lt;/code&gt;値を受け取ります。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ConditionalGenericConverter&lt;/code&gt;は、特定のソースとターゲットに適合するかどうかも判断できます。&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;StringToOrderId&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;implements&lt;/span&gt; Converter&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;String, OrderId&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Override&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; OrderId &lt;span style="color:#a6e22e"&gt;convert&lt;/span&gt;(String source) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; OrderId(UUID.&lt;span style="color:#a6e22e"&gt;fromString&lt;/span&gt;(source.&lt;span style="color:#a6e22e"&gt;strip&lt;/span&gt;()));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;Formatter&amp;lt;T&amp;gt;&lt;/code&gt;は表示層に属します。その&lt;code&gt;Printer&lt;/code&gt;および&lt;code&gt;Parser&lt;/code&gt;操作は&lt;code&gt;Locale&lt;/code&gt;を使用するため、数値、日付、人間向けテキストに適しています。コンテキストに依存しない型変更にはコンバーターを使用し、テキスト表現がロケールまたはUIポリシーに依存する場合にはフォーマッターを使用します。両方とも&lt;code&gt;FormatterRegistry&lt;/code&gt;を通じて登録します。&lt;code&gt;DefaultFormattingConversionService&lt;/code&gt;は、レジストリとコンバージョンサービスの両方の契約を実装します。&lt;/p&gt;
+&lt;h2 id="レガシーjavabeansプロパティエディター"&gt;
+ レガシーJavaBeansプロパティエディター
+ &lt;a href="#%e3%83%ac%e3%82%ac%e3%82%b7%e3%83%bcjavabeans%e3%83%97%e3%83%ad%e3%83%91%e3%83%86%e3%82%a3%e3%82%a8%e3%83%87%e3%82%a3%e3%82%bf%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Springは互換性のために、現在も&lt;code&gt;java.beans.PropertyEditor&lt;/code&gt;をサポートしています。&lt;code&gt;PropertyEditor&lt;/code&gt;は状態を持ち、主にテキストと内部値を介して動作し、スレッドセーフではありません。そのため、コンテナはインスタンスを共有せず、バインディング操作ごとにエディターを生成します。&lt;/p&gt;
+&lt;p&gt;JavaBeansの規約では、&lt;code&gt;Type&lt;/code&gt;の隣にある&lt;code&gt;TypeEditor&lt;/code&gt;という名前のエディターを検索します。また、&lt;code&gt;PropertyEditorManager&lt;/code&gt;は明示的な登録と検索パスもサポートします。Springは、型全体またはプロパティパス単位で登録するための&lt;code&gt;PropertyEditorRegistry&lt;/code&gt;と、再利用可能な登録ロジックのための&lt;code&gt;PropertyEditorRegistrar&lt;/code&gt;を追加しています。&lt;code&gt;BeanWrapper&lt;/code&gt;と&lt;code&gt;DataBinder&lt;/code&gt;は、これらのレジストリを公開します。&lt;/p&gt;
+&lt;p&gt;新しいアプリケーションの変換には&lt;code&gt;ConversionService&lt;/code&gt;を使用してください。1つを必要とするJavaBeans APIと統合する場合は、エディターが適しています。HTTPメッセージボディは通常、プロパティエディターによってデコードされません。Spring MVCは、JSONなどのボディ形式に対して&lt;code&gt;HttpMessageConverter&lt;/code&gt;を使用します。&lt;/p&gt;
+&lt;h2 id="databinderによるバインディング"&gt;
+ &lt;code&gt;DataBinder&lt;/code&gt;によるバインディング
+ &lt;a href="#databinder%e3%81%ab%e3%82%88%e3%82%8b%e3%83%90%e3%82%a4%e3%83%b3%e3%83%87%e3%82%a3%e3%83%b3%e3%82%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;DataBinder&lt;/code&gt;は、入力されたプロパティ値をターゲットオブジェクトに適用します。ネストされたプロパティパスを解決し、変換またはプロパティエディターを呼び出し、失敗を&lt;code&gt;BindingResult&lt;/code&gt;に記録し、バリデーターを呼び出すことができます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; binder &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; DataBinder(command, &lt;span style="color:#e6db74"&gt;&amp;#34;order&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;binder.&lt;span style="color:#a6e22e"&gt;setAllowedFields&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;customerId&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;quantity&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;binder.&lt;span style="color:#a6e22e"&gt;setConversionService&lt;/span&gt;(conversionService);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;binder.&lt;span style="color:#a6e22e"&gt;addValidators&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; OrderValidator());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;binder.&lt;span style="color:#a6e22e"&gt;bind&lt;/span&gt;(propertyValues);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;binder.&lt;span style="color:#a6e22e"&gt;validate&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;BindingResult result &lt;span style="color:#f92672"&gt;=&lt;/span&gt; binder.&lt;span style="color:#a6e22e"&gt;getBindingResult&lt;/span&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;信頼できない入力のバインディングは、セキュリティ境界です。広範なドメインオブジェクトを公開するのではなく、許可するフィールドを定義するか、専用のコマンドオブジェクトを使用してください。変換に失敗すると、バインディング操作の外部に例外を送出する代わりに、フィールドエラーになります。ネストされたパスとコレクションの自動拡張は設定可能であり、攻撃者が制御する入力に対しては上限を設ける必要があります。&lt;/p&gt;
+&lt;h2 id="springのvalidator契約"&gt;
+ Springの&lt;code&gt;Validator&lt;/code&gt;契約
+ &lt;a href="#spring%e3%81%aevalidator%e5%a5%91%e7%b4%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Springの&lt;code&gt;Validator&lt;/code&gt;は、クラスをサポートするかどうかを宣言し、&lt;code&gt;Errors&lt;/code&gt;を通じて失敗を報告します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OrderValidator&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;implements&lt;/span&gt; Validator {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;boolean&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;supports&lt;/span&gt;(Class&lt;span style="color:#f92672"&gt;&amp;lt;?&amp;gt;&lt;/span&gt; type) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; OrderCommand.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;isAssignableFrom&lt;/span&gt;(type);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;validate&lt;/span&gt;(Object target, Errors errors) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; order &lt;span style="color:#f92672"&gt;=&lt;/span&gt; (OrderCommand) target;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ValidationUtils.&lt;span style="color:#a6e22e"&gt;rejectIfEmpty&lt;/span&gt;(errors, &lt;span style="color:#e6db74"&gt;&amp;#34;customerId&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;required&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (order.&lt;span style="color:#a6e22e"&gt;quantity&lt;/span&gt;() &lt;span style="color:#f92672"&gt;&amp;lt;=&lt;/span&gt; 0) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; errors.&lt;span style="color:#a6e22e"&gt;rejectValue&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;quantity&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;positive&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;Errors.pushNestedPath()&lt;/code&gt;と&lt;code&gt;popNestedPath()&lt;/code&gt;を使用すると、複合バリデーターが正しいパスで子のエラーを報告できます。エラーコードは論理識別子であり、メッセージ解決によって後からローカライズされたテキストを選択できます。&lt;/p&gt;</description></item></channel></rss>

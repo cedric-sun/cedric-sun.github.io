@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Cgroups on cesun.life</title><link>https://example.org/zh-cn/tags/cgroups/</link><description>Recent content in Cgroups on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sat, 15 Oct 2022 15:47:14 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/cgroups/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 控制组第 2 版</title><link>https://example.org/zh-cn/linux-cgroup-v2/</link><pubDate>Sat, 15 Oct 2022 15:47:14 +0800</pubDate><guid>https://example.org/zh-cn/linux-cgroup-v2/</guid><description>&lt;p&gt;控制组（cgroup）负责核算和控制 Linux 任务集合。cgroup 不是进程树节点：任务在 fork 时继承父级 cgroup，但管理器随后可以迁移它。因此，cgroup 为服务管理器和容器提供资源边界，而命名空间提供全局资源的视图。&lt;/p&gt;
+&lt;p&gt;本文描述 cgroup 第 2 版（cgroup v2）。其文档化接口是 &lt;code&gt;cgroup2&lt;/code&gt; 文件系统；文件和受支持的控制器取决于正在运行的内核配置和可用硬件。&lt;/p&gt;
+&lt;h2 id="统一层次结构和成员关系"&gt;
+ 统一层次结构和成员关系
+ &lt;a href="#%e7%bb%9f%e4%b8%80%e5%b1%82%e6%ac%a1%e7%bb%93%e6%9e%84%e5%92%8c%e6%88%90%e5%91%98%e5%85%b3%e7%b3%bb" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Cgroup v2 只有一个统一层次结构。每个任务恰好属于该层次结构中的一个 cgroup，包括未命名的根 cgroup。子 cgroup 继承祖先允许的约束和控制器配置，因此子级不能获得其父级未委托的 CPU、内存或设备。&lt;/p&gt;
+&lt;p&gt;层次结构由 &lt;code&gt;cgroup2&lt;/code&gt; 挂载表示，通常为 &lt;code&gt;/sys/fs/cgroup&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;findmnt -t cgroup2
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cat /proc/self/cgroup
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ps -o pid,cgroup,comm -p $$&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每个目录都是一个 cgroup。创建目录会创建子 cgroup，向其 &lt;code&gt;cgroup.procs&lt;/code&gt; 写入 PID 会迁移进程的线程组：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo mkdir /sys/fs/cgroup/build
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;printf &lt;span style="color:#e6db74"&gt;&amp;#39;%s\n&amp;#39;&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$$&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; | sudo tee /sys/fs/cgroup/build/cgroup.procs&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;应使用服务管理器，而不是手动移动它自己的进程。例如，systemd 会为切片、作用域和服务创建并管理 cgroup；手动迁移可能违反管理器的核算和生命周期假设。&lt;/p&gt;
+&lt;h3 id="域-cgroup-和线程化-cgroup"&gt;
+ 域 cgroup 和线程化 cgroup
+ &lt;a href="#%e5%9f%9f-cgroup-%e5%92%8c%e7%ba%bf%e7%a8%8b%e5%8c%96-cgroup" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;普通层次结构由&lt;em&gt;域&lt;/em&gt; cgroup 组成，其控制器将进程作为一个整体应用。“无内部进程”规则阻止非根域 cgroup 同时包含进程并向子级分发域控制器。应将工作负载移入叶节点，并使用空的中间节点在子 cgroup 之间分配控制器：&lt;/p&gt;</description></item></channel></rss>

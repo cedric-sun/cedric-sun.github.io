@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>文件描述符 on cesun.life</title><link>https://example.org/zh-cn/tags/%E6%96%87%E4%BB%B6%E6%8F%8F%E8%BF%B0%E7%AC%A6/</link><description>Recent content in 文件描述符 on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Wed, 06 Oct 2021 12:25:39 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/%E6%96%87%E4%BB%B6%E6%8F%8F%E8%BF%B0%E7%AC%A6/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 文件描述符</title><link>https://example.org/zh-cn/linux-file-descriptors/</link><pubDate>Wed, 06 Oct 2021 12:25:39 +0800</pubDate><guid>https://example.org/zh-cn/linux-file-descriptors/</guid><description>&lt;p&gt;Linux 将进程的整数句柄与存储打开实例状态的内核对象分离。这个区别解释了偏移共享、复制、继承以及许多描述符泄漏。&lt;/p&gt;
+&lt;h2 id="描述符表和打开文件描述"&gt;
+ 描述符表和打开文件描述
+ &lt;a href="#%e6%8f%8f%e8%bf%b0%e7%ac%a6%e8%a1%a8%e5%92%8c%e6%89%93%e5%bc%80%e6%96%87%e4%bb%b6%e6%8f%8f%e8%bf%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;文件描述符是一个非负整数，用于索引调用进程的描述符表。表项引用一个&lt;strong&gt;打开文件描述&lt;/strong&gt;，在 Linux 内部由 &lt;code&gt;struct file&lt;/code&gt; 表示。打开文件描述记录如下状态：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;当前文件偏移；&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;O_APPEND&lt;/code&gt; 和 &lt;code&gt;O_NONBLOCK&lt;/code&gt; 等文件状态标志；&lt;/li&gt;
+&lt;li&gt;打开的路径、访问模式、凭据和文件操作。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;每次成功的 &lt;code&gt;open()&lt;/code&gt; 通常都会创建一个新的打开文件描述，并在进程表中安装一个引用。因此，打开同一路径两次会创建独立偏移：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; a &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;open&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;events.log&amp;#34;&lt;/span&gt;, O_RDONLY);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; b &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;open&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;events.log&amp;#34;&lt;/span&gt;, O_RDONLY); &lt;span style="color:#75715e"&gt;/* independent description and offset */&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;inode 标识文件系统对象，而打开文件描述标识对它的一次打开。取消链接或重命名路径不会使现有描述符失效。&lt;/p&gt;
+&lt;p&gt;描述符标志属于表项，而不是共享的打开文件描述。主要描述符标志是 &lt;code&gt;FD_CLOEXEC&lt;/code&gt;，通过 &lt;code&gt;fcntl(fd, F_GETFD/F_SETFD)&lt;/code&gt; 读取或更改。应优先使用 &lt;code&gt;O_CLOEXEC&lt;/code&gt;、&lt;code&gt;pipe2(O_CLOEXEC)&lt;/code&gt; 和 &lt;code&gt;dup3(..., O_CLOEXEC)&lt;/code&gt; 等原子创建标志，因为在后续 &lt;code&gt;fcntl()&lt;/code&gt; 调用中设置标志，会与另一个线程中的 &lt;code&gt;fork()&lt;/code&gt; 加 &lt;code&gt;execve()&lt;/code&gt; 竞争。&lt;/p&gt;
+&lt;h2 id="复制fork-和-execve"&gt;
+ 复制、&lt;code&gt;fork()&lt;/code&gt; 和 &lt;code&gt;execve()&lt;/code&gt;
+ &lt;a href="#%e5%a4%8d%e5%88%b6fork-%e5%92%8c-execve" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;dup()&lt;/code&gt;、&lt;code&gt;dup2()&lt;/code&gt; 和 &lt;code&gt;dup3()&lt;/code&gt; 创建另一个引用同一打开文件描述的描述符。因此，复制的描述符共享偏移和文件状态标志：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; input &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;open&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;input&amp;#34;&lt;/span&gt;, O_RDONLY &lt;span style="color:#f92672"&gt;|&lt;/span&gt; O_CLOEXEC);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; stdin_copy &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;dup&lt;/span&gt;(input);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;read&lt;/span&gt;(input, buf, &lt;span style="color:#ae81ff"&gt;16&lt;/span&gt;); &lt;span style="color:#75715e"&gt;/* advances the shared offset */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;read&lt;/span&gt;(stdin_copy, buf, &lt;span style="color:#ae81ff"&gt;16&lt;/span&gt;); &lt;span style="color:#75715e"&gt;/* starts after those 16 bytes */&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;新描述符拥有自己的描述符标志。特别是，&lt;code&gt;dup()&lt;/code&gt; 和 &lt;code&gt;dup2()&lt;/code&gt; 会清除新描述符上的 close-on-exec；&lt;code&gt;dup3()&lt;/code&gt; 可以原子地设置它。&lt;code&gt;dup2(oldfd, newfd)&lt;/code&gt; 会在必要时原子关闭 &lt;code&gt;newfd&lt;/code&gt; 并复用该编号，从而避免先关闭再复制的竞争。&lt;/p&gt;</description></item></channel></rss>

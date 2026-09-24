@@ -1,0 +1,72 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>C++ 设计指南</title></head><body><main><article><div class=article-header><h1>C++ 设计指南</h1><div class=aux>最后更新: 2023-02-05 10:36:28 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/c-plus-plus/>C-Plus-Plus</a>
+|
+<a href=/zh-cn/tags/design/>Design</a></div></div><div class="translation-notice machine-translated"><a href=/cpp-core-guidelines/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>C++ 接口应在类型和签名中编码所有权、生命周期和可替代性。C++ Core Guidelines 的
+Rule of Zero 正是这一设计的结果：由 RAII 成员组成的领域值不应手动重复它们的复制、
+移动和销毁行为。</p><h2 id=资源所有者和领域值>资源所有者和领域值
+<a href=#%e8%b5%84%e6%ba%90%e6%89%80%e6%9c%89%e8%80%85%e5%92%8c%e9%a2%86%e5%9f%9f%e5%80%bc class=heading-anchor><span>#</span></a></h2><p>资源所有者类型获取一个资源，在析构函数中释放它，并说明是否允许复制或转移。句柄表示
+对资源的访问；所有者句柄还承担释放资源的责任。当标准所有者不能表达资源的获取、释放
+或错误策略时，使用所有者句柄是合适的：</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;cstdio&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;utility&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>File</span> {
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>explicit</span> File(std<span style=color:#f92672>::</span>FILE<span style=color:#f92672>*</span> owned_handle) <span style=color:#66d9ef>noexcept</span> <span style=color:#f92672>:</span> handle_(owned_handle) {}
+</span></span><span style=display:flex><span>    <span style=color:#f92672>~</span>File() { <span style=color:#66d9ef>if</span> (handle_) std<span style=color:#f92672>::</span>fclose(handle_); }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    File(<span style=color:#66d9ef>const</span> File<span style=color:#f92672>&amp;</span>) <span style=color:#f92672>=</span> <span style=color:#66d9ef>delete</span>;
+</span></span><span style=display:flex><span>    File<span style=color:#f92672>&amp;</span> <span style=color:#66d9ef>operator</span><span style=color:#f92672>=</span>(<span style=color:#66d9ef>const</span> File<span style=color:#f92672>&amp;</span>) <span style=color:#f92672>=</span> <span style=color:#66d9ef>delete</span>;
+</span></span><span style=display:flex><span>    File(File<span style=color:#f92672>&amp;&amp;</span> other) <span style=color:#66d9ef>noexcept</span> <span style=color:#f92672>:</span> handle_(std<span style=color:#f92672>::</span>exchange(other.handle_, <span style=color:#66d9ef>nullptr</span>)) {}
+</span></span><span style=display:flex><span>    File<span style=color:#f92672>&amp;</span> <span style=color:#66d9ef>operator</span><span style=color:#f92672>=</span>(File<span style=color:#f92672>&amp;&amp;</span> other) <span style=color:#66d9ef>noexcept</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#66d9ef>this</span> <span style=color:#f92672>!=</span> <span style=color:#f92672>&amp;</span>other) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>if</span> (handle_) std<span style=color:#f92672>::</span>fclose(handle_);
+</span></span><span style=display:flex><span>            handle_ <span style=color:#f92672>=</span> std<span style=color:#f92672>::</span>exchange(other.handle_, <span style=color:#66d9ef>nullptr</span>);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#f92672>*</span><span style=color:#66d9ef>this</span>;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    std<span style=color:#f92672>::</span>FILE<span style=color:#f92672>*</span> handle_;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>栈展开期间析构函数不能抛出异常。当调用者必须观察释放失败时，提供显式的类似
+<code>close()</code> 的操作，然后让析构函数执行不抛出异常的清理。确保自定义移动操作转移资源，
+并使源对象处于可安全销毁的状态；默认的指针移动会复制裸指针，因此对于所有者裸句柄是
+错误的。如果能够表达所有权，应优先使用带自定义删除器的 <code>std::unique_ptr</code>。</p><p>领域值应组合正确的所有者：</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;string&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;utility&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;vector&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Entry</span> {
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>explicit</span> Entry(std<span style=color:#f92672>::</span>string name) <span style=color:#f92672>:</span> name_(std<span style=color:#f92672>::</span>move(name)) {}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    std<span style=color:#f92672>::</span>string name_;
+</span></span><span style=display:flex><span>    std<span style=color:#f92672>::</span>vector<span style=color:#f92672>&lt;</span>std<span style=color:#f92672>::</span>string<span style=color:#f92672>&gt;</span> labels_;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>由于 <code>std::string</code> 和 <code>std::vector</code> 已经提供值语义，<code>Entry</code> 不需要自定义析构函数、
+复制操作或移动操作。</p><h2 id=用继承表示接口>用继承表示接口
+<a href=#%e7%94%a8%e7%bb%a7%e6%89%bf%e8%a1%a8%e7%a4%ba%e6%8e%a5%e5%8f%a3 class=heading-anchor><span>#</span></a></h2><p>公有继承表示接口层面的“是一个”关系。只有当基类的每个有效操作对派生类型仍然有效时，
+才使用公有继承；若只是为了复用实现而不需要可替代性，则使用组合。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>struct</span> <span style=color:#a6e22e>Shape</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>virtual</span> <span style=color:#f92672>~</span>Shape() <span style=color:#f92672>=</span> <span style=color:#66d9ef>default</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>virtual</span> <span style=color:#66d9ef>double</span> <span style=color:#a6e22e>area</span>() <span style=color:#66d9ef>const</span> <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>当客户端可以通过基类指针销毁派生对象时，多态基类需要虚析构函数。使用 <code>override</code> 标记
+有意的重写；只有在有意关闭扩展边界时才使用 <code>final</code>。保持表示私有，因为允许访问可变
+表示会像公开数据一样直接削弱不变量。</p><h2 id=将参数作为所有权契约>将参数作为所有权契约
+<a href=#%e5%b0%86%e5%8f%82%e6%95%b0%e4%bd%9c%e4%b8%ba%e6%89%80%e6%9c%89%e6%9d%83%e5%a5%91%e7%ba%a6 class=heading-anchor><span>#</span></a></h2><p>在考虑复制成本之前，先根据所有权和生命周期要求选择参数形式：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>参数</th><th>契约</th></tr></thead><tbody><tr><td><code>T</code></td><td>被调用方接收自己的值；适合廉价值，或被调用方会保留副本的情况。</td></tr><tr><td><code>const T&</code></td><td>非所有者只读借用；调用者在调用期间负责维持生命周期。</td></tr><tr><td><code>T&</code></td><td>非空可变借用；被调用方可以修改被引用对象，但不拥有它。</td></tr><tr><td><code>T*</code></td><td>可以为空的借用；空值必须具有文档化的含义。</td></tr><tr><td><code>std::unique_ptr&lt;T></code> 按值传递</td><td>所有权转移给被调用方。</td></tr><tr><td><code>std::shared_ptr&lt;T></code> 按值传递</td><td>建立或延长共享所有权；仅在确实需要共享生命周期时使用。</td></tr></tbody></table></div></div><p>按值接收 <code>std::string</code> 并将其移动到存储中，可以为左值和右值调用者高效表达独立保留的值：</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;string&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;utility&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>User</span> {
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>explicit</span> User(std<span style=color:#f92672>::</span>string name) <span style=color:#f92672>:</span> name_(std<span style=color:#f92672>::</span>move(name)) {}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    std<span style=color:#f92672>::</span>string name_;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>不要使用裸指针隐藏所有权转移。当调用者承担责任时，应返回
+<code>std::unique_ptr&lt;T></code> 等所有者值；只有在 API 能够说明并维持被借用对象的生命周期时，才
+返回引用或非所有者指针。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cpp-core-guidelines/ class=language-option data-lang=en>English
+</a><a href=/ja/cpp-core-guidelines/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cpp-core-guidelines/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cpp-core-guidelines/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

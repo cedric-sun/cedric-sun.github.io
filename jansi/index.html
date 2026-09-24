@@ -1,0 +1,357 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Colorful Terminal Output with Jansi</title></head><body><main><article><div class=article-header><h1>Colorful Terminal Output with Jansi</h1><div class=aux>Last update: 2025-12-10 11:30:28 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/terminal/>Terminal</a>
+|
+<a href=/tags/jansi/>Jansi</a>
+|
+<a href=/tags/slf4j/>Slf4j</a>
+|
+<a href=/tags/logback/>Logback</a>
+|
+<a href=/tags/spring-boot/>Spring-Boot</a></div></div><div class=article-content><p><a href=https://github.com/jline/jline3>Jansi</a> is a Java library for generating and
+processing ANSI escape sequences. These sequences let a terminal display
+colors and styles, move the cursor, erase parts of the screen, and perform
+other terminal operations.</p><p>For example, the following bytes mean “use bold red text,” print <code>FAILED</code>, and
+then restore the terminal&rsquo;s default attributes:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>\u001B[1;31mFAILED\u001B[0m</span></span></code></pre></div></div></div><p>Writing those codes by hand is difficult to read and easy to get wrong. Jansi
+provides a fluent Java API for constructing them and terminal-aware streams
+that can pass through, adapt, or remove them as appropriate.</p><p>Jansi is useful for command-line applications, installers, build tools, and
+small terminal dashboards. It is not a logging framework and is not a complete
+interactive-shell framework. Use JLine&rsquo;s terminal and line-reader APIs when an
+application also needs command history, completion, input editing, signal
+handling, or a rich full-screen interface.</p><h2 id=the-project-moved-to-jline>The Project Moved to JLine
+<a href=#the-project-moved-to-jline class=heading-anchor><span>#</span></a></h2><p>Many examples on the internet use these old Maven coordinates and imports:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>org.fusesource.jansi:jansi
+</span></span><span style=display:flex><span>org.fusesource.jansi.Ansi
+</span></span><span style=display:flex><span>org.fusesource.jansi.AnsiConsole</span></span></code></pre></div></div></div><p>The original FuseSource project is no longer maintained. Jansi was moved into
+the JLine project, and new applications should use:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>org.jline:jansi
+</span></span><span style=display:flex><span>org.jline.jansi.Ansi
+</span></span><span style=display:flex><span>org.jline.jansi.AnsiConsole</span></span></code></pre></div></div></div><p>The API remains familiar, but the package change matters when copying examples
+or integrating with a library that discovers Jansi by class name.</p><p>Add the maintained JLine artifact to Maven:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;properties&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;jline.version&gt;</span>4.0.0<span style=color:#f92672>&lt;/jline.version&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/properties&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;groupId&gt;</span>org.jline<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;artifactId&gt;</span>jansi<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;version&gt;</span>${jline.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p>Or with Gradle:</p><div class=jose-wrapper><div class=jose-tools><span>groovy</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-groovy data-lang=groovy><span style=display:flex><span>dependencies <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>    implementation <span style=color:#e6db74>&#34;org.jline:jansi:4.0.0&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>Use the version managed by the application&rsquo;s JLine bill of materials or
+dependency management when JLine is already present. This avoids loading
+incompatible versions of closely related JLine modules.</p><h2 id=ansi-escape-sequences>ANSI Escape Sequences
+<a href=#ansi-escape-sequences class=heading-anchor><span>#</span></a></h2><p>An ANSI control sequence starts with the escape character, represented in Java
+as <code>\u001B</code> or <code>\033</code>, followed by instructions interpreted by the terminal.
+The Select Graphic Rendition, or SGR, family controls color and style:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String red <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;\u001B[31m&#34;</span>;
+</span></span><span style=display:flex><span>String bold <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;\u001B[1m&#34;</span>;
+</span></span><span style=display:flex><span>String reset <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;\u001B[0m&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(red <span style=color:#f92672>+</span> bold <span style=color:#f92672>+</span> <span style=color:#e6db74>&#34;Danger&#34;</span> <span style=color:#f92672>+</span> reset);</span></span></code></pre></div></div></div><p>This works in a compatible terminal, but direct string concatenation has
+several problems:</p><ul><li>numeric control codes hide the intent;</li><li>forgetting the reset can color every later line;</li><li>terminals support different color depths and capabilities;</li><li>escape sequences are undesirable in redirected text, files, and machine-
+readable output;</li><li>cursor operations are stateful and can corrupt output when several threads
+write concurrently.</li></ul><p>Jansi addresses the first four problems. Coordinating concurrent writers is
+still the application&rsquo;s responsibility.</p><h2 id=building-styled-text>Building Styled Text
+<a href=#building-styled-text class=heading-anchor><span>#</span></a></h2><p>The <code>org.jline.jansi.Ansi</code> builder appends text and control sequences to one
+object:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.jline.jansi.Ansi;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.jline.jansi.Ansi.Color.GREEN;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.jline.jansi.Ansi.Color.RED;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>StatusPrinter</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#a6e22e>StatusPrinter</span>() {
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>printResult</span>(<span style=color:#66d9ef>boolean</span> successful) {
+</span></span><span style=display:flex><span>        Ansi line <span style=color:#f92672>=</span> Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>bold</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>fg</span>(successful <span style=color:#f92672>?</span> GREEN : RED)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>a</span>(successful <span style=color:#f92672>?</span> <span style=color:#e6db74>&#34;SUCCESS&#34;</span> : <span style=color:#e6db74>&#34;FAILED&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>reset</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34; Deployment finished&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(line);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Calling <code>toString()</code> is implicit when the <code>Ansi</code> object is passed to
+<code>println</code>. The builder can be converted explicitly when an API requires a
+<code>String</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String message <span style=color:#f92672>=</span> Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>fgBright</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>CYAN</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34;Listening on port 8080&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>reset</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>toString</span>();</span></span></code></pre></div></div></div><p>The commonly used methods include:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Method</th><th>Effect</th></tr></thead><tbody><tr><td><code>fg(color)</code></td><td>Sets a foreground color</td></tr><tr><td><code>fgBright(color)</code></td><td>Sets a bright foreground color</td></tr><tr><td><code>bg(color)</code></td><td>Sets a background color</td></tr><tr><td><code>bgBright(color)</code></td><td>Sets a bright background color</td></tr><tr><td><code>bold()</code></td><td>Enables bold or increased intensity</td></tr><tr><td><code>underline()</code></td><td>Enables underlining</td></tr><tr><td><code>a(value)</code></td><td>Appends text or another value</td></tr><tr><td><code>newline()</code></td><td>Appends the platform line separator</td></tr><tr><td><code>reset()</code></td><td>Restores default colors and attributes</td></tr></tbody></table></div></div><p>The exact appearance is controlled by the terminal and its theme. “Bright
+black,” for example, is commonly rendered as gray, while bold may be displayed
+as brighter text rather than a heavier font.</p><p>Always reset attributes at the end of independently printed styled content:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(
+</span></span><span style=display:flex><span>        Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>fg</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>YELLOW</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34;Warning:&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>reset</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34; cache is almost full&#34;</span>)
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Resetting before the unstyled suffix also makes the intended boundary clear.</p><h3 id=backgrounds-and-nested-styles>Backgrounds and Nested Styles
+<a href=#backgrounds-and-nested-styles class=heading-anchor><span>#</span></a></h3><p>Foreground, background, and text attributes can be combined:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String banner <span style=color:#f92672>=</span> Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>fg</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>WHITE</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>bg</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>RED</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>bold</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34; STOP &#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>reset</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>toString</span>();</span></span></code></pre></div></div></div><p><code>reset()</code> resets all attributes; it does not restore an earlier nested style.
+When composing reusable fragments, either let one component own the entire
+styled region or explicitly reapply the outer style after a reset. Do not
+assume that terminal formatting behaves like nested HTML elements.</p><h3 id=renderer-syntax>Renderer Syntax
+<a href=#renderer-syntax class=heading-anchor><span>#</span></a></h3><p>Jansi also supports a compact markup syntax:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String result <span style=color:#f92672>=</span> Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>render</span>(<span style=color:#e6db74>&#34;@|bold,green Build passed|@&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>toString</span>();</span></span></code></pre></div></div></div><p>The fluent API is usually clearer for conditional or composed output. Renderer
+syntax is convenient for short, fixed messages, but should not be applied
+blindly to untrusted text because <code>@|...|@</code> has meaning to the renderer.</p><h2 id=installing-terminal-aware-streams>Installing Terminal-Aware Streams
+<a href=#installing-terminal-aware-streams class=heading-anchor><span>#</span></a></h2><p>Generating an ANSI string and making it suitable for the current output
+destination are separate concerns. <code>Ansi</code> generates sequences.
+<code>AnsiConsole</code> supplies streams that process them.</p><p>The most direct application-wide setup replaces <code>System.out</code> and <code>System.err</code>:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.jline.jansi.Ansi;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.jline.jansi.AnsiConsole;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>CliApplication</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#a6e22e>CliApplication</span>() {
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) {
+</span></span><span style=display:flex><span>        AnsiConsole.<span style=color:#a6e22e>systemInstall</span>();
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>            System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(
+</span></span><span style=display:flex><span>                    Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>                            .<span style=color:#a6e22e>fg</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>GREEN</span>)
+</span></span><span style=display:flex><span>                            .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34;Ready&#34;</span>)
+</span></span><span style=display:flex><span>                            .<span style=color:#a6e22e>reset</span>()
+</span></span><span style=display:flex><span>            );
+</span></span><span style=display:flex><span>        } <span style=color:#66d9ef>finally</span> {
+</span></span><span style=display:flex><span>            AnsiConsole.<span style=color:#a6e22e>systemUninstall</span>();
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Installation is reference-counted. Every call to <code>systemInstall()</code> must have a
+corresponding call to <code>systemUninstall()</code>. The <code>finally</code> block is therefore
+important even when the program normally exits immediately.</p><p>Replacing the global streams affects the entire process, including libraries
+and logging systems that write to <code>System.out</code> or <code>System.err</code>. A library
+should generally not do this on behalf of its host application. An application
+that wants a smaller scope can write to Jansi&rsquo;s streams directly:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>AnsiConsole.<span style=color:#a6e22e>out</span>().<span style=color:#a6e22e>println</span>(
+</span></span><span style=display:flex><span>        Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>fg</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>MAGENTA</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34;Interactive mode&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>reset</span>()
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p><code>AnsiConsole.out()</code> and <code>AnsiConsole.err()</code> initialize and return
+terminal-aware streams without assigning them to Java&rsquo;s global stream fields.</p><h2 id=terminal-detection-and-redirection>Terminal Detection and Redirection
+<a href=#terminal-detection-and-redirection class=heading-anchor><span>#</span></a></h2><p>Color is appropriate for a person looking at a terminal, but usually not for a
+file, pipe, test capture, log collector, or JSON consumer:</p><div class=jose-wrapper><div class=jose-tools><span>shell</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-shell data-lang=shell><span style=display:flex><span>java -jar tool.jar &gt; result.txt
+</span></span><span style=display:flex><span>java -jar tool.jar | jq .</span></span></code></pre></div></div></div><p>In its default mode, Jansi uses the terminal type and output destination to
+select its behavior:</p><ul><li>on a native terminal, ANSI sequences are retained and adapted to supported
+capabilities;</li><li>on unsupported or redirected output, ANSI sequences are stripped;</li><li>color depth can be inferred from terminal information such as <code>TERM</code> and
+<code>COLORTERM</code>.</li></ul><p>The behavior can be overridden with Java system properties:</p><div class=jose-wrapper><div class=jose-tools><span>shell</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-shell data-lang=shell><span style=display:flex><span><span style=color:#75715e># Always remove ANSI sequences.</span>
+</span></span><span style=display:flex><span>java -Djansi.mode<span style=color:#f92672>=</span>strip -jar tool.jar
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Emit ANSI even when output is redirected.</span>
+</span></span><span style=display:flex><span>java -Djansi.mode<span style=color:#f92672>=</span>force -jar tool.jar
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Force a particular color depth.</span>
+</span></span><span style=display:flex><span>java -Djansi.colors<span style=color:#f92672>=</span><span style=color:#ae81ff>256</span> -jar tool.jar
+</span></span><span style=display:flex><span>java -Djansi.colors<span style=color:#f92672>=</span>truecolor -jar tool.jar</span></span></code></pre></div></div></div><p><code>jansi.out.mode</code> and <code>jansi.err.mode</code> override the mode for one stream, while
+<code>jansi.out.colors</code> and <code>jansi.err.colors</code> do the same for color depth.</p><p>Forcing color is useful when another program understands ANSI sequences.
+Stripping is appropriate for deterministic plain-text output. Defaults are
+normally best for an end-user CLI.</p><p>Do not use <code>System.console() != null</code> as the only color test. It is a useful
+hint, but IDE terminals, pseudo-terminals, containers, pipes, and test runners
+make terminal detection more nuanced. Let the terminal library make the
+decision and provide an explicit <code>--color=auto|always|never</code> option for users
+when predictable control matters.</p><h2 id=windows-support>Windows Support
+<a href=#windows-support class=heading-anchor><span>#</span></a></h2><p>Historically, Jansi was especially useful because older Windows consoles did
+not interpret ANSI sequences. Jansi could translate terminal operations using
+platform-specific support.</p><p>Modern Windows 10 and later terminals generally support ANSI natively,
+including Windows Terminal and current <code>cmd.exe</code> and PowerShell environments.
+That means <code>AnsiConsole.systemInstall()</code> is no longer required merely to make
+basic colors work on most current systems. It remains useful when an
+application wants Jansi&rsquo;s consistent stream processing, redirected-output
+handling, color-depth adaptation, or support for a wider deployment matrix.</p><p>Test the actual environments supported by the application. “Windows,” an IDE
+console, an SSH session, and a CI runner do not describe one uniform set of
+terminal capabilities.</p><h2 id=cursor-and-screen-control>Cursor and Screen Control
+<a href=#cursor-and-screen-control class=heading-anchor><span>#</span></a></h2><p>Jansi can generate more than color codes:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Ansi progress <span style=color:#f92672>=</span> Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>cursorUp</span>(1)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>eraseLine</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34;Progress: 75%&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>print</span>(progress);
+</span></span><span style=display:flex><span>System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>flush</span>();</span></span></code></pre></div></div></div><p>Other operations include:</p><ul><li>positioning the cursor with <code>cursor(row, column)</code>;</li><li>moving it up, down, left, or right;</li><li>saving and restoring cursor position;</li><li>erasing a line or the screen;</li><li>scrolling terminal content.</li></ul><p>These operations should be reserved for interactive terminal output. If the
+same bytes are written to a file or mixed with ordinary logs, the result is
+unreadable. Cursor-based displays should also have one owner that serializes
+updates. Background log messages can otherwise move the cursor between an
+erase and a redraw.</p><p>For a sophisticated interactive application, use JLine&rsquo;s <code>Terminal</code>,
+<code>LineReader</code>, and display abstractions rather than building a terminal user
+interface entirely from cursor sequences.</p><h2 id=integrating-with-slf4j-and-logback>Integrating with SLF4J and Logback
+<a href=#integrating-with-slf4j-and-logback class=heading-anchor><span>#</span></a></h2><p>SLF4J, Logback, and Jansi solve different problems:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Component</th><th>Responsibility</th></tr></thead><tbody><tr><td>SLF4J</td><td>API through which application code creates logging events</td></tr><tr><td>Logback</td><td>SLF4J provider that filters, formats, and routes those events</td></tr><tr><td>ANSI pattern converters</td><td>Insert style sequences into formatted console text</td></tr><tr><td>Jansi</td><td>Generate or process ANSI sequences for a terminal stream</td></tr></tbody></table></div></div><p>SLF4J itself does not color output and does not know whether an event is going
+to a terminal, a rolling file, JSON, or a remote collector. Application code
+should therefore log semantic, uncolored values:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.slf4j.Logger;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.slf4j.LoggerFactory;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ImportService</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> Logger LOGGER <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>            LoggerFactory.<span style=color:#a6e22e>getLogger</span>(ImportService.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>importFile</span>(String name, <span style=color:#66d9ef>int</span> recordCount) {
+</span></span><span style=display:flex><span>        LOGGER.<span style=color:#a6e22e>info</span>(<span style=color:#e6db74>&#34;Imported {} records from {}&#34;</span>, recordCount, name);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Do not put <code>Ansi.ansi()</code> values into general log messages:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#75715e>// Avoid this: every appender receives control characters in the message.</span>
+</span></span><span style=display:flex><span>LOGGER.<span style=color:#a6e22e>info</span>(<span style=color:#e6db74>&#34;{} Import failed&#34;</span>, Ansi.<span style=color:#a6e22e>ansi</span>().<span style=color:#a6e22e>fg</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>RED</span>).<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34;ERROR&#34;</span>).<span style=color:#a6e22e>reset</span>());</span></span></code></pre></div></div></div><p>The same logging event may be sent to both a console and a file. Styling in the
+message contaminates every destination and makes search, parsing, alerting, and
+tests harder.</p><h3 id=a-colored-console-and-a-plain-file>A Colored Console and a Plain File
+<a href=#a-colored-console-and-a-plain-file class=heading-anchor><span>#</span></a></h3><p>Logback&rsquo;s pattern converters can add ANSI only while formatting the console
+appender. <code>%highlight</code> chooses a color according to the log level. Converters
+such as <code>%red</code>, <code>%yellow</code>, <code>%green</code>, <code>%blue</code>, <code>%magenta</code>, <code>%cyan</code>, <code>%white</code>,
+and <code>%boldRed</code> apply a fixed style.</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;configuration&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;appender</span> <span style=color:#a6e22e>name=</span><span style=color:#e6db74>&#34;CONSOLE&#34;</span>
+</span></span><span style=display:flex><span>              <span style=color:#a6e22e>class=</span><span style=color:#e6db74>&#34;ch.qos.logback.core.ConsoleAppender&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;target&gt;</span>System.err<span style=color:#f92672>&lt;/target&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;encoder&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;pattern&gt;</span>
+</span></span><span style=display:flex><span>                %d{HH:mm:ss.SSS} %highlight(%-5level)
+</span></span><span style=display:flex><span>                %cyan(%logger{36}) - %msg%n
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;/pattern&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;/encoder&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/appender&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;appender</span> <span style=color:#a6e22e>name=</span><span style=color:#e6db74>&#34;FILE&#34;</span>
+</span></span><span style=display:flex><span>              <span style=color:#a6e22e>class=</span><span style=color:#e6db74>&#34;ch.qos.logback.core.rolling.RollingFileAppender&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;file&gt;</span>logs/application.log<span style=color:#f92672>&lt;/file&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;rollingPolicy</span>
+</span></span><span style=display:flex><span>                <span style=color:#a6e22e>class=</span><span style=color:#e6db74>&#34;ch.qos.logback.core.rolling.TimeBasedRollingPolicy&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;fileNamePattern&gt;</span>
+</span></span><span style=display:flex><span>                logs/application.%d{yyyy-MM-dd}.log
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;/fileNamePattern&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;maxHistory&gt;</span>14<span style=color:#f92672>&lt;/maxHistory&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;/rollingPolicy&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;encoder&gt;</span>
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;pattern&gt;</span>
+</span></span><span style=display:flex><span>                %d{yyyy-MM-dd&#39;T&#39;HH:mm:ss.SSSXXX} %-5level
+</span></span><span style=display:flex><span>                %logger{36} - %msg%n
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&lt;/pattern&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;/encoder&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/appender&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;root</span> <span style=color:#a6e22e>level=</span><span style=color:#e6db74>&#34;INFO&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;appender-ref</span> <span style=color:#a6e22e>ref=</span><span style=color:#e6db74>&#34;CONSOLE&#34;</span><span style=color:#f92672>/&gt;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&lt;appender-ref</span> <span style=color:#a6e22e>ref=</span><span style=color:#e6db74>&#34;FILE&#34;</span><span style=color:#f92672>/&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/root&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/configuration&gt;</span></span></span></code></pre></div></div></div><p>The console pattern contains the color converters. The file pattern does not.
+The logging calls remain independent of presentation.</p><p>In a modern terminal, the ANSI sequences emitted by Logback usually work
+without Jansi. If the application globally installs the maintained Jansi
+stream before Logback&rsquo;s console appender captures <code>System.err</code>, Jansi can
+process those sequences:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) {
+</span></span><span style=display:flex><span>    AnsiConsole.<span style=color:#a6e22e>systemInstall</span>();
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>        runApplication(args);
+</span></span><span style=display:flex><span>    } <span style=color:#66d9ef>finally</span> {
+</span></span><span style=display:flex><span>        AnsiConsole.<span style=color:#a6e22e>systemUninstall</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Initialize the terminal stream before the logging system creates its console
+appender. Otherwise, the appender may retain a reference to the original
+stream.</p><h3 id=the-withjansi-compatibility-trap>The <code>withJansi</code> Compatibility Trap
+<a href=#the-withjansi-compatibility-trap class=heading-anchor><span>#</span></a></h3><p>Logback&rsquo;s <code>ConsoleAppender</code> has a <code>&lt;withJansi>true&lt;/withJansi></code> option. Current
+Logback source still discovers this legacy class by name:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>org.fusesource.jansi.AnsiConsole</span></span></code></pre></div></div></div><p>The maintained JLine artifact exposes:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>org.jline.jansi.AnsiConsole</span></span></code></pre></div></div></div><p>Consequently, <code>&lt;withJansi>true&lt;/withJansi></code> does not integrate with the
+relocated <code>org.jline:jansi</code> artifact. Adding the unmaintained
+<code>org.fusesource.jansi:jansi</code> artifact merely to satisfy that reflective lookup
+is not a good default for a new application.</p><p>Prefer one of these approaches:</p><ol><li>let a modern terminal render Logback&rsquo;s ANSI converters directly;</li><li>install the maintained <code>org.jline.jansi.AnsiConsole</code> streams in application
+bootstrap code when Jansi processing is required;</li><li>avoid ANSI converters when output is destined for a collector or a format
+such as JSON.</li></ol><p>Jansi does not decide log levels, format events, rotate files, or route logs.
+Those remain Logback responsibilities.</p><h2 id=spring-boot-logging>Spring Boot Logging
+<a href=#spring-boot-logging class=heading-anchor><span>#</span></a></h2><p>Spring Boot already has its own ANSI support for Logback and Log4j2
+configuration. Its <code>%clr</code> conversion word can color content by level or by an
+explicit style:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;pattern&gt;</span>
+</span></span><span style=display:flex><span>    %clr(%d{yyyy-MM-dd&#39;T&#39;HH:mm:ss.SSSXXX}){faint}
+</span></span><span style=display:flex><span>    %clr(%-5level)
+</span></span><span style=display:flex><span>    %clr(${PID:- }){magenta}
+</span></span><span style=display:flex><span>    %clr([%thread]){faint}
+</span></span><span style=display:flex><span>    %clr(%logger{39}){cyan} : %msg%n
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/pattern&gt;</span></span></span></code></pre></div></div></div><p>Boot controls ANSI emission through:</p><div class=jose-wrapper><div class=jose-tools><span>properties</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-properties data-lang=properties><span style=display:flex><span><span style=color:#a6e22e>spring.output.ansi.enabled</span><span style=color:#f92672>=</span><span style=color:#e6db74>detect</span></span></span></code></pre></div></div></div><p>The supported policies are <code>detect</code>, <code>always</code>, and <code>never</code>. <code>detect</code> is the
+normal choice for applications used both interactively and through redirected
+output.</p><p>Spring Boot&rsquo;s <code>%clr</code> converter and ANSI policy are separate from direct Jansi
+usage. A typical Boot service should use <code>%clr</code> for console logs and keep file
+or JSON appenders plain. Add Jansi only if the application also prints its own
+terminal UI or requires Jansi-specific stream processing.</p><h2 id=separating-human-and-machine-output>Separating Human and Machine Output
+<a href=#separating-human-and-machine-output class=heading-anchor><span>#</span></a></h2><p>A reliable CLI treats its output channels as an interface:</p><ul><li>use <code>stdout</code> for the command&rsquo;s primary result;</li><li>use <code>stderr</code> for diagnostics, progress, and logs;</li><li>keep structured output modes free of ANSI sequences;</li><li>disable cursor movement when output is not interactive;</li><li>provide an explicit color policy when scripts need stable behavior.</li></ul><p>For example, a command that supports JSON should not decorate the JSON:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>if</span> (jsonOutput) {
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(json);
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>    AnsiConsole.<span style=color:#a6e22e>out</span>().<span style=color:#a6e22e>println</span>(
+</span></span><span style=display:flex><span>            Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>fg</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>GREEN</span>)
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34;Created &#34;</span>)
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>reset</span>()
+</span></span><span style=display:flex><span>                    .<span style=color:#a6e22e>a</span>(resourceId)
+</span></span><span style=display:flex><span>    );
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Color should improve human readability without changing the meaning or
+parseability of the underlying information. Never make color the only way to
+distinguish success from failure; also use words, symbols, exit codes, or
+structured fields.</p><h2 id=testing-terminal-output>Testing Terminal Output
+<a href=#testing-terminal-output class=heading-anchor><span>#</span></a></h2><p>Most unit tests should verify the semantic text rather than depend on a real
+terminal. Put presentation behind a small formatter and make the color policy
+explicit:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.jline.jansi.Ansi;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ResultFormatter</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> String <span style=color:#a6e22e>success</span>(String message, <span style=color:#66d9ef>boolean</span> colorEnabled) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>colorEnabled) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span> <span style=color:#e6db74>&#34;SUCCESS &#34;</span> <span style=color:#f92672>+</span> message;
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> Ansi.<span style=color:#a6e22e>ansi</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>fg</span>(Ansi.<span style=color:#a6e22e>Color</span>.<span style=color:#a6e22e>GREEN</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>bold</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34;SUCCESS&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>reset</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>a</span>(<span style=color:#e6db74>&#34; &#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>a</span>(message)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>toString</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Then test both contracts:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>assertEquals(
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;SUCCESS uploaded&#34;</span>,
+</span></span><span style=display:flex><span>        formatter.<span style=color:#a6e22e>success</span>(<span style=color:#e6db74>&#34;uploaded&#34;</span>, <span style=color:#66d9ef>false</span>)
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>assertTrue(
+</span></span><span style=display:flex><span>        formatter.<span style=color:#a6e22e>success</span>(<span style=color:#e6db74>&#34;uploaded&#34;</span>, <span style=color:#66d9ef>true</span>).<span style=color:#a6e22e>contains</span>(<span style=color:#e6db74>&#34;\u001B[&#34;</span>)
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Exact ANSI strings can be asserted when the sequence itself is the contract,
+but such tests are tightly coupled to formatting choices. Integration tests for
+auto-detection should run in both a pseudo-terminal and a redirected process;
+capturing <code>System.out</code> in a byte array is not equivalent to attaching a
+terminal.</p><p>Avoid changing Jansi&rsquo;s global enabled state or replacing <code>System.out</code> in tests
+that run concurrently. Prefer injected streams and local formatters where
+possible, and restore global state in <code>finally</code> when a process-level test
+really needs it.</p><h2 id=practical-guidelines>Practical Guidelines
+<a href=#practical-guidelines class=heading-anchor><span>#</span></a></h2><p>Use Jansi deliberately:</p><ol><li>depend on the maintained <code>org.jline:jansi</code> artifact, not the old
+FuseSource coordinates;</li><li>use the <code>Ansi</code> builder instead of handwritten escape codes;</li><li>end independent styled regions with <code>reset()</code>;</li><li>let terminal-aware code strip color from redirected output by default;</li><li>keep ANSI out of files, JSON, and general SLF4J message arguments;</li><li>add color in the Logback console pattern, not in application logging calls;</li><li>do not expect Logback&rsquo;s legacy <code>&lt;withJansi></code> option to find the relocated
+JLine package;</li><li>install and uninstall global Jansi streams symmetrically;</li><li>serialize cursor-based output and keep it separate from ordinary logs;</li><li>offer users <code>auto</code>, <code>always</code>, and <code>never</code> color policies when output is a
+public CLI contract.</li></ol><p>With those boundaries, terminal output can be expressive for people while
+remaining predictable for files, pipelines, tests, and logging systems.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/jansi/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

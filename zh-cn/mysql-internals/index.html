@@ -1,0 +1,60 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MySQL InnoDB 内部机制</title></head><body><main><article><div class=article-header><h1>MySQL InnoDB 内部机制</h1><div class=aux>最后更新: 2022-08-14 15:11:43 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/mysql/>Mysql</a>
+|
+<a href=/zh-cn/tags/innodb/>Innodb</a>
+|
+<a href=/zh-cn/tags/databases/>Databases</a></div></div><div class="translation-notice machine-translated"><a href=/mysql-internals/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>InnoDB 将表数据和索引存储在按表空间组织的页面中。一个
+tablespace has a fixed page size, selected when the data directory is
+initialized. The default page size is 16 KiB. Page-oriented I/O explains why
+index locality, buffer-pool capacity, and row width affect query cost.</p><h2 id=数据字典与元数据>数据字典与元数据
+<a href=#%e6%95%b0%e6%8d%ae%e5%ad%97%e5%85%b8%e4%b8%8e%e5%85%83%e6%95%b0%e6%8d%ae class=heading-anchor><span>#</span></a></h2><p>MySQL 8 将事务性数据字典存储在 InnoDB 中。 Server metadata,
+including schemas, tables, columns, indexes, stored programs, and privileges,
+is therefore crash-safe and participates in atomic data-definition operations.
+应用必须使用 <code>INFORMATION_SCHEMA</code>、Performance Schema 或 <code>SHOW</code> 语句检查元数据；内部字典表不是应用接口。</p><p><code>INFORMATION_SCHEMA</code> exposes SQL views over metadata. The <code>sys</code> schema adds
+human-oriented views over Performance Schema and Information Schema data, such
+as expensive statements and unused indexes.</p><p>Data-definition operations update dictionary metadata and storage-engine state
+as one atomic DDL transaction when the operation supports atomic DDL. Dictionary
+records remain server internals; reading or modifying underlying InnoDB tables
+directly is unsupported.</p><h2 id=表空间>表空间
+<a href=#%e8%a1%a8%e7%a9%ba%e9%97%b4 class=heading-anchor><span>#</span></a></h2><p>InnoDB 安装可以使用：</p><ul><li><strong>系统表空间</strong>用于更改缓冲区数据和其他共享 InnoDB
+structures.</li><li><strong>独立表文件表空间</strong>，在启用
+<code>innodb_file_per_table</code> is enabled.</li><li><strong>通用表空间</strong>，由管理员创建并分配给
+compatible tables.</li><li>由 InnoDB 管理的独立撤销表空间和临时表空间。</li></ul><p>A table does not map safely to one operating-system file across all
+configurations. Backup and restore must use MySQL-aware tools or a documented
+physical-backup procedure because a consistent database spans data files, redo
+logs, and metadata.</p><h2 id=页面区与索引记录>页面、区与索引记录
+<a href=#%e9%a1%b5%e9%9d%a2%e5%8c%ba%e4%b8%8e%e7%b4%a2%e5%bc%95%e8%ae%b0%e5%bd%95 class=heading-anchor><span>#</span></a></h2><p>A tablespace is divided into pages, and pages are grouped into extents. With the
+default 16 KiB page size, an extent contains 64 pages and occupies 1 MiB.
+InnoDB allocates small segments page by page before using whole extents as they
+grow.</p><p>Each table is organized around its clustered index. Clustered leaf pages contain
+row records, while internal pages contain separator keys and child-page
+pointers. Secondary-index leaf records contain secondary keys plus the primary
+key used to locate the clustered record. Undo pages retain older row versions
+needed by MVCC, and internal temporary tables can use the global temporary
+tablespace or session temporary tablespaces depending on their kind and release.</p><h2 id=双写缓冲区与恢复>双写缓冲区与恢复
+<a href=#%e5%8f%8c%e5%86%99%e7%bc%93%e5%86%b2%e5%8c%ba%e4%b8%8e%e6%81%a2%e5%a4%8d class=heading-anchor><span>#</span></a></h2><p>InnoDB writes dirty pages through the doublewrite mechanism before making the
+final tablespace write. A storage failure can otherwise leave a partially
+written page, called a torn page. During recovery, InnoDB can use the valid
+doublewrite copy when page checksums identify a torn final write.</p><p>Redo logging records changes before affected pages are flushed. During crash
+recovery, InnoDB replays required redo and rolls back incomplete transactions
+with undo records. Disabling durability settings changes acknowledged-write
+semantics and must be treated as a data-loss decision, not a performance-only
+tuning choice.</p><h2 id=检查>检查
+<a href=#%e6%a3%80%e6%9f%a5 class=heading-anchor><span>#</span></a></h2><p>使用受支持的模式，而不是检查文件：</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> name, space_type
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> information_schema.innodb_tablespaces
+</span></span><span style=display:flex><span><span style=color:#66d9ef>ORDER</span> <span style=color:#66d9ef>BY</span> name;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> pool_id, pool_size, free_buffers, database_pages
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> information_schema.innodb_buffer_pool_stats;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> event_name, count_star, sum_timer_wait
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> performance_schema.events_waits_summary_global_by_event_name
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> event_name <span style=color:#66d9ef>LIKE</span> <span style=color:#e6db74>&#39;wait/io/file/innodb/%&#39;</span>;</span></span></code></pre></div></div></div><p><code>INFORMATION_SCHEMA.INNODB_*</code> tables describe logical InnoDB objects and buffer
+state. Performance Schema attributes observed work and waits. Both interfaces
+change across releases, so operational queries must target the deployed MySQL
+version.</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-architecture.html>InnoDB Architecture</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-tablespace.html>InnoDB Tablespaces</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-page-structure.html>InnoDB Page Structure</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mysql-internals/ class=language-option data-lang=en>English
+</a><a href=/ja/mysql-internals/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/mysql-internals/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/mysql-internals/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

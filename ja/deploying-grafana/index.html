@@ -1,0 +1,56 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Grafana のデプロイ</title></head><body><main><article><div class=article-header><h1>Grafana のデプロイ</h1><div class=aux>最終更新: 2025-07-24 19:26:27 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/grafana/>Grafana</a>
+|
+<a href=/ja/tags/%E7%9B%A3%E8%A6%96/>監視</a>
+|
+<a href=/ja/tags/%E5%8F%AF%E8%A6%B3%E6%B8%AC%E6%80%A7/>可観測性</a></div></div><div class="translation-notice machine-translated"><a href=/deploying-grafana/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Grafana は可視化とアラートのサービスです。本番環境のデプロイには、実行中のコンテナー
+だけでなく、永続的な状態、再現可能なプロビジョニング、認証されたアクセス、バックアップ
+とアップグレードの手順が必要です。</p><h2 id=永続状態で-grafana-を実行する>永続状態で Grafana を実行する
+<a href=#%e6%b0%b8%e7%b6%9a%e7%8a%b6%e6%85%8b%e3%81%a7-grafana-%e3%82%92%e5%ae%9f%e8%a1%8c%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Grafana は、ユーザー、UI で作成したダッシュボード、アラートデータ、構成メタデータを
+データベースに保存します。小規模なインストールではデフォルトの SQLite データベースを
+永続化し、高可用性デプロイではサポートされている外部データベースを使用して、ロード
+バランサーの背後で複数の Grafana インスタンスを実行します。</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>services</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>grafana</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>image</span>: <span style=color:#ae81ff>grafana/grafana:11.2.0</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>ports</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#34;3000:3000&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>grafana-data:/var/lib/grafana</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>./provisioning:/etc/grafana/provisioning:ro</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>environment</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>GF_SERVER_ROOT_URL</span>: <span style=color:#ae81ff>https://grafana.example.com/</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>GF_SECURITY_ADMIN_USER</span>: <span style=color:#ae81ff>admin</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>GF_SECURITY_ADMIN_PASSWORD__FILE</span>: <span style=color:#ae81ff>/run/secrets/grafana_admin_password</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>secrets</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>grafana_admin_password</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>grafana-data</span>:
+</span></span><span style=display:flex><span><span style=color:#f92672>secrets</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>grafana_admin_password</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>file</span>: <span style=color:#ae81ff>./grafana_admin_password.txt</span></span></span></code></pre></div></div></div><p>浮動タグではなく、テスト済みのイメージバージョンを固定してください。示したシークレット
+ファイルは、ファイルシステム権限とデプロイ機構を管理できる場合に限り適しています。
+本番環境ではプラットフォームのシークレットマネージャーを使用してください。</p><h2 id=データソースとダッシュボードをプロビジョニングする>データソースとダッシュボードをプロビジョニングする
+<a href=#%e3%83%87%e3%83%bc%e3%82%bf%e3%82%bd%e3%83%bc%e3%82%b9%e3%81%a8%e3%83%80%e3%83%83%e3%82%b7%e3%83%a5%e3%83%9c%e3%83%bc%e3%83%89%e3%82%92%e3%83%97%e3%83%ad%e3%83%93%e3%82%b8%e3%83%a7%e3%83%8b%e3%83%b3%e3%82%b0%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>プロビジョニングにより、構成をレビュー可能かつ再現可能にできます。Prometheus データ
+ソースは <code>provisioning/datasources/prometheus.yaml</code> で定義できます。</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>apiVersion</span>: <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>datasources</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#f92672>name</span>: <span style=color:#ae81ff>Prometheus</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>type</span>: <span style=color:#ae81ff>prometheus</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>access</span>: <span style=color:#ae81ff>proxy</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>url</span>: <span style=color:#ae81ff>http://prometheus:9090</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>isDefault</span>: <span style=color:#66d9ef>true</span></span></span></code></pre></div></div></div><p>バージョン管理に保存したダッシュボードにはダッシュボードプロビジョニングを使用します。
+所有権は慎重に決めてください。ソースファイルが変更されると、再起動時にプロビジョニング
+されたダッシュボードが上書きされる可能性があります。緊急の UI 変更に対応する手順を
+文書化し、変更をソース管理にエクスポートして戻せるようにします。</p><h2 id=セキュリティバックアップアップグレード>セキュリティ、バックアップ、アップグレード
+<a href=#%e3%82%bb%e3%82%ad%e3%83%a5%e3%83%aa%e3%83%86%e3%82%a3%e3%83%90%e3%83%83%e3%82%af%e3%82%a2%e3%83%83%e3%83%97%e3%82%a2%e3%83%83%e3%83%97%e3%82%b0%e3%83%ac%e3%83%bc%e3%83%89 class=heading-anchor><span>#</span></a></h2><p>Grafana または信頼できるリバースプロキシで TLS を終端し、公開 <code>root_url</code> を設定して、
+正しい OAuth、SAML、LDAP、または匿名アクセスのポリシーを構成します。意図的に公開する
+場合を除き、匿名アクセスを無効にしてください。組織とフォルダーの権限を使用して、チーム
+が互いのダッシュボードやアラートルールを変更できないようにします。</p><p>データベースとプロビジョニングリポジトリを一緒にバックアップし、リストアをテストします。
+アップグレード前にリリースノートを読み、データベースをバックアップし、データソースと
+アラート配信に対して対象バージョンをテストし、ロールバック計画を保持してください。
+認証とレート制限の制御なしに、Grafana の管理エンドポイントを直接インターネットへ公開
+しないでください。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/deploying-grafana/ class=language-option data-lang=en>English
+</a><a href=/ja/deploying-grafana/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/deploying-grafana/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/deploying-grafana/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

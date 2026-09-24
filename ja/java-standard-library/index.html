@@ -1,0 +1,48 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java標準ライブラリ</title></head><body><main><article><div class=article-header><h1>Java標準ライブラリ</h1><div class=aux>最終更新: 2021-06-11 09:05:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/java/>Java</a>
+|
+<a href=/ja/tags/jdk/>Jdk</a>
+|
+<a href=/ja/tags/standard-library/>Standard-Library</a></div></div><div class="translation-notice machine-translated"><a href=/java-standard-library/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>小さなライブラリのコントラクトは、APIの表面積よりも正しさを左右することが
+頻繁にあります。以下のルールは、よくあるJava統合の失敗を防ぎます。</p><h2 id=オブジェクトのコントラクト>オブジェクトのコントラクト
+<a href=#%e3%82%aa%e3%83%96%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88%e3%81%ae%e3%82%b3%e3%83%b3%e3%83%88%e3%83%a9%e3%82%af%e3%83%88 class=heading-anchor><span>#</span></a></h2><p><code>equals</code>は、反射的、対称的、推移的、一貫性があり、<code>null</code>に対してfalseで
+なければなりません。2つのオブジェクトが等しい場合、それらは同じ
+<code>hashCode</code>を持たなければなりません。したがって、値をハッシュキーとして
+使用する前に、両方をオーバーライドしてください。オブジェクトがマップの
+キーになっている間は、等価性の判定に使用するフィールドを変更しないでください。
+等価性によって対称性が破られる場合は、継承よりもコンポジションを優先します。</p><p><code>Object.clone</code>はフィールドをコピーしますが、コンストラクター、継承、
+可変フィールドとの相性がよくありません。コピーコンストラクターまたは
+名前付きの<code>copyOf</code>ファクトリを優先してください。配列は、<code>clone</code>が予測可能な
+浅い配列のコントラクトを持つため、限定的な例外です。</p><h2 id=テキスト正規表現文字列>テキスト、正規表現、文字列
+<a href=#%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88%e6%ad%a3%e8%a6%8f%e8%a1%a8%e7%8f%be%e6%96%87%e5%ad%97%e5%88%97 class=heading-anchor><span>#</span></a></h2><p>再利用する<code>Pattern</code>はコンパイルしてください。<code>Matcher.matches()</code>は入力全体が
+一致することを要求しますが、<code>find()</code>は次に一致する領域を検索します。
+<code>Pattern.quote(value)</code>は正規表現に配置するリテラルテキストをエスケープし、
+<code>Matcher.quoteReplacement(value)</code>は置換文字列をエスケープします。これらは
+互換的に使用できません。</p><p>JDK 9以降、HotSpotの<code>String</code>実装はコンパクト文字列を使用しています。
+<code>byte[]</code>とエンコーディングマーカーの組み合わせにより、Latin-1テキストを
+コンパクトに表現し、それ以外はUTF-16で表現できます。これは実装詳細です。
+Javaの<code>String</code>は引き続きUTF-16コード単位の列であり、I/O境界では<code>Charset</code>変換を
+明示的に行う必要があります。</p><h2 id=カウンターと列挙型コレクション>カウンターと列挙型コレクション
+<a href=#%e3%82%ab%e3%82%a6%e3%83%b3%e3%82%bf%e3%83%bc%e3%81%a8%e5%88%97%e6%8c%99%e5%9e%8b%e3%82%b3%e3%83%ac%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3 class=heading-anchor><span>#</span></a></h2><p><code>AtomicLong</code>は、正確で線形化可能な単一の値を提供します。<code>LongAdder</code>は競合時に
+更新を複数のセルへ分散するため、更新のスケーラビリティは向上しますが、
+更新と同時に実行される<code>sum()</code>はアトミックなスナップショットではありません。
+メトリクスには<code>LongAdder</code>を使用し、観測した各合計値が正しさの判定を左右する
+場合には<code>AtomicLong</code>を使用してください。</p><p><code>Enum&lt;E extends Enum&lt;E>></code>は、1つの列挙型に対して、型安全な順序付けと操作を
+<code>Enum</code>に提供します。<code>EnumSet</code>と<code>EnumMap</code>は、その閉じたキー空間を活用し、
+列挙子の宣言順序を保持します。列挙型を対象とする場合は、<code>HashSet</code>や
+<code>HashMap</code>よりもこれらを優先してください。</p><h2 id=コレクションとスレッド>コレクションとスレッド
+<a href=#%e3%82%b3%e3%83%ac%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3%e3%81%a8%e3%82%b9%e3%83%ac%e3%83%83%e3%83%89 class=heading-anchor><span>#</span></a></h2><p><code>Thread.State</code>は、<code>BLOCKED</code>、<code>WAITING</code>、<code>TIMED_WAITING</code>など、JVMレベルの状態を
+報告します。これは観測用であり、同期プロトコルではありません。スレッドの
+協調には、<code>join</code>、future、ラッチ、または構造化された所有関係を使用してください。</p><p><code>Map</code>が<code>null</code>キーまたは値を許可するかどうかは、実装固有です。
+<code>HashMap</code>は1つのnullキーを許可しますが、<code>ConcurrentHashMap</code>はnullキーと
+null値を拒否します。また、<code>TreeMap</code>は自然順序付けの場合にnullキーを拒否する
+ことがあります。<code>Map</code>インターフェースのオプション操作が成功すると仮定せず、
+選択した実装のコントラクトを確認してください。</p><p><code>Arrays.asList(array)</code>は、指定されたオブジェクト配列を基盤とする固定サイズの
+リストを返します。<code>set</code>はその配列を更新しますが、<code>add</code>と<code>remove</code>は失敗します。
+<code>int[]</code>を渡すと、可変長引数がプリミティブ配列をボックス化しないため、1要素の
+<code>List&lt;int[]></code>が作成されます。ボックス化された値のリストが必要な場合は、
+<code>Arrays.stream(ints).boxed().toList()</code>を使用してください。</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html>JDK <code>Object</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html>JDK <code>Pattern</code> API</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/LongAdder.html>JDK <code>LongAdder</code> API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-standard-library/ class=language-option data-lang=en>English
+</a><a href=/ja/java-standard-library/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/java-standard-library/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/java-standard-library/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Dependency-Injection on cesun.life</title><link>https://example.org/zh-tw/tags/dependency-injection/</link><description>Recent content in Dependency-Injection on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Mon, 17 Nov 2025 23:19:46 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/dependency-injection/index.xml" rel="self" type="application/rss+xml"/><item><title>Spring Bean 生命週期與原型作用域</title><link>https://example.org/zh-tw/spring-bean-lifecycle/</link><pubDate>Mon, 17 Nov 2025 23:19:46 +0800</pubDate><guid>https://example.org/zh-tw/spring-bean-lifecycle/</guid><description>&lt;p&gt;Spring 將 Bean 中繼資料與 Bean 執行個體分離。&lt;code&gt;BeanDefinition&lt;/code&gt; 描述如何建立物件，
+而 &lt;code&gt;BeanFactory&lt;/code&gt; 會在要求物件時套用該定義。&lt;code&gt;ApplicationContext&lt;/code&gt; 另外提供協調式啟動、
+後處理、事件、資源載入與關閉功能。&lt;/p&gt;
+&lt;h2 id="context-重新整理期間會發生什麼"&gt;
+ Context 重新整理期間會發生什麼
+ &lt;a href="#context-%e9%87%8d%e6%96%b0%e6%95%b4%e7%90%86%e6%9c%9f%e9%96%93%e6%9c%83%e7%99%bc%e7%94%9f%e4%bb%80%e9%ba%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;AbstractApplicationContext.refresh()&lt;/code&gt; 會在應用程式單例可以使用之前準備環境與
+Bean 工廠。主要階段如下：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;準備或取得 &lt;code&gt;BeanFactory&lt;/code&gt;，並載入 Bean 定義。&lt;/li&gt;
+&lt;li&gt;在定義仍可變更時呼叫 &lt;code&gt;BeanFactoryPostProcessor&lt;/code&gt;s，包括組態類別處理。&lt;/li&gt;
+&lt;li&gt;探索並註冊 &lt;code&gt;BeanPostProcessor&lt;/code&gt;s。&lt;/li&gt;
+&lt;li&gt;初始化 Context 基礎設施，例如訊息解析、事件及 Context 專用資源。&lt;/li&gt;
+&lt;li&gt;建立其餘的非延遲初始化單例 Bean。&lt;/li&gt;
+&lt;li&gt;發布已重新整理的狀態與 &lt;code&gt;ContextRefreshedEvent&lt;/code&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;BeanFactoryPostProcessor&lt;/code&gt; 會變更中繼資料。相較之下，&lt;code&gt;BeanPostProcessor&lt;/code&gt; 會處理
+執行個體，可以注入欄位、呼叫生命週期註解，或將 Bean 替換為 Proxy。由於一般應用程式
+Bean 可能在所有後處理器註冊前就被建立，因此從工廠後處理器建立一般應用程式 Bean
+並不安全。&lt;/p&gt;
+&lt;h2 id="相依順序與-depends-on"&gt;
+ 相依順序與 &lt;code&gt;depends-on&lt;/code&gt;
+ &lt;a href="#%e7%9b%b8%e4%be%9d%e9%a0%86%e5%ba%8f%e8%88%87-depends-on" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;容器會先建立 Bean 的建構函式相依項與屬性相依項，再建立相依於它的 Bean。因此，
+建構函式注入同時表達必要關係與建立順序：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Component&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;ReportService&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; ReportRepository repository;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ReportService(ReportRepository repository) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;this&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;repository&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; repository;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;當不存在注入關係時，例如初始化共用外部資源，&lt;code&gt;@DependsOn(&amp;quot;schemaInitializer&amp;quot;)&lt;/code&gt;
+或 XML 的 &lt;code&gt;depends-on&lt;/code&gt; 可以加入順序。對單例 Bean 而言，它也會反轉銷毀順序：
+相依 Bean 會在其所相依的 Bean 之前被銷毀。&lt;code&gt;depends-on&lt;/code&gt; 會隱藏類別所使用的內容，
+因此不應取代實際的具型別相依關係。&lt;/p&gt;</description></item><item><title>Spring 容器型別</title><link>https://example.org/zh-tw/spring-container-types/</link><pubDate>Thu, 14 Dec 2023 04:20:44 +0800</pubDate><guid>https://example.org/zh-tw/spring-container-types/</guid><description>&lt;p&gt;Spring 的容器 API 有三個不同層級：Bean 中繼資料、從該中繼資料建立物件的工廠，以及協調工廠與應用程式服務的應用程式上下文。保持這些層級分離，可以更容易理解 Spring 原始碼與擴充點。&lt;/p&gt;
+&lt;h2 id="bean-定義與登錄"&gt;
+ Bean 定義與登錄
+ &lt;a href="#bean-%e5%ae%9a%e7%be%a9%e8%88%87%e7%99%bb%e9%8c%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;BeanDefinition&lt;/code&gt; 是單一 Bean 的可變中繼資料。它記錄 Bean 類別或類別名稱、範圍、建構函式引數、屬性值、限定詞、工廠方法、生命週期方法、角色、來源位置與明確相依性。父子中繼資料關係獨立於 Java 繼承。&lt;/p&gt;
+&lt;p&gt;常見實作服務於不同的註冊路徑：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;RootBeanDefinition&lt;/code&gt; 表示 Bean 工廠使用的合併定義。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ChildBeanDefinition&lt;/code&gt; 從具名父定義繼承中繼資料。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;GenericBeanDefinition&lt;/code&gt; 在合併前可表達獨立或衍生自父項的中繼資料。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;AnnotatedGenericBeanDefinition&lt;/code&gt; 暴露已註冊類別的註解中繼資料。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ScannedGenericBeanDefinition&lt;/code&gt; 暴露類別路徑掃描期間讀取的中繼資料，而不先載入元件類別。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;BeanDefinitionRegistry&lt;/code&gt; 依 Bean 名稱儲存定義。其核心作業是註冊、移除與查詢定義；&lt;code&gt;DefaultListableBeanFactory&lt;/code&gt; 與 &lt;code&gt;GenericApplicationContext&lt;/code&gt; 是重要實作。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;AnnotatedBeanDefinitionReader&lt;/code&gt; 註冊明確提供的元件類別：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; GenericApplicationContext();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; reader &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; AnnotatedBeanDefinitionReader(context);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;reader.&lt;span style="color:#a6e22e"&gt;register&lt;/span&gt;(OrderService.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;context.&lt;span style="color:#a6e22e"&gt;refresh&lt;/span&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;ClassPathBeanDefinitionScanner&lt;/code&gt; 搜尋套件中的候選元件並註冊其定義。兩種機制都會套用註解範圍、命名、限定詞、條件與 &lt;code&gt;BeanDefinitionCustomizer&lt;/code&gt; 回呼。客製化器可在註冊期間進行針對性的中繼資料變更，而不必實作登錄後處理器。&lt;/p&gt;
+&lt;h2 id="beanfactoryfactorybean-與-objectfactory"&gt;
+ &lt;code&gt;BeanFactory&lt;/code&gt;、&lt;code&gt;FactoryBean&lt;/code&gt; 與 &lt;code&gt;ObjectFactory&lt;/code&gt;
+ &lt;a href="#beanfactoryfactorybean-%e8%88%87-objectfactory" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;BeanFactory&lt;/code&gt; 是執行階段登錄與相依性解析 API。它定位定義、建立 Bean、解析協作者、管理單例識別，並套用生命週期處理器。&lt;code&gt;ListableBeanFactory&lt;/code&gt; 加入列舉，&lt;code&gt;HierarchicalBeanFactory&lt;/code&gt; 加入父項查找，而 &lt;code&gt;ConfigurableListableBeanFactory&lt;/code&gt; 將容器設定暴露給框架基礎設施。應用程式程式碼應依賴其網域協作者，而不是把 &lt;code&gt;getBean()&lt;/code&gt; 當作服務定位器呼叫。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Rust on cesun.life</title><link>https://example.org/ja/tags/rust/</link><description>Recent content in Rust on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Fri, 11 Sep 2026 11:02:01 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/rust/index.xml" rel="self" type="application/rss+xml"/><item><title>agent-browser: AIエージェント向けブラウザー自動化</title><link>https://example.org/ja/agent-browser/</link><pubDate>Fri, 11 Sep 2026 11:02:01 +0800</pubDate><guid>https://example.org/ja/agent-browser/</guid><description>&lt;p&gt;&lt;a href="https://github.com/vercel-labs/agent-browser"&gt;agent-browser&lt;/a&gt; は、AIエージェント向けに設計された Apache-2.0 ライセンスのブラウザー自動化 CLI です。エージェントに Playwright プログラム全体を生成させる代わりに、ナビゲーション、操作、検査、状態、ネットワーク、可観測性の各操作をシェルコマンドとして公開します。永続的なネイティブデーモンが、これらのコマンド間でブラウザーを保持します。&lt;/p&gt;
+&lt;p&gt;このプロジェクトは、次の 3 つの考え方を組み合わせています。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;コンパクトなアクセシビリティスナップショットにより、完全な DOM を送信せずに、モデルへページの構造化されたビューを提供する。&lt;/li&gt;
+&lt;li&gt;スナップショット参照により、後続のコマンドで要素を識別する。&lt;/li&gt;
+&lt;li&gt;長時間稼働するデーモンにより、ブラウザーのライフタイムを各 CLI プロセスのライフタイムから分離する。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;2026 年 9 月 11 日時点の現行バージョンは 0.37.1 です。プロジェクトは速いペースで変更されるため、この記事でバージョンに依存する挙動を説明する箇所では、&lt;a href="https://github.com/vercel-labs/agent-browser/tree/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2"&gt;0.37.1 のソースリビジョン&lt;/a&gt; にリンクしています。&lt;/p&gt;
+&lt;h2 id="ブラウザー自動化にエージェント指向のインターフェースが必要な理由"&gt;
+ ブラウザー自動化にエージェント指向のインターフェースが必要な理由
+ &lt;a href="#%e3%83%96%e3%83%a9%e3%82%a6%e3%82%b6%e3%83%bc%e8%87%aa%e5%8b%95%e5%8c%96%e3%81%ab%e3%82%a8%e3%83%bc%e3%82%b8%e3%82%a7%e3%83%b3%e3%83%88%e6%8c%87%e5%90%91%e3%81%ae%e3%82%a4%e3%83%b3%e3%82%bf%e3%83%bc%e3%83%95%e3%82%a7%e3%83%bc%e3%82%b9%e3%81%8c%e5%bf%85%e8%a6%81%e3%81%aa%e7%90%86%e7%94%b1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Playwright などのライブラリは正確なブラウザー API を提供しますが、LLM 駆動のプロセスがそれらを直接利用すると、追加コストが発生します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;生成されたソースコードはコンテキストを消費し、ランタイムも必要とする。&lt;/li&gt;
+&lt;li&gt;生の DOM にはスクリプト、スタイル、非表示ノード、フレームワークが生成した構造が含まれるが、次のアクションに寄与することはほとんどない。&lt;/li&gt;
+&lt;li&gt;ある観測結果から生成した CSS セレクターは、再レンダリング後に無効になる可能性がある。&lt;/li&gt;
+&lt;li&gt;個別のスクリプトでは、ブラウザーとコンテキストのライフサイクルを明示的に管理する必要がある。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;agent-browser はブラウザー自体ではなく、インターフェースを変更します。エージェントはコンパクトなツリーを観測し、操作を選択し、1 つのコマンドを実行して、再び観測します。&lt;/p&gt;
+&lt;div class="mermaid"&gt;
+ &lt;div class="mermaid-toolbar" aria-label="Diagram zoom controls" hidden&gt;
+ &lt;button class="mermaid-zoom-out" type="button" aria-label="Zoom out" title="Zoom out" disabled&gt;-&lt;/button&gt;
+ &lt;output class="mermaid-zoom-level" aria-live="polite"&gt;100%&lt;/output&gt;
+ &lt;button class="mermaid-zoom-in" type="button" aria-label="Zoom in" title="Zoom in" disabled&gt;+&lt;/button&gt;
+ &lt;/div&gt;
+ &lt;div class="mermaid-viewport" aria-label="Diagram"&gt;
+ &lt;pre class="mermaid-source"&gt;flowchart LR
+ Goal[User Goal] --&amp;gt; Model[Agent]
+ Model --&amp;gt;|open or snapshot| CLI[agent-browser CLI]
+ CLI --&amp;gt; Daemon[Native Daemon]
+ Daemon --&amp;gt;|CDP or WebDriver| Browser[Browser]
+ Browser --&amp;gt; Daemon
+ Daemon --&amp;gt;|Snapshot and Refs| Model
+ Model --&amp;gt;|click @e2| CLI&lt;/pre&gt;
+ &lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;モデルは引き続き実行内容を決定します。一方、CLI は安定したアクション語彙を提供し、ブラウザー状態を管理します。&lt;a href="https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/page.mdx"&gt;プロジェクト概要&lt;/a&gt;によれば、一般的なテキストスナップショットは約 200&amp;ndash;400 トークンであるのに対し、完全な DOM は 3,000&amp;ndash;5,000 トークンを使用します。これらは独立したベンチマークではなく、プロジェクトによる推定値です。しかし、その背景にある理由は明確です。アクセシビリティツリーは、エージェントが必要としない実装詳細の多くを省略するためです。&lt;/p&gt;</description></item></channel></rss>

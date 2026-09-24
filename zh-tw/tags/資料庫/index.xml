@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>資料庫 on cesun.life</title><link>https://example.org/zh-tw/tags/%E8%B3%87%E6%96%99%E5%BA%AB/</link><description>Recent content in 資料庫 on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 16 Jun 2022 20:46:43 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/%E8%B3%87%E6%96%99%E5%BA%AB/index.xml" rel="self" type="application/rss+xml"/><item><title>MySQL 索引</title><link>https://example.org/zh-tw/mysql-indexes/</link><pubDate>Thu, 16 Jun 2022 20:46:43 +0800</pubDate><guid>https://example.org/zh-tw/mysql-indexes/</guid><description>&lt;p&gt;InnoDB 使用 B+ 樹實作主索引與次要索引。當索引順序符合選擇性述詞、聯結、範圍掃描或排序需求時，索引可降低 I/O；但每個已索引資料列都會增加寫入工作與儲存空間。&lt;/p&gt;
+&lt;h2 id="叢集索引與次要索引"&gt;
+ 叢集索引與次要索引
+ &lt;a href="#%e5%8f%a2%e9%9b%86%e7%b4%a2%e5%bc%95%e8%88%87%e6%ac%a1%e8%a6%81%e7%b4%a2%e5%bc%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 資料表會將資料列儲存在其叢集索引中。InnoDB 會選擇宣告的主索引鍵；否則會選擇第一個合適的非 NULL 唯一索引鍵，或建立內部隱藏索引鍵。請宣告短且穩定的主索引鍵，因為每個次要索引項目都會儲存主索引鍵值。&lt;/p&gt;
+&lt;p&gt;次要索引會儲存其索引欄位與主索引鍵值。需要次要索引中不存在欄位的查詢，會為每個相符項目執行叢集索引查詢。只有在能移除已量測成本時才加入涵蓋索引；較寬的索引會降低頁面扇出並增加寫入負荷。&lt;/p&gt;
+&lt;h2 id="複合索引"&gt;
+ 複合索引
+ &lt;a href="#%e8%a4%87%e5%90%88%e7%b4%a2%e5%bc%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;對於 &lt;code&gt;(tenant_id, created_at, id)&lt;/code&gt;，B+ 樹可以有效定位：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;它無法只從 &lt;code&gt;created_at&lt;/code&gt; 有效搜尋，因為樹的順序以 &lt;code&gt;tenant_id&lt;/code&gt; 開始。一般設計會讓等值述詞先於範圍述詞，接著放置滿足排序或涵蓋需求的欄位。請使用 &lt;code&gt;EXPLAIN ANALYZE&lt;/code&gt; 驗證選擇；索引順序取決於實際述詞、資料分布與結果大小。&lt;/p&gt;
+&lt;h2 id="索引類型與診斷"&gt;
+ 索引類型與診斷
+ &lt;a href="#%e7%b4%a2%e5%bc%95%e9%a1%9e%e5%9e%8b%e8%88%87%e8%a8%ba%e6%96%b7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;UNIQUE&lt;/code&gt; 除了建立存取路徑，也會強制執行不變量。大多數 InnoDB 索引都是 B 樹。&lt;code&gt;FULLTEXT&lt;/code&gt; 索引支援以 token 為基礎的文字搜尋，而幾何值上的 &lt;code&gt;SPATIAL&lt;/code&gt; 索引使用 R 樹。MySQL 也描述 &lt;code&gt;MEMORY&lt;/code&gt; 引擎的雜湊索引；InnoDB 不公開一般雜湊索引，但其自適應雜湊索引可以將頻繁存取的 B 樹頁面快取為內部最佳化。前綴索引可以減少長文字鍵的位元組大小，但前提是所選前綴仍具選擇性。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXPLAIN&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ANALYZE&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id, created_at
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; event
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;7&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;2026-01-01&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;LIMIT&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;請檢查實際資料列、迴圈次數與計時，而不要假設會使用索引。統計資料、基數估計與小型結果集可能使資料表掃描比索引走訪更便宜。&lt;/p&gt;</description></item><item><title>MySQL 變數與預備陳述式</title><link>https://example.org/zh-tw/mysql-variables/</link><pubDate>Thu, 24 Jun 2021 18:18:18 +0800</pubDate><guid>https://example.org/zh-tw/mysql-variables/</guid><description>&lt;p&gt;MySQL 區分伺服器系統變數、區域常式變數與工作階段使用者變數。它們的範圍與評估規則不同，因此不應互換使用。&lt;/p&gt;
+&lt;h2 id="系統與使用者變數"&gt;
+ 系統與使用者變數
+ &lt;a href="#%e7%b3%bb%e7%b5%b1%e8%88%87%e4%bd%bf%e7%94%a8%e8%80%85%e8%ae%8a%e6%95%b8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;系統變數使用 &lt;code&gt;@@&lt;/code&gt;，可能具有全域、工作階段或兩者範圍：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.sql_mode;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; sql_safe_updates &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;變更全域變數會影響新的工作階段（當該變數也具有工作階段範圍時）；它不是變更現有連線交易原則的方法。動態變數可在執行時變更，而唯讀變數需要啟動設定。&lt;code&gt;SET PERSIST&lt;/code&gt; 會變更執行期全域值並寫入 &lt;code&gt;mysqld-auto.cnf&lt;/code&gt;；&lt;code&gt;SET PERSIST_ONLY&lt;/code&gt; 會寫入持久化值，但不變更執行期狀態。使用任一形式前，請確認變數可以持久化，並讓檔案擁有權由伺服器維持，不要編輯該產生的檔案。&lt;/p&gt;
+&lt;p&gt;使用者變數使用 &lt;code&gt;@name&lt;/code&gt;，以連線為區域，且沒有宣告型別：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;minimum_total &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id &lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; orders &lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; total &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;minimum_total;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;不要在同一運算式或查詢中指派並讀取相同的使用者變數，以模擬程序式評估。MySQL 不保證能使這類查詢可靠的評估順序。請改用視窗函數、通用表運算式、儲存程式區域變數或應用程式程式碼。值的型別會在指派時衍生，而預備陳述式參照會保留陳述式首次預備時建立的變數型別。需要的 SQL 型別屬於契約時，請明確使用 &lt;code&gt;CAST&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="預備陳述式"&gt;
+ 預備陳述式
+ &lt;a href="#%e9%a0%90%e5%82%99%e9%99%b3%e8%bf%b0%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;用戶端函式庫預備陳述式會將資料與 SQL 語法分開繫結，應是應用程式查詢的預設方式。它們能防止值被解讀為注入的 SQL，並讓伺服器分開剖析陳述式結構。&lt;/p&gt;
+&lt;p&gt;伺服器端 SQL 預備陳述式遵循以連線為範圍的生命週期：&lt;code&gt;PREPARE&lt;/code&gt; 會剖析一個陳述式，&lt;code&gt;EXECUTE&lt;/code&gt; 會重複執行它，而 &lt;code&gt;DEALLOCATE PREPARE&lt;/code&gt; 會釋放它。同名的第二次 &lt;code&gt;PREPARE&lt;/code&gt; 會先解除配置舊陳述式。工作階段結束時，預備陳述式也會被捨棄。當識別碼必須組合時，它們適合用於管理用途的動態 SQL。參數標記會繫結資料值，而不是識別碼、關鍵字或 SQL 片段：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;sql&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;SELECT id FROM orders WHERE customer_id = ?&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;PREPARE&lt;/span&gt; stmt &lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;sql&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;customer_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXECUTE&lt;/span&gt; stmt &lt;span style="color:#66d9ef"&gt;USING&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;customer_id;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;DEALLOCATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;PREPARE&lt;/span&gt; stmt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;將任何動態識別碼串接至 SQL 前，請先驗證或使用允許清單。參數標記不能在每個文法位置代表任意運算式，而預備陳述式數量受 &lt;code&gt;max_prepared_stmt_count&lt;/code&gt; 限制。釋放短生命週期的管理陳述式，並讓應用程式驅動程式管理自己的預備陳述式控制代碼。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Annotations on cesun.life</title><link>https://example.org/ja/tags/annotations/</link><description>Recent content in Annotations on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 25 Sep 2025 03:47:26 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/annotations/index.xml" rel="self" type="application/rss+xml"/><item><title>Springアノテーション処理</title><link>https://example.org/ja/spring-annotation-processing/</link><pubDate>Thu, 25 Sep 2025 03:47:26 +0800</pubDate><guid>https://example.org/ja/spring-annotation-processing/</guid><description>&lt;p&gt;Springは、コンポーネントの検出、設定、依存性注入、トランザクション、Webリクエストマッピング、その他のフレームワークサービスにおいて、宣言的メタデータとしてアノテーションを使用します。Javaリフレクションは生のアノテーションを公開しますが、Springは合成アノテーション、エイリアス、検索戦略、クラスをロードせずにメタデータを読み取るための一貫したモデルを追加します。&lt;/p&gt;
+&lt;h2 id="javaアノテーションのセマンティクス"&gt;
+ Javaアノテーションのセマンティクス
+ &lt;a href="#java%e3%82%a2%e3%83%8e%e3%83%86%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3%e3%81%ae%e3%82%bb%e3%83%9e%e3%83%b3%e3%83%86%e3%82%a3%e3%82%af%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;アノテーション宣言自体はインターフェースであり、暗黙のスーパーインターフェースは
+&lt;code&gt;java.lang.annotation.Annotation&lt;/code&gt;です。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Retention&lt;/span&gt;(RetentionPolicy.&lt;span style="color:#a6e22e"&gt;RUNTIME&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Target&lt;/span&gt;(ElementType.&lt;span style="color:#a6e22e"&gt;TYPE&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Audited {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;実行時リフレクションでは、クラスに&lt;code&gt;@Audited&lt;/code&gt;が直接付与されている場合に検査できます。&lt;code&gt;@Retention&lt;/code&gt;、&lt;code&gt;@Target&lt;/code&gt;、&lt;code&gt;@Documented&lt;/code&gt;などのメタアノテーションはアノテーション宣言を記述しますが、任意の推移的な検索を引き起こすわけではありません。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;SOURCE&lt;/code&gt;、&lt;code&gt;CLASS&lt;/code&gt;、&lt;code&gt;RUNTIME&lt;/code&gt;の保持ポリシーは、メタデータがソースコードのみに残るか、クラスファイルに残るか、リフレクションから利用可能になるかを決定します。&lt;code&gt;@Target&lt;/code&gt;は宣言または型使用の場所を制限します。反復可能アノテーションは&lt;code&gt;@Repeatable&lt;/code&gt;によってコンテナを指定します。リフレクションとSpringは、論理的な反復アノテーションまたは物理的なコンテナのいずれかを公開できます。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;@Inherited&lt;/code&gt;は限定的な例外です。一部の&lt;code&gt;Class&lt;/code&gt;検索メソッドは、アノテーション宣言に&lt;code&gt;@Inherited&lt;/code&gt;が付与されている場合、スーパークラス上の継承されたアノテーションを検出できます。この規則はインターフェースには適用されず、メソッドやフィールドも対象外であり、Springの合成アノテーションモデルとは別のものです。&lt;/p&gt;
+&lt;h2 id="合成アノテーション"&gt;
+ 合成アノテーション
+ &lt;a href="#%e5%90%88%e6%88%90%e3%82%a2%e3%83%8e%e3%83%86%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Springは、他のアノテーション宣言に付与されたアノテーションを解釈します。例えば、&lt;code&gt;@Service&lt;/code&gt;にはメタアノテーションとして&lt;code&gt;@Component&lt;/code&gt;が付与されています。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Component&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Service {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@AliasFor&lt;/span&gt;(annotation &lt;span style="color:#f92672"&gt;=&lt;/span&gt; Component.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; String &lt;span style="color:#a6e22e"&gt;value&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;&amp;#34;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;@Service&lt;/code&gt;が付与されたクラスは、通常のリフレクションでは&lt;code&gt;@Component&lt;/code&gt;が直接付与されているとは報告されないにもかかわらず、結果としてコンポーネント候補になります。アプリケーションは同じ仕組みを使用して、ドメイン固有のアノテーションを作成できます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Target&lt;/span&gt;(ElementType.&lt;span style="color:#a6e22e"&gt;TYPE&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Retention&lt;/span&gt;(RetentionPolicy.&lt;span style="color:#a6e22e"&gt;RUNTIME&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Service&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Transactional&lt;/span&gt;(readOnly &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;true&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; ReadOnlyService {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;これはJava言語の規則ではなく、プログラミングモデルです。Springのコードは、走査、循環検出、フィルタリング、属性の合成を実行する必要があります。&lt;/p&gt;
+&lt;h2 id="マージ済みアノテーション"&gt;
+ マージ済みアノテーション
+ &lt;a href="#%e3%83%9e%e3%83%bc%e3%82%b8%e6%b8%88%e3%81%bf%e3%82%a2%e3%83%8e%e3%83%86%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;MergedAnnotations&lt;/code&gt;は、直接付与、継承、メタ付与されたアノテーションに対するSpringの中心的なクエリモデルです。その&lt;code&gt;SearchStrategy&lt;/code&gt;は、どの型関係を走査するかを制御します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DIRECT&lt;/code&gt;は、要素に直接宣言されたアノテーションのみを検査します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;INHERITED_ANNOTATIONS&lt;/code&gt;は、Javaの&lt;code&gt;@Inherited&lt;/code&gt;規則に従います。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;SUPERCLASS&lt;/code&gt;は、スーパークラス階層を検索します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;TYPE_HIERARCHY&lt;/code&gt;は、スーパークラスと実装されたインターフェースを検索します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;フレームワーク機能に適合する最も狭い戦略を使用してください。広範な階層検索では、Javaリフレクションだけでは公開されないメタデータが生成される可能性があります。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;MergedAnnotation&amp;lt;T&amp;gt;&lt;/code&gt;は、検出された1つのアノテーションを、その距離、集約位置、ソース、合成された属性とともに表します。合成処理は、&lt;code&gt;@AliasFor&lt;/code&gt;で宣言されたSpringのエイリアス関係を解決します。したがって、合成アノテーションとそのメタアノテーション全体で、一貫した属性ビューを提示できます。&lt;/p&gt;
+&lt;p&gt;エイリアス宣言は一貫していなければなりません。1つのアノテーション内では、エイリアス対象の属性が互換性のある戻り値型とデフォルト値を持つ必要があります。アノテーション間のエイリアスは、メタアノテーション階層内で到達可能な属性を識別する必要があります。&lt;/p&gt;
+&lt;h2 id="メタデータ抽象化"&gt;
+ メタデータ抽象化
+ &lt;a href="#%e3%83%a1%e3%82%bf%e3%83%87%e3%83%bc%e3%82%bf%e6%8a%bd%e8%b1%a1%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Springは、一般的なアノテーション付き要素のメタデータと、クラス固有およびメソッド固有のメタデータを分離します。&lt;/p&gt;
+&lt;div
+ class="goat svg-container"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 384 137"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 112,0 L 304,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 112,32 L 208,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 208,32 L 304,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,80 L 184,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 200,80 L 208,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 224,80 L 232,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,80 L 352,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,112 L 232,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,112 L 368,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,80 L 80,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 112,0 L 112,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 232,96 L 232,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,96 L 248,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 304,0 L 304,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 368,96 L 368,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 192,80 L 208,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 224,48 L 240,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 232,88 L 232,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,88 L 248,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='204.000000,80.000000 192.000000,74.400002 192.000000,85.599998' fill='currentColor' transform='rotate(120.000000, 192.000000, 80.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='252.000000,80.000000 240.000000,74.400002 240.000000,85.599998' fill='currentColor' transform='rotate(60.000000, 240.000000, 80.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 352,80 A 16,16 0 0,1 368,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;text text-anchor='middle' x='88' y='100' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='20' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='100' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='20' fill='currentColor' style='font-size:1em'&gt;T&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='20' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='20' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='20' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='100' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;AnnotatedTypeMetadata&lt;/code&gt;は、型とメソッドに共通するアノテーションクエリを公開します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;AnnotationMetadata&lt;/code&gt;は、クラス情報とアノテーション付きメソッドへのアクセスを追加します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;MethodMetadata&lt;/code&gt;は、宣言クラス、戻り値型、メソッドプロパティを追加します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;リフレクションベースの実装は、ロード済みクラスを検査します。クラス読み取り実装はバイトコードメタデータを使用するため、コンポーネントスキャンや設定解析などのインフラストラクチャは、クラスを初期化せずに検査できます。クラスのロードを回避することで、静的初期化の副作用を防ぎ、すべてのオプション依存関係を解決できる前にメタデータを検出できます。&lt;/p&gt;</description></item><item><title>Javaアノテーション</title><link>https://example.org/ja/java-annotations/</link><pubDate>Sun, 10 Jan 2021 11:11:46 +0800</pubDate><guid>https://example.org/ja/java-annotations/</guid><description>&lt;p&gt;アノテーションは、宣言または型の使用箇所に付加されるメタデータです。汎用的なオブジェクトリテラルではありません。アノテーション型は特殊なインターフェースであり、そのメンバーによって許可されるメタデータを記述します。&lt;/p&gt;
+&lt;h2 id="アノテーション型の宣言"&gt;
+ アノテーション型の宣言
+ &lt;a href="#%e3%82%a2%e3%83%8e%e3%83%86%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3%e5%9e%8b%e3%81%ae%e5%ae%a3%e8%a8%80" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;アノテーションのメンバーにはパラメーターも型パラメーターもなく、&lt;code&gt;throws&lt;/code&gt; 節を宣言できません。メンバー型として指定できるのは、プリミティブ型、&lt;code&gt;String&lt;/code&gt;、&lt;code&gt;Class&lt;/code&gt;、列挙型、アノテーション型、またはこれらのいずれかの一次元配列に限られます。値は、コンパイル時定数、クラスリテラル、列挙定数、アノテーション、またはそれらの配列でなければなりません。&lt;code&gt;null&lt;/code&gt; はアノテーション要素の値になりません。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Retention&lt;/span&gt;(RetentionPolicy.&lt;span style="color:#a6e22e"&gt;RUNTIME&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Target&lt;/span&gt;({ElementType.&lt;span style="color:#a6e22e"&gt;TYPE&lt;/span&gt;, ElementType.&lt;span style="color:#a6e22e"&gt;METHOD&lt;/span&gt;})
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Retry {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;attempts&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt; 3;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Class&lt;span style="color:#f92672"&gt;&amp;lt;?&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;extends&lt;/span&gt; Throwable&lt;span style="color:#f92672"&gt;&amp;gt;[]&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;retryOn&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt; {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;@Target&lt;/code&gt; は、アノテーションを記述できる場所を制約します。該当する場所には、宣言、型の使用箇所、型パラメーター、モジュール、レコードコンポーネントなどがあります。&lt;code&gt;@Target&lt;/code&gt; がない場合、アノテーションは任意の宣言コンテキストに記述できますが、型コンテキストには記述できません。&lt;code&gt;@Retention&lt;/code&gt; は、コンパイラーがアノテーションを破棄するか（&lt;code&gt;SOURCE&lt;/code&gt;）、クラスファイルに記録するか（&lt;code&gt;CLASS&lt;/code&gt;、デフォルト）、リフレクション用に記録するか（&lt;code&gt;RUNTIME&lt;/code&gt;）を制御します。&lt;code&gt;@Inherited&lt;/code&gt; が影響するのは、&lt;code&gt;Class&lt;/code&gt; に対するクエリ、クラス上のアノテーション、そしてスーパークラスチェーンに沿った継承だけです。インターフェース、メソッド、フィールド、パラメーター、型の使用箇所にあるアノテーションは継承しません。&lt;/p&gt;
+&lt;p&gt;デフォルト値はすべての使用箇所にコピーされるのではなく、アノテーション型にコンパイルされます。そのため、古いクライアントのクラスファイルを新しいアノテーション型とともに実行した場合、変更されたデフォルト値によって観測される結果が変わる可能性があります。&lt;/p&gt;
+&lt;h2 id="リフレクションとアクセス境界"&gt;
+ リフレクションとアクセス境界
+ &lt;a href="#%e3%83%aa%e3%83%95%e3%83%ac%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3%e3%81%a8%e3%82%a2%e3%82%af%e3%82%bb%e3%82%b9%e5%a2%83%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;Class&lt;/code&gt;、&lt;code&gt;Method&lt;/code&gt;、&lt;code&gt;Field&lt;/code&gt;、&lt;code&gt;Constructor&lt;/code&gt;、&lt;code&gt;Parameter&lt;/code&gt;、&lt;code&gt;Package&lt;/code&gt;、&lt;code&gt;Module&lt;/code&gt; は &lt;code&gt;AnnotatedElement&lt;/code&gt; を実装します。&lt;code&gt;getDeclared*&lt;/code&gt; メソッドは、その要素に直接存在するアノテーションを調べます。&lt;code&gt;getDeclared&lt;/code&gt; ではないメソッドは、継承されたクラスアノテーションを含める場合があります。&lt;code&gt;getAnnotationsByType&lt;/code&gt; と &lt;code&gt;getDeclaredAnnotationsByType&lt;/code&gt; は、繰り返し可能なアノテーションのコンテナーも展開します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Retry&lt;span style="color:#f92672"&gt;[]&lt;/span&gt; policies &lt;span style="color:#f92672"&gt;=&lt;/span&gt; operation.&lt;span style="color:#a6e22e"&gt;getAnnotationsByType&lt;/span&gt;(Retry.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;実行時保持によってメタデータが可視になりますが、メンバーへのアクセスが許可されたり、private 状態を安全に公開できるようになったりするわけではありません。リフレクションは、Java 言語のアクセスチェックに加え、名前付きモジュールでは強力なカプセル化チェックにも合格する必要があります。&lt;code&gt;trySetAccessible&lt;/code&gt; は、パッケージが呼び出し元に対して開かれている場合に限り、適用可能な言語レベルのチェックを抑制できます。コマンドラインの &lt;code&gt;--add-opens&lt;/code&gt; はデプロイメント上の判断であり、ライブラリの契約ではありません。従来の &lt;code&gt;SecurityManager&lt;/code&gt; は削除に向けて非推奨となっているため、セキュリティ設計では、グローバルなリフレクションポリシーを前提にせず、モジュール境界、プロセス権限、入力検証、明示的な API を使用する必要があります。&lt;/p&gt;
+&lt;p&gt;検査だけを初期化メカニズムとして使用すべきではありません。リフレクションによる構築と呼び出しはクラスを初期化する可能性があり、アノテーションメンバーへのアクセスでは、リンクされた型の解決が必要になる場合があります。静的初期化では、必須の構成や外部から観測可能な副作用を発生させないでください。&lt;/p&gt;
+&lt;h2 id="繰り返し可能なアノテーション"&gt;
+ 繰り返し可能なアノテーション
+ &lt;a href="#%e7%b9%b0%e3%82%8a%e8%bf%94%e3%81%97%e5%8f%af%e8%83%bd%e3%81%aa%e3%82%a2%e3%83%8e%e3%83%86%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;@Repeatable&lt;/code&gt; は、繰り返されるアノテーション型の配列を唯一の必須メンバーとするコンテナーアノテーションを指定します。コンテナーの保持期間は、繰り返される型と同じか、それ以上でなければならず、互換性のあるターゲットを持つ必要があります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Repeatable&lt;/span&gt;(Labels.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Label { String &lt;span style="color:#a6e22e"&gt;value&lt;/span&gt;(); }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Labels { Label&lt;span style="color:#f92672"&gt;[]&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;value&lt;/span&gt;(); }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Label&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;read&amp;#34;&lt;/span&gt;) &lt;span style="color:#a6e22e"&gt;@Label&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;write&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Permission&lt;/span&gt; {}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;複数回出現する場合、言語は宣言を暗黙的に宣言されたコンテナーとしてモデル化します。そのため、クラスファイルのコンシューマーからは、明示的な &lt;code&gt;@Labels({ ... })&lt;/code&gt; 宣言と同じコンテナー形式に見えます。単一の &lt;code&gt;@Label&lt;/code&gt; は、単一要素の明示的なコンテナーと一般にバイト単位で同一ではありません。&lt;code&gt;getAnnotation(Label.class)&lt;/code&gt; はコンテナーを展開しませんが、&lt;code&gt;getAnnotationsByType(Label.class)&lt;/code&gt; は展開します。&lt;/p&gt;</description></item></channel></rss>

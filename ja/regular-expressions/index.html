@@ -1,0 +1,31 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>正規表現</title></head><body><main><article><div class=article-header><h1>正規表現</h1><div class=aux>最終更新: 2022-10-11 18:31:04 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/regex/>Regex</a>
+|
+<a href=/ja/tags/text-processing/>Text-Processing</a></div></div><div class="translation-notice machine-translated"><a href=/regular-expressions/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>正規表現は単一の言語ではありません。POSIX BRE、POSIX ERE、Perl 互換エンジンには
+共通部分がありますが、構文、マッチング規則、利用可能な機能が異なります。</p><h2 id=posix-bre>POSIX BRE
+<a href=#posix-bre class=heading-anchor><span>#</span></a></h2><p>基本正規表現は、<code>grep</code> と <code>sed</code> で使用されてきた歴史的な構文です。</p><p>重要な規則は次のとおりです。</p><ul><li>グループ化には <code>\(</code> と <code>\)</code> を使用します。</li><li>回数指定の繰り返しには <code>\{m,n\}</code> を使用します。</li><li>ツールが拡張機能を追加していない限り、<code>+</code>、<code>?</code>、<code>|</code>、<code>()</code> はリテラル文字です。</li><li>後方参照には <code>\1</code>、<code>\2</code> などを使用します。</li></ul><p>BRE は移植性がありますが、多くのメタ文字をエスケープする必要があるため冗長です。</p><h2 id=posix-ere>POSIX ERE
+<a href=#posix-ere class=heading-anchor><span>#</span></a></h2><p>拡張正規表現は、現代的な正規表現の構文に近い形式です。</p><ul><li><code>()</code> はグループ化します。</li><li><code>+</code> は 1 回以上を意味します。</li><li><code>?</code> は 0 回または 1 回を意味します。</li><li><code>{m,n}</code> は繰り返し回数を指定します。</li><li><code>|</code> は選択を表します。</li></ul><p><code>grep -E</code> と <code>sed -E</code> はこの形式を使用します。POSIX ERE は、遅延量指定子、
+先読み、後読みをサポートしないため、機能が制限されています。</p><h2 id=perl-互換エンジン>Perl 互換エンジン
+<a href=#perl-%e4%ba%92%e6%8f%9b%e3%82%a8%e3%83%b3%e3%82%b8%e3%83%b3 class=heading-anchor><span>#</span></a></h2><p>Perl 互換正規表現には、POSIX RE にない機能が追加されています。</p><ul><li><code>*?</code> や <code>+?</code> などの遅延量指定子</li><li>先読みと後読み</li><li><code>(?:...)</code> などの非キャプチャグループ</li><li>多くのエンジンで利用できる名前付きキャプチャ</li><li>より豊富な文字クラス構文</li></ul><p>したがって、非貪欲マッチを行うには、多くの場合エンジンを切り替える必要があります。
+POSIX BRE と ERE には、同等の演算子が存在しません。</p><h2 id=マッチング動作>マッチング動作
+<a href=#%e3%83%9e%e3%83%83%e3%83%81%e3%83%b3%e3%82%b0%e5%8b%95%e4%bd%9c class=heading-anchor><span>#</span></a></h2><p>POSIX エンジンは、左端最長一致に基づいて定義されています。その規則により、
+構文が似ている場合でも Perl 形式のエンジンとは異なる結果になることがあります。</p><p>選択と繰り返しが重なる場合、エンジンは最初に成功した構文上の選択肢ではなく、
+より長い一致を優先する可能性があるため、この違いが重要になります。</p><p>アンカーもエンジンとモードに依存します。POSIX の <code>^</code> と <code>$</code> は文字列の先頭と
+末尾を表し、行に対する動作はツールごとに異なります。PCRE 形式のエンジンには、
+絶対的な文字列境界用のアンカーと複数行モードが別に用意されていることがあります。
+コマンドのデフォルトに依存せず、入力のリテラルな境界を明示的にマッチさせてください。</p><p>文字クラスは固定された ASCII の略記ではありません。<code>[[:alpha:]]</code> などの POSIX
+ブラケットクラスは有効なロケールに従います。一方、<code>\w</code>、大文字と小文字の同一視、
+Unicode プロパティは、Perl 互換の実装やフラグによって異なります。バイト単位の
+自動処理では既知のロケールを設定するか、エンジンの Unicode モードを意図的に
+選択してください。</p><p>バックトラッキングエンジンでは、長い不一致入力に対する <code>(a+)+$</code> のような、
+曖昧な入れ子の繰り返しによって実行時間が指数関数的に増加する可能性があります。
+信頼できないデータをパターンで処理する場合は、入力サイズを制限し、重複する選択肢や
+入れ子の量指定子を避けるか、線形時間で動作するエンジンを使用してください。
+先読み、後読み、非キャプチャグループは式の構造を改善しますが、エンジン間の互換性を
+もたらすものではありません。</p><h2 id=実用的な変換>実用的な変換
+<a href=#%e5%ae%9f%e7%94%a8%e7%9a%84%e3%81%aa%e5%a4%89%e6%8f%9b class=heading-anchor><span>#</span></a></h2><p>同じ意図でも、異なる構文が必要になる場合があります。</p><ul><li>キャプチャグループ: BRE では <code>\(...\)</code>、ERE では <code>(...)</code></li><li>1 桁以上の数字: BRE では <code>\{1,\}</code>、ERE では <code>+</code></li><li>非貪欲ワイルドカード: POSIX RE では利用不可</li></ul><p>移植性が重要な場合は、特定のエンジンを選択し、要件を満たす最小限の機能セットを
+使用してください。バックスラッシュを機械的に追加または削除するのではなく、
+意図する言語とマッチングセマンティクスに基づいて変換してください。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/regular-expressions/ class=language-option data-lang=en>English
+</a><a href=/ja/regular-expressions/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/regular-expressions/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/regular-expressions/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Posix on cesun.life</title><link>https://example.org/zh-cn/tags/posix/</link><description>Recent content in Posix on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Wed, 09 Aug 2023 17:37:46 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/posix/index.xml" rel="self" type="application/rss+xml"/><item><title>POSIX 时间 API</title><link>https://example.org/zh-cn/posix-time/</link><pubDate>Wed, 09 Aug 2023 17:37:46 +0800</pubDate><guid>https://example.org/zh-cn/posix-time/</guid><description>&lt;p&gt;时间 API 回答不同问题：民用时间为某个时刻命名，单调时间测量间隔，CPU 时钟测量工作消耗的执行时间。选择错误的时钟会使超时响应墙上时钟校正，或使 I/O 等待从测量结果中消失。&lt;/p&gt;
+&lt;h2 id="选择时钟"&gt;
+ 选择时钟
+ &lt;a href="#%e9%80%89%e6%8b%a9%e6%97%b6%e9%92%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;clock_gettime&lt;/code&gt; 将 &lt;code&gt;clockid_t&lt;/code&gt; 读取到 &lt;code&gt;struct timespec&lt;/code&gt; 中，其中 &lt;code&gt;tv_sec&lt;/code&gt; 和 &lt;code&gt;tv_nsec&lt;/code&gt; 字段分别表示秒和纳秒。POSIX 要求提供 &lt;code&gt;CLOCK_REALTIME&lt;/code&gt;（从纪元开始计量的系统民用时钟）和 &lt;code&gt;CLOCK_MONOTONIC&lt;/code&gt;（起点未指定且不能设置）。时间戳使用 realtime，经过时间和截止时间使用单调时间。&lt;/p&gt;
+&lt;p&gt;在受支持时，&lt;code&gt;CLOCK_PROCESS_CPUTIME_ID&lt;/code&gt; 和 &lt;code&gt;CLOCK_THREAD_CPUTIME_ID&lt;/code&gt; 分别测量进程或单个线程消耗的 CPU 执行时间。它们不包括阻塞在 I/O 中或被取消调度的时间。Linux 还提供包含挂起时间的 &lt;code&gt;CLOCK_BOOTTIME&lt;/code&gt;；这是 Linux 扩展，而不是可移植的 POSIX 选择。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; timespec start, end;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;clock_gettime&lt;/span&gt;(CLOCK_MONOTONIC, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;start);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;/* operation */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;clock_gettime&lt;/span&gt;(CLOCK_MONOTONIC, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;end);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;clock_getres&lt;/code&gt; 报告实现的分辨率，而不是保证连续读取会产生不同结果。调度延迟、定时器合并和硬件都会影响代码运行的时刻。当某个时刻无法放入 &lt;code&gt;time_t&lt;/code&gt; 时，调用可能以 &lt;code&gt;EOVERFLOW&lt;/code&gt; 失败；应验证 &lt;code&gt;tv_nsec&lt;/code&gt;，规范化跨秒边界的算术运算，并且不要假设 &lt;code&gt;time_t&lt;/code&gt; 具有固定宽度。&lt;/p&gt;
+&lt;h2 id="睡眠与定时器"&gt;
+ 睡眠与定时器
+ &lt;a href="#%e7%9d%a1%e7%9c%a0%e4%b8%8e%e5%ae%9a%e6%97%b6%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;nanosleep&lt;/code&gt; 提供相对延迟。信号可以以 &lt;code&gt;EINTR&lt;/code&gt; 中断它并报告剩余时间，但在周期性代码中从剩余时间重新开始仍会累积工作和调度延迟。每个周期计算一个绝对的单调截止时间，并使用 &lt;code&gt;clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, ...)&lt;/code&gt; 等待；已经过去的截止时间会立即返回，因此调用方必须决定跳过工作还是追赶进度。&lt;/p&gt;
+&lt;p&gt;POSIX 定时器使用 &lt;code&gt;timer_create&lt;/code&gt; 和 &lt;code&gt;timer_settime&lt;/code&gt;；&lt;code&gt;TIMER_ABSTIME&lt;/code&gt; 使请求的到期时间成为定时器所选时钟上的绝对时间。通知可以是信号或线程通知，两者具有不同的排队和生命周期影响。Linux 的 &lt;code&gt;timerfd_create&lt;/code&gt; 不是 POSIX 接口，但可以将定时器到期与 &lt;code&gt;poll&lt;/code&gt;、&lt;code&gt;select&lt;/code&gt; 和 &lt;code&gt;epoll&lt;/code&gt; 集成。&lt;code&gt;alarm&lt;/code&gt; 和 &lt;code&gt;setitimer&lt;/code&gt; 是面向信号的旧接口。&lt;/p&gt;</description></item></channel></rss>

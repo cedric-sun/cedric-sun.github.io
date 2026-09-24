@@ -1,0 +1,32 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Flex</title></head><body><main><article><div class=article-header><h1>Flex</h1><div class=aux>最後更新: 2023-01-10 06:39:13 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/flex/>Flex</a>
+|
+<a href=/zh-tw/tags/lexing/>Lexing</a>
+|
+<a href=/zh-tw/tags/gnu/>Gnu</a></div></div><div class="translation-notice machine-translated"><a href=/flex/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>Flex 會根據將輸入文字對應至 C 或 C++ 動作的規則產生掃描器。掃描器通常會向剖析器提供權杖，但也可以轉換文字或驗證正則語言格式。<a href=https://westes.github.io/flex/manual/>Flex 手冊</a> 定義了產生的介面以及各選項的行為。</p><h2 id=規格結構>規格結構
+<a href=#%e8%a6%8f%e6%a0%bc%e7%b5%90%e6%a7%8b class=heading-anchor><span>#</span></a></h2><p><code>.l</code> 檔案包含三個以 <code>%%</code> 分隔的部分：定義、規則和使用者程式碼。定義部分包含 C 宣告、命名正規表示式和開始條件。規則部分會將模式與動作配對。最後一個部分提供輔助函式，並在需要時提供驅動程式。</p><div class=jose-wrapper><div class=jose-tools><span>lex</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-lex data-lang=lex>%option noyywrap
+%{
+#include &#34;parser.h&#34;
+%}
+
+identifier  [[:alpha:]_][[:alnum:]_]*
+%%
+[[:space:]]+  ;
+{identifier}   return IDENTIFIER;
+&#34;+&#34;            return &#39;+&#39;;
+.              return INVALID;
+%%</code></pre></div></div><p>Flex 會選取與輸入文字中<strong>最長</strong>部分相符的規則。當多個規則相符的長度相同時，會選取書寫順序較前的規則。預設規則會將未相符的字元複製到標準輸出；當必須回報未相符的輸入時，請使用明確的萬用規則或 <code>-s</code>/<code>%option nodefault</code>。</p><h2 id=正規表示式與掃描器狀態>正規表示式與掃描器狀態
+<a href=#%e6%ad%a3%e8%a6%8f%e8%a1%a8%e7%a4%ba%e5%bc%8f%e8%88%87%e6%8e%83%e6%8f%8f%e5%99%a8%e7%8b%80%e6%85%8b class=heading-anchor><span>#</span></a></h2><p>Flex 模式描述正規語言。命名定義可以減少重複，字元類別用來表示與地區設定相關的群組，而加引號的文字則用來比對字面字串。當語言權杖需要逐字使用中繼字元時，請將其逸出或加上引號。</p><p>開始條件可以將規則集分割。使用 <code>%s</code> 宣告包含式條件，使用 <code>%x</code> 宣告排他式條件；使用 <code>&lt;STATE></code> 限定規則。</p><div class=jose-wrapper><div class=jose-tools><span>lex</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-lex data-lang=lex>%x COMMENT
+%%
+&#34;/*&#34;             BEGIN(COMMENT);
+&lt;COMMENT&gt;&#34;*/&#34;    BEGIN(INITIAL);
+&lt;COMMENT&gt;\n      ++line;
+&lt;COMMENT&gt;.       ;
+&lt;COMMENT&gt;&lt;&lt;EOF&gt;&gt; return UNTERMINATED_COMMENT;</code></pre></div></div><p>包含式條件會保留未限定的規則，而排他式條件只會執行明確限定為該條件或所有狀態的規則。除非使用 <code>%option nodefault</code> 或明確的萬用規則取代，否則 Flex 產生的預設規則在每個狀態中都保持啟用。使用 <code>BEGIN</code> 變更狀態；當動作需要檢查目前狀態時，使用 <code>YY_START</code>。對於可能提早結束輸入的狀態，請處理 <code>&lt;&lt;EOF>></code>。請將字串、註解、縮排或詞法模式建模為明確狀態，而不要嘗試在單一模式中表達具上下文相關的結構。</p><h2 id=產生的-api緩衝區與可重入性>產生的 API、緩衝區與可重入性
+<a href=#%e7%94%a2%e7%94%9f%e7%9a%84-api%e7%b7%a9%e8%a1%9d%e5%8d%80%e8%88%87%e5%8f%af%e9%87%8d%e5%85%a5%e6%80%a7 class=heading-anchor><span>#</span></a></h2><p>依預設，Flex 會產生 <code>yylex()</code> 以及 <code>yytext</code>、<code>yyleng</code> 和輸入緩衝區狀態等全域變數。<code>%option prefix="project_"</code> 會重新命名產生的公用符號，因此可以在同一個程式中使用多個掃描器。<code>%option outfile="scanner.c"</code> 會選取產生的檔案；命令列選項也可以提供相同的設定。</p><p>掃描器會透過緩衝區讀取輸入。<code>yyrestart(FILE*)</code> 會重新開始輸入，而 <code>yy_scan_string</code> 或 <code>yy_scan_bytes</code> 會掃描呼叫端提供的記憶體。請使用 <code>yy_delete_buffer</code> 刪除由 <code>yy_scan_*</code> 函式建立的緩衝區；當巢狀輸入需要在受管理的緩衝區之間切換時，使用 <code>yy_switch_to_buffer</code>。</p><p><code>%option reentrant</code> 會建立掃描器控制代碼 (<code>yyscan_t</code>)，並讓產生的 API 接受該控制代碼。使用 <code>yylex_init</code>/<code>yylex_destroy</code>（或 <code>_extra</code> 變體）初始化和銷毀控制代碼，然後透過 <code>yyextra</code> 而不是全域變數傳遞每個掃描器的狀態。當剖析器或執行緒必須彼此獨立運作時，請使用此模式。</p><h2 id=剖析器整合與診斷>剖析器整合與診斷
+<a href=#%e5%89%96%e6%9e%90%e5%99%a8%e6%95%b4%e5%90%88%e8%88%87%e8%a8%ba%e6%96%b7 class=heading-anchor><span>#</span></a></h2><p>與 Bison 整合時，請設定相符的權杖宣告，並包含產生的剖析器標頭檔。<code>%option bison-bridge</code> 會透過掃描器介面傳遞語意值；<code>%option bison-locations</code> 另外也會傳遞位置資訊。請為每個消耗的字元（包括空白和註解）更新位置，否則診斷資訊會偏離原始碼。</p><p>請區分詞法分析錯誤與剖析器語法錯誤。掃描器應回傳或回報包含其來源範圍的無效權杖；剖析器應在文法上下文中描述非預期的權杖，並且只在刻意設定的同步點進行復原。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/flex/ class=language-option data-lang=en>English
+</a><a href=/ja/flex/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/flex/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/flex/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

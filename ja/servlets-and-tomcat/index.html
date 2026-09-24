@@ -1,0 +1,60 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>サーブレットと Tomcat</title></head><body><main><article><div class=article-header><h1>サーブレットと Tomcat</h1><div class=aux>最終更新: 2025-07-31 23:33:22 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/java/>Java</a>
+|
+<a href=/ja/tags/servlet/>Servlet</a>
+|
+<a href=/ja/tags/tomcat/>Tomcat</a></div></div><div class="translation-notice machine-translated"><a href=/servlets-and-tomcat/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Jakarta Servlet API はサーバー側のリクエストとレスポンスのモデルを定義します。
+Apache Tomcat はその API を実装し、Catalina サーブレットコンテナー、HTTP および
+AJP コネクター、セッション管理、デプロイメント、運用ツールを提供します。
+Tomcat 11 は Jakarta Servlet 6.1 を実装し、Java 17 を必要とします。<code>javax.servlet.*</code>
+を import する古いアプリケーションは、<code>jakarta.servlet.*</code> 名前空間へ移行するか、
+互換性のある古いコンテナーを使用する必要があります。</p><h2 id=web-アプリケーションの構成>Web アプリケーションの構成
+<a href=#web-%e3%82%a2%e3%83%97%e3%83%aa%e3%82%b1%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3%e3%81%ae%e6%a7%8b%e6%88%90 class=heading-anchor><span>#</span></a></h2><p>デプロイ可能な Web アプリケーションは、展開されたディレクトリまたは WAR アーカイブ
+にできます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>orders.war
+</span></span><span style=display:flex><span>|-- index.html
+</span></span><span style=display:flex><span>`-- WEB-INF
+</span></span><span style=display:flex><span>    |-- web.xml
+</span></span><span style=display:flex><span>    |-- classes/com/example/OrdersServlet.class
+</span></span><span style=display:flex><span>    `-- lib/orders-domain.jar</span></span></code></pre></div></div></div><p><code>WEB-INF/</code> 以下のリソースはクライアントから直接アドレス指定できません。
+<code>WEB-INF/classes/</code> にはアプリケーションのクラスとリソースが含まれ、<code>WEB-INF/lib/</code>
+には依存 JAR が含まれます。<code>WEB-INF/web.xml</code> はデプロイメント記述子です。Servlet
+3.0 以降はアノテーションベースの登録と、<code>ServletContainerInitializer</code> による
+プログラム登録もサポートするため、デプロイメントで記述子のメタデータや順序が必要
+でない限り <code>web.xml</code> は省略できます。</p><h2 id=マッピングとリクエストディスパッチ>マッピングとリクエストディスパッチ
+<a href=#%e3%83%9e%e3%83%83%e3%83%94%e3%83%b3%e3%82%b0%e3%81%a8%e3%83%aa%e3%82%af%e3%82%a8%e3%82%b9%e3%83%88%e3%83%87%e3%82%a3%e3%82%b9%e3%83%91%e3%83%83%e3%83%81 class=heading-anchor><span>#</span></a></h2><p>サーブレットマッピングは URL パターンからサーブレットを選択します。完全一致
+マッピングが最長パスマッピングより優先され、その後に拡張子マッピング、デフォルト
+の <code>/</code> マッピングが続きます。フィルターは対象の前後でリクエストとレスポンスを
+ラップでき、リスナーはコンテキスト、セッション、リクエストのライフサイクル
+イベントを監視します。</p><p>ディスパッチには個別の <code>DispatcherType</code> 値があります。</p><ul><li><code>REQUEST</code> は元のコンテナーディスパッチを表します。</li><li><code>FORWARD</code> はクライアントとの往復なしで処理を移します。</li><li><code>INCLUDE</code> は別のリソースの出力を挿入します。</li><li><code>ERROR</code> は設定されたエラー処理を呼び出します。</li><li><code>ASYNC</code> は非同期リクエストを継続します。</li></ul><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>request.<span style=color:#a6e22e>getRequestDispatcher</span>(<span style=color:#e6db74>&#34;/WEB-INF/views/order.jsp&#34;</span>)
+</span></span><span style=display:flex><span>       .<span style=color:#a6e22e>forward</span>(request, response);</span></span></code></pre></div></div></div><p>リダイレクトは代わりに 3xx レスポンスを送り、その後クライアントが新しいリクエスト
+を開始します。通常のディスパッチでは、コネクターがリクエストを解析し、Catalina が
+仮想ホストと Web コンテキストを選択し、フィルターチェーンが実行され、1 つの
+サーブレットインスタンスが呼び出しを処理します。コンテナーはサーブレットを並行
+して呼び出すため、可変のインスタンスフィールドには同期が必要であり、できれば
+排除するべきです。</p><p>セッションは Cookie または URL 書き換えによって識別されます。セッション属性は
+並行リクエストからアクセスされる可能性があるため、スレッドに閉じたものとして
+扱ってはなりません。非同期処理はリクエストスレッドを解放しますが、アプリケーション
+は <code>AsyncContext</code> を完了し、必要なセキュリティまたはロギングコンテキストを保持
+しなければなりません。</p><h2 id=tomcats-container-model>Tomcat&rsquo;s Container Model
+<a href=#tomcats-container-model class=heading-anchor><span>#</span></a></h2><p><code>org.apache.catalina.startup.Bootstrap</code> starts a standalone installation.
+<code>catalina.home</code> points to the shared Tomcat binaries, while <code>catalina.base</code>
+points to an instance&rsquo;s configuration, logs, temporary files, work directory,
+and deployed applications. Multiple instances can thus share one installation.</p><p>Catalina composes these elements:</p><ol><li>A <code>Server</code> owns the Tomcat instance.</li><li>A <code>Service</code> associates one or more <code>Connector</code>s with one <code>Engine</code>.</li><li>An <code>Engine</code> routes requests to a <code>Host</code>.</li><li>A <code>Host</code> contains one or more web application <code>Context</code>s.</li><li>A <code>Wrapper</code> represents an individual servlet.</li></ol><p>Connectors own protocol processing and worker threads. Blocking servlet work
+occupies those threads, so connector limits, downstream timeouts, and application
+executor limits must form one capacity plan.</p><h2 id=class-loaders-and-shutdown>Class Loaders and Shutdown
+<a href=#class-loaders-and-shutdown class=heading-anchor><span>#</span></a></h2><p>Tomcat separates bootstrap, system, common, and per-web-application class
+loaders. A web application sees its own <code>WEB-INF/classes</code> and <code>WEB-INF/lib</code> but
+not another application&rsquo;s classes. Tomcat&rsquo;s web loader uses local-first lookup
+for application classes, with mandatory delegation for Java, Jakarta Servlet,
+and container implementation APIs. Duplicate API JARs in <code>WEB-INF/lib</code> do not
+override container APIs and can cause linkage failures.</p><p>For graceful shutdown, stop accepting new traffic, allow in-flight work to
+finish within a deadline, and then stop the <code>Server</code>. Servlet context listeners
+and managed resources receive shutdown callbacks, but application-created
+executors and threads still need explicit termination. Session persistence
+depends on the configured manager and must not be assumed across a restart.</p><h2 id=primary-references>Primary References
+<a href=#primary-references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://jakarta.ee/specifications/servlet/6.1/>Jakarta Servlet 6.1 specification</a></li><li><a href=https://tomcat.apache.org/tomcat-11.0-doc/architecture/overview.html>Tomcat 11 architecture</a></li><li><a href=https://tomcat.apache.org/tomcat-11.0-doc/class-loader-howto.html>Tomcat class-loader documentation</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/servlets-and-tomcat/ class=language-option data-lang=en>English
+</a><a href=/ja/servlets-and-tomcat/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/servlets-and-tomcat/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/servlets-and-tomcat/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

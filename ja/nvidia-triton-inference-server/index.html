@@ -1,0 +1,38 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>NVIDIA Triton Inference Server</title></head><body><main><article><div class=article-header><h1>NVIDIA Triton Inference Server</h1><div class=aux>最終更新: 2021-09-18 04:18:49 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/nvidia/>Nvidia</a>
+|
+<a href=/ja/tags/triton/>Triton</a>
+|
+<a href=/ja/tags/%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92/>機械学習</a>
+|
+<a href=/ja/tags/%E6%8E%A8%E8%AB%96/>推論</a></div></div><div class="translation-notice machine-translated"><a href=/nvidia-triton-inference-server/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>NVIDIA Triton Inference Server は、HTTP と gRPC で機械学習モデルを提供します。TensorRT、
+PyTorch、ONNX Runtime、TensorFlow、Python、アンサンブルなど複数のバックエンドをサポート
+し、バッチ処理、メトリクス、モデルのバージョン管理、同時実行制御を提供します。</p><h2 id=コンテナーから開始する>コンテナーから開始する
+<a href=#%e3%82%b3%e3%83%b3%e3%83%86%e3%83%8a%e3%83%bc%e3%81%8b%e3%82%89%e9%96%8b%e5%a7%8b%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>サポートされている Triton コンテナーは NVIDIA NGC で公開されています。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>docker pull nvcr.io/nvidia/tritonserver:&lt;tag&gt;
+</span></span><span style=display:flex><span>docker run --gpus all --rm -p 8000:8000 -p 8001:8001 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  -v <span style=color:#e6db74>&#34;</span>$PWD<span style=color:#e6db74>/models:/models&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  nvcr.io/nvidia/tritonserver:&lt;tag&gt; tritonserver <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --model-repository<span style=color:#f92672>=</span>/models</span></span></code></pre></div></div></div><p>モデルに適したバックエンドサポートを持つタグを選択してください。最小イメージには
+サーバーのみが含まれますが、その他のイメージには選択したフレームワークや SDK の
+コンポーネントが追加されます。サーバー、CUDA ドライバー、モデルランタイム間の互換性
+については、リリースノートを確認してください。</p><h2 id=モデルリポジトリのレイアウト>モデルリポジトリのレイアウト
+<a href=#%e3%83%a2%e3%83%87%e3%83%ab%e3%83%aa%e3%83%9d%e3%82%b8%e3%83%88%e3%83%aa%e3%81%ae%e3%83%ac%e3%82%a4%e3%82%a2%e3%82%a6%e3%83%88 class=heading-anchor><span>#</span></a></h2><p>Triton は、モデルごとに 1 つのディレクトリと、1 つ以上の数値バージョンディレクトリを
+持つリポジトリからモデルを検出します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>models/
+</span></span><span style=display:flex><span>  classifier/
+</span></span><span style=display:flex><span>    config.pbtxt
+</span></span><span style=display:flex><span>    1/
+</span></span><span style=display:flex><span>      model.onnx</span></span></code></pre></div></div></div><p><code>config.pbtxt</code> は、モデルの入力、出力、バッチ処理の動作、バックエンド固有の設定を宣言
+します。Triton はサポートされている形式の一部の構成を推論できますが、明示的な構成の
+ほうが明確で、多くの機能で必要です。Python バックエンドモデルは通常、バージョン
+ディレクトリに <code>model.py</code> を配置し、Triton のバックエンドインターフェイスを実装します。</p><h2 id=リクエストと運用>リクエストと運用
+<a href=#%e3%83%aa%e3%82%af%e3%82%a8%e3%82%b9%e3%83%88%e3%81%a8%e9%81%8b%e7%94%a8 class=heading-anchor><span>#</span></a></h2><p>クライアントは推論リクエストで名前付きテンソルを送信し、レスポンスで名前付き出力
+テンソルを受信します。動的バッチ処理は互換性のあるリクエストをまとめてスループットを
+向上できますが、キュー遅延とバッチサイズはレイテンシー目標に対して調整する必要が
+あります。</p><p>環境に適したエンドポイントとモデルリポジトリへのアクセスだけを公開してください。
+Prometheus メトリクスエンドポイントを監視し、代表的な入力形状でテストし、ロールバックを
+運用上簡単にできるようモデルをバージョン管理します。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/nvidia-triton-inference-server/ class=language-option data-lang=en>English
+</a><a href=/ja/nvidia-triton-inference-server/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/nvidia-triton-inference-server/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/nvidia-triton-inference-server/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

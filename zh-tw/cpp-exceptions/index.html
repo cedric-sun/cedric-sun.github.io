@@ -1,0 +1,48 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>C++ 例外與例外安全</title></head><body><main><article><div class=article-header><h1>C++ 例外與例外安全</h1><div class=aux>最後更新: 2024-05-28 17:55:25 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/c-plus-plus/>C-Plus-Plus</a>
+|
+<a href=/zh-tw/tags/language/>Language</a></div></div><div class="translation-notice machine-translated"><a href=/cpp-exceptions/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>例外會將失敗操作的回報與傳播至能夠回應的邊界分開。例外會將控制權轉移至相符的處理常式；控制權向外傳遞時，C++ 會依反向建構順序，摧毀每個離開其範圍且已完整建構的自動物件。因此，資源取得即初始化（RAII）會讓一般與例外清理路徑相同。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>void</span> <span style=color:#a6e22e>load_configuration</span>(std<span style=color:#f92672>::</span>filesystem<span style=color:#f92672>::</span>path path) {
+</span></span><span style=display:flex><span>    std<span style=color:#f92672>::</span>ifstream input{path};             <span style=color:#75715e>// Closed during unwinding.
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>input) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>throw</span> std<span style=color:#f92672>::</span>runtime_error{<span style=color:#e6db74>&#34;cannot open configuration&#34;</span>};
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// Parsing may throw; input still closes.
+</span></span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>    load_configuration(<span style=color:#e6db74>&#34;app.conf&#34;</span>);
+</span></span><span style=display:flex><span>} <span style=color:#66d9ef>catch</span> (<span style=color:#66d9ef>const</span> std<span style=color:#f92672>::</span>exception<span style=color:#f92672>&amp;</span> error) {
+</span></span><span style=display:flex><span>    report(error.what());
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>請以值擲出例外物件，並以 <code>const</code> 參照捕捉多型例外型別。以值捕捉基底例外會切割衍生物件。<code>catch (...)</code> 只應位於能恢復不變量、轉譯錯誤或刻意終止的邊界；不得在狀態損壞時靜默繼續。</p><h2 id=展開與-raii>展開與 RAII
+<a href=#%e5%b1%95%e9%96%8b%e8%88%87-raii class=heading-anchor><span>#</span></a></h2><p>擲出例外的建構函式不會產生完成的物件，但其已完整建構的基底與成員子物件仍會執行解構函式。解構函式不得在另一個例外作用中讓例外逸出，因為這會呼叫 <code>std::terminate</code>。因此，解構函式、智慧指標刪除器與回復防護應不擲出例外。清理可能失敗時，請公開一個在解構前回報失敗的明確操作。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Transaction</span> {
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>explicit</span> Transaction(Database<span style=color:#f92672>&amp;</span> db) <span style=color:#f92672>:</span> db_{db} { db_.begin(); }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>commit</span>() {
+</span></span><span style=display:flex><span>        db_.commit();
+</span></span><span style=display:flex><span>        committed_ <span style=color:#f92672>=</span> true;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>~</span>Transaction() <span style=color:#66d9ef>noexcept</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>committed_) {
+</span></span><span style=display:flex><span>            db_.rollback_noexcept();
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span><span style=color:#f92672>:</span>
+</span></span><span style=display:flex><span>    Database<span style=color:#f92672>&amp;</span> db_;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>bool</span> committed_ <span style=color:#f92672>=</span> false;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>解構函式只會嘗試回復；<code>commit()</code> 仍是可以回報錯誤的操作。每個公開操作都必須定義其失敗後保留的狀態。</p><h2 id=例外安全保證>例外安全保證
+<a href=#%e4%be%8b%e5%a4%96%e5%ae%89%e5%85%a8%e4%bf%9d%e8%ad%89 class=heading-anchor><span>#</span></a></h2><p>操作可以宣告下列其中一種保證：</p><ol><li><strong>不擲出保證：</strong> 不會傳播例外。</li><li><strong>強保證：</strong> 若失敗，可觀察狀態不變。</li><li><strong>基本保證：</strong> 不變量成立且資源不洩漏，但狀態可能變更。</li></ol><p>不要僅因型別使用 RAII，就推斷具有超出基本保證的保證。RAII 可防止洩漏，但不會復原被覆寫的值或外部效果。會擲出的變更操作應記錄其保證。</p><h3 id=提交回復與不變量>提交、回復與不變量
+<a href=#%e6%8f%90%e4%ba%a4%e5%9b%9e%e5%be%a9%e8%88%87%e4%b8%8d%e8%ae%8a%e9%87%8f class=heading-anchor><span>#</span></a></h3><p>強保證遵循準備與提交結構：在替代狀態中執行可能擲出的工作，接著套用不會擲出的提交。提交通常是 <code>swap</code>、指標替換或資料庫交易提交。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>void</span> Account<span style=color:#f92672>::</span>replace_limits(Limits requested) {
+</span></span><span style=display:flex><span>    requested.validate();                  <span style=color:#75715e>// May throw; `limits_` is unchanged.
+</span></span></span><span style=display:flex><span>    limits_.swap(requested);               <span style=color:#75715e>// Commit must not throw.
+</span></span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>替代狀態成本太高或外部動作無法復原時，請維持基本保證。定義呼叫者可在每次失敗後依賴的不變量，例如「物件仍可使用，且餘額為非負」。除非外部系統提供交易或補償動作，否則不要宣稱不可逆副作用可以回復。</p><h2 id=noexcept-是終止契約><code>noexcept</code> 是終止契約
+<a href=#noexcept-%e6%98%af%e7%b5%82%e6%ad%a2%e5%a5%91%e7%b4%84 class=heading-anchor><span>#</span></a></h2><p><code>noexcept</code> 在某些用途上會改變函數型別，並承諾從函數逸出的例外會造成 <code>std::terminate</code>。它不會抑制例外，也不會定義性地使主體更快。當終止是預期回應，且所有被呼叫操作都符合該契約時，才將函數標記為 <code>noexcept</code>。</p><p>除非另行宣告，解構函式會隱含為不擲出。只有在呼叫者能在非展開路徑捕捉其例外時，明確使解構函式成為 <code>noexcept(false)</code> 才適當；若另一個例外已在傳播，這仍然不安全。</p><p><code>noexcept</code> 也會影響標準函式庫策略。例如，<code>std::vector</code> 重新配置時，如果元素的移動建構函式不會擲出，便可以在保留強保證的同時移動元素。若移動可能擲出且可用複製，實作可以改為複製。若移動可能擲出且複製不可用，vector 可能無法為該次重新配置提供強保證。這是容器特定的結果，不是虛假標記操作為 <code>noexcept</code> 的理由。</p><h2 id=設計例外邊界>設計例外邊界
+<a href=#%e8%a8%ad%e8%a8%88%e4%be%8b%e5%a4%96%e9%82%8a%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>讓一般程式碼保持例外中立：使用擁有物件取得資源，在區域中保留不變量，並讓失敗抵達知道復原原則的層。當目標錯誤模型需要時，在程序、請求、執行緒或外部函式邊界轉譯例外。絕不要讓 C++ 例外跨越不允許例外的介面。</p><p>例外不是驗證的替代品。在變更前驗證前置條件；當失敗屬於正常的區域控制流程時，使用 C++23 <code>std::expected</code> 等回傳值；當呼叫者需要具備可靠清理的非區域傳播時，使用例外。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cpp-exceptions/ class=language-option data-lang=en>English
+</a><a href=/ja/cpp-exceptions/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cpp-exceptions/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cpp-exceptions/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

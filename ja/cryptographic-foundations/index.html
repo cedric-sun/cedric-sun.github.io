@@ -1,0 +1,94 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>暗号技術の基礎</title></head><body><main><article><div class=article-header><h1>暗号技術の基礎</h1><div class=aux>最終更新: 2026-09-03 15:56:39 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/cryptography/>Cryptography</a>
+|
+<a href=/ja/tags/encryption/>Encryption</a>
+|
+<a href=/ja/tags/authentication/>Authentication</a></div></div><div class="translation-notice machine-translated"><a href=/cryptographic-foundations/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>暗号技術は、機密性、完全性、ピア認証、否認防止などのセキュリティ目標に数学的
+プリミティブを適用します。エンコーディング、鍵管理、乱数、状態、攻撃者の能力も
+結果を決めるため、安全なプリミティブだけでプロトコルが安全になるわけではありません。</p><h2 id=ビットxor剰余算術>ビット、XOR、剰余算術
+<a href=#%e3%83%93%e3%83%83%e3%83%88xor%e5%89%b0%e4%bd%99%e7%ae%97%e8%a1%93 class=heading-anchor><span>#</span></a></h2><p>暗号仕様は正確なサイズのビット列とバイト列を扱います。排他的論理和は 2 を法とする
+加算です。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>a</code></th><th><code>b</code></th><th><code>a XOR b</code></th></tr></thead><tbody><tr><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>1</td></tr><tr><td>1</td><td>0</td><td>1</td></tr><tr><td>1</td><td>1</td><td>0</td></tr></tbody></table></div></div><p>XOR は結合的、交換的、自己逆元であるため、
+<code>(message XOR mask) XOR mask = message</code>. これらの恒等式でストリーム暗号がキーストリームを適用・除去する方法を説明できます。
+ただし安全性を意味しません。マスクを再利用すると平文間の関係が露呈します。</p><p>剰余算術は整数を合同類にまとめます。<code>a ≡ b (mod n)</code> は <code>n</code> が <code>a - b</code> を割り切る
+ことを意味します。加算と乗算はそれらの類の中にとどまります。整数 <code>a</code> が法 <code>n</code> に
+おける乗法逆元を持つのは <code>gcd(a, n) = 1</code> の場合に限られ、拡張ユークリッド互除法で
+その逆元を求められます。</p><p>素数を法とすると、すべての非零要素が可逆な有限体が生成されます。その他の公開鍵
+システムは、楕円曲線群を含む慎重に選択された有限群で動作します。実装は任意の整数
+や点を有効な鍵として扱わず、選択した標準が定義する群、エンコーディング、検証、
+部分群の規則を使わなければなりません。</p><h2 id=確率とセキュリティパラメーター>確率とセキュリティパラメーター
+<a href=#%e7%a2%ba%e7%8e%87%e3%81%a8%e3%82%bb%e3%82%ad%e3%83%a5%e3%83%aa%e3%83%86%e3%82%a3%e3%83%91%e3%83%a9%e3%83%a1%e3%83%bc%e3%82%bf%e3%83%bc class=heading-anchor><span>#</span></a></h2><p>暗号の保証は確率的で、パラメーター化されています。秘密を <code>2^k</code> 個の可能性から
+一様にサンプリングすると、総当たり探索は平均して約 <code>2^(k-1)</code> 回の推測を要します。
+理想的な n ビットハッシュは、原像には約 <code>2^n</code> の計算量を必要としますが、誕生日
+限界により衝突には <code>2^(n/2)</code> だけで済みます。</p><p>セキュリティパラメーターは、すべてのオブジェクトのビット数ではなく、想定する
+計算量を示します。256 ビットの楕円曲線群は約 128 ビットの古典的安全性を目標に
+できますが、256 ビットハッシュは 256 ビットの原像耐性と 128 ビットの衝突耐性を
+目標にします。アルゴリズム固有の攻撃、量子攻撃モデル、実装からの漏洩、弱い乱数
+生成、鍵の寿命によって実効強度は低下します。したがってパラメーター選択はプロトコル
+標準と現在の鍵管理ガイダンスに従わなければなりません。</p><p>Probabilities also govern failure limits. Authentication tags can be forged
+with some bounded probability, and nonce-based modes cap the number and total
+size of messages processed under one key. Systems must enforce those usage
+limits rather than assuming that a large key alone makes unlimited use safe.</p><h2 id=ワンタイムパッドとストリーム暗号>ワンタイムパッドとストリーム暗号
+<a href=#%e3%83%af%e3%83%b3%e3%82%bf%e3%82%a4%e3%83%a0%e3%83%91%e3%83%83%e3%83%89%e3%81%a8%e3%82%b9%e3%83%88%e3%83%aa%e3%83%bc%e3%83%a0%e6%9a%97%e5%8f%b7 class=heading-anchor><span>#</span></a></h2><p>For equal-length strings, a one-time pad computes:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ciphertext = plaintext XOR pad
+</span></span><span style=display:flex><span>plaintext  = ciphertext XOR pad</span></span></code></pre></div></div></div><p>情報理論的秘匿性が成立するのは、パッドが一様乱数で秘密であり、平文以上の長さで、
+全体または一部を決して再利用しない場合だけです。パッドを再利用すると
+<code>ciphertext1 XOR ciphertext2 = plaintext1 XOR plaintext2</code>, となり、どちらの平文も最初は未知であっても構造が漏れます。パッドを安全に生成、
+配布、破棄することは、ほとんどのソフトウェアシステムでは構成を実用的でないものに
+します。</p><p>ストリーム暗号は真の乱数パッドを、短い秘密鍵と nonce から導出した擬似乱数キースト
+リームに置き換えます。nonce は通常公開されますが、一意性要件は必須です。1 つの
+ChaCha20-Poly1305 鍵で nonce を再利用すると、ChaCha20 キーストリームが繰り返され、
+ワンタイム認証鍵も再利用されます。AES-GCM も nonce 再利用後は強い機密性と認証の
+保証を失います。nonce を管理または検証するライブラリ API を使い、モードのメッセージ
+またはデータ制限に達する前に鍵をローテーションします。</p><h2 id=認証付き暗号化と関連データ>認証付き暗号化と関連データ
+<a href=#%e8%aa%8d%e8%a8%bc%e4%bb%98%e3%81%8d%e6%9a%97%e5%8f%b7%e5%8c%96%e3%81%a8%e9%96%a2%e9%80%a3%e3%83%87%e3%83%bc%e3%82%bf class=heading-anchor><span>#</span></a></h2><p>暗号化だけでは変更を検出できません。関連データ付き認証暗号化（AEAD）方式は、暗号文
+と認証タグを返し、次を認証します。</p><ul><li>機密性が維持される平文。</li><li>目に見えるままだが、気付かれずに変更できない関連データ。</li><li>方式が要求する nonce とアルゴリズム入力。</li></ul><p>プロトコルバージョン、レコードシーケンス番号、テナント識別子、ルーティング
+フィールドなどのヘッダーは、中間者が読む必要がある場合に関連データにできます。
+差異があるとタグ検証に失敗するため、両端はまったく同じ関連データをシリアライズ
+しなければなりません。</p><p>保守された暗号ライブラリを通じて、AES-GCM や ChaCha20-Poly1305 などの標準化された
+AEAD を使います。受信側は認証されていない平文を公開したり、それに基づいて動作
+したりしてはなりません。タグ失敗は認証失敗です。再試行、ログ、エラーレスポンスは
+部分的な平文を公開したり、有用な内部失敗状態を区別させたりしてはなりません。暗号文
+に付加した鍵なしダイジェストではこの保護を提供できません。</p><h2 id=ハッシュmac鍵導出>ハッシュ、MAC、鍵導出
+<a href=#%e3%83%8f%e3%83%83%e3%82%b7%e3%83%a5mac%e9%8d%b5%e5%b0%8e%e5%87%ba class=heading-anchor><span>#</span></a></h2><p>Related-looking primitives have distinct roles:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Primitive</th><th>Secret Input</th><th>Primary Role</th></tr></thead><tbody><tr><td>Cryptographic hash</td><td>No</td><td>Stable digest, commitment component, or protocol-defined transcript hash</td></tr><tr><td>Message authentication code (MAC)</td><td>Shared key</td><td>Integrity and source authentication among key holders</td></tr><tr><td>Key-derivation function (KDF)</td><td>Secret keying material</td><td>Produce context-bound keys with the required length</td></tr><tr><td>Password-hashing function</td><td>Password and salt</td><td>Make offline password guesses costly</td></tr></tbody></table></div></div><p>通常のハッシュはデータを認証できません。攻撃者がメッセージを置き換えると新しい
+ダイジェストを計算できるためです。HMAC は標準化された MAC 構成であり、
+<code>hash(key || message)</code> に置き換えないでください。HKDF はまず入力鍵素材から固定長の
+擬似乱数鍵を抽出し、コンテキスト固有の出力へ展開します。salt と <code>info</code> の入力は
+パスワードではなく、パスワードハッシュのアカウントごとのランダム salt とは異なる
+目的を持ちます。</p><p>KDF context labels separate keys by protocol, version, direction, role, and
+purpose. For example, an encryption key and a MAC key must not be the same bytes
+merely because both came from one shared secret. Follow the enclosing protocol&rsquo;s
+defined labels and encoding because ambiguous concatenation defeats that
+separation.</p><h2 id=asymmetric-key-establishment-and-signatures>Asymmetric Key Establishment and Signatures
+<a href=#asymmetric-key-establishment-and-signatures class=heading-anchor><span>#</span></a></h2><p>Diffie-Hellman and elliptic-curve Diffie-Hellman let two parties derive a shared
+secret across an observable channel. Bare Diffie-Hellman does not authenticate
+either party: an active attacker can negotiate one secret with each endpoint.
+A complete protocol binds the exchange transcript to certificates, pre-shared
+keys, or previously authenticated public keys, then derives traffic keys with a
+KDF.</p><p>A key encapsulation mechanism (KEM) produces a shared secret and an
+encapsulation for a recipient&rsquo;s public key. Protocols may combine independently
+secure components during a cryptographic migration, but the combination and
+its KDF must come from a reviewed protocol specification. Public-key encryption
+is not interchangeable with key agreement or a KEM.</p><p>Digital signatures bind a private signing operation to a message and allow
+verification with the public key. Algorithms such as Ed25519, ECDSA, and
+RSA-PSS define message formatting, hashing, randomness or deterministic nonce
+generation, and verification rules. A signature is not &ldquo;encryption with the
+private key,&rdquo; and signature verification does not make an untrusted public key
+authentic.</p><h2 id=start-with-a-threat-model>Start with a Threat Model
+<a href=#start-with-a-threat-model class=heading-anchor><span>#</span></a></h2><p>Select primitives only after stating the security boundary:</p><ol><li>Identify protected assets and whether confidentiality, integrity, peer
+authentication, replay resistance, or forward secrecy is required.</li><li>Identify attacker capabilities, including observation, active modification,
+chosen inputs, endpoint compromise, side channels, rollback, and denial of
+service.</li><li>Define trust anchors, key ownership, key rotation, compromise recovery, and
+authenticated metadata.</li><li>Choose a standardized protocol and maintained implementation whose security
+properties match those requirements.</li></ol><p>TLS can protect data in transit while leaving compromised endpoints,
+authorization errors, and application-level replay outside its boundary.
+Signatures can prove that a key authorized a message while saying nothing about
+whether that key should be trusted. Explicit boundaries prevent one property
+from being mistaken for another.</p><p>OpenSSH randomart illustrates the same distinction. It is a visual rendering of
+a public-key fingerprint, not an authenticated identity proof. Compare the full
+fingerprint over a separately authenticated channel.</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final>NIST SP 800-57 Part 1 Rev. 5: Recommendation for Key Management</a></li><li><a href=https://csrc.nist.gov/pubs/sp/800/38/d/final>NIST SP 800-38D: Galois/Counter Mode</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc8439>RFC 8439: ChaCha20 and Poly1305 for IETF Protocols</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc5869>RFC 5869: HMAC-Based Extract-and-Expand Key Derivation Function</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc7748>RFC 7748: Elliptic Curves for Security</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc8032>RFC 8032: Edwards-Curve Digital Signature Algorithm</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cryptographic-foundations/ class=language-option data-lang=en>English
+</a><a href=/ja/cryptographic-foundations/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cryptographic-foundations/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cryptographic-foundations/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

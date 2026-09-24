@@ -1,0 +1,47 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>awk</title></head><body><main><article><div class=article-header><h1>awk</h1><div class=aux>最后更新: 2024-05-22 06:31:54 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/awk/>Awk</a>
+|
+<a href=/zh-cn/tags/gnu/>Gnu</a>
+|
+<a href=/zh-cn/tags/linux/>Linux</a></div></div><div class="translation-notice machine-translated"><a href=/awk/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p><code>awk</code> 以记录流的形式转换文本。每条记录都会按照有序的模式-动作规则进行测试，
+因此该语言适合生成报告、执行验证和进行小型数据转换。POSIX <code>awk</code> 广泛可用；
+GNU awk（<code>gawk</code>）增加了脚本需要显式声明的功能。</p><h2 id=记录字段和计数器>记录、字段和计数器
+<a href=#%e8%ae%b0%e5%bd%95%e5%ad%97%e6%ae%b5%e5%92%8c%e8%ae%a1%e6%95%b0%e5%99%a8 class=heading-anchor><span>#</span></a></h2><p><code>RS</code> 分隔输入记录，默认为换行符。<code>FS</code> 分隔字段；其默认行为会特殊处理连续的空格和制表符。
+<code>$0</code> 是完整记录，<code>$1</code> 到 <code>$NF</code> 是字段，<code>NF</code> 是字段数量。
+<code>NR</code> 统计所有输入中的记录，而 <code>FNR</code> 对每个输入文件重新开始计数。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>awk -F <span style=color:#e6db74>&#39;:&#39;</span> <span style=color:#e6db74>&#39;$3 &gt;= 1000 { print $1, $6 }&#39;</span> /etc/passwd
+</span></span><span style=display:flex><span>awk -v limit<span style=color:#f92672>=</span><span style=color:#ae81ff>10</span> <span style=color:#e6db74>&#39;NF &gt; limit { print FILENAME &#34;:&#34; FNR }&#39;</span> input</span></span></code></pre></div></div></div><p>生成结构化结果时，应显式设置输出分隔符：</p><div class=jose-wrapper><div class=jose-tools><span>awk</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-awk data-lang=awk><span style=display:flex><span>BEGIN { FS <span style=color:#f92672>=</span> OFS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;,&#34;</span> }
+</span></span><span style=display:flex><span>NF <span style=color:#f92672>&gt;=</span> <span style=color:#ae81ff>3</span> { <span style=color:#a6e22e>total</span> <span style=color:#f92672>+=</span> <span style=color:#f92672>$</span><span style=color:#ae81ff>3</span> }
+</span></span><span style=display:flex><span>END { <span style=color:#66d9ef>print</span> <span style=color:#e6db74>&#34;total&#34;</span>, <span style=color:#a6e22e>total</span> }</span></span></code></pre></div></div></div><p>GNU awk 将多字符 <code>RS</code> 视为正则表达式。可移植的 awk 要求记录分隔符为单个字符，
+因此处理以 NUL 分隔的名称时应显式要求 <code>gawk</code>，例如 <code>gawk -v RS='\0'</code>。</p><h2 id=编写模式-动作程序>编写模式-动作程序
+<a href=#%e7%bc%96%e5%86%99%e6%a8%a1%e5%bc%8f-%e5%8a%a8%e4%bd%9c%e7%a8%8b%e5%ba%8f class=heading-anchor><span>#</span></a></h2><p>规则的形式为 <code>pattern { action }</code>。<code>/error/</code> 这样的正则表达式会测试 <code>$0</code>；
+表达式会根据 awk 的真值规则进行测试；省略模式则匹配每条记录。
+<code>BEGIN</code> 在输入前运行，<code>END</code> 在最后一条记录之后运行。</p><div class=jose-wrapper><div class=jose-tools><span>awk</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-awk data-lang=awk><span style=display:flex><span>BEGIN { FS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;:&#34;</span> }
+</span></span><span style=display:flex><span><span style=color:#f92672>$</span><span style=color:#ae81ff>7</span> <span style=color:#f92672>~</span> <span style=color:#e6db74>/nologin$/</span> { <span style=color:#a6e22e>next</span> }
+</span></span><span style=display:flex><span>{ <span style=color:#a6e22e>users</span>[<span style=color:#f92672>$</span><span style=color:#ae81ff>1</span>] <span style=color:#f92672>=</span> <span style=color:#f92672>$</span><span style=color:#ae81ff>6</span> }
+</span></span><span style=display:flex><span>END {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> (<span style=color:#a6e22e>name</span> <span style=color:#f92672>in</span> <span style=color:#a6e22e>users</span>)
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>print</span> <span style=color:#a6e22e>name</span>, <span style=color:#a6e22e>users</span>[<span style=color:#a6e22e>name</span>]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>关联数组的键是字符串，<code>for (key in array)</code> 没有可移植的迭代顺序。
+需要确定性输出时，应在外部排序，或使用有文档说明的 GNU awk 排序功能。</p><h2 id=值和正则表达式>值和正则表达式
+<a href=#%e5%80%bc%e5%92%8c%e6%ad%a3%e5%88%99%e8%a1%a8%e8%be%be%e5%bc%8f class=heading-anchor><span>#</span></a></h2><p>awk 值具有字符串和数值形式。上下文决定转换方式：
+<code>total += $3</code> 需要数字，而连接操作需要字符串。
+应在依赖转换前验证输入，因为非数字字符串在数值上下文中会转换为零。</p><p>正则表达式使用 POSIX 扩展正则表达式语法。<code>~</code> 和 <code>!~</code> 测试值；
+<code>match()</code>、<code>sub()</code>、<code>gsub()</code> 和 <code>split()</code> 在动作中执行操作。
+<code>sub()</code> 修改第一个匹配，<code>gsub()</code> 修改所有匹配。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>awk <span style=color:#e6db74>&#39;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  /^[[:space:]]*#/ || NF == 0 { next }
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  $2 ~ /^[0-9]+$/ { count[$1] += $2 }
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>  END { for (key in count) print key, count[key] }
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#39;</span> metrics.txt</span></span></code></pre></div></div></div><h2 id=安全地调用-awk>安全地调用 <code>awk</code>
+<a href=#%e5%ae%89%e5%85%a8%e5%9c%b0%e8%b0%83%e7%94%a8-awk class=heading-anchor><span>#</span></a></h2><p>将程序放在单引号中，使 shell 不会在 awk 接收前展开 <code>$1</code>、反斜杠或 glob 字符。
+使用 <code>-v</code> 传递 shell 数据，而不是将其插入程序源码：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>awk -v prefix<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$prefix<span style=color:#e6db74>&#34;</span> <span style=color:#e6db74>&#39;$1 == prefix { print $0 }&#39;</span> input
+</span></span><span style=display:flex><span>awk -f report.awk -- --filename-starting-with-dash</span></span></code></pre></div></div></div><p>在支持 <code>--</code> 的实现中，该选项会结束 awk 的选项处理；当输入名称可能以 <code>-</code> 开头时应使用它。
+将 <code>-v</code> 数据视为数据，而不是 awk 源码。对于不受信任的 CSV，应使用支持 CSV 的解析器或 GNU awk
+有文档说明的 <code>--csv</code> 模式，因为 <code>FS=","</code> 不会实现 CSV 引号规则。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/awk/ class=language-option data-lang=en>English
+</a><a href=/ja/awk/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/awk/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/awk/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,39 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Java 泛型</title></head><body><main><article><div class=article-header><h1>Java 泛型</h1><div class=aux>最后更新: 2025-02-02 05:23:41 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/generics/>Generics</a>
+|
+<a href=/zh-cn/tags/java/>Java</a></div></div><div class="translation-notice machine-translated"><a href=/java-generics/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Java 泛型提供编译期类型检查，同时保持与泛型出现之前字节码的兼容性。
+编译器会擦除类型参数，在需要的位置插入强制类型转换，并可能生成桥接方法，
+以便擦除后仍能保留重写关系。因此，<code>List&lt;String></code> 和 <code>List&lt;Integer></code> 具有相同的运行时类，
+并且无法可靠地从对象中恢复泛型类型参数。</p><h2 id=不变性和边界>不变性和边界
+<a href=#%e4%b8%8d%e5%8f%98%e6%80%a7%e5%92%8c%e8%be%b9%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>泛型类是不变的：<code>List&lt;Integer></code> 不是 <code>List&lt;Number></code>，因为后者允许插入 <code>Double</code>。
+通配符在 API 边界表达变型。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>double</span> <span style=color:#a6e22e>sum</span>(List<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>extends</span> Number<span style=color:#f92672>&gt;</span> values) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> values.<span style=color:#a6e22e>stream</span>().<span style=color:#a6e22e>mapToDouble</span>(Number::doubleValue).<span style=color:#a6e22e>sum</span>();
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>addDefaults</span>(List<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>super</span> Integer<span style=color:#f92672>&gt;</span> destination) {
+</span></span><span style=display:flex><span>    destination.<span style=color:#a6e22e>add</span>(0);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>使用 <strong>extends</strong> 表示从中读取的生产者，使用 <strong>super</strong> 表示向其中写入的消费者。
+<code>List&lt;? extends Number></code> 可以产生 <code>Number</code> 值，但不接受非空值；
+<code>List&lt;? super Integer></code> 接受 <code>Integer</code> 值，但只能产生 <code>Object</code>。
+“只读”和“只写”只是简写，并非能力规则：两种列表仍可被查询、清空，
+或者在实现允许时接收 <code>null</code>。</p><h2 id=捕获和推断>捕获和推断
+<a href=#%e6%8d%95%e8%8e%b7%e5%92%8c%e6%8e%a8%e6%96%ad class=heading-anchor><span>#</span></a></h2><p>每个通配符都表示一个未知的捕获类型。通配符容器无法表达两个独立通配符值具有相同类型，
+因此在关系重要时使用泛型辅助方法：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>reverse</span>(List<span style=color:#f92672>&lt;?&gt;</span> list) { reverseCaptured(list); }
+</span></span><span style=display:flex><span><span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>reverseCaptured</span>(List<span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> list) {
+</span></span><span style=display:flex><span>    Collections.<span style=color:#a6e22e>reverse</span>(list);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>方法推断会结合参数约束、目标类型和声明的边界。菱形运算符会为构造器调用推断类型参数；
+但它不会使原始类型变得安全。边界可以要求特定能力：
+<code>&lt;T extends Comparable&lt;? super T>> T max(List&lt;? extends T> values)</code>。
+交集边界可以包含一个类，后面跟随多个接口。</p><h2 id=擦除下的构造>擦除下的构造
+<a href=#%e6%93%a6%e9%99%a4%e4%b8%8b%e7%9a%84%e6%9e%84%e9%80%a0 class=heading-anchor><span>#</span></a></h2><p><code>new T()</code>、<code>new T[n]</code> 和 <code>T.class</code> 都是非法的，因为擦除不会保留运行时所需的构造器、
+组件类型或类字面量。应改为传入工厂：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#f92672>&lt;</span>T<span style=color:#f92672>&gt;</span> T <span style=color:#a6e22e>create</span>(Supplier<span style=color:#f92672>&lt;?</span> <span style=color:#66d9ef>extends</span> T<span style=color:#f92672>&gt;</span> factory) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> factory.<span style=color:#a6e22e>get</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>对于反射集成，接受 <code>Class&lt;T></code> 并处理其受检查的反射异常；但如果由调用方负责构造，
+优先使用 <code>Supplier&lt;T></code>。泛型数组仍受到限制，因为数组是具体化且协变的，而泛型类型会被擦除且具有不变性。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-4.html>JLS §4.5–§4.6，参数化类型和擦除</a></li><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.10>JLS §5.1.10，捕获转换</a></li><li><a href=https://docs.oracle.com/javase/specs/jls/se21/html/jls-18.html>JLS §18，类型推断</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/java-generics/ class=language-option data-lang=en>English
+</a><a href=/ja/java-generics/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/java-generics/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/java-generics/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

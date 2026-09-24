@@ -1,0 +1,36 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MySQL 表与视图</title></head><body><main><article><div class=article-header><h1>MySQL 表与视图</h1><div class=aux>最后更新: 2021-09-09 08:09:41 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/mysql/>Mysql</a>
+|
+<a href=/zh-cn/tags/sql/>Sql</a>
+|
+<a href=/zh-cn/tags/databases/>Databases</a></div></div><div class="translation-notice machine-translated"><a href=/mysql-tables-and-views/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>基表持久化存储行。视图持久化存储查询定义，并将其结果呈现为类似表的对象。<code>SHOW FULL TABLES</code>
+可区分二者，而 <code>INFORMATION_SCHEMA.TABLES.TABLE_TYPE</code> 会报告 <code>BASE TABLE</code> 或 <code>VIEW</code>。</p><h2 id=innodb-行格式>InnoDB 行格式
+<a href=#innodb-%e8%a1%8c%e6%a0%bc%e5%bc%8f class=heading-anchor><span>#</span></a></h2><p>InnoDB 支持 <code>REDUNDANT</code>、<code>COMPACT</code>、<code>DYNAMIC</code> 和 <code>COMPRESSED</code> 行格式。
+<code>DYNAMIC</code> 是当前的默认格式。对于可变长度列，InnoDB 可以将较长的值存储在溢出页中，
+并在聚簇记录中保留一个引用。具体的行内和溢出存储行为取决于行格式、页大小、列类型和值长度；
+设计模式时不应假定 <code>TEXT</code> 或 <code>BLOB</code> 值在行内占用固定大小。</p><p>检查表的实际配置：</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>SHOW</span> <span style=color:#66d9ef>TABLE</span> STATUS <span style=color:#66d9ef>LIKE</span> <span style=color:#e6db74>&#39;orders&#39;</span>;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SHOW</span> <span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>TABLE</span> orders;</span></span></code></pre></div></div></div><h2 id=视图>视图
+<a href=#%e8%a7%86%e5%9b%be class=heading-anchor><span>#</span></a></h2><p>使用稳定且明确的列列表创建视图：</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>VIEW</span> active_customer_orders <span style=color:#66d9ef>AS</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> o.id, o.customer_id, o.created_at, o.total
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> orders <span style=color:#66d9ef>AS</span> o
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> o.status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;active&#39;</span>;</span></span></code></pre></div></div></div><p>默认情况下，视图不会存储单独的表。优化器可以将可合并视图并入外层查询；当定义要求时，
+例如涉及聚合、<code>DISTINCT</code> 或某些派生表操作时，也可以将其物化为临时表。
+<code>ALGORITHM = MERGE</code> 和 <code>ALGORITHM = TEMPTABLE</code> 表达一种偏好，但视图定义仍须满足所选算法的限制。</p><p>当每个受影响的行都能明确映射到一个基表时，部分视图可以更新。包含聚合、<code>GROUP BY</code>、
+<code>DISTINCT</code>、窗口函数、集合操作或不可更新连接的视图不可更新。当视图的更新行为不属于所需接口时，
+应使用基表执行写入。</p><p><code>DEFINER</code> 账户和 <code>SQL SECURITY</code> 设置决定执行视图时应用谁的权限。
+当视图向应用程序账户公开受限的投影时，应检查这两项设置。</p><p><code>WITH CHECK OPTION</code> 可防止通过可更新视图进行的写入创建该视图无法看到的行。
+<code>CASCADED</code> 检查当前视图和底层视图的条件，而 <code>LOCAL</code> 仅检查当前视图的条件：</p><div class=jose-wrapper><div class=jose-tools><span>sql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sql data-lang=sql><span style=display:flex><span><span style=color:#66d9ef>CREATE</span> <span style=color:#66d9ef>SQL</span> <span style=color:#66d9ef>SECURITY</span> <span style=color:#66d9ef>INVOKER</span> <span style=color:#66d9ef>VIEW</span> active_customer_orders <span style=color:#66d9ef>AS</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>SELECT</span> id, customer_id, created_at, total, status
+</span></span><span style=display:flex><span><span style=color:#66d9ef>FROM</span> orders
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WHERE</span> status <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;active&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>WITH</span> <span style=color:#66d9ef>CASCADED</span> <span style=color:#66d9ef>CHECK</span> <span style=color:#66d9ef>OPTION</span>;</span></span></code></pre></div></div></div><p>MySQL 将视图定义存储在数据字典中，并在执行视图时解析引用的对象，但模式变更仍可能使视图失效。
+更改依赖表后，应使用 <code>SHOW CREATE VIEW</code> 和 <code>CHECK TABLE</code>，并合理安排迁移顺序，
+确保调用方始终不会看到不兼容的定义。</p><p>MySQL 没有原生且自动维护的物化视图对象。需要预计算时，应使用由定时事务、变更数据管道或应用程序作业填充的基表。
+应明确规定刷新的原子性和数据新鲜度；与查询普通视图相比，交换或更新该表具有不同的一致性和元数据锁定行为。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://dev.mysql.com/doc/refman/8.4/en/innodb-row-format.html>InnoDB 行格式</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/view-algorithms.html>视图处理算法</a></li><li><a href=https://dev.mysql.com/doc/refman/8.4/en/view-updatability.html>可更新视图与检查选项</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mysql-tables-and-views/ class=language-option data-lang=en>English
+</a><a href=/ja/mysql-tables-and-views/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/mysql-tables-and-views/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/mysql-tables-and-views/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

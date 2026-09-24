@@ -1,0 +1,66 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Jenkins</title></head><body><main><article><div class=article-header><h1>Jenkins</h1><div class=aux>最終更新: 2023-09-13 18:46:33 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/ci-cd/>Ci-Cd</a>
+|
+<a href=/ja/tags/jenkins/>Jenkins</a></div></div><div class="translation-notice machine-translated"><a href=/jenkins/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Jenkins はジョブと Pipeline としてデリバリー作業を調整します。ビルドロジック、アプリケーションコード、ツールのバージョンは
+同じレビュープロセスで変更すべきであるため、Pipeline はバージョン管理された <code>Jenkinsfile</code> に保存します。</p><h2 id=コントローラーエージェントワークスペース>コントローラー、エージェント、ワークスペース
+<a href=#%e3%82%b3%e3%83%b3%e3%83%88%e3%83%ad%e3%83%bc%e3%83%a9%e3%83%bc%e3%82%a8%e3%83%bc%e3%82%b8%e3%82%a7%e3%83%b3%e3%83%88%e3%83%af%e3%83%bc%e3%82%af%e3%82%b9%e3%83%9a%e3%83%bc%e3%82%b9 class=heading-anchor><span>#</span></a></h2><p>コントローラーは設定とビルド記録を保存し、スケジューリング判断を評価し、ユーザーインターフェースを提供し、エージェントを調整します。
+ビルドをコントローラー上で実行してはいけません。エージェントは 1 つ以上の executor を提供し、
+各 executor は一度に 1 つの Pipeline タスクを占有できます。ラベルは
+<code>linux</code>、<code>arm64</code>、<code>docker</code> などの能力を表し、Pipeline の <code>agent</code> 選択はワークスペースの割り当て先を制約します。</p><p>ワークスペースは変更可能なチェックアウトとビルド状態であり、アーティファクトリポジトリではありません。
+並行ビルドには異なるワークスペースパスが割り当てられることがあり、エフェメラルなエージェントはステージ後に消える可能性があります。
+出力は <code>archiveArtifacts</code> で公開し、小さなファイルは <code>stash</code> と <code>unstash</code> でステージ間転送し、
+リリースアーティファクトは専用リポジトリへアップロードします。前回のビルドが残したファイルに依存してはいけません。</p><p>エージェントには、ラベルが要求するツール、ネットワークパス、資格情報だけを持たせます。
+エフェメラルなエージェントはビルド間の汚染を減らしますが、再現可能なビルドには固定されたコンテナイメージ、
+ツールチェーン、プラグイン、依存関係入力が依然として必要です。</p><h2 id=declarative-pipeline-と-scripted-pipeline>Declarative Pipeline と Scripted Pipeline
+<a href=#declarative-pipeline-%e3%81%a8-scripted-pipeline class=heading-anchor><span>#</span></a></h2><p>Declarative Pipeline は <code>pipeline</code>、<code>agent</code>、<code>stages</code>、<code>steps</code>、<code>environment</code>、<code>options</code>、<code>post</code> の周囲に
+検証済みの構造を提供します。Scripted Pipeline は <code>node</code> やその他の Pipeline ステップ内で Groovy の制御フローを使います。
+Declarative の <code>script { ... }</code> には命令的なセクションを含められますが、スクリプト領域が大きいと宣言的検証とステージ意味論が失われます。
+再利用可能なポリシーはリポジトリ間で Groovy をコピーせず、バージョン管理された Shared Library に置きます。</p><div class=jose-wrapper><div class=jose-tools><span>groovy</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-groovy data-lang=groovy><span style=display:flex><span>pipeline <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>  agent <span style=color:#f92672>{</span> label <span style=color:#e6db74>&#39;linux &amp;&amp; container&#39;</span> <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  options <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>    timeout<span style=color:#f92672>(</span>time: <span style=color:#ae81ff>20</span><span style=color:#f92672>,</span> unit: <span style=color:#e6db74>&#39;MINUTES&#39;</span><span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>    disableConcurrentBuilds<span style=color:#f92672>()</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  stages <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>    stage<span style=color:#f92672>(</span><span style=color:#e6db74>&#39;Test&#39;</span><span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>      steps <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>        retry<span style=color:#f92672>(</span><span style=color:#ae81ff>2</span><span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>          sh <span style=color:#e6db74>&#39;./mvnw --batch-mode verify&#39;</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>      post <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>        always <span style=color:#f92672>{</span> junit <span style=color:#e6db74>&#39;target/surefire-reports/*.xml&#39;</span> <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>    stage<span style=color:#f92672>(</span><span style=color:#e6db74>&#39;Package&#39;</span><span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>      steps <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>        sh <span style=color:#e6db74>&#39;./mvnw --batch-mode package -DskipTests&#39;</span>
+</span></span><span style=display:flex><span>        archiveArtifacts artifacts: <span style=color:#e6db74>&#39;target/*.jar&#39;</span><span style=color:#f92672>,</span> fingerprint: <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  post <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>    always <span style=color:#f92672>{</span> deleteDir<span style=color:#f92672>()</span> <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>Pipeline ステップは実行状態を永続化するため、耐久タスクはコントローラー再起動後も継続できますが、
+外部コマンドは再起動に安全でなければなりません。停止した処理には <code>timeout</code> で上限を設け、
+<code>retry</code> はべき等だと分かっている操作にだけ使います。デプロイの再試行は副作用を重複させる可能性があります。
+ブランチが同じワークスペースや外部リソースを変更しない場合、<code>parallel</code> はレイテンシーを削減します。
+分離が必要なら別のワークスペースまたはエージェントを使います。</p><h2 id=資格情報と最小権限>資格情報と最小権限
+<a href=#%e8%b3%87%e6%a0%bc%e6%83%85%e5%a0%b1%e3%81%a8%e6%9c%80%e5%b0%8f%e6%a8%a9%e9%99%90 class=heading-anchor><span>#</span></a></h2><p>シークレットは Jenkins credentials に保存し、可能な限り小さいスコープでバインドします。</p><div class=jose-wrapper><div class=jose-tools><span>groovy</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-groovy data-lang=groovy><span style=display:flex><span>withCredentials<span style=color:#f92672>([</span>file<span style=color:#f92672>(</span>credentialsId: <span style=color:#e6db74>&#39;registry-token-file&#39;</span><span style=color:#f92672>,</span>
+</span></span><span style=display:flex><span>                      variable: <span style=color:#e6db74>&#39;REGISTRY_TOKEN_FILE&#39;</span><span style=color:#f92672>)])</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>  sh <span style=color:#e6db74>&#39;registry-client --token-file &#34;$REGISTRY_TOKEN_FILE&#34;&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>}</span></span></span></code></pre></div></div></div><p>マスキングはログへの偶発的な開示を減らしますが、同じスコープで動く信頼できないビルドコードからシークレットを保護できません。
+文字列シークレットの Groovy 補間は、マスキング前に値がプロセス引数や Jenkins 生成スクリプトへ入る可能性があるため避けます。
+ファイル資格情報は一時的な保護ファイルを提供しますが、同じビルドコンテキストの信頼できないコードはそれを読めます。
+フォルダーごとに credential ID を制限し、信頼できない pull request をデプロイジョブから分離し、
+エージェントには 1 つの環境向けの短命資格情報を与えます。</p><h2 id=pipeline-の運用>Pipeline の運用
+<a href=#pipeline-%e3%81%ae%e9%81%8b%e7%94%a8 class=heading-anchor><span>#</span></a></h2><p>multibranch ジョブまたは信頼できる webhook を使い、実行を正確なコミットに関連付けます。
+保持ポリシーに従ってテストレポートと不変アーティファクトを保存します。ステージが失敗してもクリーンアップと通知が行われるよう <code>post</code> アクションを設定します。
+認証と認可でコントローラーを保護し、プラグイン更新をコントローラーコードとしてレビューし、
+<code>JENKINS_HOME</code> をバックアップし、ビルドエージェントをコントローラーの信頼境界の外に置きます。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/jenkins/ class=language-option data-lang=en>English
+</a><a href=/ja/jenkins/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/jenkins/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/jenkins/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

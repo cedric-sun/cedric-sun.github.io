@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Time on cesun.life</title><link>https://example.org/ja/tags/time/</link><description>Recent content in Time on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Wed, 09 Aug 2023 17:37:46 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/time/index.xml" rel="self" type="application/rss+xml"/><item><title>POSIX Time APIs</title><link>https://example.org/ja/posix-time/</link><pubDate>Wed, 09 Aug 2023 17:37:46 +0800</pubDate><guid>https://example.org/ja/posix-time/</guid><description>&lt;p&gt;時間 API は異なる問いに答えます。市民時刻はある時点を示し、単調時刻は区間を測定し、CPU クロックは処理が消費した実行時間を測定します。
+誤ったクロックを選ぶと、タイムアウトが実時間の補正に反応したり、I/O 待ち時間が測定から消えたりします。&lt;/p&gt;
+&lt;h2 id="クロックの選択"&gt;
+ クロックの選択
+ &lt;a href="#%e3%82%af%e3%83%ad%e3%83%83%e3%82%af%e3%81%ae%e9%81%b8%e6%8a%9e" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;clock_gettime&lt;/code&gt; は &lt;code&gt;clockid_t&lt;/code&gt; を &lt;code&gt;struct timespec&lt;/code&gt; に読み込みます。その &lt;code&gt;tv_sec&lt;/code&gt; と &lt;code&gt;tv_nsec&lt;/code&gt; フィールドは秒とナノ秒を表します。
+POSIX は、エポックから測定するシステム市民時刻 &lt;code&gt;CLOCK_REALTIME&lt;/code&gt; と、起点が未規定で設定できない &lt;code&gt;CLOCK_MONOTONIC&lt;/code&gt; を要求します。
+タイムスタンプには実時間を、経過時間と期限には単調時刻を使います。&lt;/p&gt;
+&lt;p&gt;対応している場合、&lt;code&gt;CLOCK_PROCESS_CPUTIME_ID&lt;/code&gt; と &lt;code&gt;CLOCK_THREAD_CPUTIME_ID&lt;/code&gt; はプロセスまたは 1 スレッドが消費した CPU 実行時間を測定します。
+I/O でブロックされた時間やスケジュールから外れていた時間は含みません。Linux にはサスペンド時間を含む &lt;code&gt;CLOCK_BOOTTIME&lt;/code&gt; もありますが、
+これは移植可能な POSIX の選択肢ではなく Linux 拡張です。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; timespec start, end;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;clock_gettime&lt;/span&gt;(CLOCK_MONOTONIC, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;start);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;/* operation */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;clock_gettime&lt;/span&gt;(CLOCK_MONOTONIC, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;end);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;clock_getres&lt;/code&gt; は実装の分解能を報告しますが、連続した読み取り値が異なることを保証するものではありません。
+スケジューリング遅延、タイマーの集約、ハードウェアがコードの実行時点に影響します。
+時点が &lt;code&gt;time_t&lt;/code&gt; に収まらない場合、呼び出しは &lt;code&gt;EOVERFLOW&lt;/code&gt; で失敗することがあります。
+&lt;code&gt;tv_nsec&lt;/code&gt; を検証し、秒境界をまたぐ算術を正規化し、&lt;code&gt;time_t&lt;/code&gt; の幅が固定だと仮定しないでください。&lt;/p&gt;
+&lt;h2 id="スリープとタイマー"&gt;
+ スリープとタイマー
+ &lt;a href="#%e3%82%b9%e3%83%aa%e3%83%bc%e3%83%97%e3%81%a8%e3%82%bf%e3%82%a4%e3%83%9e%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;nanosleep&lt;/code&gt; は相対的な遅延を指定します。シグナルによって &lt;code&gt;EINTR&lt;/code&gt; で中断され、残り時間が報告されることがありますが、
+その残り時間から再開しても、周期処理では処理時間とスケジューリング遅延が蓄積します。
+各周期に 1 つの絶対的な単調時刻の期限を計算し、&lt;code&gt;clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, ...)&lt;/code&gt; で待機します。
+期限を過ぎていれば直ちに戻るため、呼び出し側は処理をスキップするか追いつくかを選択する必要があります。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,50 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Spring 线程池</title></head><body><main><article><div class=article-header><h1>Spring 线程池</h1><div class=aux>最后更新: 2023-01-02 16:27:18 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/concurrency/>Concurrency</a>
+|
+<a href=/zh-cn/tags/java/>Java</a>
+|
+<a href=/zh-cn/tags/spring/>Spring</a></div></div><div class="translation-notice machine-translated"><a href=/spring-thread-pools/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Spring 的 <code>TaskExecutor</code> 抽象任务提交。常见的 <code>ThreadPoolTaskExecutor</code> 是围绕
+<code>ThreadPoolExecutor</code> 的受管 JavaBean 包装器；其线程池、队列、拒绝和生命周期选择仍决定系统容量。</p><h2 id=定义和命名执行器>定义和命名执行器
+<a href=#%e5%ae%9a%e4%b9%89%e5%92%8c%e5%91%bd%e5%90%8d%e6%89%a7%e8%a1%8c%e5%99%a8 class=heading-anchor><span>#</span></a></h2><p>按照工作负载命名执行器，使调用方选择预期资源：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Bean</span>(<span style=color:#e6db74>&#34;reportExecutor&#34;</span>)
+</span></span><span style=display:flex><span>ThreadPoolTaskExecutor <span style=color:#a6e22e>reportExecutor</span>() {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>var</span> executor <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> ThreadPoolTaskExecutor();
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setCorePoolSize</span>(8);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setMaxPoolSize</span>(24);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setQueueCapacity</span>(100);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setKeepAliveSeconds</span>(30);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setThreadNamePrefix</span>(<span style=color:#e6db74>&#34;report-&#34;</span>);
+</span></span><span style=display:flex><span>    executor.<span style=color:#a6e22e>setRejectedExecutionHandler</span>(
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> ThreadPoolExecutor.<span style=color:#a6e22e>CallerRunsPolicy</span>());
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> executor;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring 会将 <code>ThreadPoolTaskExecutor</code> 作为受管 bean 初始化和关闭。
+返回其具体类型可以保留生命周期配置和监控方法。
+应使用不同执行器隔离具有不同延迟、阻塞、优先级或下游容量要求的工作负载。</p><h2 id=线程池队列和饱和行为>线程池、队列和饱和行为
+<a href=#%e7%ba%bf%e7%a8%8b%e6%b1%a0%e9%98%9f%e5%88%97%e5%92%8c%e9%a5%b1%e5%92%8c%e8%a1%8c%e4%b8%ba class=heading-anchor><span>#</span></a></h2><p>底层执行器遵循明确的接纳顺序：</p><ol><li>创建工作线程，直到达到 <code>corePoolSize</code>。</li><li>工作队列接受任务时，将新任务排队。</li><li>只有队列拒绝任务后，才创建线程，直到达到 <code>maxPoolSize</code>。</li><li>线程池和队列都饱和时，应用拒绝策略。</li></ol><p>因此，无界队列会阻止线程数超过核心大小，并将过载转化为不断增长的延迟和内存使用。
+有界队列能使过载可观察。<code>AbortPolicy</code> 以异常拒绝，<code>CallerRunsPolicy</code> 通过让提交线程运行任务施加背压，
+而丢弃策略会丢失工作，需要明确的产品决策。</p><p>核心/最大大小、队列容量和保活时间必须依据测得的任务服务时间、阻塞比例、到达突发和下游限制。
+更大的线程池无法增加数据库的连接容量。</p><h2 id=async-选择和失败><code>@Async</code> 选择和失败
+<a href=#async-%e9%80%89%e6%8b%a9%e5%92%8c%e5%a4%b1%e8%b4%a5 class=heading-anchor><span>#</span></a></h2><p>使用 <code>@EnableAsync</code> 启用方法拦截。当应用有多个执行器时，选择一个命名执行器：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@Async</span>(<span style=color:#e6db74>&#34;reportExecutor&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> CompletableFuture<span style=color:#f92672>&lt;</span>Report<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>render</span>(ReportRequest request) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> CompletableFuture.<span style=color:#a6e22e>completedFuture</span>(renderer.<span style=color:#a6e22e>render</span>(request));
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>没有注解限定符时，基础设施会查找唯一的 <code>TaskExecutor</code>，或查找名为 <code>taskExecutor</code> 的 <code>Executor</code> bean；
+<code>AsyncConfigurer</code> 可以提供显式默认值。基于代理的 <code>@Async</code> 与其他 Spring AOP 通知具有相同的自调用限制。</p><p><code>Future</code> 或 <code>CompletableFuture</code> 方法的失败通过其结果观察。
+void 异步方法没有结果通道，因此应配置 <code>AsyncUncaughtExceptionHandler</code>；
+单独记录日志不是交付或重试保证。</p><h2 id=上下文传播>上下文传播
+<a href=#%e4%b8%8a%e4%b8%8b%e6%96%87%e4%bc%a0%e6%92%ad class=heading-anchor><span>#</span></a></h2><p>执行器任务在另一个线程上运行。线程本地 MDC、安全、区域设置和观测上下文不会自动传递。
+<code>TaskDecorator</code> 可以在提交任务时捕获选定状态，在执行前后恢复状态，并在 <code>finally</code> 中清理。
+只复制必需上下文，因为过时或秘密状态泄漏到复用的工作线程是正确性和安全缺陷。</p><h2 id=优雅关闭>优雅关闭
+<a href=#%e4%bc%98%e9%9b%85%e5%85%b3%e9%97%ad class=heading-anchor><span>#</span></a></h2><p>关闭策略必须匹配任务语义。配置执行器是否等待排队工作，并设置有限的等待终止时间。
+服务关闭期间，先停止接受新请求，然后在截止时间内让已接受工作完成，最后取消或持久化未完成工作。
+内存中的执行器队列不是持久存储。</p><h2 id=spring-boot-和虚拟线程>Spring Boot 和虚拟线程
+<a href=#spring-boot-%e5%92%8c%e8%99%9a%e6%8b%9f%e7%ba%bf%e7%a8%8b class=heading-anchor><span>#</span></a></h2><p>Spring Boot 3.2 及更高版本可以使用 Java 21 虚拟线程作为自动配置的异步执行器：</p><div class=jose-wrapper><div class=jose-tools><span>properties</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-properties data-lang=properties><span style=display:flex><span><span style=color:#a6e22e>spring.threads.virtual.enabled</span><span style=color:#f92672>=</span><span style=color:#e6db74>true</span></span></span></code></pre></div></div></div><p>虚拟线程降低每个阻塞任务占用一个线程的成本，但不会限制对数据库、HTTP 服务或其他稀缺资源的并发调用。
+为此应使用信号量、连接池或工作负载接纳限制。
+当 Boot 选择按任务创建虚拟线程的执行器时，许多线程池大小属性不适用。</p><p>在 JDK 21 到 23 中，持有监视器时阻塞，或在某些本地代码中阻塞，可能将虚拟线程固定到载体线程。
+JDK 24 的 JEP 491 消除了基于监视器的固定，但本地和外部函数边界仍需测量。
+使用 Java Flight Recorder 和线程转储诊断实际部署的 JDK 版本，不要假设虚拟线程让所有阻塞都无害。</p><h2 id=主要参考资料>主要参考资料
+<a href=#%e4%b8%bb%e8%a6%81%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/integration/scheduling.html>Spring 任务执行和调度</a></li><li><a href=https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/concurrent/ThreadPoolTaskExecutor.html><code>ThreadPoolTaskExecutor</code> Javadoc</a></li><li><a href=https://docs.spring.io/spring-boot/reference/features/task-execution-and-scheduling.html>Spring Boot 任务执行</a></li><li><a href=https://openjdk.org/jeps/444>JEP 444：虚拟线程</a></li><li><a href=https://openjdk.org/jeps/491>JEP 491：无固定虚拟线程的同步</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/spring-thread-pools/ class=language-option data-lang=en>English
+</a><a href=/ja/spring-thread-pools/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/spring-thread-pools/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/spring-thread-pools/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

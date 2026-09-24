@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>内核 on cesun.life</title><link>https://example.org/zh-cn/tags/%E5%86%85%E6%A0%B8/</link><description>Recent content in 内核 on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Tue, 26 Nov 2024 05:37:18 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/%E5%86%85%E6%A0%B8/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 内核锁</title><link>https://example.org/zh-cn/linux-kernel-locking/</link><pubDate>Tue, 26 Nov 2024 05:37:18 +0800</pubDate><guid>https://example.org/zh-cn/linux-kernel-locking/</guid><description>&lt;p&gt;内核锁定从执行上下文开始。对进程上下文调用方正确的锁，当同一数据从软中断、硬中断或不可屏蔽中断（NMI）访问时可能死锁。原语及其后缀必须匹配访问受保护状态的所有上下文。&lt;/p&gt;
+&lt;h2 id="自旋锁语义"&gt;
+ 自旋锁语义
+ &lt;a href="#%e8%87%aa%e6%97%8b%e9%94%81%e8%af%ad%e4%b9%89" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用以下方式声明并初始化普通自旋锁：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;DEFINE_SPINLOCK&lt;/span&gt;(queue_lock);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; queue {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;spinlock_t&lt;/span&gt; lock;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;spin_lock_init&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;queue&lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt;lock);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在非 PREEMPT_RT 的 SMP 内核上，&lt;code&gt;spin_lock()&lt;/code&gt; 禁止本地 CPU 上的抢占，并旋转等待获取独占所有权。它不会禁用本地中断或软中断。持有者不得睡眠、显式调度、执行阻塞分配，或调用可能获取睡眠锁的代码。&lt;/p&gt;
+&lt;p&gt;在单处理器非 RT 构建中，由于没有其他 CPU 竞争，部分实现可能编译为抢占和编译器控制。正确性不能依赖该优化；同一源代码必须在 SMP 上仍然有效。&lt;/p&gt;
+&lt;p&gt;PREEMPT_RT 会改变 &lt;code&gt;spinlock_t&lt;/code&gt; 和 &lt;code&gt;rwlock_t&lt;/code&gt; 的语义，使其使用基于 RT-mutex 的实现并保持可抢占。需要在 RT 和非 RT 内核之间真正自旋、不可抢占锁的代码使用 &lt;code&gt;raw_spinlock_t&lt;/code&gt;，但原始临界区必须保持很小，且不能调用在 RT 上会变为睡眠的代码。替换在锁头文件和核心代码内部实现；应用程序代码不应使用配置条件重复实现。&lt;/p&gt;
+&lt;h2 id="匹配进程软中断和硬中断上下文"&gt;
+ 匹配进程、软中断和硬中断上下文
+ &lt;a href="#%e5%8c%b9%e9%85%8d%e8%bf%9b%e7%a8%8b%e8%bd%af%e4%b8%ad%e6%96%ad%e5%92%8c%e7%a1%ac%e4%b8%ad%e6%96%ad%e4%b8%8a%e4%b8%8b%e6%96%87" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;选择能够阻止同一 CPU 重新进入的最窄变体：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;数据访问来源&lt;/th&gt;
+ &lt;th&gt;进程上下文获取&lt;/th&gt;
+ &lt;th&gt;中断侧获取&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;仅进程上下文&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;不适用&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;进程上下文和软中断/tasklet&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_bh()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;软中断中使用 &lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;进程上下文和硬中断&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_irqsave()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;处理程序中使用 &lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;已知 IRQ 状态的硬中断上下文&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_irq()&lt;/code&gt; 或 &lt;code&gt;spin_lock_irqsave()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;根据调用方状态&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;spin_lock_bh()&lt;/code&gt; 在获取锁前禁用本地下半部。&lt;code&gt;spin_lock_irq()&lt;/code&gt; 禁用本地可屏蔽中断。&lt;code&gt;spin_lock_irqsave(lock, flags)&lt;/code&gt; 还会保存之前的中断状态，而 &lt;code&gt;spin_unlock_irqrestore(lock, flags)&lt;/code&gt; 恢复该确切状态：&lt;/p&gt;</description></item><item><title>Linux CPU 频率缩放</title><link>https://example.org/zh-cn/linux-cpu-frequency-scaling/</link><pubDate>Sun, 30 Oct 2022 03:35:16 +0800</pubDate><guid>https://example.org/zh-cn/linux-cpu-frequency-scaling/</guid><description>&lt;p&gt;现代处理器公开了在执行能力、功耗和发热之间进行权衡的性能状态。Linux 通过 CPUFreq 提供这些控制。“频率”一词因兼容性仍保留在接口中，尽管硬件管理的 Intel HWP 和 AMD CPPC 操作的是性能请求，而不是离散的时钟表。&lt;/p&gt;
+&lt;h2 id="cpufreq-的三个层次"&gt;
+ CPUFreq 的三个层次
+ &lt;a href="#cpufreq-%e7%9a%84%e4%b8%89%e4%b8%aa%e5%b1%82%e6%ac%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;CPUFreq 包括：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;核心&lt;/strong&gt;，拥有策略对象和通用 sysfs 接口。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;调节器&lt;/strong&gt;，将工作负载需求转换为性能请求。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;缩放驱动程序&lt;/strong&gt;，将请求转换为特定于平台的寄存器、固件或硬件操作。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;一次只能注册一个 &lt;code&gt;struct cpufreq_driver&lt;/code&gt;。因此，驱动程序必须处理所有 CPUFreq 可用的 CPU；异构系统仍然使用策略对象表示不同的控制域。&lt;/p&gt;
+&lt;p&gt;调度器驱动的 &lt;code&gt;schedutil&lt;/code&gt; 调节器会在任务入队、出队和调度器时钟等事件上接收利用率更新。它推导容量请求，并直接调用驱动程序，或根据驱动程序是否支持快速转换而通过延迟工作调用。其他通用调节器包括 &lt;code&gt;performance&lt;/code&gt;、&lt;code&gt;powersave&lt;/code&gt;、&lt;code&gt;ondemand&lt;/code&gt;、&lt;code&gt;conservative&lt;/code&gt; 和 &lt;code&gt;userspace&lt;/code&gt;，但具体集合取决于内核配置和已加载模块。&lt;/p&gt;
+&lt;h2 id="策略表示硬件控制域"&gt;
+ 策略表示硬件控制域
+ &lt;a href="#%e7%ad%96%e7%95%a5%e8%a1%a8%e7%a4%ba%e7%a1%ac%e4%bb%b6%e6%8e%a7%e5%88%b6%e5%9f%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;struct cpufreq_policy&lt;/code&gt; 表示共享性能控制接口的逻辑 CPU。一个策略可以涵盖一个逻辑 CPU，也可以涵盖多个无法独立控制的 CPU。核心为每个 CPU 保留策略指针；一个硬件域中 CPU 的指针指向同一对象。&lt;/p&gt;
+&lt;p&gt;驱动程序初始化新策略时，其 &lt;code&gt;-&amp;gt;init()&lt;/code&gt; 回调提供：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;相关 CPU 掩码；&lt;/li&gt;
+&lt;li&gt;硬件最小和最大频率；&lt;/li&gt;
+&lt;li&gt;硬件使用离散表时的工作频率表；&lt;/li&gt;
+&lt;li&gt;转换属性和驱动程序能力。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;核心随后附加一个调节器，并调用其 &lt;code&gt;-&amp;gt;init()&lt;/code&gt; 和 &lt;code&gt;-&amp;gt;start()&lt;/code&gt; 操作。启动支持调度器的调节器会安装每 CPU 利用率回调。拥有自身选择算法的驱动程序可以改为实现 &lt;code&gt;-&amp;gt;setpolicy()&lt;/code&gt;，绕过通用调节器。当最后一个 CPU 下线时，CPU 热插拔可以停用策略；之后可重新激活，而不改变底层控制域模型。&lt;/p&gt;
+&lt;h2 id="检查和控制策略"&gt;
+ 检查和控制策略
+ &lt;a href="#%e6%a3%80%e6%9f%a5%e5%92%8c%e6%8e%a7%e5%88%b6%e7%ad%96%e7%95%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每个策略显示在 &lt;code&gt;/sys/devices/system/cpu/cpufreq/policyX/&lt;/code&gt; 下。&lt;code&gt;related_cpus&lt;/code&gt; 列出域中的所有逻辑 CPU，包括离线 CPU；&lt;code&gt;affected_cpus&lt;/code&gt; 列出在线成员。&lt;/p&gt;</description></item><item><title>Linux 控制组第 2 版</title><link>https://example.org/zh-cn/linux-cgroup-v2/</link><pubDate>Sat, 15 Oct 2022 15:47:14 +0800</pubDate><guid>https://example.org/zh-cn/linux-cgroup-v2/</guid><description>&lt;p&gt;控制组（cgroup）负责核算和控制 Linux 任务集合。cgroup 不是进程树节点：任务在 fork 时继承父级 cgroup，但管理器随后可以迁移它。因此，cgroup 为服务管理器和容器提供资源边界，而命名空间提供全局资源的视图。&lt;/p&gt;
+&lt;p&gt;本文描述 cgroup 第 2 版（cgroup v2）。其文档化接口是 &lt;code&gt;cgroup2&lt;/code&gt; 文件系统；文件和受支持的控制器取决于正在运行的内核配置和可用硬件。&lt;/p&gt;
+&lt;h2 id="统一层次结构和成员关系"&gt;
+ 统一层次结构和成员关系
+ &lt;a href="#%e7%bb%9f%e4%b8%80%e5%b1%82%e6%ac%a1%e7%bb%93%e6%9e%84%e5%92%8c%e6%88%90%e5%91%98%e5%85%b3%e7%b3%bb" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Cgroup v2 只有一个统一层次结构。每个任务恰好属于该层次结构中的一个 cgroup，包括未命名的根 cgroup。子 cgroup 继承祖先允许的约束和控制器配置，因此子级不能获得其父级未委托的 CPU、内存或设备。&lt;/p&gt;
+&lt;p&gt;层次结构由 &lt;code&gt;cgroup2&lt;/code&gt; 挂载表示，通常为 &lt;code&gt;/sys/fs/cgroup&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;findmnt -t cgroup2
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cat /proc/self/cgroup
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ps -o pid,cgroup,comm -p $$&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每个目录都是一个 cgroup。创建目录会创建子 cgroup，向其 &lt;code&gt;cgroup.procs&lt;/code&gt; 写入 PID 会迁移进程的线程组：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo mkdir /sys/fs/cgroup/build
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;printf &lt;span style="color:#e6db74"&gt;&amp;#39;%s\n&amp;#39;&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$$&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; | sudo tee /sys/fs/cgroup/build/cgroup.procs&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;应使用服务管理器，而不是手动移动它自己的进程。例如，systemd 会为切片、作用域和服务创建并管理 cgroup；手动迁移可能违反管理器的核算和生命周期假设。&lt;/p&gt;
+&lt;h3 id="域-cgroup-和线程化-cgroup"&gt;
+ 域 cgroup 和线程化 cgroup
+ &lt;a href="#%e5%9f%9f-cgroup-%e5%92%8c%e7%ba%bf%e7%a8%8b%e5%8c%96-cgroup" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;普通层次结构由&lt;em&gt;域&lt;/em&gt; cgroup 组成，其控制器将进程作为一个整体应用。“无内部进程”规则阻止非根域 cgroup 同时包含进程并向子级分发域控制器。应将工作负载移入叶节点，并使用空的中间节点在子 cgroup 之间分配控制器：&lt;/p&gt;</description></item><item><title>Linux 文件描述符</title><link>https://example.org/zh-cn/linux-file-descriptors/</link><pubDate>Wed, 06 Oct 2021 12:25:39 +0800</pubDate><guid>https://example.org/zh-cn/linux-file-descriptors/</guid><description>&lt;p&gt;Linux 将进程的整数句柄与存储打开实例状态的内核对象分离。这个区别解释了偏移共享、复制、继承以及许多描述符泄漏。&lt;/p&gt;
+&lt;h2 id="描述符表和打开文件描述"&gt;
+ 描述符表和打开文件描述
+ &lt;a href="#%e6%8f%8f%e8%bf%b0%e7%ac%a6%e8%a1%a8%e5%92%8c%e6%89%93%e5%bc%80%e6%96%87%e4%bb%b6%e6%8f%8f%e8%bf%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;文件描述符是一个非负整数，用于索引调用进程的描述符表。表项引用一个&lt;strong&gt;打开文件描述&lt;/strong&gt;，在 Linux 内部由 &lt;code&gt;struct file&lt;/code&gt; 表示。打开文件描述记录如下状态：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;当前文件偏移；&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;O_APPEND&lt;/code&gt; 和 &lt;code&gt;O_NONBLOCK&lt;/code&gt; 等文件状态标志；&lt;/li&gt;
+&lt;li&gt;打开的路径、访问模式、凭据和文件操作。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;每次成功的 &lt;code&gt;open()&lt;/code&gt; 通常都会创建一个新的打开文件描述，并在进程表中安装一个引用。因此，打开同一路径两次会创建独立偏移：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; a &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;open&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;events.log&amp;#34;&lt;/span&gt;, O_RDONLY);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; b &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;open&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;events.log&amp;#34;&lt;/span&gt;, O_RDONLY); &lt;span style="color:#75715e"&gt;/* independent description and offset */&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;inode 标识文件系统对象，而打开文件描述标识对它的一次打开。取消链接或重命名路径不会使现有描述符失效。&lt;/p&gt;
+&lt;p&gt;描述符标志属于表项，而不是共享的打开文件描述。主要描述符标志是 &lt;code&gt;FD_CLOEXEC&lt;/code&gt;，通过 &lt;code&gt;fcntl(fd, F_GETFD/F_SETFD)&lt;/code&gt; 读取或更改。应优先使用 &lt;code&gt;O_CLOEXEC&lt;/code&gt;、&lt;code&gt;pipe2(O_CLOEXEC)&lt;/code&gt; 和 &lt;code&gt;dup3(..., O_CLOEXEC)&lt;/code&gt; 等原子创建标志，因为在后续 &lt;code&gt;fcntl()&lt;/code&gt; 调用中设置标志，会与另一个线程中的 &lt;code&gt;fork()&lt;/code&gt; 加 &lt;code&gt;execve()&lt;/code&gt; 竞争。&lt;/p&gt;
+&lt;h2 id="复制fork-和-execve"&gt;
+ 复制、&lt;code&gt;fork()&lt;/code&gt; 和 &lt;code&gt;execve()&lt;/code&gt;
+ &lt;a href="#%e5%a4%8d%e5%88%b6fork-%e5%92%8c-execve" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;dup()&lt;/code&gt;、&lt;code&gt;dup2()&lt;/code&gt; 和 &lt;code&gt;dup3()&lt;/code&gt; 创建另一个引用同一打开文件描述的描述符。因此，复制的描述符共享偏移和文件状态标志：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; input &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;open&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;input&amp;#34;&lt;/span&gt;, O_RDONLY &lt;span style="color:#f92672"&gt;|&lt;/span&gt; O_CLOEXEC);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; stdin_copy &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;dup&lt;/span&gt;(input);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;read&lt;/span&gt;(input, buf, &lt;span style="color:#ae81ff"&gt;16&lt;/span&gt;); &lt;span style="color:#75715e"&gt;/* advances the shared offset */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;read&lt;/span&gt;(stdin_copy, buf, &lt;span style="color:#ae81ff"&gt;16&lt;/span&gt;); &lt;span style="color:#75715e"&gt;/* starts after those 16 bytes */&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;新描述符拥有自己的描述符标志。特别是，&lt;code&gt;dup()&lt;/code&gt; 和 &lt;code&gt;dup2()&lt;/code&gt; 会清除新描述符上的 close-on-exec；&lt;code&gt;dup3()&lt;/code&gt; 可以原子地设置它。&lt;code&gt;dup2(oldfd, newfd)&lt;/code&gt; 会在必要时原子关闭 &lt;code&gt;newfd&lt;/code&gt; 并复用该编号，从而避免先关闭再复制的竞争。&lt;/p&gt;</description></item><item><title>Linux 内核发布生命周期</title><link>https://example.org/zh-cn/linux-kernel-release-lifecycle/</link><pubDate>Sat, 07 Aug 2021 19:49:51 +0800</pubDate><guid>https://example.org/zh-cn/linux-kernel-release-lifecycle/</guid><description>&lt;p&gt;Linux 开发围绕 Linus Torvalds 维护的主线 Git 树，遵循基于时间的周期。主线开发、稳定版回移植和发行版内核相关但彼此不同。&lt;/p&gt;
+&lt;h2 id="主线开发"&gt;
+ 主线开发
+ &lt;a href="#%e4%b8%bb%e7%ba%bf%e5%bc%80%e5%8f%91" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;大多数补丁会经过层级结构，而不是直接发送给 Linus。开发者将补丁发布到相关邮件列表；审阅者和子系统维护者对其进行评估；维护者将接受的工作暂存到子系统树中。低层级树可以向高层级树提供内容，例如驱动程序树向网络树提供内容。&lt;code&gt;linux-next&lt;/code&gt; 中的集成会在子系统树进入主线之前暴露它们之间的冲突。在合并窗口期间，顶层维护者向 Linus 的树发送带签名的拉取请求。&lt;/p&gt;
+&lt;p&gt;主线发布会为下一个版本开启一个大约两周的合并窗口。该窗口期间合并的更改通常已经过开发、审查和测试。窗口关闭后生成 &lt;code&gt;&amp;lt;major&amp;gt;.&amp;lt;minor&amp;gt;-rc1&lt;/code&gt;；维护者修复回归和集成缺陷时，后续候选版本大约每周发布一次。除非属于异常的低风险情况，否则新功能会被推迟。最终版本通常在 &lt;code&gt;-rc7&lt;/code&gt; 后发布，但严重且未解决的缺陷可能需要增加候选版本。因此，一个完整周期大约需要 9–10 周。&lt;/p&gt;
+&lt;p&gt;候选版本是测试快照，不是稳定更新分支。例如，&lt;code&gt;6.12-rc3&lt;/code&gt; 是主线 &lt;code&gt;6.12&lt;/code&gt; 的第三个候选版本，而 &lt;code&gt;6.12.3&lt;/code&gt; 是最终 &lt;code&gt;6.12&lt;/code&gt; 发布后的第三个稳定更新。&lt;/p&gt;
+&lt;h2 id="稳定版和长期支持版"&gt;
+ 稳定版和长期支持版
+ &lt;a href="#%e7%a8%b3%e5%ae%9a%e7%89%88%e5%92%8c%e9%95%bf%e6%9c%9f%e6%94%af%e6%8c%81%e7%89%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;主线最终版本发布后，指定的稳定版维护者负责其 &lt;code&gt;.y&lt;/code&gt; 分支。&lt;a href="https://docs.kernel.org/process/stable-kernel-rules.html"&gt;当前稳定版规则&lt;/a&gt;要求某个修复或等效修复首先存在于主线中。候选修复必须经过测试、明显正确、连同上下文不超过 100 行，并且解决真实的用户可见缺陷或添加设备 ID。没有用户收益的功能开发和清理不符合条件。接受的回移植会经过公开审查周期，然后发布下一个 &lt;code&gt;&amp;lt;major&amp;gt;.&amp;lt;minor&amp;gt;.&amp;lt;patch&amp;gt;&lt;/code&gt; 版本。&lt;/p&gt;
+&lt;p&gt;部分稳定分支会被选为长期支持版本。选择结果不会编码在版本号中，也不会提前承诺给未来版本。维护者能力、用户和供应商需求以及该版本的适用性都会影响选择。预计的生命周期结束日期可能延长或缩短，因为它们代表维护承诺，而不是 ABI 保证。&lt;/p&gt;
+&lt;p&gt;发行版供应商可以从主线或长期支持版本开始，添加补丁并发布不同的支持计划。因此，&lt;code&gt;6.12.18-200.fc41.x86_64&lt;/code&gt; 这样的字符串标识的是供应商构建，而不是上游稳定标签。&lt;/p&gt;
+&lt;h2 id="版本号和生命周期结束"&gt;
+ 版本号和生命周期结束
+ &lt;a href="#%e7%89%88%e6%9c%ac%e5%8f%b7%e5%92%8c%e7%94%9f%e5%91%bd%e5%91%a8%e6%9c%9f%e7%bb%93%e6%9d%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;当前上游最终版本使用 &lt;code&gt;&amp;lt;major&amp;gt;.&amp;lt;minor&amp;gt;&lt;/code&gt;，稳定更新增加第三个组件。主版本递增不表示 ABI 断裂；kernel.org 解释说，当次版本号变得不便于使用时才会更改主版本号。2.6 之前的奇偶开发约定已经过时，因为现在使用 &lt;code&gt;-rc&lt;/code&gt; 标识预发布版本。&lt;/p&gt;
+&lt;p&gt;使用以下命令检查运行中的构建：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;uname -r&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;输出中的本地和供应商后缀属于构建发布字符串。应将底层上游版本与 Git 标签比较，而不要将任意后缀当作上游补丁编号进行排序。&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.kernel.org/releases.html"&gt;kernel.org 发布页面&lt;/a&gt;是有关活动主线、稳定版和长期支持系列、其维护者及预计生命周期结束日期的权威来源。某个系列达到生命周期结束后，上游不再为其发布修复；继续使用需要供应商维护承诺，或迁移到受支持的系列。&lt;/p&gt;
+&lt;h2 id="源代码参考"&gt;
+ 源代码参考
+ &lt;a href="#%e6%ba%90%e4%bb%a3%e7%a0%81%e5%8f%82%e8%80%83" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://docs.kernel.org/process/2.Process.html"&gt;开发流程如何运作&lt;/a&gt;记录合并窗口、候选版本、维护者层级和 &lt;code&gt;linux-next&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://docs.kernel.org/process/stable-kernel-rules.html"&gt;稳定内核规则&lt;/a&gt;定义回移植的接受标准和审查流程。&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.kernel.org/releases.html"&gt;内核发布&lt;/a&gt;发布当前发布状态和生命周期结束预测。&lt;/li&gt;
+&lt;/ul&gt;</description></item></channel></rss>

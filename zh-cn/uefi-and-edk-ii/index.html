@@ -1,0 +1,43 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>UEFI 与 EDK II</title></head><body><main><article><div class=article-header><h1>UEFI 与 EDK II</h1><div class=aux>最后更新: 2022-04-13 08:27:02 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/edk-ii/>Edk-Ii</a>
+|
+<a href=/zh-cn/tags/firmware/>Firmware</a>
+|
+<a href=/zh-cn/tags/uefi/>Uefi</a></div></div><div class="translation-notice machine-translated"><a href=/uefi-and-edk-ii/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>UEFI 是平台固件与操作系统之间的固件接口。UEFI Forum 发布 UEFI 和
+平台初始化（Platform Initialization，PI）规范；EDK II 是 TianoCore
+的参考实现和构建环境。</p><h2 id=启动阶段>启动阶段
+<a href=#%e5%90%af%e5%8a%a8%e9%98%b6%e6%ae%b5 class=heading-anchor><span>#</span></a></h2><p>PI 架构将早期固件执行划分为多个阶段。预 EFI 初始化
+（Pre-EFI Initialization，PEI）开始时，除 CPU 和临时存储外几乎没有
+其他资源。PEI Foundation 运行 PEI 模块（PEIM），发布 PPI
+（PEIM 间接口），并使用切换块（HOB）描述已发现的资源。其核心任务是
+初始化足够的 RAM，以供下一阶段使用。</p><p>随后，驱动执行环境（Driver Execution Environment，DXE）从固件卷加载
+驱动程序和服务，安装 UEFI 协议，并构建 UEFI 系统表。启动设备选择阶段
+选择并加载操作系统启动选项。执行 <code>ExitBootServices</code> 后，操作系统接管
+正常启动阶段的硬件资源；仅当平台支持时，UEFI 运行时服务仍然可用。
+ACPI 表向操作系统描述硬件和电源管理接口。</p><h2 id=固件映像>固件映像
+<a href=#%e5%9b%ba%e4%bb%b6%e6%98%a0%e5%83%8f class=heading-anchor><span>#</span></a></h2><p>闪存设备（FD）是物理或逻辑固件映像。它包含一个或多个固件卷（FV）；
+固件卷是格式化容器，通常使用固件文件系统（FFS）。FFS 文件封装可执行
+段、原始数据、压缩段和其他固件内容。FDF 文件描述如何将这些组成部分
+构建为 FFS 文件、FV、更新胶囊、选项 ROM，并最终构建为 FD 映像。</p><p>大多数模块都可重定位，并会加载到 RAM 中。原地执行模块针对固定 ROM
+地址进行链接，可直接从闪存运行；部分模块同时支持两种模式。</p><h2 id=edk-ii-元数据与构建流程>EDK II 元数据与构建流程
+<a href=#edk-ii-%e5%85%83%e6%95%b0%e6%8d%ae%e4%b8%8e%e6%9e%84%e5%bb%ba%e6%b5%81%e7%a8%8b class=heading-anchor><span>#</span></a></h2><p>EDK II 包使用多种声明式文件：</p><ul><li><code>.dec</code> 包声明发布 GUID、协议、库类和包含路径。</li><li><code>.inf</code> 模块信息文件描述模块的源文件、依赖项、库类、包和构建选项。
+它可以描述源代码、二进制或混合内容；构建过程会为源代码模块生成
+AsBuilt INF。</li><li><code>.dsc</code> 平台描述文件选择组件、库实例、工具链设置和平台级配置。
+<code>.dsc.inc</code> 文件用于提取共享片段。</li><li><code>.fdf</code> 闪存定义文件规划最终固件映像的布局。</li></ul><p>BaseTools 读取这些元数据，解析库，并生成 <code>AutoGen.c</code> 和 <code>AutoGen.h</code>。
+选定的工具链编译源文件，并将库对象归档。链接器生成中间映像，即使在
+非 Windows 主机上也常命名为 <code>.dll</code>。<code>GenFw</code> 将其转换为 PE/COFF EFI
+映像（<code>.efi</code>），并设置适当的 EFI 子系统，例如 EFI 启动服务驱动程序。
+随后，模块会被封装到 FFS 文件、FV 和最终的 FD 映像中。</p><p>人机交互基础设施（Human Interface Infrastructure，HII）是面向用户的
+固件资源的统称，包括字符串、字体、图像和设置表单（IFR）数据库。</p><h2 id=迁移的参考资料>迁移的参考资料
+<a href=#%e8%bf%81%e7%a7%bb%e7%9a%84%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><p><code>EFISTUB</code> 是 Linux 内核的一项功能，它允许直接将 <code>vmlinux</code> 作为 EFI 应用程序调用，从而无需使用 <code>GRUB2</code> 等引导加载程序。</p><p>首先，检查内核是否已启用 EFISTUB：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>zgrep <span style=color:#e6db74>&#39;CONFIG_EFI_STUB&#39;</span> /proc/config.gz</span></span></code></pre></div></div></div><p>然后，通过以下命令创建新的 UEFI 启动项：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>efibootmgr --create
+</span></span><span style=display:flex><span>    --disk ... <span style=color:#75715e># device node e.g. /dev/sdX</span>
+</span></span><span style=display:flex><span>    --part ... <span style=color:#75715e># partition number</span>
+</span></span><span style=display:flex><span>    --label ... <span style=color:#75715e># Entry Nickname</span>
+</span></span><span style=display:flex><span>    --loader <span style=color:#e6db74>&#39;/vmlinuz-linux&#39;</span>    <span style=color:#75715e># the executable path under the given partition</span>
+</span></span><span style=display:flex><span>    --unicode       <span style=color:#75715e># interpret the following string in UCS-2 as argument to the EFI application, in our case, the kernel</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#39;root=UUID=01a40dd8-28f0-4636-be1e-aeed60c98095 resume=UUID=2d877d5d-4ca1-4d46-a3d6-b6ee94cbbd78 rw rootflags=subvol=@ loglevel=3 quiet initrd=\initramfs-linux-lts.img&#39;</span>        <span style=color:#75715e># kernel arguments</span></span></span></code></pre></div></div></div><p><code>efibootmgr</code> 由 <code>efibootmgr</code> 包提供；请查看所用发行版的包管理器或访问 <a href=https://github.com/rhboot/efibootmgr>https://github.com/rhboot/efibootmgr</a>。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/uefi-and-edk-ii/ class=language-option data-lang=en>English
+</a><a href=/ja/uefi-and-edk-ii/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/uefi-and-edk-ii/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/uefi-and-edk-ii/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

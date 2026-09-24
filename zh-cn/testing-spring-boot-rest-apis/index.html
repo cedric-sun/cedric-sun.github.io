@@ -1,0 +1,233 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>测试 Spring Boot REST API</title></head><body><main><article><div class=article-header><h1>测试 Spring Boot REST API</h1><div class=aux>最后更新: 2026-08-17 10:18:23 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/java/>Java</a>
+|
+<a href=/zh-cn/tags/junit/>Junit</a>
+|
+<a href=/zh-cn/tags/mockito/>Mockito</a>
+|
+<a href=/zh-cn/tags/spring-boot/>Spring-Boot</a>
+|
+<a href=/zh-cn/tags/testing/>Testing</a></div></div><div class="translation-notice machine-translated"><a href=/testing-spring-boot-rest-apis/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>测试 Spring Boot REST API 需要多个范围，因为直接的 Java 调用、模拟的 MVC 请求以及通过运行中服务器发出的请求，会分别验证不同的故障边界。有效的测试套件应将大多数行为检查放在 Spring 上下文之外，然后再添加范围更窄的 Web 切片测试和少量完整应用测试。</p><p>依赖示例面向 Spring Boot 3.x，因为其测试 starter 使用 JUnit 5。Spring Boot 4 管理 JUnit 6；Jupiter 的概念仍然适用，但若干 Boot 测试注解的包名发生了变化。</p><h2 id=不使用测试框架进行测试>不使用测试框架进行测试
+<a href=#%e4%b8%8d%e4%bd%bf%e7%94%a8%e6%b5%8b%e8%af%95%e6%a1%86%e6%9e%b6%e8%bf%9b%e8%a1%8c%e6%b5%8b%e8%af%95 class=heading-anchor><span>#</span></a></h2><p>REST API 无需 JUnit、Spring Test 或 Mockito 也可以进行检查。启动应用，使用 JDK HTTP 客户端发送请求，并在响应违反契约时抛出错误：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>package</span> com.example;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.URI;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpClient;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpRequest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpResponse;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ManualApiCheck</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> request <span style=color:#f92672>=</span> HttpRequest.<span style=color:#a6e22e>newBuilder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>uri</span>(URI.<span style=color:#a6e22e>create</span>(<span style=color:#e6db74>&#34;http://localhost:8080/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>header</span>(<span style=color:#e6db74>&#34;Accept&#34;</span>, <span style=color:#e6db74>&#34;application/json&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>GET</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> response <span style=color:#f92672>=</span> HttpClient.<span style=color:#a6e22e>newHttpClient</span>().<span style=color:#a6e22e>send</span>(
+</span></span><span style=display:flex><span>                request, HttpResponse.<span style=color:#a6e22e>BodyHandlers</span>.<span style=color:#a6e22e>ofString</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (response.<span style=color:#a6e22e>statusCode</span>() <span style=color:#f92672>!=</span> 200) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> AssertionError(<span style=color:#e6db74>&#34;status: &#34;</span> <span style=color:#f92672>+</span> response.<span style=color:#a6e22e>statusCode</span>());
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span>response.<span style=color:#a6e22e>body</span>().<span style=color:#a6e22e>equals</span>(<span style=color:#e6db74>&#34;{\&#34;message\&#34;:\&#34;Hello, Ada\&#34;}&#34;</span>)) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> <span style=color:#66d9ef>new</span> AssertionError(<span style=color:#e6db74>&#34;body: &#34;</span> <span style=color:#f92672>+</span> response.<span style=color:#a6e22e>body</span>());
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Java 的 <code>assert</code> 语句可以替代显式检查，但除非 JVM 使用 <code>-ea</code> 启动，否则断言处于禁用状态。因此，显式的 <code>AssertionError</code> 能够提供可靠的进程退出代码。</p><p>自定义可执行程序仍然适用于对已部署服务执行冒烟检查。完全替代测试框架还需要实现测试发现、fixture 生命周期、隔离、结果报告、并行执行和构建集成。手动的 <code>curl</code> 或浏览器检查提供的是探索能力，而不是可重复的回归测试套件。</p><h2 id=选择测试范围>选择测试范围
+<a href=#%e9%80%89%e6%8b%a9%e6%b5%8b%e8%af%95%e8%8c%83%e5%9b%b4 class=heading-anchor><span>#</span></a></h2><p>Spring 的测试文档区分了单元测试和集成测试，并提供了多个 Web 测试范围。不存在适用于每个端点的单一推荐注解。应选择包含待检查行为的最小范围：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>范围</th><th>机制</th><th>所验证的行为</th></tr></thead><tbody><tr><td>普通单元测试</td><td>JUnit 和普通构造函数</td><td>不使用 Spring 的控制器或服务 Java 逻辑</td></tr><tr><td>MVC 切片</td><td><code>@WebMvcTest</code> 和 <code>MockMvc</code></td><td>路由、绑定、验证、序列化、过滤器和控制器通知</td></tr><tr><td>带模拟 Web 层的完整上下文</td><td><code>@SpringBootTest</code> 和 <code>@AutoConfigureMockMvc</code></td><td>应用装配以及模拟的 Servlet 请求</td></tr><tr><td>完整运行服务器</td><td><code>@SpringBootTest(webEnvironment = RANDOM_PORT)</code></td><td>嵌入式服务器、过滤器、序列化、网络和完整应用装配</td></tr><tr><td>已部署系统测试</td><td>外部 HTTP 客户端</td><td>打包后的服务及其已部署的依赖项</td></tr></tbody></table></div></div><p>Spring 建议在不需要 Spring 容器时使用单元测试。随后，<code>MockMvc</code> 可以在不运行服务器的情况下提供完整的 Spring MVC 请求处理。仍应保留一些运行服务器测试，因为模拟请求无法覆盖 Servlet 容器的网络、分发和错误页面行为。</p><p>使用数据库或 broker 的测试需要单独进行依赖决策：</p><ul><li>测试应用决策时，将边界替换为 fake 或 mock。</li><li>如果数据库查询、映射、事务、broker 行为或线协议兼容性属于需求的一部分，则使用隔离的真实服务。</li><li>自动化测试绝不能指向生产基础设施。</li></ul><h2 id=spring-boot-测试依赖>Spring Boot 测试依赖
+<a href=#spring-boot-%e6%b5%8b%e8%af%95%e4%be%9d%e8%b5%96 class=heading-anchor><span>#</span></a></h2><p>已经继承 Spring Boot 3 parent 或导入其 BOM 的应用只需要一个测试依赖：</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.springframework.boot<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>spring-boot-starter-test<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;scope&gt;</span>test<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>该 starter 包含 Spring Boot Test、Spring Test、JUnit Jupiter、Mockito、AssertJ、Hamcrest、JSONassert、JsonPath 和 Awaitility。由于整个依赖集合作为同一个发行序列进行测试，因此应让 Spring Boot 管理它们的版本。</p><p>示例使用以下应用边界：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>interface</span> <span style=color:#a6e22e>GreetingService</span> {
+</span></span><span style=display:flex><span>    Greeting <span style=color:#a6e22e>greet</span>(String name);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>record</span> <span style=color:#a6e22e>Greeting</span>(String message) {}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RestController</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RequestMapping</span>(<span style=color:#e6db74>&#34;/greetings&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingController</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> GreetingService service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>GreetingController</span>(GreetingService service) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>service</span> <span style=color:#f92672>=</span> service;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@GetMapping</span>(<span style=color:#e6db74>&#34;/{name}&#34;</span>)
+</span></span><span style=display:flex><span>    Greeting <span style=color:#a6e22e>get</span>(<span style=color:#a6e22e>@PathVariable</span> String name) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> service.<span style=color:#a6e22e>greet</span>(name);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><h2 id=普通-junit-5-测试>普通 JUnit 5 测试
+<a href=#%e6%99%ae%e9%80%9a-junit-5-%e6%b5%8b%e8%af%95 class=heading-anchor><span>#</span></a></h2><p>Spring 组件仍然是普通 Java 对象。当测试关注分支、返回值或服务委托时，直接构造控制器可以避免启动上下文：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingControllerTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>returnsTheServiceResult</span>() {
+</span></span><span style=display:flex><span>        GreetingService service <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>                name <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Hello, &#34;</span> <span style=color:#f92672>+</span> name);
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> controller <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> GreetingController(service);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>),
+</span></span><span style=display:flex><span>                controller.<span style=color:#a6e22e>get</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>该测试不会验证 <code>@GetMapping</code>、路径变量转换、JSON 序列化、验证、过滤器或异常处理器，因为直接调用方法绕过了 Spring MVC。</p><h2 id=使用-junit-5-的-mvc-切片测试>使用 JUnit 5 的 MVC 切片测试
+<a href=#%e4%bd%bf%e7%94%a8-junit-5-%e7%9a%84-mvc-%e5%88%87%e7%89%87%e6%b5%8b%e8%af%95 class=heading-anchor><span>#</span></a></h2><p><code>@WebMvcTest</code> 会加载 MVC 基础设施和选定的 Web 组件，而不是完整应用。为控制器依赖提供确定性实现，从而将 Mockito 排除在测试之外：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.beans.factory.annotation.Autowired;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.context.TestConfiguration;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.context.annotation.Bean;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.context.annotation.Import;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.test.web.servlet.MockMvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@WebMvcTest</span>(GreetingController.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Import</span>(GreetingControllerWebTest.<span style=color:#a6e22e>Dependencies</span>.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingControllerWebTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Autowired</span>
+</span></span><span style=display:flex><span>    MockMvc mvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>rendersAJsonGreeting</span>() <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        mvc.<span style=color:#a6e22e>perform</span>(get(<span style=color:#e6db74>&#34;/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(status().<span style=color:#a6e22e>isOk</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(content().<span style=color:#a6e22e>contentTypeCompatibleWith</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;application/json&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(jsonPath(<span style=color:#e6db74>&#34;$.message&#34;</span>).<span style=color:#a6e22e>value</span>(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@TestConfiguration</span>(proxyBeanMethods <span style=color:#f92672>=</span> <span style=color:#66d9ef>false</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Dependencies</span> {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>        GreetingService <span style=color:#a6e22e>greetingService</span>() {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span> name <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Hello, &#34;</span> <span style=color:#f92672>+</span> name);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>当安全配置、控制器通知、转换器或过滤器的行为属于端点契约时，应将它们添加到切片中。排除了待测生产组件的切片可能在组装后的应用失败时仍然通过，因此完整上下文覆盖仍然是必要的。</p><h2 id=完整上下文测试>完整上下文测试
+<a href=#%e5%ae%8c%e6%95%b4%e4%b8%8a%e4%b8%8b%e6%96%87%e6%b5%8b%e8%af%95 class=heading-anchor><span>#</span></a></h2><p>默认的 <code>@SpringBootTest</code> Web 环境是 <code>MOCK</code>。添加 <code>@AutoConfigureMockMvc</code>，即可通过完整应用上下文执行请求，而无需打开网络端口：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#a6e22e>@SpringBootTest</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@AutoConfigureMockMvc</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingApplicationTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Autowired</span>
+</span></span><span style=display:flex><span>    MockMvc mvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>servesAGreeting</span>() <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        mvc.<span style=color:#a6e22e>perform</span>(get(<span style=color:#e6db74>&#34;/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(status().<span style=color:#a6e22e>isOk</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(jsonPath(<span style=color:#e6db74>&#34;$.message&#34;</span>).<span style=color:#a6e22e>value</span>(<span style=color:#e6db74>&#34;Hello, Ada&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>当嵌入式服务器或真实 HTTP 行为属于测试范围时，应使用随机端口环境：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.URI;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpClient;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpRequest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.net.http.HttpResponse;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.context.SpringBootTest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.web.server.LocalServerPort;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@SpringBootTest</span>(webEnvironment <span style=color:#f92672>=</span> SpringBootTest.<span style=color:#a6e22e>WebEnvironment</span>.<span style=color:#a6e22e>RANDOM_PORT</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingHttpTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@LocalServerPort</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> port;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>servesAGreetingOverHttp</span>() <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> request <span style=color:#f92672>=</span> HttpRequest.<span style=color:#a6e22e>newBuilder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>uri</span>(URI.<span style=color:#a6e22e>create</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;http://localhost:&#34;</span> <span style=color:#f92672>+</span> port <span style=color:#f92672>+</span> <span style=color:#e6db74>&#34;/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>GET</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> response <span style=color:#f92672>=</span> HttpClient.<span style=color:#a6e22e>newHttpClient</span>().<span style=color:#a6e22e>send</span>(
+</span></span><span style=display:flex><span>                request, HttpResponse.<span style=color:#a6e22e>BodyHandlers</span>.<span style=color:#a6e22e>ofString</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(200, response.<span style=color:#a6e22e>statusCode</span>());
+</span></span><span style=display:flex><span>        assertEquals(
+</span></span><span style=display:flex><span>                <span style=color:#e6db74>&#34;{\&#34;message\&#34;:\&#34;Hello, Ada\&#34;}&#34;</span>,
+</span></span><span style=display:flex><span>                response.<span style=color:#a6e22e>body</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>随机端口可以防止并发构建期间发生固定端口冲突。客户端和服务器代码运行在不同线程中，因此测试线程启动的事务不会自动回滚运行服务器请求提交的数据。应显式重置状态，或隔离后端服务。</p><p>Boot 3 还提供 <code>TestRestTemplate</code>，而 Spring 的响应式栈提供 <code>WebTestClient</code>。Spring Framework 7 添加了 <code>RestTestClient</code>，用于在 MockMvc 和运行服务器测试之间提供通用的同步断言 API。应选择应用所使用 Spring 版本支持的客户端，而不是直接复制未注明版本的示例。</p><h2 id=不使用-spring-上下文的-junit-5-和-mockito>不使用 Spring 上下文的 JUnit 5 和 Mockito
+<a href=#%e4%b8%8d%e4%bd%bf%e7%94%a8-spring-%e4%b8%8a%e4%b8%8b%e6%96%87%e7%9a%84-junit-5-%e5%92%8c-mockito class=heading-anchor><span>#</span></a></h2><p>当 Spring 配线不属于测试对象时，使用 <code>MockitoExtension</code>：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.junit.jupiter.api.Assertions.assertEquals;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.verify;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.when;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.extension.ExtendWith;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.InjectMocks;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.Mock;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.mockito.junit.jupiter.MockitoExtension;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@ExtendWith</span>(MockitoExtension.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingControllerMockitoTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Mock</span>
+</span></span><span style=display:flex><span>    GreetingService service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@InjectMocks</span>
+</span></span><span style=display:flex><span>    GreetingController controller;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>delegatesToTheService</span>() {
+</span></span><span style=display:flex><span>        when(service.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>thenReturn</span>(<span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        assertEquals(
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>),
+</span></span><span style=display:flex><span>                controller.<span style=color:#a6e22e>get</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>));
+</span></span><span style=display:flex><span>        verify(service).<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>该测试不会加载 Spring 上下文。<code>@InjectMocks</code> 会调用控制器构造函数，而 <code>@Mock</code> 会创建普通的 Mockito 对象。</p><h2 id=spring-测试上下文中的-mockito>Spring 测试上下文中的 Mockito
+<a href=#spring-%e6%b5%8b%e8%af%95%e4%b8%8a%e4%b8%8b%e6%96%87%e4%b8%ad%e7%9a%84-mockito class=heading-anchor><span>#</span></a></h2><p>普通的 <code>@Mock</code> 字段不会替换 Spring <code>ApplicationContext</code> 中的 Bean。当切片测试或完整上下文测试需要覆盖 Bean 时，应使用 <code>@MockitoBean</code>：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.verify;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.mockito.Mockito.when;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.junit.jupiter.api.Test;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.beans.factory.annotation.Autowired;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.test.context.bean.override.mockito.MockitoBean;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.test.web.servlet.MockMvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@WebMvcTest</span>(GreetingController.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>GreetingControllerMockitoWebTest</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Autowired</span>
+</span></span><span style=display:flex><span>    MockMvc mvc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@MockitoBean</span>
+</span></span><span style=display:flex><span>    GreetingService service;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Test</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>rendersTheMockedServiceResult</span>() <span style=color:#66d9ef>throws</span> Exception {
+</span></span><span style=display:flex><span>        when(service.<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>thenReturn</span>(<span style=color:#66d9ef>new</span> Greeting(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        mvc.<span style=color:#a6e22e>perform</span>(get(<span style=color:#e6db74>&#34;/greetings/Ada&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(status().<span style=color:#a6e22e>isOk</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>andExpect</span>(jsonPath(<span style=color:#e6db74>&#34;$.message&#34;</span>).<span style=color:#a6e22e>value</span>(<span style=color:#e6db74>&#34;Welcome, Ada&#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        verify(service).<span style=color:#a6e22e>greet</span>(<span style=color:#e6db74>&#34;Ada&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>Spring Framework 的 TestContext 支持会创建 mock，并在刷新上下文之前替换匹配的 Bean。Spring Boot 测试注解已经注册了 <code>SpringExtension</code>，因此添加 <code>MockitoExtension</code> 无助于替换上下文 Bean。</p><p>当必须保留选定的真实行为时，使用 <code>@MockitoSpyBean</code> 包装现有的上下文 Bean。Spring Boot 较旧的 <code>@MockBean</code> 和 <code>@SpyBean</code> 注解在 Boot 3.4 中已弃用，改为推荐使用 Spring Framework 的 <code>@MockitoBean</code> 和 <code>@MockitoSpyBean</code>。使用 Boot 3.3 或更早版本的项目必须使用旧注解。</p><p>应将 Bean 覆盖应用于远程客户端、消息发布器、时钟或 repository 等架构边界。在完整上下文测试中替换大量内部 Bean，会移除选择 <code>@SpringBootTest</code> 所要验证的配线；此时，普通单元测试或 MVC 切片能够更准确地表达测试范围。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.spring.io/spring-framework/reference/testing.html>Spring Framework Testing</a></li><li><a href=https://docs.spring.io/spring-framework/reference/testing/mockmvc.html>Spring MVC Test Framework</a></li><li><a href=https://docs.spring.io/spring-boot/reference/testing/index.html>Spring Boot Testing</a></li><li><a href=https://docs.spring.io/spring-framework/reference/testing/annotations/integration-spring/annotation-mockitobean.html><code>@MockitoBean</code> and <code>@MockitoSpyBean</code></a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/testing-spring-boot-rest-apis/ class=language-option data-lang=en>English
+</a><a href=/ja/testing-spring-boot-rest-apis/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/testing-spring-boot-rest-apis/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/testing-spring-boot-rest-apis/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

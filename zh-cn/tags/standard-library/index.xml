@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Standard-Library on cesun.life</title><link>https://example.org/zh-cn/tags/standard-library/</link><description>Recent content in Standard-Library on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Tue, 14 Apr 2026 01:31:52 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/standard-library/index.xml" rel="self" type="application/rss+xml"/><item><title>C++ 容器与迭代器</title><link>https://example.org/zh-cn/cpp-containers-and-iterators/</link><pubDate>Tue, 14 Apr 2026 01:31:52 +0800</pubDate><guid>https://example.org/zh-cn/cpp-containers-and-iterators/</guid><description>&lt;p&gt;应根据所需的查找、遍历、插入、擦除、内存局部性和引用稳定性来选择容器。复杂度描述操作在满足前置条件时的性质；失效规则和所有权则决定设计在修改后是否仍然正确。&lt;/p&gt;
+&lt;h2 id="选择容器"&gt;
+ 选择容器
+ &lt;a href="#%e9%80%89%e6%8b%a9%e5%ae%b9%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;std::vector&lt;/code&gt; 是需要连续存储、随机访问、缓存局部性以及通过 &lt;code&gt;data()&lt;/code&gt; 与 C 互操作时的默认序列容器。追加操作具有摊销常数时间复杂度。容量的任何增长都会使所有迭代器、指针和引用失效；如果容量不增长，插入操作会使插入点及其后的迭代器和引用失效。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::deque&lt;/code&gt; 支持索引访问。在两端插入会使迭代器失效，但不会使引用失效；其存储并不连续，在中间插入会使迭代器和引用失效。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::list&lt;/code&gt; 和 &lt;code&gt;std::forward_list&lt;/code&gt; 在插入和擦除时，会保留指向未受影响节点的迭代器和引用。节点分配和指针追踪带来的成本意味着应根据测量结果选择它们，而不是将它们作为默认选项。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::map&lt;/code&gt; 和 &lt;code&gt;std::set&lt;/code&gt; 提供有序遍历和对数时间查找。除被擦除的元素外，插入不会使迭代器或引用失效。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::unordered_map&lt;/code&gt; 和 &lt;code&gt;std::unordered_set&lt;/code&gt; 提供平均常数时间查找。重新哈希会使迭代器失效，但指向元素的引用和指针仍然有效；擦除只会使被擦除的元素失效。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;reserve()&lt;/code&gt; 可避免预期中的 &lt;code&gt;vector&lt;/code&gt; 重新分配，也可以减少 &lt;code&gt;unordered_*&lt;/code&gt; 的重新哈希。对于根据文档规则会使迭代器失效的操作，它并不能让该迭代器保持有效。&lt;/p&gt;
+&lt;h2 id="插入与转移值"&gt;
+ 插入与转移值
+ &lt;a href="#%e6%8f%92%e5%85%a5%e4%b8%8e%e8%bd%ac%e7%a7%bb%e5%80%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;insert&lt;/code&gt; 接受元素或范围，而 &lt;code&gt;emplace&lt;/code&gt; 根据参数直接在容器存储空间中构造元素：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;utility&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;vector&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;vector&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; names;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string name &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;Ada&amp;#34;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;names.push_back(name); &lt;span style="color:#75715e"&gt;// copies; name remains owned by the caller
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;names.push_back(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(name)); &lt;span style="color:#75715e"&gt;// moves; name stays valid but has unspecified value
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;names.emplace_back(&lt;span style="color:#ae81ff"&gt;3&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#39;x&amp;#39;&lt;/span&gt;); &lt;span style="color:#75715e"&gt;// constructs &amp;#34;xxx&amp;#34; in the vector
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;当对象已经存在时，使用 &lt;code&gt;insert&lt;/code&gt; 或 &lt;code&gt;push_back(std::move(value))&lt;/code&gt; 可以明确显示所有权转移。只有在构造函数参数可用时，&lt;code&gt;emplace&lt;/code&gt; 才能避免创建临时对象；它既不会在所有情况下都更快，也不能代替对元素构造函数的验证。当键已存在时，关联容器的 &lt;code&gt;emplace&lt;/code&gt; 可能构造后再丢弃一个元素。&lt;code&gt;try_emplace&lt;/code&gt; 可在这种键重复的情况下避免构造映射值，而 &lt;code&gt;insert_or_assign&lt;/code&gt; 则明确表达替换策略。&lt;/p&gt;</description></item><item><title>C++ 随机数设施</title><link>https://example.org/zh-cn/cpp-randomness/</link><pubDate>Wed, 30 Oct 2024 00:23:14 +0800</pubDate><guid>https://example.org/zh-cn/cpp-randomness/</guid><description>&lt;p&gt;C++ 随机库将确定性的&lt;strong&gt;引擎&lt;/strong&gt;与&lt;strong&gt;分布&lt;/strong&gt;分开。引擎在规定的输出范围内产生均匀分布的值；
+分布消费引擎输出，并将其映射到所需的统计分布。当状态必须继续时，应让两个对象都保持存活。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;random&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;mt19937_64 engine{std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;random_device{}()};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;uniform_int_distribution&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; die{&lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;6&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; roll &lt;span style="color:#f92672"&gt;=&lt;/span&gt; die(engine); &lt;span style="color:#75715e"&gt;// Both engine and distribution may advance state.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;std::mt19937&lt;/code&gt; 和 &lt;code&gt;std::mt19937_64&lt;/code&gt; 是伪随机引擎：固定初始状态会产生可复现序列。
+&lt;code&gt;std::default_random_engine&lt;/code&gt; 由实现定义，因此当测试、文件或协议要求不同实现产生相同序列时不适用。&lt;/p&gt;
+&lt;h2 id="根据需求设定种子"&gt;
+ 根据需求设定种子
+ &lt;a href="#%e6%a0%b9%e6%8d%ae%e9%9c%80%e6%b1%82%e8%ae%be%e5%ae%9a%e7%a7%8d%e5%ad%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;确定性测试应使用明确且有文档说明的种子。当生成数据必须复现时，在测试失败时记录种子。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;mt19937 engine{&lt;span style="color:#ae81ff"&gt;0x5EEDu&lt;/span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;当实现具有合适来源时，&lt;code&gt;std::random_device&lt;/code&gt; 用于提供非确定性随机数，但实现也可能提供确定性回退。
+其 &lt;code&gt;entropy()&lt;/code&gt; 值是估计值；没有可用估计时可能为零。因此，&lt;code&gt;random_device&lt;/code&gt; 适合作为非加密模拟的尽力而为种子来源，
+不能作为可移植的加密安全保证。对于密钥、令牌、盐值和 nonce，应使用操作系统的加密随机 API
+或经过审查的加密库。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;std::seed_seq&lt;/code&gt; 可以将多个源字扩展为引擎状态。当需要独立流时，避免用相同的小整数为多个长期引擎设种子；
+应建立并记录流分配策略。&lt;/p&gt;
+&lt;h2 id="分布产生有界值且没有模偏差"&gt;
+ 分布产生有界值且没有模偏差
+ &lt;a href="#%e5%88%86%e5%b8%83%e4%ba%a7%e7%94%9f%e6%9c%89%e7%95%8c%e5%80%bc%e4%b8%94%e6%b2%a1%e6%9c%89%e6%a8%a1%e5%81%8f%e5%b7%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用表达所需结果的分布：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;uniform_int_distribution&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; index{&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;static_cast&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;(size &lt;span style="color:#f92672"&gt;-&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;)};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;bernoulli_distribution enabled{&lt;span style="color:#ae81ff"&gt;0.25&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;normal_distribution&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;double&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; noise{&lt;span style="color:#ae81ff"&gt;0.0&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;1.0&lt;/span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;uniform_int_distribution&lt;/code&gt; 的边界包含在内。构造或参数化它之前验证动态边界：
+&lt;code&gt;a &amp;gt; b&lt;/code&gt; 的范围违反分布的前置条件。除非引擎的输出范围能整除 &lt;code&gt;n&lt;/code&gt;，否则不要使用 &lt;code&gt;engine() % n&lt;/code&gt;
+获取有界均匀结果，因为某些余数会出现得更频繁。标准分布会为其指定的分布执行必要的拒绝或映射处理。&lt;/p&gt;</description></item><item><title>C++ 范围与视图</title><link>https://example.org/zh-cn/cpp-ranges-and-views/</link><pubDate>Fri, 01 Oct 2021 09:45:43 +0800</pubDate><guid>https://example.org/zh-cn/cpp-ranges-and-views/</guid><description>&lt;p&gt;ranges library separates the ability 到 iterate 来自 ownership, traversal strength, 和 lazy transformation. 一个 range supplies iteration boundaries; a view 是 a range suited 到 adaptor pipelines; an adaptor builds a new view whose elements 是 evaluated 当 iteration requests them.&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;ranges&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;vector&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;vector&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; source{&lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;3&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;4&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;5&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; even_squares &lt;span style="color:#f92672"&gt;=&lt;/span&gt; source
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;|&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;views&lt;span style="color:#f92672"&gt;::&lt;/span&gt;filter([](&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value) { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value &lt;span style="color:#f92672"&gt;%&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt; &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;; })
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;|&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;views&lt;span style="color:#f92672"&gt;::&lt;/span&gt;transform([](&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value) { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value &lt;span style="color:#f92672"&gt;*&lt;/span&gt; value; });&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Constructing &lt;code&gt;even_squares&lt;/code&gt; does 不 transform every element. Iteration invokes the predicate 和 transformation, so changes 到 &lt;code&gt;source&lt;/code&gt; 在……之前 iteration 可以 be observed subject 到 the 源码 container’s invalidation rules.&lt;/p&gt;</description></item><item><title>Java 标准库</title><link>https://example.org/zh-cn/java-standard-library/</link><pubDate>Fri, 11 Jun 2021 09:05:39 +0800</pubDate><guid>https://example.org/zh-cn/java-standard-library/</guid><description>&lt;p&gt;小型库的契约往往比 API 的表面积更能决定正确性。以下规则可以避免常见的
+Java 集成失败。&lt;/p&gt;
+&lt;h2 id="对象契约"&gt;
+ 对象契约
+ &lt;a href="#%e5%af%b9%e8%b1%a1%e5%a5%91%e7%ba%a6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;equals&lt;/code&gt; 必须满足自反性、对称性、传递性和一致性，并且对&lt;code&gt;null&lt;/code&gt;返回 false。
+如果两个对象相等，它们必须具有相同的&lt;code&gt;hashCode&lt;/code&gt;；因此，在将值用作哈希键之前，
+应同时重写这两个方法。对象作为映射键期间，不要修改参与相等性判断的字段。
+如果继承会破坏对称性，应优先使用组合而非继承。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;Object.clone&lt;/code&gt;执行字段复制，并且与构造函数、继承和可变字段的配合较差。
+应优先使用复制构造函数或命名为&lt;code&gt;copyOf&lt;/code&gt;的工厂方法。数组是一个范围有限的例外，
+因为它们的&lt;code&gt;clone&lt;/code&gt;具有可预测的浅数组契约。&lt;/p&gt;
+&lt;h2 id="文本正则表达式和字符串"&gt;
+ 文本、正则表达式和字符串
+ &lt;a href="#%e6%96%87%e6%9c%ac%e6%ad%a3%e5%88%99%e8%a1%a8%e8%be%be%e5%bc%8f%e5%92%8c%e5%ad%97%e7%ac%a6%e4%b8%b2" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;对于会重复使用的&lt;code&gt;Pattern&lt;/code&gt;，应进行编译。&lt;code&gt;Matcher.matches()&lt;/code&gt;要求整个输入都匹配，
+而&lt;code&gt;find()&lt;/code&gt;搜索下一个匹配区域。&lt;code&gt;Pattern.quote(value)&lt;/code&gt;会转义放入正则表达式的
+字面文本；&lt;code&gt;Matcher.quoteReplacement(value)&lt;/code&gt;会转义替换字符串。两者不能互换。&lt;/p&gt;
+&lt;p&gt;从 JDK 9 开始，HotSpot 的&lt;code&gt;String&lt;/code&gt;实现使用紧凑字符串：通过&lt;code&gt;byte[]&lt;/code&gt;加编码标记，
+可以紧凑地表示 Latin-1 文本，否则使用 UTF-16。这属于实现细节；Java &lt;code&gt;String&lt;/code&gt;
+仍然是 UTF-16 代码单元序列，并且必须在 I/O 边界显式进行&lt;code&gt;Charset&lt;/code&gt;转换。&lt;/p&gt;
+&lt;h2 id="计数器和枚举集合"&gt;
+ 计数器和枚举集合
+ &lt;a href="#%e8%ae%a1%e6%95%b0%e5%99%a8%e5%92%8c%e6%9e%9a%e4%b8%be%e9%9b%86%e5%90%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;AtomicLong&lt;/code&gt;提供一个精确且线性一致的值。&lt;code&gt;LongAdder&lt;/code&gt;在存在竞争时将更新分散到
+多个单元中，因此更新具有更好的扩展性，但与更新并发执行的&lt;code&gt;sum()&lt;/code&gt;不是原子快照。
+对于度量指标使用&lt;code&gt;LongAdder&lt;/code&gt;；当每个观测到的总数都会驱动正确性判断时，使用
+&lt;code&gt;AtomicLong&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;Enum&amp;lt;E extends Enum&amp;lt;E&amp;gt;&amp;gt;&lt;/code&gt;为单个枚举类型提供类型安全的排序和操作。&lt;code&gt;EnumSet&lt;/code&gt;和
+&lt;code&gt;EnumMap&lt;/code&gt;利用这一封闭的键空间，并保留枚举声明顺序；对于枚举域，应优先使用
+它们而不是&lt;code&gt;HashSet&lt;/code&gt;和&lt;code&gt;HashMap&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="集合和线程"&gt;
+ 集合和线程
+ &lt;a href="#%e9%9b%86%e5%90%88%e5%92%8c%e7%ba%bf%e7%a8%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;Thread.State&lt;/code&gt;报告&lt;code&gt;BLOCKED&lt;/code&gt;、&lt;code&gt;WAITING&lt;/code&gt;和&lt;code&gt;TIMED_WAITING&lt;/code&gt;等 JVM 级别的状态；
+它用于观察，而不是同步协议。应使用&lt;code&gt;join&lt;/code&gt;、future、闩锁或结构化所有权来协调线程。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;Map&lt;/code&gt;是否允许&lt;code&gt;null&lt;/code&gt;键或值取决于具体实现：&lt;code&gt;HashMap&lt;/code&gt;允许一个 null 键，而
+&lt;code&gt;ConcurrentHashMap&lt;/code&gt;拒绝 null 键和值；在自然排序下，&lt;code&gt;TreeMap&lt;/code&gt;也可能拒绝 null
+键。不要假定&lt;code&gt;Map&lt;/code&gt;接口的可选操作一定成功，而应验证所选实现的契约。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;Arrays.asList(array)&lt;/code&gt;返回一个由所提供对象数组支持的固定大小列表。&lt;code&gt;set&lt;/code&gt;会更新
+该数组，但&lt;code&gt;add&lt;/code&gt;和&lt;code&gt;remove&lt;/code&gt;会失败。传入&lt;code&gt;int[]&lt;/code&gt;会创建包含一个元素的&lt;code&gt;List&amp;lt;int[]&amp;gt;&lt;/code&gt;，
+因为可变参数不会将基本类型数组装箱。需要装箱值列表时，请使用
+&lt;code&gt;Arrays.stream(ints).boxed().toList()&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="参考资料"&gt;
+ 参考资料
+ &lt;a href="#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html"&gt;JDK &lt;code&gt;Object&lt;/code&gt; API&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html"&gt;JDK &lt;code&gt;Pattern&lt;/code&gt; API&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/LongAdder.html"&gt;JDK &lt;code&gt;LongAdder&lt;/code&gt; API&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</description></item></channel></rss>

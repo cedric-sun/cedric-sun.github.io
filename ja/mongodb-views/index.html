@@ -1,0 +1,74 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MongoDB ビュー</title></head><body><main><article><div class=article-header><h1>MongoDB ビュー</h1><div class=aux>最終更新: 2021-07-25 21:42:07 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/mongodb/>Mongodb</a>
+|
+<a href=/ja/tags/databases/>Databases</a>
+|
+<a href=/ja/tags/aggregation/>Aggregation</a></div></div><div class="translation-notice machine-translated"><a href=/mongodb-views/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>MongoDB ビューは、コレクションまたは別のビューに対する読み取り専用のクエリ定義
+です。ビューが保存するのは集約パイプラインであり、その結果ではないため、読み取り
+ごとに現在のソースデータへパイプラインが適用されます。したがって標準ビューは
+マテリアライズドビューのキャッシュを提供しません。</p><h2 id=ビューを作成する>ビューを作成する
+<a href=#%e3%83%93%e3%83%a5%e3%83%bc%e3%82%92%e4%bd%9c%e6%88%90%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p><code>db.createView()</code> は対象コレクション名、ソース名前空間、集約パイプラインを受け取ります。</p><div class=jose-wrapper><div class=jose-tools><span>javascript</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#a6e22e>db</span>.<span style=color:#a6e22e>createView</span>(
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;active_orders&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#e6db74>&#34;orders&#34;</span>,
+</span></span><span style=display:flex><span>  [
+</span></span><span style=display:flex><span>    { <span style=color:#a6e22e>$match</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>status</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;active&#34;</span> } },
+</span></span><span style=display:flex><span>    { <span style=color:#a6e22e>$project</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>customerId</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>1</span>, <span style=color:#a6e22e>total</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>1</span>, <span style=color:#a6e22e>createdAt</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>1</span> } }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>)</span></span></code></pre></div></div></div><p>クライアントはコレクションと同じように <code>active_orders</code> をクエリします。</p><div class=jose-wrapper><div class=jose-tools><span>javascript</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#a6e22e>db</span>.<span style=color:#a6e22e>active_orders</span>.<span style=color:#a6e22e>find</span>({ <span style=color:#a6e22e>customerId</span><span style=color:#f92672>:</span> <span style=color:#a6e22e>customerId</span> })</span></span></code></pre></div></div></div><p>サーバーはビュー定義とクライアントクエリを組み合わせ、ソースコレクションに対して
+結果を計画します。標準ビューは基盤となるコレクションのインデックスを使用します。
+汎用インデックスを標準ビューへ直接作成、削除、再構築することはできません。選択性
+の高い <code>$match</code> ステージを先頭に置き、パイプラインとクライアントクエリが使うソース
+フィールドにインデックスを設定します。</p><p>Views can also be created with <code>db.createCollection()</code>:</p><div class=jose-wrapper><div class=jose-tools><span>javascript</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#a6e22e>db</span>.<span style=color:#a6e22e>createCollection</span>(<span style=color:#e6db74>&#34;recent_orders&#34;</span>, {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>viewOn</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;orders&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>pipeline</span><span style=color:#f92672>:</span> [
+</span></span><span style=display:flex><span>    { <span style=color:#a6e22e>$match</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>createdAt</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>$gte</span><span style=color:#f92672>:</span> <span style=color:#a6e22e>ISODate</span>(<span style=color:#e6db74>&#34;2026-01-01&#34;</span>) } } }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>collation</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>locale</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;en&#34;</span>, <span style=color:#a6e22e>strength</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>2</span> }
+</span></span><span style=display:flex><span>})</span></span></code></pre></div></div></div><p>ビューとそのソースは同じデータベースに存在しなければなりません。ビューのデフォルト
+照合順序は作成時に固定され、クエリで別の照合順序に上書きすることはできません。</p><h2 id=設計上の制約>設計上の制約
+<a href=#%e8%a8%ad%e8%a8%88%e4%b8%8a%e3%81%ae%e5%88%b6%e7%b4%84 class=heading-anchor><span>#</span></a></h2><p>ビューはフィールドの一部を公開したり、フィールド名を変更したり、<code>$lookup</code> で別の
+コレクションを結合したり、データを集約したりできます。insert、update、delete は
+受け付けません。<code>$out</code> や <code>$merge</code> などのデータを書き込むサポート対象外の集約
+ステージは、標準ビュー定義に含められません。</p><p>ビューは別のビューに依存できますが、依存グラフに循環を含めてはなりません。パイプ
+ラインは決定的かつ有界に保ちます。リクエストごとに大規模な <code>$lookup</code>、<code>$group</code>、
+ソートを実行するパイプラインは、運用コストを書き込みから読み取りへ移します。</p><p>ビューは時点読み取りやスナップショット読み取り分離をサポートしません。ブロッキング
+集約ステージは、サーバーの集約メモリと一時ファイルの動作にも従います。パイプライン
+をビューの背後に隠せば安価になると仮定せず、最終クエリを explain して負荷テストします。</p><h2 id=認可とスキーマの境界>認可とスキーマの境界
+<a href=#%e8%aa%8d%e5%8f%af%e3%81%a8%e3%82%b9%e3%82%ad%e3%83%bc%e3%83%9e%e3%81%ae%e5%a2%83%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>認証が有効な場合、ビュー作成にはデータベースの <code>createCollection</code> 権限と参照する
+名前空間への関連する読み取り権限が必要です。ビューのクエリにはビュー名前空間への
+<code>find</code> 権限が必要ですが、クライアントはソースコレクションへの直接の <code>find</code> 権限を
+別途必要としません。</p><p>認可の分離により、個人識別情報フィールドを含まない従業員レコードなど、制御された
+射影を公開できます。他の権限でソースコレクション、メタデータ、サイドチャネルが
+公開される場合、ビューは完全なセキュリティ境界ではありません。アプリケーション
+アカウントには必要な名前空間とコマンドだけを許可します。</p><p>A standard view has no independent document-validation schema because it cannot
+accept writes. Validation on the source collection constrains writes to that
+collection but does not promise that a projection, <code>$lookup</code>, or computed field
+matches an application schema forever. Version the view definition and consumer
+contract together. The view and every namespace it references must remain in
+the same database; a view cannot cross the database namespace boundary.</p><h2 id=標準ビューとオンデマンドのマテリアライズドビュー>標準ビューとオンデマンドのマテリアライズドビュー
+<a href=#%e6%a8%99%e6%ba%96%e3%83%93%e3%83%a5%e3%83%bc%e3%81%a8%e3%82%aa%e3%83%b3%e3%83%87%e3%83%9e%e3%83%b3%e3%83%89%e3%81%ae%e3%83%9e%e3%83%86%e3%83%aa%e3%82%a2%e3%83%a9%e3%82%a4%e3%82%ba%e3%83%89%e3%83%93%e3%83%a5%e3%83%bc class=heading-anchor><span>#</span></a></h2><p>新鮮さが重要で基盤クエリが安価な場合は標準ビューが適しています。派生結果が高価でも
+更新遅延を許容できる場合、MongoDB は集約パイプラインで生成されたコレクションを
+<em>オンデマンドのマテリアライズドビュー</em> と呼びます。</p><div class=jose-wrapper><div class=jose-tools><span>javascript</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#a6e22e>db</span>.<span style=color:#a6e22e>orders</span>.<span style=color:#a6e22e>aggregate</span>([
+</span></span><span style=display:flex><span>  { <span style=color:#a6e22e>$group</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>_id</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;$customerId&#34;</span>, <span style=color:#a6e22e>lifetimeValue</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>$sum</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;$total&#34;</span> } } },
+</span></span><span style=display:flex><span>  { <span style=color:#a6e22e>$merge</span><span style=color:#f92672>:</span> { <span style=color:#a6e22e>into</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;customer_lifetime_value&#34;</span>, <span style=color:#a6e22e>whenMatched</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;replace&#34;</span>,
+</span></span><span style=display:flex><span>              <span style=color:#a6e22e>whenNotMatched</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;insert&#34;</span> } }
+</span></span><span style=display:flex><span>])</span></span></code></pre></div></div></div><p>宛先は実際のコレクションなので、インデックスを付けて効率的にクエリできます。
+<code>$merge</code> は一致するドキュメントを段階的に置き換えられますが、<code>$out</code> は宛先
+コレクションを置き換えます。スケジューラー、変更ストリームコンシューマー、Atlas
+Stream Processing パイプライン、またはアプリケーションワークフローが結果を更新
+しなければなりません。通常の集約はオンデマンドのマテリアライズドビューを継続的に
+維持しないため、新鮮さの契約を明示します。</p><p><code>$merge</code> ジョブが多数のドキュメントを更新すると、読み取り側が部分的に更新された
+宛先を観測することがあります。コンシューマーが単一バージョンの可視性を必要とする
+場合は、バージョン付きコレクションへ書き込み、検証後に小さなメタデータポインターを
+切り替え、古いバージョンを廃止します。重複ストレージ、インデックス構築、更新中の
+変更捕捉、クリーンアップ失敗を運用手順に含めます。</p><p>コンシューマーが変更ストリームを通じて宛先を監視する必要がある場合は <code>$merge</code> を
+使用します。<code>$out</code> で置き換えられたコレクションは、同じマテリアライズドビュー更新
+メカニズムとして監視できません。</p><h2 id=references>References
+<a href=#references class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.mongodb.com/docs/manual/core/views/>MongoDB Views</a></li><li><a href=https://www.mongodb.com/docs/manual/core/views/create-view/>Create and Query a View</a></li><li><a href=https://www.mongodb.com/docs/manual/core/materialized-views/>On-Demand Materialized Views</a></li><li><a href=https://www.mongodb.com/docs/manual/reference/method/db.createView/><code>db.createView()</code></a></li><li><a href=https://www.mongodb.com/docs/manual/core/views/command-support/>Restrictions for Views</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mongodb-views/ class=language-option data-lang=en>English
+</a><a href=/ja/mongodb-views/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/mongodb-views/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/mongodb-views/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

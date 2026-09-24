@@ -1,0 +1,69 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>MyBatis 映射</title></head><body><main><article><div class=article-header><h1>MyBatis 映射</h1><div class=aux>最后更新: 2025-10-21 15:55:03 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/java/>Java</a>
+|
+<a href=/zh-cn/tags/mybatis/>Mybatis</a>
+|
+<a href=/zh-cn/tags/sql/>Sql</a></div></div><div class="translation-notice machine-translated"><a href=/mybatis-mapping/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>MyBatis 将 Java 调用映射到 SQL 语句，而参数绑定、语句执行和结果集访问由 JDBC
+负责。映射器应使这一边界清晰可见：SQL 列名属于语句，Java 属性名属于参数映射和
+结果映射，任何非标准转换都应由类型处理器在二者之间执行。</p><h2 id=参数与结果边界>参数与结果边界
+<a href=#%e5%8f%82%e6%95%b0%e4%b8%8e%e7%bb%93%e6%9e%9c%e8%be%b9%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>简单参数可以使用 <code>#{id}</code> 占位符。对象参数和 Map 参数会公开命名属性；对于多个映射器
+参数，应使用 <code>@Param</code>，使参数名不依赖编译器元数据：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>List<span style=color:#f92672>&lt;</span>Task<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>findByState</span>(<span style=color:#a6e22e>@Param</span>(<span style=color:#e6db74>&#34;state&#34;</span>) State state,
+</span></span><span style=display:flex><span>                       <span style=color:#a6e22e>@Param</span>(<span style=color:#e6db74>&#34;limit&#34;</span>) <span style=color:#66d9ef>int</span> limit);</span></span></code></pre></div></div></div><p><code>#{...}</code> 会创建 JDBC 参数标记并绑定值。<code>${...}</code> 会在准备 SQL 之前将文本替换到 SQL
+中，因此只能用于允许列表中的标识符或无法参数化的片段。绝不能将请求数据直接放入
+<code>${...}</code> 表达式。</p><p>当列标签与 Java 属性匹配时，自动结果映射较为简洁。当名称不同时、嵌套对象需要显式
+标识时，或连接可能产生重复的父行时，应使用 <code>resultMap</code>：</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;resultMap</span> <span style=color:#a6e22e>id=</span><span style=color:#e6db74>&#34;taskResult&#34;</span> <span style=color:#a6e22e>type=</span><span style=color:#e6db74>&#34;com.example.Task&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;id</span> <span style=color:#a6e22e>property=</span><span style=color:#e6db74>&#34;id&#34;</span> <span style=color:#a6e22e>column=</span><span style=color:#e6db74>&#34;task_id&#34;</span><span style=color:#f92672>/&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;result</span> <span style=color:#a6e22e>property=</span><span style=color:#e6db74>&#34;name&#34;</span> <span style=color:#a6e22e>column=</span><span style=color:#e6db74>&#34;task_name&#34;</span><span style=color:#f92672>/&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;result</span> <span style=color:#a6e22e>property=</span><span style=color:#e6db74>&#34;state&#34;</span> <span style=color:#a6e22e>column=</span><span style=color:#e6db74>&#34;state&#34;</span>
+</span></span><span style=display:flex><span>          <span style=color:#a6e22e>typeHandler=</span><span style=color:#e6db74>&#34;com.example.StateTypeHandler&#34;</span><span style=color:#f92672>/&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/resultMap&gt;</span></span></span></code></pre></div></div></div><p><code>&lt;id></code> 映射用于标识连接结果中的对象，并帮助 MyBatis 合并重复的父级数据。它不会
+声明数据库约束；数据库模式仍必须保证标识性。</p><h2 id=生成键>生成键
+<a href=#%e7%94%9f%e6%88%90%e9%94%ae class=heading-anchor><span>#</span></a></h2><p>对于支持生成键的数据库和 JDBC 驱动程序，应启用 <code>useGeneratedKeys</code>，并指定可写入的
+Java 属性。MyBatis 会在插入之后调用 JDBC 生成键 API，并将生成的主键赋给该属性。</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;insert</span> <span style=color:#a6e22e>id=</span><span style=color:#e6db74>&#34;insert&#34;</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>parameterType=</span><span style=color:#e6db74>&#34;com.example.Task&#34;</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>useGeneratedKeys=</span><span style=color:#e6db74>&#34;true&#34;</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>keyProperty=</span><span style=color:#e6db74>&#34;id&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  INSERT INTO task (name) VALUES (#{name})
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/insert&gt;</span></span></span></code></pre></div></div></div><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Task task <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Task();
+</span></span><span style=display:flex><span>task.<span style=color:#a6e22e>setName</span>(<span style=color:#e6db74>&#34;import&#34;</span>);
+</span></span><span style=display:flex><span>mapper.<span style=color:#a6e22e>insert</span>(task);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>long</span> id <span style=color:#f92672>=</span> task.<span style=color:#a6e22e>getId</span>();</span></span></code></pre></div></div></div><p>此赋值只会填充生成键属性，不会重新加载数据库默认值、触发器生成的列或其他无关字段。
+应使用后续的 <code>SELECT</code>、数据库支持时的 <code>RETURNING</code> 子句，或者在数据库使用序列或驱动
+程序不支持 <code>getGeneratedKeys</code> 时使用 <code>selectKey</code> 语句。</p><h2 id=null-参数>NULL 参数
+<a href=#null-%e5%8f%82%e6%95%b0 class=heading-anchor><span>#</span></a></h2><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span>UPDATE task
+</span></span><span style=display:flex><span>SET completed_at = #{completedAt, jdbcType=TIMESTAMP}
+</span></span><span style=display:flex><span>WHERE id = #{id}</span></span></code></pre></div></div></div><p>只有在数据库约定与所有可为 NULL 的参数兼容时，才应设置全局
+<code>jdbcTypeForNull</code>。对于 SQL 类型不同的列，按参数指定类型更加清晰。由于生成键和
+NULL 绑定行为取决于驱动程序，应使用生产环境中的驱动程序测试插入和更新操作。</p><h2 id=动态-sql-与类型处理器>动态 SQL 与类型处理器
+<a href=#%e5%8a%a8%e6%80%81-sql-%e4%b8%8e%e7%b1%bb%e5%9e%8b%e5%a4%84%e7%90%86%e5%99%a8 class=heading-anchor><span>#</span></a></h2><p>动态元素可以构建语句结构，而无需拼接任意应用程序文本：</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;select</span> <span style=color:#a6e22e>id=</span><span style=color:#e6db74>&#34;find&#34;</span> <span style=color:#a6e22e>resultMap=</span><span style=color:#e6db74>&#34;taskResult&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>  SELECT id AS task_id, name AS task_name, state
+</span></span><span style=display:flex><span>  FROM task
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;where&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;if</span> <span style=color:#a6e22e>test=</span><span style=color:#e6db74>&#34;state != null&#34;</span><span style=color:#f92672>&gt;</span>
+</span></span><span style=display:flex><span>      state = #{state, typeHandler=com.example.StateTypeHandler}
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/if&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/where&gt;</span>
+</span></span><span style=display:flex><span>  ORDER BY id
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/select&gt;</span></span></span></code></pre></div></div></div><p>仅当子元素输出条件时，<code>&lt;where></code> 才会插入 <code>WHERE</code>，并移除开头的 <code>AND</code> 或 <code>OR</code>。
+相关元素包括 <code>&lt;choose></code>、<code>&lt;set></code>、<code>&lt;trim></code> 和 <code>&lt;foreach></code>。<code>TypeHandler</code> 应定义
+有意设计的 Java/JDBC 表示方式，例如将枚举存储为稳定字符串；如果不同列以不同方式
+编码相同的 Java 类型，应进行窄范围注册。</p><h2 id=会话与事务所有权>会话与事务所有权
+<a href=#%e4%bc%9a%e8%af%9d%e4%b8%8e%e4%ba%8b%e5%8a%a1%e6%89%80%e6%9c%89%e6%9d%83 class=heading-anchor><span>#</span></a></h2><p>映射语句通过 <code>SqlSession</code> 执行。直接使用 MyBatis 时，调用方负责打开会话、提交或
+回滚事务，以及关闭会话：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>try</span> (SqlSession session <span style=color:#f92672>=</span> factory.<span style=color:#a6e22e>openSession</span>()) {
+</span></span><span style=display:flex><span>    TaskMapper mapper <span style=color:#f92672>=</span> session.<span style=color:#a6e22e>getMapper</span>(TaskMapper.<span style=color:#a6e22e>class</span>);
+</span></span><span style=display:flex><span>    mapper.<span style=color:#a6e22e>insert</span>(task);
+</span></span><span style=display:flex><span>    session.<span style=color:#a6e22e>commit</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>默认会话不是自动提交模式，且 <code>SqlSession</code> 不是线程安全的。MyBatis-Spring 等框架
+集成会将会话绑定到由框架管理的事务中；应用程序代码不得将手动提交与该所有权模型
+混用。生成键赋值发生在语句执行期间，但只有在所属事务提交后，该行才会持久化。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://mybatis.org/mybatis-3/sqlmap-xml.html>MyBatis XML Mapping</a></li><li><a href=https://mybatis.org/mybatis-3/dynamic-sql.html>MyBatis Dynamic SQL</a></li><li><a href=https://mybatis.org/mybatis-3/java-api.html>MyBatis Java API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/mybatis-mapping/ class=language-option data-lang=en>English
+</a><a href=/ja/mybatis-mapping/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/mybatis-mapping/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/mybatis-mapping/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

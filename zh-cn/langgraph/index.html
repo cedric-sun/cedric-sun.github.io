@@ -1,0 +1,307 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>LangGraph4j</title></head><body><main><article><div class=article-header><h1>LangGraph4j</h1><div class=aux>最后更新: 2026-04-22 22:26:49 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/ai/>Ai</a>
+|
+<a href=/zh-cn/tags/agents/>Agents</a>
+|
+<a href=/zh-cn/tags/langgraph4j/>Langgraph4j</a>
+|
+<a href=/zh-cn/tags/workflows/>Workflows</a>
+|
+<a href=/zh-cn/tags/java/>Java</a></div></div><div class="translation-notice machine-translated"><a href=/langgraph/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p><a href=https://github.com/langgraph4j/langgraph4j>LangGraph4j</a> 是一个用于构建有状态、基于图的 AI 应用的 Java 库。图由执行工作的节点、选择下一个节点的边，以及随图运行而变化的共享状态组成。它的设计受到 LangGraph 启发，并与 <a href=https://docs.langchain4j.dev/>LangChain4j</a> 和 <a href=/spring-ai/>Spring AI</a> 集成，但图节点也可以使用普通 Java 代码。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>                    +------------+
+</span></span><span style=display:flex><span>                    | call model |
+</span></span><span style=display:flex><span>                    +------+-----+
+</span></span><span style=display:flex><span>                           |
+</span></span><span style=display:flex><span>                    tool requested?
+</span></span><span style=display:flex><span>                     /           \
+</span></span><span style=display:flex><span>                   yes            no
+</span></span><span style=display:flex><span>                   /               \
+</span></span><span style=display:flex><span>          +-------v-------+      +--v--+
+</span></span><span style=display:flex><span>          | execute tool  |      | END |
+</span></span><span style=display:flex><span>          +-------+-------+      +-----+
+</span></span><span style=display:flex><span>                  |
+</span></span><span style=display:flex><span>                  +----------&gt; call model</span></span></code></pre></div></div></div><p>循环是有意设计的。循环使应用能够进行推理、执行操作、检查结果，然后再次推理。LangGraph4j 将这种控制流及其状态显式化，并提供 reducer、条件路由、检查点、断点、流式处理、图可视化和子图。</p><p>本教程使用 LangGraph4j 1.8.24 和 Java 17。教程聚焦于核心模块，因此示例不依赖特定的模型提供商或 Web 框架。</p><h2 id=langgraph4j-解决的问题>LangGraph4j 解决的问题
+<a href=#langgraph4j-%e8%a7%a3%e5%86%b3%e7%9a%84%e9%97%ae%e9%a2%98 class=heading-anchor><span>#</span></a></h2><p>一个小型 AI 功能可以是单次请求：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>request -&gt; prompt -&gt; model -&gt; response</span></span></code></pre></div></div></div><p>代理型应用可能需要：</p><ol><li>对请求进行分类；</li><li>检索私有文档；</li><li>让模型选择工具；</li><li>验证并执行该工具；</li><li>重试可恢复的失败；</li><li>在高风险操作前暂停；</li><li>跨请求保留进度；</li><li>恢复同一次运行；以及</li><li>在处理过程中报告进度。</li></ol><p>不使用图库，也可以通过循环、条件、队列和数据库表实现这些功能。困难之处在于：即使模型的决策具有非确定性，也要让执行过程易于理解、可中断、可恢复且安全。</p><p>LangGraph4j 提供执行模型，但不会替你选择工作流、提示词、工具、授权规则或业务策略。这些仍然属于应用的职责。</p><h2 id=图不限于-dag>图不限于 DAG
+<a href=#%e5%9b%be%e4%b8%8d%e9%99%90%e4%ba%8e-dag class=heading-anchor><span>#</span></a></h2><p>有向无环图（DAG）适合单向流水线：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>load -&gt; transform -&gt; validate -&gt; publish</span></span></code></pre></div></div></div><p>代理循环通常是循环结构：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>model -&gt; tool -&gt; model -&gt; tool -&gt; model -&gt; answer</span></span></code></pre></div></div></div><p>LangGraph4j 同时支持这两种形式。图可以分支、循环、并行运行相互独立的分支、合并结果、调用子图、在配置的节点处暂停并最终完成。路由既可以是确定性的 Java 代码，也可以是经过验证的模型决策结果。</p><p>运行时遵循类似 Pregel 的 superstep 模型。一个步骤中被激活的节点可以并发运行，然后在后续工作开始前合并它们的更新。因此，共享状态的合并规则非常重要。</p><h2 id=核心概念>核心概念
+<a href=#%e6%a0%b8%e5%bf%83%e6%a6%82%e5%bf%b5 class=heading-anchor><span>#</span></a></h2><h3 id=状态>状态
+<a href=#%e7%8a%b6%e6%80%81 class=heading-anchor><span>#</span></a></h3><p><code>AgentState</code> 是贯穿图运行过程的共享数据。它封装了一个 <code>Map&lt;String, Object></code>，通常通过类型化访问器进行扩展：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.AgentState;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>SupportState</span> <span style=color:#66d9ef>extends</span> AgentState {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String REQUEST <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;request&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String DOCUMENTS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;documents&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String PROPOSED_ACTION <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;proposed_action&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String APPROVED <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;approved&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String ATTEMPTS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;attempts&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String ANSWER <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;answer&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    SupportState(Map<span style=color:#f92672>&lt;</span>String, Object<span style=color:#f92672>&gt;</span> data) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>super</span>(data);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>request</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> value(REQUEST).<span style=color:#a6e22e>map</span>(Object::toString).<span style=color:#a6e22e>orElse</span>(<span style=color:#e6db74>&#34;&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>documents</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#f92672>&lt;</span>List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;&gt;</span>value(DOCUMENTS).<span style=color:#a6e22e>orElse</span>(List.<span style=color:#a6e22e>of</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>boolean</span> <span style=color:#a6e22e>approved</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#f92672>&lt;</span>Boolean<span style=color:#f92672>&gt;</span>value(APPROVED).<span style=color:#a6e22e>orElse</span>(<span style=color:#66d9ef>false</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>节点返回更新，而不是替换完整的状态对象：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Map<span style=color:#f92672>&lt;</span>String, Object<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>incrementAttempt</span>(SupportState state) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> attempts <span style=color:#f92672>=</span> state.<span style=color:#f92672>&lt;</span>Integer<span style=color:#f92672>&gt;</span>value(SupportState.<span style=color:#a6e22e>ATTEMPTS</span>).<span style=color:#a6e22e>orElse</span>(0);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> Map.<span style=color:#a6e22e>of</span>(SupportState.<span style=color:#a6e22e>ATTEMPTS</span>, attempts <span style=color:#f92672>+</span> 1);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>状态不仅是聊天历史。将决策、标识符、工件和状态保存在命名字段中，比从文本消息中恢复这些信息更容易验证。</p><p>不要将开放连接、执行器、请求对象或机密信息放入检查点状态。检查点必须可序列化，并且可能被运维人员检查，或持久化到进程之外。</p><h3 id=通道和-reducer>通道和 Reducer
+<a href=#%e9%80%9a%e9%81%93%e5%92%8c-reducer class=heading-anchor><span>#</span></a></h3><p>状态模式将一个键映射到 <code>Channel&lt;?></code>。通道定义该键的默认值以及如何合并更新。使用基础通道时，新值会替换旧值。<code>Channels.appender</code> 会将值累积到列表中。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.ArrayList;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.Channel;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.Channels;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> Map<span style=color:#f92672>&lt;</span>String, Channel<span style=color:#f92672>&lt;?&gt;&gt;</span> SCHEMA <span style=color:#f92672>=</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;status&#34;</span>, Channels.<span style=color:#a6e22e>base</span>(() <span style=color:#f92672>-&gt;</span> <span style=color:#e6db74>&#34;new&#34;</span>),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;audit&#34;</span>, Channels.<span style=color:#a6e22e>appender</span>(ArrayList::<span style=color:#66d9ef>new</span>));</span></span></code></pre></div></div></div><p>如果一个节点返回 <code>Map.of("audit", "classified")</code>，后续节点返回 <code>Map.of("audit", "retrieved")</code>，appender 通道会保留两个条目。标准 appender 不允许重复值；如果重复值具有意义，请使用 <code>Channels.appenderWithDuplicate</code>。</p><p>当并行分支写入同一个键时，reducer 至关重要。由于检查点恢复和重放可能会再次应用相同的状态转换，reducer 应当是确定性的，并且不产生副作用。</p><p>对于聊天消息，请使用适当的 LangChain4j 或 Spring AI 集成提供的消息通道功能，而不要将消息编辑视为盲目的列表拼接。</p><h3 id=节点>节点
+<a href=#%e8%8a%82%e7%82%b9 class=heading-anchor><span>#</span></a></h3><p>节点接收当前状态，并返回更新映射。它可以调用模型、查询<a href=/vector-stores/>向量存储</a>、调用工具、验证数据、生成审计条目或调用子图。</p><p><code>NodeAction&lt;S></code> 是同步的。<code>AsyncNodeAction&lt;S></code> 返回 <code>CompletableFuture</code>，适合非阻塞的模型、数据库和 HTTP 客户端。<code>node_async</code> 适配器可将同步操作转换为异步节点操作。</p><p>保持节点小而专注。让一个节点同时负责分类、检索、调用多个工具、写入一行数据和生成回答，会将工作流隐藏在一个方法中，从而使检查点和失败难以解释。</p><h3 id=边>边
+<a href=#%e8%be%b9 class=heading-anchor><span>#</span></a></h3><p>普通边始终选择同一个目标：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>graph.<span style=color:#a6e22e>addEdge</span>(<span style=color:#e6db74>&#34;retrieve&#34;</span>, <span style=color:#e6db74>&#34;generate&#34;</span>);</span></span></code></pre></div></div></div><p>条件边会评估状态并返回路由标签。图会将该标签映射到声明的目标：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>graph.<span style=color:#a6e22e>addConditionalEdges</span>(
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;review&#34;</span>,
+</span></span><span style=display:flex><span>        edge_async(state <span style=color:#f92672>-&gt;</span> state.<span style=color:#a6e22e>approved</span>() <span style=color:#f92672>?</span> <span style=color:#e6db74>&#34;publish&#34;</span> : <span style=color:#e6db74>&#34;reject&#34;</span>),
+</span></span><span style=display:flex><span>        Map.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;publish&#34;</span>, <span style=color:#e6db74>&#34;publish&#34;</span>, <span style=color:#e6db74>&#34;reject&#34;</span>, <span style=color:#e6db74>&#34;reject&#34;</span>));</span></span></code></pre></div></div></div><p>该映射是允许列表。不要将模型生成的字符串用作不受限制的目标或函数名。应先验证模型输出，再将少量接受的决策映射到图节点。</p><p><code>StateGraph.START</code> 和 <code>StateGraph.END</code> 标记图的入口和终止位置。在定义节点和边后调用 <code>compile()</code>。编译过程会验证结构，并生成可运行的 <code>CompiledGraph</code>。</p><h2 id=安装-langgraph4j>安装 LangGraph4j
+<a href=#%e5%ae%89%e8%a3%85-langgraph4j class=heading-anchor><span>#</span></a></h2><p>LangGraph4j 1.8.x 要求 Java 17 或更高版本。导入 BOM，以保持核心模块和可选模块的版本一致：</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;properties&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;langgraph4j.version&gt;</span>1.8.24<span style=color:#f92672>&lt;/langgraph4j.version&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/properties&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>org.bsc.langgraph4j<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>langgraph4j-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>${langgraph4j.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>org.bsc.langgraph4j<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>langgraph4j-core<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p>仅在应用需要时添加集成模块。LangGraph4j 可以编排使用提供商 SDK、LangChain4j、Spring AI、数据库客户端或普通应用代码的节点。</p><h2 id=完整的-java-图>完整的 Java 图
+<a href=#%e5%ae%8c%e6%95%b4%e7%9a%84-java-%e5%9b%be class=heading-anchor><span>#</span></a></h2><p>下面的确定性图会起草发布公告、审核公告，然后发布或拒绝。简单的起草逻辑让图的机制保持清晰；生产代码可以将起草节点替换为模型调用。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.ArrayList;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.GraphStateException;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.StateGraph;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.action.NodeAction;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.AgentState;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.Channel;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.state.Channels;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.StateGraph.END;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.StateGraph.START;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
+</span></span><span style=display:flex><span><span style=color:#f92672>import static</span> org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReleaseState</span> <span style=color:#66d9ef>extends</span> AgentState {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String RELEASE_ID <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;release_id&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String NOTES <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;notes&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String DRAFT <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;draft&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String APPROVED <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;approved&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String STATUS <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;status&#34;</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> String AUDIT <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;audit&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> Map<span style=color:#f92672>&lt;</span>String, Channel<span style=color:#f92672>&lt;?&gt;&gt;</span> SCHEMA <span style=color:#f92672>=</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            STATUS, Channels.<span style=color:#a6e22e>base</span>(() <span style=color:#f92672>-&gt;</span> <span style=color:#e6db74>&#34;new&#34;</span>),
+</span></span><span style=display:flex><span>            AUDIT, Channels.<span style=color:#a6e22e>appender</span>(ArrayList::<span style=color:#66d9ef>new</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReleaseState(Map<span style=color:#f92672>&lt;</span>String, Object<span style=color:#f92672>&gt;</span> data) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>super</span>(data);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>releaseId</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> value(RELEASE_ID).<span style=color:#a6e22e>map</span>(Object::toString).<span style=color:#a6e22e>orElseThrow</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>notes</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> value(NOTES).<span style=color:#a6e22e>map</span>(Object::toString).<span style=color:#a6e22e>orElse</span>(<span style=color:#e6db74>&#34;&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    String <span style=color:#a6e22e>draft</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> value(DRAFT).<span style=color:#a6e22e>map</span>(Object::toString).<span style=color:#a6e22e>orElseThrow</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>boolean</span> <span style=color:#a6e22e>approved</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#f92672>&lt;</span>Boolean<span style=color:#f92672>&gt;</span>value(APPROVED).<span style=color:#a6e22e>orElse</span>(<span style=color:#66d9ef>false</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>audit</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>this</span>.<span style=color:#f92672>&lt;</span>List<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;&gt;</span>value(AUDIT).<span style=color:#a6e22e>orElse</span>(List.<span style=color:#a6e22e>of</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ReleaseGraph</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> NodeAction<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> DRAFT <span style=color:#f92672>=</span> state <span style=color:#f92672>-&gt;</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>DRAFT</span>,
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;Release %s%n%n%s&#34;</span>.<span style=color:#a6e22e>formatted</span>(state.<span style=color:#a6e22e>releaseId</span>(), state.<span style=color:#a6e22e>notes</span>()),
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>STATUS</span>, <span style=color:#e6db74>&#34;awaiting_review&#34;</span>,
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>AUDIT</span>, <span style=color:#e6db74>&#34;drafted&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> NodeAction<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> REVIEW <span style=color:#f92672>=</span> state <span style=color:#f92672>-&gt;</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>AUDIT</span>, <span style=color:#e6db74>&#34;reviewed&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> NodeAction<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> PUBLISH <span style=color:#f92672>=</span> state <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// Call a publication API here with releaseId() as an idempotency key.</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>STATUS</span>, <span style=color:#e6db74>&#34;published&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>AUDIT</span>, <span style=color:#e6db74>&#34;published&#34;</span>);
+</span></span><span style=display:flex><span>    };
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>final</span> NodeAction<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> REJECT <span style=color:#f92672>=</span> state <span style=color:#f92672>-&gt;</span> Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>STATUS</span>, <span style=color:#e6db74>&#34;rejected&#34;</span>,
+</span></span><span style=display:flex><span>            ReleaseState.<span style=color:#a6e22e>AUDIT</span>, <span style=color:#e6db74>&#34;rejected&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> StateGraph<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>definition</span>() <span style=color:#66d9ef>throws</span> GraphStateException {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> StateGraph<span style=color:#f92672>&lt;&gt;</span>(
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>SCHEMA</span>,
+</span></span><span style=display:flex><span>                ReleaseState::<span style=color:#66d9ef>new</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;draft&#34;</span>, node_async(DRAFT))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;review&#34;</span>, node_async(REVIEW))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;publish&#34;</span>, node_async(PUBLISH))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;reject&#34;</span>, node_async(REJECT))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addEdge</span>(START, <span style=color:#e6db74>&#34;draft&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addEdge</span>(<span style=color:#e6db74>&#34;draft&#34;</span>, <span style=color:#e6db74>&#34;review&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addConditionalEdges</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#e6db74>&#34;review&#34;</span>,
+</span></span><span style=display:flex><span>                        edge_async(state <span style=color:#f92672>-&gt;</span>
+</span></span><span style=display:flex><span>                                state.<span style=color:#a6e22e>approved</span>() <span style=color:#f92672>?</span> <span style=color:#e6db74>&#34;publish&#34;</span> : <span style=color:#e6db74>&#34;reject&#34;</span>),
+</span></span><span style=display:flex><span>                        Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>                                <span style=color:#e6db74>&#34;publish&#34;</span>, <span style=color:#e6db74>&#34;publish&#34;</span>,
+</span></span><span style=display:flex><span>                                <span style=color:#e6db74>&#34;reject&#34;</span>, <span style=color:#e6db74>&#34;reject&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addEdge</span>(<span style=color:#e6db74>&#34;publish&#34;</span>, END)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>addEdge</span>(<span style=color:#e6db74>&#34;reject&#34;</span>, END);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) <span style=color:#66d9ef>throws</span> GraphStateException {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> graph <span style=color:#f92672>=</span> definition().<span style=color:#a6e22e>compile</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> input <span style=color:#f92672>=</span> Map.<span style=color:#f92672>&lt;</span>String, Object<span style=color:#f92672>&gt;</span>of(
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>RELEASE_ID</span>, <span style=color:#e6db74>&#34;2026.08&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>NOTES</span>, <span style=color:#e6db74>&#34;Adds resumable exports and audit reports.&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>APPROVED</span>, <span style=color:#66d9ef>true</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> output : graph.<span style=color:#a6e22e>stream</span>(input)) {
+</span></span><span style=display:flex><span>            System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(output);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>图从 <code>draft</code> 开始，移动到 <code>review</code>，然后评估条件边。真实的审核流程不应直接接受来自不受信任浏览器请求的 <code>approved</code>。必须将经过身份验证的审批者绑定到特定的拟议操作，并在服务器上验证该决定。</p><p><code>PUBLISH</code> 节点特意与面向模型的工作分离。它必须将 <code>release_id</code> 作为幂等键，验证最终负载，并在产生外部副作用之前执行授权。</p><h2 id=条件路由和有界循环>条件路由和有界循环
+<a href=#%e6%9d%a1%e4%bb%b6%e8%b7%af%e7%94%b1%e5%92%8c%e6%9c%89%e7%95%8c%e5%be%aa%e7%8e%af class=heading-anchor><span>#</span></a></h2><p>条件边可以显式表示重试或工具循环：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>call model -&gt; tool needed? -- yes --&gt; execute tool --+
+</span></span><span style=display:flex><span>      |                                              |
+</span></span><span style=display:flex><span>      no                                             |
+</span></span><span style=display:flex><span>      v                                              |
+</span></span><span style=display:flex><span>     answer &lt;----------------------------------------+</span></span></code></pre></div></div></div><p>路由操作应返回少量标签中的一个。对于重试循环，将尝试次数保存在状态中，并在达到限制后路由到失败节点。<code>CompileConfig.builder().recursionLimit(...)</code> 也会设置图迭代次数的正上限；默认值为 25。</p><p>不要依赖模型来停止昂贵或危险的循环。在应用状态或可观测性数据中跟踪模型调用、工具调用、经过的时间、令牌使用量和重试次数。每个循环都需要成功路径、有界重试路径和失败路径。</p><h2 id=检查点断点和恢复>检查点、断点和恢复
+<a href=#%e6%a3%80%e6%9f%a5%e7%82%b9%e6%96%ad%e7%82%b9%e5%92%8c%e6%81%a2%e5%a4%8d class=heading-anchor><span>#</span></a></h2><p>检查点保存器会根据 <code>RunnableConfig</code> 的线程 ID 保存快照。这样，应用可以检查状态，在配置的节点处停止，并在稍后继续同一线程。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.CompileConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.RunnableConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.checkpoint.MemorySaver;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> compiled <span style=color:#f92672>=</span> ReleaseGraph.<span style=color:#a6e22e>definition</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>compile</span>(CompileConfig.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>checkpointSaver</span>(<span style=color:#66d9ef>new</span> MemorySaver())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>interruptBefore</span>(<span style=color:#e6db74>&#34;publish&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> thread <span style=color:#f92672>=</span> RunnableConfig.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>threadId</span>(<span style=color:#e6db74>&#34;release-2026.08&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> output : compiled.<span style=color:#a6e22e>stream</span>(
+</span></span><span style=display:flex><span>        Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>RELEASE_ID</span>, <span style=color:#e6db74>&#34;2026.08&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>NOTES</span>, <span style=color:#e6db74>&#34;Adds resumable exports and audit reports.&#34;</span>,
+</span></span><span style=display:flex><span>                ReleaseState.<span style=color:#a6e22e>APPROVED</span>, <span style=color:#66d9ef>true</span>),
+</span></span><span style=display:flex><span>        thread)) {
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(output);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>使用 <code>interruptBefore("publish")</code> 后，执行会在指定节点之前停止。<code>MemorySaver</code> 仅适用于本地开发，因为进程结束时它会丢失所有状态。LangGraph4j 还提供面向 PostgreSQL、SQLite、MySQL、Redis、DynamoDB、CockroachDB、Hazelcast 和 Oracle Database 等数据库与存储的保存器模块。应根据应用的可用性、保留、事务和运维要求选择后端。</p><p>要编辑已暂停的线程，请持久化经过身份验证的审批决定，并更新检查点状态。<code>updateState</code> 会返回一个用于标识更新后检查点的配置；提供作出决定的节点后，运行时可以计算下一条路由：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>RunnableConfig resumed <span style=color:#f92672>=</span> compiled.<span style=color:#a6e22e>updateState</span>(
+</span></span><span style=display:flex><span>        thread,
+</span></span><span style=display:flex><span>        Map.<span style=color:#a6e22e>of</span>(ReleaseState.<span style=color:#a6e22e>APPROVED</span>, <span style=color:#66d9ef>true</span>),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;review&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> output : compiled.<span style=color:#a6e22e>stream</span>(<span style=color:#66d9ef>null</span>, resumed)) {
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(output);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>向此 <code>stream</code> 重载传入 <code>null</code> 会恢复已保存的图输入。在服务中，应将线程 ID 与其租户和所有者一同保存在服务器端。验证访问权限之前，绝不要加载客户端任意提供的线程 ID。</p><p>中断是节点级断点，而不是授权系统。审批界面必须显示具体且已验证的操作及其参数。如果操作会部署服务、删除数据或改变资金，仅显示“继续？”并不构成有意义的同意。</p><h3 id=持久化不等于-exactly-once>持久化不等于 Exactly Once
+<a href=#%e6%8c%81%e4%b9%85%e5%8c%96%e4%b8%8d%e7%ad%89%e4%ba%8e-exactly-once class=heading-anchor><span>#</span></a></h3><p>检查点可以恢复计算，但检查点和外部副作用不会自动成为同一个事务：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>1. publish node calls an external API
+</span></span><span style=display:flex><span>2. process fails before the following checkpoint
+</span></span><span style=display:flex><span>3. the node runs again during recovery</span></span></code></pre></div></div></div><p>如果没有幂等键或权威事务记录，副作用可能发生两次。发送电子邮件、修改基础设施或改变业务系统的节点必须是幂等的。将模型调用视为可重复但非确定性的操作：重放可能产生费用，并返回不同的输出。</p><h2 id=流式处理和状态检查>流式处理和状态检查
+<a href=#%e6%b5%81%e5%bc%8f%e5%a4%84%e7%90%86%e5%92%8c%e7%8a%b6%e6%80%81%e6%a3%80%e6%9f%a5 class=heading-anchor><span>#</span></a></h2><p><code>CompiledGraph.stream</code> 会在图运行时产生一系列 <code>NodeOutput</code> 值。完整示例会打印每个值；Web 应用可以将安全的进度事件转换为 Server-Sent Events 或 WebSocket 消息。</p><p>默认情况下，图流式处理使用 <code>CompiledGraph.StreamMode.VALUES</code>。配置保存器后，<code>streamSnapshots</code> 或使用 <code>StreamMode.SNAPSHOTS</code> 的 <code>RunnableConfig</code> 会提供面向检查点的状态快照。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.CompiledGraph;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.bsc.langgraph4j.RunnableConfig;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> config <span style=color:#f92672>=</span> RunnableConfig.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>threadId</span>(<span style=color:#e6db74>&#34;release-2026.08&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>streamMode</span>(CompiledGraph.<span style=color:#a6e22e>StreamMode</span>.<span style=color:#a6e22e>SNAPSHOTS</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> output : compiled.<span style=color:#a6e22e>streamSnapshots</span>(
+</span></span><span style=display:flex><span>        Map.<span style=color:#a6e22e>of</span>(ReleaseState.<span style=color:#a6e22e>APPROVED</span>, <span style=color:#66d9ef>true</span>),
+</span></span><span style=display:flex><span>        config)) {
+</span></span><span style=display:flex><span>    System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(output);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>不要将每个状态字段都序列化到浏览器。状态可能包含检索到的文档、工具参数、内部标识符或节点意外添加的数据。应定义明确的事件 DTO，只包含特定接收者可以看到的字段。</p><p><code>CompiledGraph.getState</code>、<code>stateOf</code>、<code>lastStateOf</code> 和 <code>getStateHistory</code> 可检查线程的已保存状态。将这些接口视为特权运维工具，并应用与其他应用数据相同的租户隔离、保留、删除和加密规则。</p><h2 id=并行节点和合并规则>并行节点和合并规则
+<a href=#%e5%b9%b6%e8%a1%8c%e8%8a%82%e7%82%b9%e5%92%8c%e5%90%88%e5%b9%b6%e8%a7%84%e5%88%99 class=heading-anchor><span>#</span></a></h2><p>多个出站边可以在同一个 superstep 中激活相互独立的工作：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>                   +-&gt; search internal docs -+
+</span></span><span style=display:flex><span>question -&gt; route  +-&gt; search issue tracker --+-&gt; combine -&gt; answer
+</span></span><span style=display:flex><span>                   +-&gt; search source code ----+</span></span></code></pre></div></div></div><p>只有在分支相互独立时，并行化才有价值。分支的写入必须可合并：通道可以追加候选项，自定义基础通道 reducer 可以合并带命名空间的映射，而单个所有者可以写入最终答案。</p><p>并行模型请求会增加成本，并可能耗尽提供商限制。使用应用执行器限制并发，传播取消信号，并决定一个分支失败而另一个分支成功时的处理方式。并行节点本身不能拥有互不兼容的多个下游路由，因此应设计一个合并节点，以确定下一步的确定性决策。</p><h2 id=子图和多代理工作流>子图和多代理工作流
+<a href=#%e5%ad%90%e5%9b%be%e5%92%8c%e5%a4%9a%e4%bb%a3%e7%90%86%e5%b7%a5%e4%bd%9c%e6%b5%81 class=heading-anchor><span>#</span></a></h2><p>可以将 <code>StateGraph</code> 或 <code>CompiledGraph</code> 添加为另一个图的节点。子图适用于可复用的研究流程、专用工具循环、团队负责的模块或可单独测试的工作流。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>StateGraph<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> child <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StateGraph<span style=color:#f92672>&lt;&gt;</span>(
+</span></span><span style=display:flex><span>        ReleaseState.<span style=color:#a6e22e>SCHEMA</span>,
+</span></span><span style=display:flex><span>        ReleaseState::<span style=color:#66d9ef>new</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>StateGraph<span style=color:#f92672>&lt;</span>ReleaseState<span style=color:#f92672>&gt;</span> parent <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StateGraph<span style=color:#f92672>&lt;&gt;</span>(
+</span></span><span style=display:flex><span>        ReleaseState.<span style=color:#a6e22e>SCHEMA</span>,
+</span></span><span style=display:flex><span>        ReleaseState::<span style=color:#66d9ef>new</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>addNode</span>(<span style=color:#e6db74>&#34;prepare_release&#34;</span>, child);</span></span></code></pre></div></div></div><p>父图和这种形式的子图共享同一个状态类型。在组合图之前，应明确状态所有权和收窄后的接口。不要为普通的确定性函数创建单独的、由模型协调的代理；这样会增加延迟、成本和非确定性，却不会改善控制流。</p><p>进程内子图不是独立的远程代理。<a href=/zh-cn/a2a-protocol/>A2A</a> 处理跨代理服务边界的通信。<a href=/mcp/>MCP</a> 向代理公开工具和资源。LangGraph4j 编排使用任一协议的 Java 工作流。</p><h2 id=langgraph4jlangchain4j-和-spring-ai>LangGraph4j、LangChain4j 和 Spring AI
+<a href=#langgraph4jlangchain4j-%e5%92%8c-spring-ai class=heading-anchor><span>#</span></a></h2><p>这些组件处于不同层次：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>组件</th><th>主要作用</th></tr></thead><tbody><tr><td>LangGraph4j</td><td>Java 状态图、路由、检查点、断点和执行</td></tr><tr><td>LangChain4j</td><td>Java 模型、消息、工具、检索和代理抽象</td></tr><tr><td>Spring AI</td><td>Spring 模型客户端、工具、RAG、向量存储、MCP 和可观测性</td></tr><tr><td>LangGraph4j Studio</td><td>图可视化、执行和调试 UI</td></tr></tbody></table></div></div><p>LangGraph4j 是受 LangGraph 启发的独立项目；它不是另一个运行时的即插即用实现，也不共享检查点或部署兼容性保证。</p><p>当 LangChain4j 或 Spring AI 的提供商适配器、消息抽象、工具或检索支持适合应用时，可以在图节点内使用它们。如果使用普通 Java 客户端更简单，则应直接使用。应用需要显式循环、有状态路由、持久检查点或受控暂停时，图运行时才有价值；基本聊天和检索不需要图运行时。</p><h2 id=部署和运维>部署和运维
+<a href=#%e9%83%a8%e7%bd%b2%e5%92%8c%e8%bf%90%e7%bb%b4 class=heading-anchor><span>#</span></a></h2><p>LangGraph4j 是嵌入 Java 服务的库，由团队构建和运营该服务。团队负责：</p><ul><li>检查点存储、迁移、保留和删除；</li><li>排队、并发限制、取消和超时；</li><li>身份验证和线程授权；</li><li>重试策略和幂等性；</li><li>流式端点和重连行为；</li><li>可观测性、告警和成本控制；</li><li>模型和工具凭据；以及</li><li>安全关闭和恢复。</li></ul><p>LangGraph4j 支持 Mermaid 和 PlantUML 图表示，并提供可嵌入的 Studio 项目用于可视化检查。这些功能对开发有帮助，但不能替代生产指标、跟踪、审计日志或授权检查。</p><p>将编译后的图注册为 Spring 单例时，应保持其节点和依赖项无状态且线程安全。每次运行的数据应放在图输入和检查点存储中，而不是放在单例的可变字段中。</p><h2 id=设计指南>设计指南
+<a href=#%e8%ae%be%e8%ae%a1%e6%8c%87%e5%8d%97 class=heading-anchor><span>#</span></a></h2><h3 id=将确定性决策保留在-java-中>将确定性决策保留在 Java 中
+<a href=#%e5%b0%86%e7%a1%ae%e5%ae%9a%e6%80%a7%e5%86%b3%e7%ad%96%e4%bf%9d%e7%95%99%e5%9c%a8-java-%e4%b8%ad class=heading-anchor><span>#</span></a></h3><p>使用模型进行语义分类和生成。对于授权、算术、配额、模式验证和不变量约束，应使用普通 Java 代码。</p><h3 id=使状态显式化>使状态显式化
+<a href=#%e4%bd%bf%e7%8a%b6%e6%80%81%e6%98%be%e5%bc%8f%e5%8c%96 class=heading-anchor><span>#</span></a></h3><p>将重要决策保存到命名字段中，而不是解析旧消息。记录每个字段由哪个节点负责，以及并发更新如何合并。</p><h3 id=为每个循环设置上限>为每个循环设置上限
+<a href=#%e4%b8%ba%e6%af%8f%e4%b8%aa%e5%be%aa%e7%8e%af%e8%ae%be%e7%bd%ae%e4%b8%8a%e9%99%90 class=heading-anchor><span>#</span></a></h3><p>跟踪尝试次数、模型调用、经过时间、令牌和工具调用。为每个循环设置终止条件和错误路径。</p><h3 id=使副作用具备幂等性>使副作用具备幂等性
+<a href=#%e4%bd%bf%e5%89%af%e4%bd%9c%e7%94%a8%e5%85%b7%e5%a4%87%e5%b9%82%e7%ad%89%e6%80%a7 class=heading-anchor><span>#</span></a></h3><p>重试和恢复是正常情况。对外部可见的副作用使用稳定的操作 ID 和权威记录。</p><h3 id=分离提议和执行>分离提议和执行
+<a href=#%e5%88%86%e7%a6%bb%e6%8f%90%e8%ae%ae%e5%92%8c%e6%89%a7%e8%a1%8c class=heading-anchor><span>#</span></a></h3><p>让模型提出操作。在由独立节点执行操作之前，先进行验证、授权并获取所需批准。</p><h3 id=只持久化可治理的数据>只持久化可治理的数据
+<a href=#%e5%8f%aa%e6%8c%81%e4%b9%85%e5%8c%96%e5%8f%af%e6%b2%bb%e7%90%86%e7%9a%84%e6%95%b0%e6%8d%ae class=heading-anchor><span>#</span></a></h3><p>对检查点应用保留、加密、删除和租户隔离规则。图状态可能包含提示词、个人数据、检索到的文档和工具结果。</p><h3 id=评估轨迹>评估轨迹
+<a href=#%e8%af%84%e4%bc%b0%e8%bd%a8%e8%bf%b9 class=heading-anchor><span>#</span></a></h3><p>即使图使用了错误的工具、检索了禁止访问的数据、进行了过多重试或忽略了必要审核，最终回答也可能看起来正确。除最终输出外，还应评估路由、状态转换、工具参数、证据、成本和延迟。</p><h3 id=对图和状态进行版本管理>对图和状态进行版本管理
+<a href=#%e5%af%b9%e5%9b%be%e5%92%8c%e7%8a%b6%e6%80%81%e8%bf%9b%e8%a1%8c%e7%89%88%e6%9c%ac%e7%ae%a1%e7%90%86 class=heading-anchor><span>#</span></a></h3><p>线程可以跨部署持续存在。后续版本可能重命名节点或更改状态模式，而已保存的检查点仍引用旧图。在更改生产图之前，应定义迁移和兼容性策略。</p><h2 id=不应使用-langgraph4j-的场景>不应使用 LangGraph4j 的场景
+<a href=#%e4%b8%8d%e5%ba%94%e4%bd%bf%e7%94%a8-langgraph4j-%e7%9a%84%e5%9c%ba%e6%99%af class=heading-anchor><span>#</span></a></h2><p>以下情况不要添加图运行时：</p><ul><li>一次模型调用已经足够；</li><li>简短的确定性流水线已经清晰；</li><li>普通 Spring AI 或 LangChain4j 代码已经满足需求；</li><li>传统工作流引擎已经负责持久化业务流程；</li><li>无需在请求之间保留状态；或</li><li>团队无法运营和评估额外的有状态系统。</li></ul><p>对于金融或履约流程，传统工作流引擎可以继续作为权威系统，而图负责执行有界的 AI 分析：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>durable business workflow
+</span></span><span style=display:flex><span>  -&gt; starts an AI analysis graph
+</span></span><span style=display:flex><span>  -&gt; receives a proposed decision
+</span></span><span style=display:flex><span>  -&gt; applies deterministic policy and approval
+</span></span><span style=display:flex><span>  -&gt; performs the authoritative transaction</span></span></code></pre></div></div></div><p>应选择能够表达所需控制流的最小抽象。当工作流确实需要分支、循环、暂停和恢复时，图很有价值；否则，它可能只是围绕已经清晰的代码构建了一个冗长的流程图。</p><h2 id=延伸阅读>延伸阅读
+<a href=#%e5%bb%b6%e4%bc%b8%e9%98%85%e8%af%bb class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://langgraph4j.github.io/langgraph4j/>LangGraph4j Documentation</a></li><li><a href=https://github.com/langgraph4j/langgraph4j>LangGraph4j Repository</a></li><li><a href=https://central.sonatype.com/artifact/org.bsc.langgraph4j/langgraph4j-core>LangGraph4j Releases on Maven Central</a></li><li><a href=https://github.com/langgraph4j/langgraph4j/tree/main/langgraph4j-postgres-saver>LangGraph4j Checkpoint Saver Modules</a></li><li><a href=https://docs.langchain4j.dev/>LangChain4j Documentation</a></li><li><a href=/spring-ai/>Spring AI</a></li><li><a href=/zh-cn/agentscope/>AgentScope</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/langgraph/ class=language-option data-lang=en>English
+</a><a href=/ja/langgraph/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/langgraph/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/langgraph/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

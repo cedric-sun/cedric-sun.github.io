@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Concurrency on cesun.life</title><link>https://example.org/zh-tw/tags/concurrency/</link><description>Recent content in Concurrency on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Mon, 02 Jan 2023 16:27:18 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/concurrency/index.xml" rel="self" type="application/rss+xml"/><item><title>快取與交錯記憶體存取</title><link>https://example.org/zh-tw/cache-and-interleaved-memory-access/</link><pubDate>Wed, 23 Aug 2023 00:00:00 +0000</pubDate><guid>https://example.org/zh-tw/cache-and-interleaved-memory-access/</guid><description>&lt;blockquote&gt;
+&lt;p&gt;如果一個執行緒設定已清零陣列中的所有奇數位元，而另一個執行緒設定所有偶數位元，記憶體中會包含什麼？&lt;/p&gt;
+&lt;/blockquote&gt;</description></item><item><title>Spring 執行緒池</title><link>https://example.org/zh-tw/spring-thread-pools/</link><pubDate>Mon, 02 Jan 2023 16:27:18 +0800</pubDate><guid>https://example.org/zh-tw/spring-thread-pools/</guid><description>&lt;p&gt;Spring 的 &lt;code&gt;TaskExecutor&lt;/code&gt; 抽象化工作提交。常見的 &lt;code&gt;ThreadPoolTaskExecutor&lt;/code&gt; 是受管理的 JavaBean 封裝器，包裝 &lt;code&gt;ThreadPoolExecutor&lt;/code&gt;；其執行緒池、佇列、拒絕與生命週期選擇仍決定系統容量。&lt;/p&gt;
+&lt;h2 id="定義與命名執行器"&gt;
+ 定義與命名執行器
+ &lt;a href="#%e5%ae%9a%e7%be%a9%e8%88%87%e5%91%bd%e5%90%8d%e5%9f%b7%e8%a1%8c%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;請依工作負載命名執行器，讓呼叫者選取預期的資源：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Bean&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;reportExecutor&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ThreadPoolTaskExecutor &lt;span style="color:#a6e22e"&gt;reportExecutor&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; executor &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ThreadPoolTaskExecutor();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setCorePoolSize&lt;/span&gt;(8);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setMaxPoolSize&lt;/span&gt;(24);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setQueueCapacity&lt;/span&gt;(100);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setKeepAliveSeconds&lt;/span&gt;(30);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setThreadNamePrefix&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;report-&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setRejectedExecutionHandler&lt;/span&gt;(
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ThreadPoolExecutor.&lt;span style="color:#a6e22e"&gt;CallerRunsPolicy&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; executor;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Spring 會將 &lt;code&gt;ThreadPoolTaskExecutor&lt;/code&gt; 作為受管理 bean 初始化並關閉。回傳其具體型別可保留生命週期設定與監控方法。不同延遲、阻塞、優先順序或下游容量需求的工作負載應使用分開的執行器隔離。&lt;/p&gt;
+&lt;h2 id="執行緒池佇列與飽和行為"&gt;
+ 執行緒池、佇列與飽和行為
+ &lt;a href="#%e5%9f%b7%e8%a1%8c%e7%b7%92%e6%b1%a0%e4%bd%87%e5%88%97%e8%88%87%e9%a3%bd%e5%92%8c%e8%a1%8c%e7%82%ba" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;底層執行器遵循特定的接納順序：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;建立工作者，直到達到 &lt;code&gt;corePoolSize&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;工作佇列接受新工作時，將工作排入佇列。&lt;/li&gt;
+&lt;li&gt;只有在佇列拒絕項目後，才建立工作者，直到達到 &lt;code&gt;maxPoolSize&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;執行緒池與佇列都飽和時，套用拒絕原則。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;因此，無界佇列會阻止大小超過核心值，並將過載轉化為持續增加的延遲與記憶體使用。有界佇列會使過載可觀察。&lt;code&gt;AbortPolicy&lt;/code&gt; 以例外拒絕，&lt;code&gt;CallerRunsPolicy&lt;/code&gt; 在提交執行緒上執行工作以施加反壓，而捨棄原則會遺失工作，需要明確的產品決策。&lt;/p&gt;
+&lt;p&gt;核心／最大大小、佇列容量與存活時間必須依據已量測的工作服務時間、阻塞比例、到達突發與下游限制。較大的執行緒池無法增加資料庫的連線容量。&lt;/p&gt;
+&lt;h2 id="async-選取與失敗"&gt;
+ &lt;code&gt;@Async&lt;/code&gt; 選取與失敗
+ &lt;a href="#async-%e9%81%b8%e5%8f%96%e8%88%87%e5%a4%b1%e6%95%97" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用 &lt;code&gt;@EnableAsync&lt;/code&gt; 啟用方法攔截。應用程式有多個執行器時，請選取具名執行器：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Async&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;reportExecutor&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; CompletableFuture&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Report&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;render&lt;/span&gt;(ReportRequest request) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; CompletableFuture.&lt;span style="color:#a6e22e"&gt;completedFuture&lt;/span&gt;(renderer.&lt;span style="color:#a6e22e"&gt;render&lt;/span&gt;(request));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;沒有註解限定詞時，基礎結構會尋找唯一的 &lt;code&gt;TaskExecutor&lt;/code&gt;，或名為 &lt;code&gt;taskExecutor&lt;/code&gt; 的 &lt;code&gt;Executor&lt;/code&gt; bean；&lt;code&gt;AsyncConfigurer&lt;/code&gt; 可以提供明確的預設值。以 Proxy 為基礎的 &lt;code&gt;@Async&lt;/code&gt; 具有與其他 Spring AOP 建議相同的自我呼叫限制。&lt;/p&gt;</description></item><item><title>Java 並行與執行器</title><link>https://example.org/zh-tw/java-concurrency-and-executors/</link><pubDate>Thu, 21 Oct 2021 19:20:35 +0800</pubDate><guid>https://example.org/zh-tw/java-concurrency-and-executors/</guid><description>&lt;p&gt;&lt;code&gt;Executor&lt;/code&gt; 將提交 &lt;code&gt;Runnable&lt;/code&gt; 與決定其執行位置分開。&lt;code&gt;ExecutorService&lt;/code&gt; 增加生命週期管理與 &lt;code&gt;submit&lt;/code&gt;；&lt;code&gt;Callable&amp;lt;V&amp;gt;&lt;/code&gt; 可以回傳值或擲出受檢查例外，而 &lt;code&gt;Future&amp;lt;V&amp;gt;&lt;/code&gt; 代表最終結果。&lt;code&gt;Future.get()&lt;/code&gt; 會建立工作完成前由工作執行之動作所需的可見性。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Future&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Result&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; future &lt;span style="color:#f92672"&gt;=&lt;/span&gt; pool.&lt;span style="color:#a6e22e"&gt;submit&lt;/span&gt;(() &lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt; compute(input));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;try&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; future.&lt;span style="color:#a6e22e"&gt;get&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;} &lt;span style="color:#66d9ef"&gt;catch&lt;/span&gt; (ExecutionException e) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;throw&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ServiceException(e.&lt;span style="color:#a6e22e"&gt;getCause&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;使用 &lt;code&gt;synchronized&lt;/code&gt;、&lt;code&gt;Lock&lt;/code&gt;、原子操作、並行集合或訊息傳遞來建立 happens-before 關係。執行器提供排程，但不會自動確保可變共用物件的安全性。&lt;/p&gt;
+&lt;h2 id="aqs-與同步器"&gt;
+ AQS 與同步器
+ &lt;a href="#aqs-%e8%88%87%e5%90%8c%e6%ad%a5%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;AbstractQueuedSynchronizer&lt;/code&gt;（AQS）是鎖、Semaphore、Latch 與相關同步器的框架。子類別會維護原子整數狀態，並實作取得／釋放嘗試。發生競爭時，AQS 會將等待執行緒加入 FIFO 風格的同步佇列，並以 &lt;code&gt;LockSupport&lt;/code&gt; 暫停它們；釋放時會喚醒符合條件的後繼者。Condition 使用相關的條件佇列，並在收到訊號時將等待者移回同步佇列。佇列順序本身不是普遍的公平性保證。&lt;/p&gt;
+&lt;h2 id="threadpoolexecutor-接納"&gt;
+ ThreadPoolExecutor 接納
+ &lt;a href="#threadpoolexecutor-%e6%8e%a5%e7%b4%8d" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;ThreadPoolExecutor&lt;/code&gt; 會先建立工作者，直到達到 &lt;code&gt;corePoolSize&lt;/code&gt;；接著將工作排入佇列；只有佇列拒絕工作時，才會向 &lt;code&gt;maximumPoolSize&lt;/code&gt; 增長；之後便拒絕工作。因此，無界的 &lt;code&gt;LinkedBlockingQueue&lt;/code&gt; 實際上會阻止執行緒數超過核心執行緒，而 &lt;code&gt;SynchronousQueue&lt;/code&gt; 會積極建立工作者，直到達到上限。核心大小以上的閒置工作者會在 &lt;code&gt;keepAliveTime&lt;/code&gt; 後終止；明確啟用時，核心執行緒也可能逾時。&lt;/p&gt;
+&lt;p&gt;根據工作負載證據、記憶體限制與下游系統容量選擇有界佇列並設定大小。工作者工廠會控制名稱、daemon 狀態與未捕捉例外處理。&lt;code&gt;AbortPolicy&lt;/code&gt; 會擲出例外，&lt;code&gt;CallerRunsPolicy&lt;/code&gt; 讓提交者執行工作以施加反壓，&lt;code&gt;DiscardPolicy&lt;/code&gt; 會捨棄工作，而 &lt;code&gt;DiscardOldestPolicy&lt;/code&gt; 會在重試前移除佇列中的工作。只有呼叫者可以容忍時，才可靜默捨棄工作。&lt;/p&gt;
+&lt;h2 id="生命週期取消與可見性"&gt;
+ 生命週期、取消與可見性
+ &lt;a href="#%e7%94%9f%e5%91%bd%e9%80%b1%e6%9c%9f%e5%8f%96%e6%b6%88%e8%88%87%e5%8f%af%e8%a6%8b%e6%80%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;cancel(true)&lt;/code&gt; 會將 &lt;code&gt;Future&lt;/code&gt; 標記為已取消，並在工作執行中時要求中斷；中斷是協作式的，因此阻塞操作必須傳播或恢復中斷狀態，而 CPU 密集工作必須輪詢它。取消不會回復副作用。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Netfilter on cesun.life</title><link>https://example.org/ja/tags/netfilter/</link><description>Recent content in Netfilter on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sun, 23 Aug 2026 11:46:28 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/netfilter/index.xml" rel="self" type="application/rss+xml"/><item><title>iptables と nftables による Linux パケットフィルタリング</title><link>https://example.org/ja/linux-iptables-and-nftables/</link><pubDate>Sun, 23 Aug 2026 11:46:28 +0800</pubDate><guid>https://example.org/ja/linux-iptables-and-nftables/</guid><description>&lt;p&gt;Linux のパケットフィルタリングは、ネットワークスタックにフックを公開するカーネルフレームワーク &lt;strong&gt;Netfilter&lt;/strong&gt; によって実装されています。&lt;code&gt;iptables&lt;/code&gt; と &lt;code&gt;nftables&lt;/code&gt; は独立したファイアウォールではありません。これらは、各フックでパケットの分類とアクションをプログラミングするためのユーザー空間インターフェースです。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;iptables&lt;/code&gt; は歴史的なインターフェースです。&lt;code&gt;nft&lt;/code&gt; コマンドで設定するネイティブな &lt;code&gt;nftables&lt;/code&gt; は、個別に存在していた &lt;code&gt;iptables&lt;/code&gt;、&lt;code&gt;ip6tables&lt;/code&gt;、&lt;code&gt;arptables&lt;/code&gt;、&lt;code&gt;ebtables&lt;/code&gt; のルール管理モデルを、1 つの言語と 1 つの Netlink API に置き換えます。互換ツールは、iptables 構文を受け付けながら nftables カーネルバックエンドへ書き込むこともできるため、コマンド名だけでは実際に有効な実装を判別できません。&lt;/p&gt;
+&lt;h2 id="netfilter-のパケットフロー"&gt;
+ Netfilter のパケットフロー
+ &lt;a href="#netfilter-%e3%81%ae%e3%83%91%e3%82%b1%e3%83%83%e3%83%88%e3%83%95%e3%83%ad%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;パケットがネットワークスタックを通過すると、Netfilter は登録済みの処理を呼び出します。&lt;/p&gt;
+&lt;div
+ class="goat svg-container goat--sized" style="--goat-width: 80%;"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 640 329"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 0,0 L 104,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 184,0 L 288,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 304,0 L 432,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 496,0 L 624,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 104,16 L 176,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,32 L 104,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 184,32 L 288,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 304,32 L 368,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 368,32 L 432,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 496,32 L 560,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 560,32 L 624,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,112 L 408,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,144 L 368,144' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 368,144 L 408,144' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,192 L 584,192' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,224 L 456,224' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 456,224 L 584,224' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 400,272 L 512,272' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 400,304 L 512,304' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,0 L 0,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 104,0 L 104,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 104,16 L 104,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 184,0 L 184,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 288,0 L 288,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 288,16 L 288,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 304,0 L 304,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,112 L 328,144' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,192 L 328,224' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 368,32 L 368,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 368,80 L 368,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 368,144 L 368,176' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 400,272 L 400,304' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 408,112 L 408,144' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 456,224 L 456,256' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 496,0 L 496,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 512,272 L 512,304' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 560,32 L 560,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 560,80 L 560,176' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 584,192 L 584,224' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 624,0 L 624,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='184.000000,16.000000 172.000000,10.400000 172.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 176.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='304.000000,16.000000 292.000000,10.400000 292.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 296.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 368,96 L 368,104' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='384.000000,96.000000 372.000000,90.400002 372.000000,101.599998' fill='currentColor' transform='rotate(90.000000, 368.000000, 96.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 368,176 L 368,184' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='384.000000,176.000000 372.000000,170.399994 372.000000,181.600006' fill='currentColor' transform='rotate(90.000000, 368.000000, 176.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 456,256 L 456,264' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='472.000000,256.000000 460.000000,250.399994 460.000000,261.600006' fill='currentColor' transform='rotate(90.000000, 456.000000, 256.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 560,176 L 560,184' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='576.000000,176.000000 564.000000,170.399994 564.000000,181.600006' fill='currentColor' transform='rotate(90.000000, 560.000000, 176.000000)'&gt;&lt;/polygon&gt;
+&lt;text text-anchor='middle' x='16' y='20' fill='currentColor' style='font-size:1em'&gt;N&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='20' fill='currentColor' style='font-size:1em'&gt;w&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='20' fill='currentColor' style='font-size:1em'&gt;k&lt;/text&gt;
+&lt;text text-anchor='middle' x='80' y='20' fill='currentColor' style='font-size:1em'&gt;I&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='4' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='4' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='4' fill='currentColor' style='font-size:1em'&gt;g&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='4' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='4' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='4' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='4' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='20' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='20' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='20' fill='currentColor' style='font-size:1em'&gt;g&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='20' fill='currentColor' style='font-size:1em'&gt;R&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='20' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='68' fill='currentColor' style='font-size:1em'&gt;f&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='132' fill='currentColor' style='font-size:1em'&gt;f&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='68' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='132' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='68' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='132' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='20' fill='currentColor' style='font-size:1em'&gt;D&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='68' fill='currentColor' style='font-size:1em'&gt;w&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='132' fill='currentColor' style='font-size:1em'&gt;w&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='68' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='132' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='20' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='68' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='132' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='68' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='132' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='408' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='212' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='292' fill='currentColor' style='font-size:1em'&gt;N&lt;/text&gt;
+&lt;text text-anchor='middle' x='424' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='424' y='212' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='424' y='292' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='432' y='20' fill='currentColor' style='font-size:1em'&gt;+&lt;/text&gt;
+&lt;text text-anchor='middle' x='432' y='212' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='432' y='292' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='440' y='20' fill='currentColor' style='font-size:1em'&gt;-&lt;/text&gt;
+&lt;text text-anchor='middle' x='440' y='212' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='440' y='292' fill='currentColor' style='font-size:1em'&gt;w&lt;/text&gt;
+&lt;text text-anchor='middle' x='448' y='4' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='448' y='20' fill='currentColor' style='font-size:1em'&gt;-&lt;/text&gt;
+&lt;text text-anchor='middle' x='448' y='212' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='448' y='292' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='456' y='4' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='456' y='20' fill='currentColor' style='font-size:1em'&gt;-&lt;/text&gt;
+&lt;text text-anchor='middle' x='456' y='212' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='456' y='292' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='464' y='4' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='464' y='20' fill='currentColor' style='font-size:1em'&gt;-&lt;/text&gt;
+&lt;text text-anchor='middle' x='464' y='212' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='464' y='292' fill='currentColor' style='font-size:1em'&gt;k&lt;/text&gt;
+&lt;text text-anchor='middle' x='472' y='4' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='472' y='20' fill='currentColor' style='font-size:1em'&gt;-&lt;/text&gt;
+&lt;text text-anchor='middle' x='472' y='212' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='480' y='4' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='480' y='20' fill='currentColor' style='font-size:1em'&gt;-&lt;/text&gt;
+&lt;text text-anchor='middle' x='480' y='212' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='480' y='292' fill='currentColor' style='font-size:1em'&gt;O&lt;/text&gt;
+&lt;text text-anchor='middle' x='488' y='20' fill='currentColor' style='font-size:1em'&gt;&amp;gt;&lt;/text&gt;
+&lt;text text-anchor='middle' x='488' y='212' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='488' y='292' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='496' y='212' fill='currentColor' style='font-size:1em'&gt;g&lt;/text&gt;
+&lt;text text-anchor='middle' x='496' y='292' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='512' y='20' fill='currentColor' style='font-size:1em'&gt;L&lt;/text&gt;
+&lt;text text-anchor='middle' x='520' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='528' y='20' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='536' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='544' y='20' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='544' y='68' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='552' y='68' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='560' y='20' fill='currentColor' style='font-size:1em'&gt;P&lt;/text&gt;
+&lt;text text-anchor='middle' x='560' y='68' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='568' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='568' y='68' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='576' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='576' y='68' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='584' y='20' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='584' y='68' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='592' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='600' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='608' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;p&gt;ルーティングの判断によって、パケットが通る経路が決まります。&lt;/p&gt;</description></item><item><title>Linux ネットワーキング</title><link>https://example.org/ja/linux-networking/</link><pubDate>Wed, 17 Jun 2026 09:53:22 +0800</pubDate><guid>https://example.org/ja/linux-networking/</guid><description>&lt;p&gt;Linux は、ネットワーク名前空間を認識するインターフェースを通じてネットワーク状態を公開します。Linux 2.6.25 以降、
+&lt;code&gt;/proc/net&lt;/code&gt; は &lt;code&gt;/proc/self/net&lt;/code&gt; への互換性シンボリックリンクであるため、読み取りを行うプロセスの
+ネットワーク名前空間を示します。現在のツールは通常、procfs を解析する代わりに Netlink を使用します。&lt;/p&gt;
+&lt;h2 id="ルートと-netlink"&gt;
+ ルートと Netlink
+ &lt;a href="#%e3%83%ab%e3%83%bc%e3%83%88%e3%81%a8-netlink" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;IPv4 転送情報ベース（FIB）は、パケットの送信先を決定します。
+&lt;code&gt;/proc/net/route&lt;/code&gt; はその歴史的なビューです。一方、&lt;code&gt;ip route&lt;/code&gt; は Netlink を通じてカーネルに問い合わせ、
+カーネルの設定を変更します。Netlink はメッセージ指向ソケットのファミリーであり、新しいシステムコールを
+追加せずに、ユーザー空間からカーネルサブシステムを設定および検査できるようにします。
+ルーティング、リンク、アドレス、近隣、トラフィック制御、Netfilter はすべてこれを使用します。&lt;/p&gt;
+&lt;h2 id="netfilter-と-iptables"&gt;
+ Netfilter と iptables
+ &lt;a href="#netfilter-%e3%81%a8-iptables" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Netfilter は、ネットワークスタックにおけるパケット処理フックを提供します。&lt;code&gt;iptables&lt;/code&gt; は IPv4 用の
+従来のユーザー空間ルール管理ツールです（IPv6 には &lt;code&gt;ip6tables&lt;/code&gt; を使用します）。現在のシステムでは一般に
+nftables が使用されますが、その互換性レイヤーは引き続き iptables 構文を受け付けることができます。&lt;/p&gt;
+&lt;p&gt;重要な iptables テーブルは次のとおりです。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;filter&lt;/code&gt; はデフォルトのフィルタリングテーブルで、&lt;code&gt;INPUT&lt;/code&gt;、&lt;code&gt;FORWARD&lt;/code&gt;、&lt;code&gt;OUTPUT&lt;/code&gt; チェーンを持ちます。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;nat&lt;/code&gt; は接続の最初のパケットに対してアドレスまたはポートの変換を行い、&lt;code&gt;PREROUTING&lt;/code&gt;、&lt;code&gt;INPUT&lt;/code&gt;、
+&lt;code&gt;OUTPUT&lt;/code&gt;、&lt;code&gt;POSTROUTING&lt;/code&gt; チェーンを持ちます。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;mangle&lt;/code&gt; は複数のフックで、特殊なパケットフィールドを変更します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;raw&lt;/code&gt; はコネクション追跡より前に実行され、&lt;code&gt;NOTRACK&lt;/code&gt; によってトラフィックを除外できます。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;security&lt;/code&gt; は &lt;code&gt;filter&lt;/code&gt; テーブルの後に強制アクセス制御ラベルを適用し、SELinux および関連する
+Linux Security Module ポリシーに使用されます。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;ルールはチェーンの順序に従って評価されます。&lt;code&gt;INPUT&lt;/code&gt; はローカルソケット宛てのパケットに適用され、
+&lt;code&gt;FORWARD&lt;/code&gt; はルーティングされたトラフィックに、&lt;code&gt;OUTPUT&lt;/code&gt; はローカルで生成されたパケットに適用されます。
+コネクション追跡により、後続のパケットはそのフローに対して決定された処理に従うことができます。&lt;/p&gt;</description></item></channel></rss>

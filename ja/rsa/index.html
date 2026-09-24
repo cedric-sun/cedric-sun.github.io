@@ -1,0 +1,81 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>RSA暗号化と署名</title></head><body><main><article><div class=article-header><h1>RSA暗号化と署名</h1><div class=aux>最終更新: 2025-05-10 18:23:26 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/cryptography/>Cryptography</a>
+|
+<a href=/ja/tags/rsa/>Rsa</a></div></div><div class="translation-notice machine-translated"><a href=/rsa/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>RSAは、合成数を法とする整数上のトラップドア演算を定義します。
+教科書的RSAは決定的で、改変可能性があり、構造的に安全でないため、
+安全なシステムでは、標準化された暗号化方式または署名方式を通してのみ
+これらの演算を使用します。</p><h2 id=鍵生成>鍵生成
+<a href=#%e9%8d%b5%e7%94%9f%e6%88%90 class=heading-anchor><span>#</span></a></h2><p>RSA鍵生成器は、異なる、独立して生成された確率的素数 <code>p</code> と <code>q</code> を取得し、
+次を計算します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>n      = p * q
+</span></span><span style=display:flex><span>phi(n) = (p - 1) * (q - 1)
+</span></span><span style=display:flex><span>lambda = lcm(p - 1, q - 1)</span></span></code></pre></div></div></div><p>法 <code>n</code> が鍵サイズを決定します。生成規格は、素数のサイズ、差、素数判定、
+乱数ビット生成に追加条件を課します。小さな素数による試し割りに合格した
+だけの二つの値を選ぶのでは不十分です。アプリケーションは素数を自力で
+生成せず、承認されたライブラリの鍵生成器を呼び出すべきです。</p><p>公開指数 <code>e</code> は <code>gcd(e, lambda) = 1</code> を満たすように選びます。慣例的には <code>65537</code> を
+選びます。秘密指数は、そのモジュラ逆数です。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>e * d = 1 (mod lambda)</span></span></code></pre></div></div></div><p><code>phi(n)</code> をカーマイケル値 <code>lambda</code> の代わりに使用しても、PKCS #1 の条件下で
+正しい逆数を生成できます。公開鍵には <code>(n, e)</code> が含まれます。秘密鍵は通常、
+<code>p</code>、<code>q</code>、<code>d</code>、および中国剰余定理（CRT）の値を保持します。</p><h2 id=秘密鍵演算とcrt>秘密鍵演算とCRT
+<a href=#%e7%a7%98%e5%af%86%e9%8d%b5%e6%bc%94%e7%ae%97%e3%81%a8crt class=heading-anchor><span>#</span></a></h2><p>公開代表元 <code>m</code> と暗号文代表元 <code>c</code> は、RSAプリミティブによって次のように
+関係付けられます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>c = m^e mod n
+</span></span><span style=display:flex><span>m = c^d mod n</span></span></code></pre></div></div></div><p>秘密鍵演算では、<code>p</code> と <code>q</code> を法として別々に計算し、CRTで結果を再結合できます。
+この最適化は大幅に高速ですが、一方の分岐での障害によって <code>n</code> の因数が
+露出する可能性があります。したがって、暗号ライブラリはCRTの保護策と、
+RSAブラインディングや結果検証などの実装上の対策を組み合わせます。</p><p>攻撃者が選択した暗号文または署名をデバイスに送信できる場合、タイミング、
+キャッシュ、電力、および故障時の挙動も脅威モデルに含まれます。定数時間性と
+サイドチャネル耐性は実装の性質であり、RSA方程式から生じる性質ではありません。</p><h2 id=安全性の仮定と鍵サイズ>安全性の仮定と鍵サイズ
+<a href=#%e5%ae%89%e5%85%a8%e6%80%a7%e3%81%ae%e4%bb%ae%e5%ae%9a%e3%81%a8%e9%8d%b5%e3%82%b5%e3%82%a4%e3%82%ba class=heading-anchor><span>#</span></a></h2><p><code>p</code> と <code>q</code> が既知なら秘密鍵演算を容易に復元できるため、法の素因数分解は
+十分な攻撃になります。しかし、すべてのRSAベース方式の解読が素因数分解と
+厳密に等価であることを確立した証明はありません。安全性の議論は、
+RSA問題、符号化方式、ハッシュ関数、乱数、および攻撃モデルにも依存します。</p><p>現行のNIST移行ガイダンスでは、112ビットの古典的安全性強度に対して、
+少なくとも2,048ビットのRSA法を許容しています。3,072ビットの法は、
+約128ビットの強度に対応します。プロトコルやコンプライアンス要件によって、
+さらに大きなサイズが要求されたり、新規用途でRSAが禁止されたりする場合が
+あります。鍵を大きくするとCPU、帯域幅、証明書サイズの負担が増えますが、
+脆弱なパディング方式や侵害された実装は修復されません。</p><p>RSA自体は前方秘匿性を提供しません。TLS 1.3はRSA鍵輸送を廃止し、一時的な
+(EC)DHEによってトラフィック秘密を確立します。RSA証明書は、許可された
+RSA-PSS署名を使用して、引き続きTLS 1.3エンドポイントを認証できます。</p><h2 id=oaep暗号化>OAEP暗号化
+<a href=#oaep%e6%9a%97%e5%8f%b7%e5%8c%96 class=heading-anchor><span>#</span></a></h2><p>RSAES-OAEPは、公開RSA演算を適用する前に、ハッシュ、マスク生成関数、
+ラベル、およびランダムシードを用いてメッセージを符号化します。
+法を <code>k</code> オクテット、ハッシュ出力を <code>hLen</code> オクテットで表す場合、
+平文の上限は次のとおりです。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>mLen &lt;= k - 2*hLen - 2</span></span></code></pre></div></div></div><p>したがって、OAEPは大量データではなく、ランダム生成された対称鍵などの
+短い値を対象とします。ハイブリッドプロトコルはコンテンツ暗号鍵を
+カプセル化または転送し、実際のペイロードを認証付き暗号で保護します。
+完全なハイブリッド構成はプロトコル標準に従う必要があります。
+RSAES-OAEP単体ではアプリケーションデータを認証しません。</p><p>OAEPパラメーターはアルゴリズム識別子の一部です。両エンドポイントは、
+ハッシュ、マスク生成用ハッシュ、およびラベルについて合意する必要があります。
+あるAPIのライブラリ既定値は別のAPIの既定値と一致しない可能性があるため、
+プロトコルで明示しなければなりません。</p><h2 id=pss署名>PSS署名
+<a href=#pss%e7%bd%b2%e5%90%8d class=heading-anchor><span>#</span></a></h2><p>RSASSA-PSSはメッセージをハッシュし、ソルトを取り込み、マスク生成関数を
+適用して、秘密RSA演算の前に結果を法の幅に符号化します。検証では公開演算を
+逆向きにたどり、すべてのフィールドを検証します。ソルト長、メッセージ
+ハッシュ、およびマスク生成用ハッシュは明示的なパラメーターです。</p><p>RSA署名が必要な新規プロトコルではPSSを使用すべきです。PKCS #1 v1.5の
+暗号化および署名の符号化は一部のレガシープロトコルで依然として必要ですが、
+互換性は新規設計でそれらを選択する理由にはなりません。検証器は、
+プロトコルで識別された方式を正確に実装し、不正な形式または範囲外の
+代表元を拒否する必要があります。</p><h2 id=整数asn1pemの符号化>整数、ASN.1、PEMの符号化
+<a href=#%e6%95%b4%e6%95%b0asn1pem%e3%81%ae%e7%ac%a6%e5%8f%b7%e5%8c%96 class=heading-anchor><span>#</span></a></h2><p>PKCS #1は、非負整数と固定長ビッグエンディアン・オクテット文字列との間で
+変換する <code>I2OSP</code> と <code>OS2IP</code> を定義します。方式が正確に <code>k</code> オクテットを
+要求する場合、先頭のゼロ・オクテットにも意味があります。ASN.1 DERの
+INTEGER値は符号付きであるため、最上位ビットが立っている正のRSA整数には
+先頭に <code>00</code> オクテットが付きます。これらの規則を混同すると、値が切り詰め
+られる、負になる、または誤った幅になります。</p><p>一般的なコンテナーは、それぞれ異なる構造を持ちます。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>コンテナー</th><th>内容</th></tr></thead><tbody><tr><td>PKCS #1 <code>RSAPublicKey</code></td><td>法と公開指数</td></tr><tr><td>X.509 <code>SubjectPublicKeyInfo</code></td><td>アルゴリズム識別子と符号化された公開鍵</td></tr><tr><td>PKCS #1 <code>RSAPrivateKey</code></td><td>法、指数、素数、およびCRTパラメーター</td></tr><tr><td>PKCS #8 <code>PrivateKeyInfo</code> または <code>OneAsymmetricKey</code></td><td>アルゴリズムタグ付き秘密鍵</td></tr><tr><td>X.509証明書</td><td>サブジェクト識別情報、発行者署名、拡張、および <code>SubjectPublicKeyInfo</code></td></tr></tbody></table></div></div><p>PEMは、DER値をテキストラベルとBase64アーマーで囲みます。したがって、
+<code>PUBLIC KEY</code> と <code>RSA PUBLIC KEY</code> のようなラベルは、それぞれ異なるASN.1構造を
+識別します。場当たり的なBase64処理とバイトスライスで整数を取り出さず、
+保守されているライブラリで期待するコンテナーを解析してください。</p><h2 id=教科書的rsaとパディングオラクルの排除>教科書的RSAとパディングオラクルの排除
+<a href=#%e6%95%99%e7%a7%91%e6%9b%b8%e7%9a%84rsa%e3%81%a8%e3%83%91%e3%83%87%e3%82%a3%e3%83%b3%e3%82%b0%e3%82%aa%e3%83%a9%e3%82%af%e3%83%ab%e3%81%ae%e6%8e%92%e9%99%a4 class=heading-anchor><span>#</span></a></h2><p>教科書的RSAは、モジュラ累乗を直接適用します。平文の同一性を漏らし、
+代数的な改変を許し、完全性検査もありません。「秘密鍵でハッシュを暗号化して
+署名する」と説明される例を含め、暗号化にも署名にも決して使用しないでください。</p><p>復号処理では、失敗原因が暗号文の範囲、OAEP構造、ラベルハッシュ、区切り文字、
+後段の平文解析のいずれであるかを明らかにしてはなりません。攻撃者から観測可能な
+異なるエラー、応答時間、再試行動作、またはログは、パディングオラクルを形成する
+可能性があります。オラクル耐性のある復号を実装したライブラリを使用し、
+外部から観測できる失敗時の挙動を均一に保ち、外側のプロトコルを認証してください。
+いかなる失敗後も、部分的に復号された平文を返してはなりません。</p><h2 id=参考文献>参考文献
+<a href=#%e5%8f%82%e8%80%83%e6%96%87%e7%8c%ae class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc8017>RFC 8017: PKCS #1 v2.2</a></li><li><a href=https://csrc.nist.gov/pubs/fips/186-5/final>FIPS 186-5: デジタル署名規格</a></li><li><a href=https://csrc.nist.gov/pubs/sp/800/56/b/r2/final>NIST SP 800-56B Rev. 2: 整数因数分解暗号を用いるペア単位の鍵確立方式</a></li><li><a href=https://csrc.nist.gov/pubs/sp/800/131/a/r2/final>NIST SP 800-131A Rev. 2: 暗号アルゴリズムと鍵長の利用移行</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc8446>RFC 8446: TLS 1.3</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc7468>RFC 7468: PKIX、PKCS、およびCMS構造のテキスト符号化</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/rsa/ class=language-option data-lang=en>English
+</a><a href=/ja/rsa/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/rsa/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/rsa/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,21 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Helm 运维与 Argo CD 迁移</title></head><body><main><article><div class=article-header><h1>Helm 运维与 Argo CD 迁移</h1><div class=aux>最后更新: 2021-11-05 13:57:33 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/argocd/>Argocd</a>
+|
+<a href=/zh-cn/tags/gitops/>Gitops</a>
+|
+<a href=/zh-cn/tags/helm/>Helm</a>
+|
+<a href=/zh-cn/tags/kubernetes/>Kubernetes</a></div></div><div class="translation-notice machine-translated"><a href=/helm-operations-and-argocd-migrations/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>将静态 Kubernetes 清单迁移到 Helm，再迁移到 Argo CD，不仅会改变模板化方式，也会改变所有权。应盘点线上资源，保留不可变名称和存储，并在启用自动修剪前使期望状态可复现。</p><h2 id=了解-helm-的发布模型>了解 Helm 的发布模型
+<a href=#%e4%ba%86%e8%a7%a3-helm-%e7%9a%84%e5%8f%91%e5%b8%83%e6%a8%a1%e5%9e%8b class=heading-anchor><span>#</span></a></h2><p>对于直接的 Helm 发布，升级会比较之前的发布清单、新渲染的清单和线上对象。两个清单中都存在的资源会在其字段允许时更新；只存在于新清单中的资源会被创建；从 chart 中移除的资源通常会被删除。不可变字段可能需要明确的替换策略。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>helm upgrade --install web ./chart <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --namespace web --create-namespace <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --values environments/production.yaml <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --dry-run --debug</span></span></code></pre></div></div></div><p>在既有工具链提供 <code>helm diff</code> 时使用它，并在升级后检查 <code>helm get manifest</code> 和
+<code>helm history</code>。<code>helm.sh/resource-policy: keep</code> 注解可以在卸载期间保留资源，但这应是有意作出的生命周期决策，而不是通用的安全措施。</p><h2 id=增量迁移静态清单>增量迁移静态清单
+<a href=#%e5%a2%9e%e9%87%8f%e8%bf%81%e7%a7%bb%e9%9d%99%e6%80%81%e6%b8%85%e5%8d%95 class=heading-anchor><span>#</span></a></h2><p>首先从源代码管理中获取实际的期望规格，并将其与线上对象比较。只将真正的环境差异（镜像版本、主机名、资源限制、存储类）参数化，而不要参数化每个字段。渲染 chart，并将其与现有资源比较。</p><p>首次迁移期间，保持稳定的 <code>metadata.name</code>、命名空间、选择器和持久卷声明名称。更改选择器可能使 Pod 无法归属；更改 PVC 名称会创建新的声明，并不会移动数据。对于有状态工作负载，在发生任何所有权转换前，应在非生产集群中演练备份、恢复和回滚流程。</p><h2 id=安全地移交给-argo-cd>安全地移交给 Argo CD
+<a href=#%e5%ae%89%e5%85%a8%e5%9c%b0%e7%a7%bb%e4%ba%a4%e7%bb%99-argo-cd class=heading-anchor><span>#</span></a></h2><p>当 Argo CD 渲染 Helm chart 时，避免针对同一资源运行单独的 <code>helm upgrade</code>。配置
+<code>Application</code>，验证渲染后的清单和差异，先在不修剪的情况下同步，然后仅在应用健康且作用域中没有无关资源后启用修剪。</p><p>对于资源重命名或带有删除保护的依赖图，应使用分阶段迁移：</p><ol><li>添加新资源，同时保留旧资源；</li><li>更新消费者并等待健康检查；</li><li>移除旧的依赖项；</li><li>在后续同步中移除旧的父资源。</li></ol><p>Argo CD 同步波可以对普通的应用和修剪顺序进行排序，但当涉及数据迁移、准入 Webhook
+或外部客户端时，分阶段变更更清晰。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/helm-operations-and-argocd-migrations/ class=language-option data-lang=en>English
+</a><a href=/ja/helm-operations-and-argocd-migrations/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/helm-operations-and-argocd-migrations/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/helm-operations-and-argocd-migrations/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

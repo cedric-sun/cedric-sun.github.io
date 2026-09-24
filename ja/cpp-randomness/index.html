@@ -1,0 +1,57 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>C++ 乱数機能</title></head><body><main><article><div class=article-header><h1>C++ 乱数機能</h1><div class=aux>最終更新: 2024-10-30 00:23:14 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/c-plus-plus/>C-Plus-Plus</a>
+|
+<a href=/ja/tags/standard-library/>Standard-Library</a></div></div><div class="translation-notice machine-translated"><a href=/cpp-randomness/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>C++ の乱数ライブラリは、決定論的な <strong>エンジン</strong> と <strong>分布</strong> を分離します。エンジンは
+指定された出力範囲で一様分布する値の列を生成します。分布はエンジンの出力を消費し、
+要求された統計分布へ写像します。状態を継続する必要がある場合は、両方のオブジェクトを
+存続させます。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;random&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>std<span style=color:#f92672>::</span>mt19937_64 engine{std<span style=color:#f92672>::</span>random_device{}()};
+</span></span><span style=display:flex><span>std<span style=color:#f92672>::</span>uniform_int_distribution<span style=color:#f92672>&lt;</span><span style=color:#66d9ef>int</span><span style=color:#f92672>&gt;</span> die{<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>6</span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>int</span> roll <span style=color:#f92672>=</span> die(engine); <span style=color:#75715e>// Both engine and distribution may advance state.
+</span></span></span></code></pre></div></div></div><p><code>std::mt19937</code> と <code>std::mt19937_64</code> は擬似乱数エンジンです。固定した初期状態から
+再現可能な列を生成します。<code>std::default_random_engine</code> は実装定義のため、テスト、
+ファイル、プロトコルで実装間の同じ列が必要な場合には適しません。</p><h2 id=要件に応じてシードを設定する>要件に応じてシードを設定する
+<a href=#%e8%a6%81%e4%bb%b6%e3%81%ab%e5%bf%9c%e3%81%98%e3%81%a6%e3%82%b7%e3%83%bc%e3%83%89%e3%82%92%e8%a8%ad%e5%ae%9a%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>決定論的なテストでは、文書化された明示的なシードを使用します。生成データを再現する
+必要がある場合は、テスト失敗時にシードを記録します。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span>std<span style=color:#f92672>::</span>mt19937 engine{<span style=color:#ae81ff>0x5EEDu</span>};</span></span></code></pre></div></div></div><p><code>std::random_device</code> は、実装に適切なソースがある場合に非決定的な乱数を提供する
+ことを意図していますが、実装が決定論的なフォールバックを提供することもあります。
+<code>entropy()</code> の値は推定値であり、推定できない場合は 0 になることがあります。
+したがって <code>random_device</code> は非暗号シミュレーションの最善努力によるシードソースには
+適していますが、移植可能な暗号学的安全性の保証にはなりません。鍵、トークン、
+salt、nonce には、オペレーティングシステムの暗号乱数 API または検証済みの暗号
+ライブラリを使用します。</p><p><code>std::seed_seq</code> は複数のソースワードをエンジン状態へ展開できます。独立したストリーム
+が必要な場合、長寿命の複数エンジンに同じ小さな整数をシードしないでください。代わり
+にストリーム割り当てポリシーを確立して文書化します。</p><h2 id=分布は剰余バイアスなしで範囲内の値を生成する>分布は剰余バイアスなしで範囲内の値を生成する
+<a href=#%e5%88%86%e5%b8%83%e3%81%af%e5%89%b0%e4%bd%99%e3%83%90%e3%82%a4%e3%82%a2%e3%82%b9%e3%81%aa%e3%81%97%e3%81%a7%e7%af%84%e5%9b%b2%e5%86%85%e3%81%ae%e5%80%a4%e3%82%92%e7%94%9f%e6%88%90%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>Use the distribution that expresses the desired result:</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span>std<span style=color:#f92672>::</span>uniform_int_distribution<span style=color:#f92672>&lt;</span><span style=color:#66d9ef>int</span><span style=color:#f92672>&gt;</span> index{<span style=color:#ae81ff>0</span>, <span style=color:#66d9ef>static_cast</span><span style=color:#f92672>&lt;</span><span style=color:#66d9ef>int</span><span style=color:#f92672>&gt;</span>(size <span style=color:#f92672>-</span> <span style=color:#ae81ff>1</span>)};
+</span></span><span style=display:flex><span>std<span style=color:#f92672>::</span>bernoulli_distribution enabled{<span style=color:#ae81ff>0.25</span>};
+</span></span><span style=display:flex><span>std<span style=color:#f92672>::</span>normal_distribution<span style=color:#f92672>&lt;</span><span style=color:#66d9ef>double</span><span style=color:#f92672>&gt;</span> noise{<span style=color:#ae81ff>0.0</span>, <span style=color:#ae81ff>1.0</span>};</span></span></code></pre></div></div></div><p><code>uniform_int_distribution</code> の境界は両端を含みます。動的な境界は構築またはパラメーター
+化する前に検証します。<code>a > b</code> の範囲は分布の事前条件に違反します。エンジンの出力
+範囲が <code>n</code> で割り切れない限り、範囲内の一様結果に <code>engine() % n</code> を使わないで
+ください。そうしないと、一部の剰余がより頻繁に現れます。標準分布は指定された分布
+に必要な棄却または写像処理を実行します。</p><p>分布はエンジンと交換可能ではありません。分布は状態を保持できます。たとえば正規分布
+の実装が生成値をキャッシュすることがあります。そのため、シミュレーションの再現性
+要件に応じて分布状態を保持またはリセットします。</p><h2 id=寿命再現性シリアライズ>寿命、再現性、シリアライズ
+<a href=#%e5%af%bf%e5%91%bd%e5%86%8d%e7%8f%be%e6%80%a7%e3%82%b7%e3%83%aa%e3%82%a2%e3%83%a9%e3%82%a4%e3%82%ba class=heading-anchor><span>#</span></a></h2><p>エンジンを値渡しすると、意図的に別の列状態が作成されます。ヘルパーが呼び出し側の
+列を進める必要がある場合は、参照渡しします。</p><div class=jose-wrapper><div class=jose-tools><span>cpp</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-cpp data-lang=cpp><span style=display:flex><span><span style=color:#66d9ef>int</span> <span style=color:#a6e22e>roll_die</span>(std<span style=color:#f92672>::</span>mt19937_64<span style=color:#f92672>&amp;</span> engine) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>static</span> std<span style=color:#f92672>::</span>uniform_int_distribution<span style=color:#f92672>&lt;</span><span style=color:#66d9ef>int</span><span style=color:#f92672>&gt;</span> die{<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>6</span>};
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> die(engine);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>static</code> 分布は、呼び出しが同期されている場合にだけ安全です。可変状態を持つ可能性が
+あります。シミュレーションごとにパラメーターまたは状態が異なる場合は、分布の所有権
+を明示する方が適切です。</p><p>標準エンジンは状態の書式付きストリーム入出力をサポートし、同じ標準エンジン仕様内で
+チェックポイントを可能にします。シリアライズした状態とともに、エンジン型、シード
+ポリシー、分布パラメーターを保存します。シリアライズされた列は暗号秘密の保管場所
+ではなく、選択したエンジンと実装環境の保証を超えるバージョン間再現性をプロジェクト
+が主張してはなりません。</p><h2 id=並行性>並行性
+<a href=#%e4%b8%a6%e8%a1%8c%e6%80%a7 class=heading-anchor><span>#</span></a></h2><p>エンジンと分布のオブジェクトは可変状態であり、同期せずに同時変更してはなりません。
+ストリームが独立している場合は各スレッドに専用のエンジンと分布を与え、1 つの順序
+付き列が必要な場合は共有ジェネレーターを mutex で保護します。スレッドローカル
+ジェネレーターには意図的なシードポリシーが必要です。同じシードをすべてのスレッドへ
+単純にコピーすると、並列乱数ではなく相関した同一ストリームが生成されます。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/cpp-randomness/ class=language-option data-lang=en>English
+</a><a href=/ja/cpp-randomness/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/cpp-randomness/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/cpp-randomness/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Kerberos on cesun.life</title><link>https://example.org/zh-tw/tags/kerberos/</link><description>Recent content in Kerberos on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Fri, 31 Jul 2026 20:08:54 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/kerberos/index.xml" rel="self" type="application/rss+xml"/><item><title>Kerberos</title><link>https://example.org/zh-tw/kerberos/</link><pubDate>Fri, 31 Jul 2026 20:08:54 +0800</pubDate><guid>https://example.org/zh-tw/kerberos/</guid><description>&lt;p&gt;Kerberos 是一種適用於協同管理系統的網路身分驗證協定。使用者先向受信任的金鑰發行中心（Key Distribution Center，KDC）驗證身分，再取得各項服務的限時票證。服務無須接收使用者密碼即可驗證其身分，而用戶端也能要求服務證明其持有預期的祕密金鑰。&lt;/p&gt;
+&lt;p&gt;Kerberos 主要使用對稱式密碼學。對稱式密碼學使 KDC 成為中央信任錨點：KDC 或其資料庫一旦遭入侵，KDC 所掌管長期金鑰的每個主體都可能受影響。因此，Kerberos 以分散式信任換取集中式身分管理、高效率票證簽發，以及領域內的單一登入。&lt;/p&gt;
+&lt;h2 id="信任模型與核心物件"&gt;
+ 信任模型與核心物件
+ &lt;a href="#%e4%bf%a1%e4%bb%bb%e6%a8%a1%e5%9e%8b%e8%88%87%e6%a0%b8%e5%bf%83%e7%89%a9%e4%bb%b6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;**領域（realm）**是管理上的身分驗證網域，依慣例以大寫表示，例如 &lt;code&gt;EXAMPLE.COM&lt;/code&gt;。領域名稱通常類似 DNS 網域，但兩者屬於不同命名空間。組態或 DNS 探索會將主機和網域名稱對應至 Kerberos 領域。&lt;/p&gt;
+&lt;p&gt;**主體（principal）**用來命名身分：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;alice@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP/web.example.com@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;主體名稱包含一個或多個組成部分，後接領域。&lt;code&gt;alice&lt;/code&gt; 是使用者主體。&lt;code&gt;HTTP/web.example.com&lt;/code&gt; 是服務主體，第一個組成部分表示服務，第二個則表示主機。主體字串區分大小寫，儘管領域、使用者及主機組成部分在實務上有不同慣例。&lt;/p&gt;
+&lt;p&gt;每個主體都有一把或多把向 KDC 註冊的長期金鑰。不同類型的主體以不同方式取得金鑰：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;人員主體通常透過加密類型（enctype）專屬的字串轉金鑰函式及鹽值，從密碼衍生金鑰。&lt;/li&gt;
+&lt;li&gt;服務主體通常取得管理員產生的隨機金鑰。&lt;/li&gt;
+&lt;li&gt;領域的 &lt;code&gt;krbtgt/REALM&lt;/code&gt; 主體擁有用於加密票證授予票證（ticket-granting ticket，TGT）的金鑰。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;keytab&lt;/strong&gt; 儲存主體名稱、金鑰版本號（KVNO）、加密類型和長期金鑰。常駐程式使用 keytab，因為無人值守的服務無法輸入密碼。keytab 是憑證而非公開憑證；任何能讀取可用服務金鑰的人，都能冒充該服務並解密簽發給其主體的票證。&lt;/p&gt;
+&lt;p&gt;KDC 提供兩項邏輯服務：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;**身分驗證服務（Authentication Service，AS）**在初始身分驗證後簽發 TGT。&lt;/li&gt;
+&lt;li&gt;**票證授予服務（Ticket-Granting Service，TGS）**將有效 TGT 交換為特定服務的票證。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;兩項服務通常在同一個 KDC 程序中執行，並使用相同的領域資料庫。正式環境會部署備援 KDC，因為票證取得否則將依賴單一主機，而資料庫管理與複寫也需要額外控制措施。&lt;/p&gt;
+&lt;h2 id="協定流程"&gt;
+ 協定流程
+ &lt;a href="#%e5%8d%94%e5%ae%9a%e6%b5%81%e7%a8%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;假設 &lt;code&gt;alice@EXAMPLE.COM&lt;/code&gt; 要存取 &lt;code&gt;HTTP/web.example.com@EXAMPLE.COM&lt;/code&gt;。取得所需憑證需要三次交換。以下名稱描述 Kerberos 協定訊息，而非應用程式專屬封包。&lt;/p&gt;
+&lt;h3 id="初始身分驗證as-req-與-as-rep"&gt;
+ 初始身分驗證：AS-REQ 與 AS-REP
+ &lt;a href="#%e5%88%9d%e5%a7%8b%e8%ba%ab%e5%88%86%e9%a9%97%e8%ad%89as-req-%e8%88%87-as-rep" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;用戶端傳送 &lt;strong&gt;AS-REQ&lt;/strong&gt;，要求取得 &lt;code&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/code&gt; 的 TGT。要求包含用戶端主體、所要求的有效期限與旗標、nonce、支援的加密類型，以及必要時的預先身分驗證資料。&lt;/p&gt;</description></item></channel></rss>

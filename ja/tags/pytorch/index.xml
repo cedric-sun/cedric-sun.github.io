@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Pytorch on cesun.life</title><link>https://example.org/ja/tags/pytorch/</link><description>Recent content in Pytorch on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sat, 01 Mar 2025 23:50:26 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/pytorch/index.xml" rel="self" type="application/rss+xml"/><item><title>Inference with vLLM</title><link>https://example.org/ja/vllm-adapters/</link><pubDate>Sat, 01 Mar 2025 23:50:26 +0800</pubDate><guid>https://example.org/ja/vllm-adapters/</guid><description>&lt;ul&gt;
+&lt;li&gt;生成モデル: &lt;code&gt;llm = LLM(model=..., task=&amp;quot;generate&amp;quot;) &lt;/code&gt;（task=generate のみ）&lt;/li&gt;
+&lt;li&gt;プーリングモデル: &lt;code&gt;llm = LLM(model=..., task=&amp;quot;embed&amp;quot;)&lt;/code&gt;（task={embed,classify,reward} のみ）&lt;/li&gt;
+&lt;li&gt;成功すると、生成モデルはテキストを返し、プーリングモデルは隠れ状態を返します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="カスタムモデルの統合"&gt;
+ カスタムモデルの統合
+ &lt;a href="#%e3%82%ab%e3%82%b9%e3%82%bf%e3%83%a0%e3%83%a2%e3%83%87%e3%83%ab%e3%81%ae%e7%b5%b1%e5%90%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;git clone --depth 1 https://github.com/vllm-project/vllm/&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Transformers リポジトリにファイルを追加し、vllm/model_executor/models ディレクトリに配置します。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="既存のモデルエグゼキューター"&gt;
+ 既存のモデルエグゼキューター
+ &lt;a href="#%e6%97%a2%e5%ad%98%e3%81%ae%e3%83%a2%e3%83%87%e3%83%ab%e3%82%a8%e3%82%b0%e3%82%bc%e3%82%ad%e3%83%a5%e3%83%bc%e3%82%bf%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href="https://github.com/vllm-project/vllm/tree/main/vllm/model_executor/models"&gt;https://github.com/vllm-project/vllm/tree/main/vllm/model_executor/models&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="hugging-face-transformer-リポジトリ"&gt;
+ Hugging Face Transformer リポジトリ
+ &lt;a href="#hugging-face-transformer-%e3%83%aa%e3%83%9d%e3%82%b8%e3%83%88%e3%83%aa" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;.gitattributes&lt;/p&gt;
+&lt;p&gt;Git の動作を設定します。通常は大きな重みファイルの Git LFS 追跡を設定します。
+推論時には使用されません。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;config.json&lt;/p&gt;
+&lt;p&gt;モデルアーキテクチャとハイパーパラメーター（モデル種別、層数、隠れサイズ、
+アテンションヘッド数、語彙サイズ、位置エンコーディング、dtype、アーキテクチャ
+クラス）を定義します。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;generation_config.json&lt;/p&gt;
+&lt;p&gt;EOS/PAD トークン ID、サンプリング設定、最大出力長など、デフォルトの生成動作を
+定義します。呼び出し時のパラメーターで上書きできます。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;model.safetensors&lt;/code&gt; or &lt;code&gt;model-x-of-y.safetensors&lt;/code&gt;
+モデルの重みの一部です。シャーディングにより、巨大な単一ファイルを避けます。
+シャードの境界は必ずしも層に対応しません。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;model.safetensors.index.json&lt;/p&gt;
+&lt;p&gt;すべてのパラメーター名を、それを含むシャードに対応付けます。たとえば
+model.layers.0&amp;hellip; → model-00001-of-00024.safetensors のようになります。
+通常は重みの合計サイズも記録します。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;tokenizer_config.json&lt;/p&gt;
+&lt;p&gt;トークナイザーのメタデータ（トークナイザークラス、最大長、特殊トークン、
+正規化オプション、多くの場合はチャットテンプレート）です。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;tokenizer.json&lt;/p&gt;
+&lt;p&gt;語彙、分割、正規化、BPE ルール、後処理を含む、「fast tokenizer」パイプライン
+全体のシリアライズデータです。&lt;/p&gt;</description></item><item><title>Torch と PyTorch</title><link>https://example.org/ja/torch/</link><pubDate>Thu, 14 Mar 2024 19:05:08 +0800</pubDate><guid>https://example.org/ja/torch/</guid><description>&lt;p&gt;Torch は、Lua インターフェイスと C/CUDA コアを持つ初期の機械学習フレームワークでした。PyTorch はその後継エコシステムです。名前と一部の実装上の系譜を引き継いでいますが、Python と C++ API を中心とする、現在も活発に開発されているフレームワークです。LibTorch は PyTorch の C++ ディストリビューションです。&lt;/p&gt;
+&lt;h2 id="pytorch-をインストールする"&gt;
+ PyTorch をインストールする
+ &lt;a href="#pytorch-%e3%82%92%e3%82%a4%e3%83%b3%e3%82%b9%e3%83%88%e3%83%bc%e3%83%ab%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;ほとんどの Python プロジェクトでは、&lt;a href="https://pytorch.org/get-started/locally/"&gt;PyTorch インストールセレクター&lt;/a&gt;が生成するコマンドを使用して公開パッケージをインストールします。適切なパッケージは、オペレーティングシステム、Python バージョン、アプリケーションが CPU、CUDA、または別のアクセラレーターバックエンドを使用するかどうかによって異なります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;python -m pip install torch torchvision&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;インストールを検証し、該当する場合は CUDA が利用可能であることを確認します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;python&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-python" data-lang="python"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import&lt;/span&gt; torch
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;print(torch&lt;span style="color:#f92672"&gt;.&lt;/span&gt;__version__)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;print(torch&lt;span style="color:#f92672"&gt;.&lt;/span&gt;cuda&lt;span style="color:#f92672"&gt;.&lt;/span&gt;is_available())&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="ソースから-libtorch-をビルドする"&gt;
+ ソースから LibTorch をビルドする
+ &lt;a href="#%e3%82%bd%e3%83%bc%e3%82%b9%e3%81%8b%e3%82%89-libtorch-%e3%82%92%e3%83%93%e3%83%ab%e3%83%89%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;ソースからのビルドは通常不要です。カスタムビルドが必要でない限り、ビルド済みパッケージまたは LibTorch アーカイブを使用します。ソースビルドには、互換性のある C++ コンパイラー、CMake、Ninja、Python ツール、ビルドで選択したアクセラレーター SDK が必要です。リリースとそのサブモジュールをクローンし、そのリリースのビルド手順に従います。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git clone --recursive https://github.com/pytorch/pytorch
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cd pytorch
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git checkout &amp;lt;release-tag&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git submodule sync
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git submodule update --init --recursive
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cmake -S . -B build -GNinja -DBUILD_PYTHON&lt;span style="color:#f92672"&gt;=&lt;/span&gt;OFF
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cmake --build build&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;ビルドフラグとサポートされるコンパイラーはリリース間で変わるため、リリース文書を確認せずに古いコマンドラインを本番自動化へコピーしないでください。&lt;/p&gt;</description></item></channel></rss>

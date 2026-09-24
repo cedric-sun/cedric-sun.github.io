@@ -1,0 +1,39 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>DEFLATE 與 Gzip 格式</title></head><body><main><article><div class=article-header><h1>DEFLATE 與 Gzip 格式</h1><div class=aux>最後更新: 2023-09-27 03:10:18 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/compression/>Compression</a>
+|
+<a href=/zh-tw/tags/deflate/>Deflate</a>
+|
+<a href=/zh-tw/tags/gzip/>Gzip</a></div></div><div class="translation-notice machine-translated"><a href=/deflate-and-gzip/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>DEFLATE 是 RFC 1951 定義的位元流格式。它結合 LZ77 滑動視窗與霍夫曼
+編碼。「zlib」和「gzip」通常指包含 DEFLATE 的檔案，但兩者分別是包覆
+原始位元流的不同封裝格式。</p><h2 id=區塊邊界與-btype>區塊邊界與 BTYPE
+<a href=#%e5%8d%80%e5%a1%8a%e9%82%8a%e7%95%8c%e8%88%87-btype class=heading-anchor><span>#</span></a></h2><p>DEFLATE 串流由一連串區塊組成。每個區塊都從目前的位元位置開始，包含
+<code>BFINAL</code>（1 位元）和 <code>BTYPE</code>（2 位元）：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>BTYPE</code></th><th>意義</th></tr></thead><tbody><tr><td><code>00</code></td><td>未使用霍夫曼編碼的儲存位元組</td></tr><tr><td><code>01</code></td><td>使用固定霍夫曼編碼壓縮</td></tr><tr><td><code>10</code></td><td>使用動態霍夫曼編碼壓縮</td></tr><tr><td><code>11</code></td><td>保留值，無效</td></tr></tbody></table></div></div><p>只有最後一個區塊的 <code>BFINAL</code> 為 1。當文字/長度串流輸出區塊結束
+（EOB）符號 256 時，壓縮區塊就會結束。下一個區塊標頭會緊接在下一個
+位元處；壓縮區塊不會填補到位元組邊界。儲存區塊是例外：讀取標頭後，
+解碼器會捨棄目前位元組中的剩餘位元，讀取小端序的 <code>LEN</code> 和 <code>NLEN</code>
+（<code>LEN</code> 的一補數），然後正好複製 <code>LEN</code> 個位元組。<code>LEN</code> 為 16 位元，
+因此單一儲存區塊最多可容納 65,535 個位元組。</p><h2 id=lz77-符號與霍夫曼編碼>LZ77 符號與霍夫曼編碼
+<a href=#lz77-%e7%ac%a6%e8%99%9f%e8%88%87%e9%9c%8d%e5%a4%ab%e6%9b%bc%e7%b7%a8%e7%a2%bc class=heading-anchor><span>#</span></a></h2><p>壓縮資料字母表包含文字位元組 0–255、EOB 256，以及長度符號 257–285。
+長度符號會選取基礎長度與額外位元數。接續的距離符號會選取基礎距離與
+額外位元數。產生的配對會從已產生的輸出向後複製位元組，最遠 32 KiB，
+長度最多 258 個位元組；重疊是有效的。</p><p>固定區塊使用 RFC 1951 規定的編碼長度。動態區塊包含 <code>HLIT</code>（5 位元）、
+<code>HDIST</code>（5 位元）和 <code>HCLEN</code>（4 位元），接著依指定排列傳送編碼長度
+字母表。該字母表描述文字/長度編碼與距離編碼的編碼長度，包括用於表示
+連續零或重複長度的重複符號。透過正規重建，可將這些長度轉換為實際編碼。</p><p>DEFLATE 在每個位元組內由最低有效位元向最高有效位元封裝資料元素。
+數值型額外位元欄位採用最低有效位元優先順序。霍夫曼編碼會以正規值分配，
+但輸出時遵循該格式規定的位元反轉慣例。剖析器必須維護位元游標，而不能
+將每個欄位都當作位元組對齊的整數讀取。</p><h2 id=zlib-與-gzip-封裝格式>zlib 與 gzip 封裝格式
+<a href=#zlib-%e8%88%87-gzip-%e5%b0%81%e8%a3%9d%e6%a0%bc%e5%bc%8f class=heading-anchor><span>#</span></a></h2><p>原始 DEFLATE 沒有標頭或尾端。zlib 封裝格式（RFC 1950）以 <code>CMF</code> 和
+<code>FLG</code> 開始，其中 <code>FCHECK</code> 確保 16 位元標頭可被 31 整除。如果設定
+<code>FDICT</code>，後面會接著一個四位元組的 Adler-32 字典識別碼。串流以未壓縮
+資料的大端序 Adler-32 結束。</p><p>gzip 封裝格式（RFC 1952）是一連串成員。每個成員都有魔術位元組 <code>1f 8b</code>、
+壓縮方法 8、旗標、修改時間、額外旗標和作業系統欄位。旗標可以加入額外
+欄位、原始檔名、註解和標頭 CRC。尾端儲存未壓縮成員的小端序 CRC-32，
+以及 <code>ISIZE</code>，即其大小對 2³² 取模的結果。中繼資料不能取代對尾端的驗證。</p><p>協定文件必須明確指出表示形式。HTTP <code>Content-Encoding: gzip</code> 攜帶 gzip
+格式，而使用 method 8 的 ZIP 項目通常攜帶原始 DEFLATE 串流。不能僅因
+某個承載被描述為「compressed」，就安全地選擇 zlib 解碼器。</p><h2 id=參考資料>參考資料
+<a href=#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://www.rfc-editor.org/rfc/rfc1951>RFC 1951: DEFLATE</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1950>RFC 1950: zlib Format</a></li><li><a href=https://www.rfc-editor.org/rfc/rfc1952>RFC 1952: gzip Format</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/deflate-and-gzip/ class=language-option data-lang=en>English
+</a><a href=/ja/deflate-and-gzip/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/deflate-and-gzip/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/deflate-and-gzip/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

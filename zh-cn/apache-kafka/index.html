@@ -1,0 +1,308 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Apache Kafka</title></head><body><main><article><div class=article-header><h1>Apache Kafka</h1><div class=aux>最后更新: 2026-07-19 19:31:59 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/apache-kafka/>Apache-Kafka</a>
+|
+<a href=/zh-cn/tags/event-streaming/>Event-Streaming</a>
+|
+<a href=/zh-cn/tags/kafka/>Kafka</a></div></div><div class="translation-notice machine-translated"><a href=/apache-kafka/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Apache Kafka 是一种用于持久化事件流的分布式追加日志系统。
+生产者将记录追加到主题分区，代理复制并保留这些记录，消费者则通过偏移量读取记录。
+因此，当多个相互独立的应用需要观察相同的有序历史，同时又不希望耦合它们的可用性或
+处理速率时，Kafka 非常适用。</p><h2 id=集群角色和元数据>集群角色和元数据
+<a href=#%e9%9b%86%e7%be%a4%e8%a7%92%e8%89%b2%e5%92%8c%e5%85%83%e6%95%b0%e6%8d%ae class=heading-anchor><span>#</span></a></h2><p>Kafka 集群包含两种服务器角色：</p><ul><li><strong>代理</strong>存储分区副本，并处理 produce 和 fetch 请求。</li><li><strong>KRaft 控制器</strong>维护集群元数据、代理成员关系、主题配置、副本放置和分区领导权。</li></ul><p>在开发集群中，一个进程可以执行其中一个或两个角色。生产集群会分离控制器和代理角色，
+因为数据平面负载不应干扰元数据仲裁决策。ZooKeeper 属于 Kafka 的旧版元数据架构，
+在 Kafka 4.x 中已不存在。</p><p>客户端接收的是引导地址列表，而不是完整的路由表。元数据请求会标识当前负责每个分区的
+代理，之后 produce 和 fetch 请求会直接发送给相关的领导者。因此，每个公布的代理地址
+都必须能从客户端网络中解析并访问；向外部客户端公布仅容器内部可用的主机名，是常见的
+部署错误。</p><p>Kafka 在 TCP 之上使用版本化的二进制协议。<code>org.apache.kafka:kafka-clients</code> 工件提供
+Java 生产者、消费者和管理 API。其他语言的客户端实现相同的协议。</p><h2 id=主题分区和记录>主题、分区和记录
+<a href=#%e4%b8%bb%e9%a2%98%e5%88%86%e5%8c%ba%e5%92%8c%e8%ae%b0%e5%bd%95 class=heading-anchor><span>#</span></a></h2><p>主题被划分为有序分区。每条记录可以包含：</p><ol><li>一个键；</li><li>一个值；</li><li>一个时间戳；以及</li><li>零个或多个标头。</li></ol><p>在协议边界，键和值都是字节数组。序列化器将应用对象转换为这些字节，反序列化器执行
+逆向操作。</p><p>代理会为追加到某个分区的记录分配单调递增的偏移量。偏移量标识该分区内的位置，
+并不是全局有序的事件 ID。Kafka 只保证单个分区内的顺序，不保证主题范围内的顺序。</p><p>如果生产者未指定分区，分区器会使用记录键和当前主题元数据。因此，只要分区数量不变，
+相等的非 null 键就会被路由到同一个分区。这个特性支持以账户 ID 或设备 ID 等键实现
+实体级顺序。增加分区数量可能改变键到分区的映射，因此扩展分区需要进行明确的顺序和
+迁移分析。</p><p>每个分区都以段文件的形式存储在代理日志目录下。段文件包含二进制记录批次以及偏移量
+和时间戳索引；它们不是按行组织的文本日志。</p><h2 id=保留和压缩>保留和压缩
+<a href=#%e4%bf%9d%e7%95%99%e5%92%8c%e5%8e%8b%e7%bc%a9 class=heading-anchor><span>#</span></a></h2><p>消费不会删除记录。代理根据主题的清理策略删除记录：</p><ul><li><code>cleanup.policy=delete</code> 在达到配置的时间或大小边界后删除旧段。</li><li><code>cleanup.policy=compact</code> 保留每个键的最新值。</li><li><code>cleanup.policy=compact,delete</code> 同时应用两种策略。</li></ul><p>压缩会保留偏移量，但不会生成稠密的连续序列。因此，消费者可能会遇到偏移量之间的
+间隔。值为 null 的带键记录称为<strong>墓碑记录</strong>；经过 <code>delete.retention.ms</code> 后，压缩可能
+同时删除该墓碑记录和该键的旧值。</p><p>使用管理工具配置压缩状态主题：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>bin/kafka-topics.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --create --topic customer-state <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --partitions <span style=color:#ae81ff>12</span> --replication-factor <span style=color:#ae81ff>3</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --config cleanup.policy<span style=color:#f92672>=</span>compact <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --config min.cleanable.dirty.ratio<span style=color:#f92672>=</span>0.5</span></span></code></pre></div></div></div><p>压缩是异步的。应用不得假设替换值或墓碑记录追加后，过时值会立即消失。</p><h2 id=复制和持久性>复制和持久性
+<a href=#%e5%a4%8d%e5%88%b6%e5%92%8c%e6%8c%81%e4%b9%85%e6%80%a7 class=heading-anchor><span>#</span></a></h2><p>一个分区具有一个领导者和一个或多个副本。生产者和消费者通常与领导者通信。
+跟随者获取领导者的日志，当领导权发生变化时，控制器会选出替代领导者。</p><p>多个相互独立的设置共同决定已确认写入的持久性：</p><ul><li><code>replication.factor</code> 决定存储该分区的代理数量。</li><li><code>acks=all</code> 使生产者等待领导者满足同步副本要求。</li><li><code>min.insync.replicas</code> 在同步副本数量过少时拒绝 <code>acks=all</code> 写入。</li><li>允许非干净领导者选举会使过时副本成为领导者，因此可能丢失已确认的记录。</li></ul><p>例如，复制因子为 3 且 <code>min.insync.replicas=2</code> 时，可以容忍一个副本不可用，同时
+保持双副本确认规则。但写入不能容忍两个副本不可用。这个选择使可用性与持久性相互关联。</p><p>副本放置必须跨越主机、机架或可用区等故障域。将三个副本放在同一台物理主机上，
+并不能提供主机故障容错能力。</p><h2 id=创建和检查主题>创建和检查主题
+<a href=#%e5%88%9b%e5%bb%ba%e5%92%8c%e6%a3%80%e6%9f%a5%e4%b8%bb%e9%a2%98 class=heading-anchor><span>#</span></a></h2><p>主题数量和分区数量属于运行容量决策，因此应显式创建重要主题，而不是依赖代理端的
+自动创建：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>bin/kafka-topics.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --create --topic orders <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --partitions <span style=color:#ae81ff>12</span> --replication-factor <span style=color:#ae81ff>3</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --config min.insync.replicas<span style=color:#f92672>=</span><span style=color:#ae81ff>2</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --config retention.ms<span style=color:#f92672>=</span><span style=color:#ae81ff>604800000</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>bin/kafka-topics.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --describe --topic orders
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>bin/kafka-configs.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --entity-type topics --entity-name orders --describe</span></span></code></pre></div></div></div><p>Java Admin API 提供相同的控制平面：</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.admin.Admin;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.admin.AdminClientConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.admin.NewTopic;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties config <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(AdminClientConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (Admin admin <span style=color:#f92672>=</span> Admin.<span style=color:#a6e22e>create</span>(config)) {
+</span></span><span style=display:flex><span>    NewTopic orders <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> NewTopic(<span style=color:#e6db74>&#34;orders&#34;</span>, 12, (<span style=color:#66d9ef>short</span>) 3)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>configs</span>(Map.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;min.insync.replicas&#34;</span>, <span style=color:#e6db74>&#34;2&#34;</span>,
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;retention.ms&#34;</span>, <span style=color:#e6db74>&#34;604800000&#34;</span>
+</span></span><span style=display:flex><span>        ));
+</span></span><span style=display:flex><span>    admin.<span style=color:#a6e22e>createTopics</span>(List.<span style=color:#a6e22e>of</span>(orders)).<span style=color:#a6e22e>all</span>().<span style=color:#a6e22e>get</span>();
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>createTopics</code> 是异步的；等待返回的 future 可以显现授权、验证和超时失败。</p><h2 id=java-客户端依赖>Java 客户端依赖
+<a href=#java-%e5%ae%a2%e6%88%b7%e7%ab%af%e4%be%9d%e8%b5%96 class=heading-anchor><span>#</span></a></h2><p>生产者、消费者和 Admin 客户端位于同一个工件中：</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>org.apache.kafka<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>kafka-clients<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;version&gt;</span>${kafka.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>请从 Kafka 的兼容性文档中选择客户端版本。协议协商允许混用许多不同版本的客户端
+和代理，但新的 API 和记录格式仍然要求代理达到最低版本。</p><h2 id=生成记录>生成记录
+<a href=#%e7%94%9f%e6%88%90%e8%ae%b0%e5%bd%95 class=heading-anchor><span>#</span></a></h2><p><code>KafkaProducer</code> 是线程安全的。它会将记录累积到各分区批次中，压缩每个批次，并异步
+发送请求。因此，长期运行的生产者比每条记录创建一个生产者具有更好的性能。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.nio.charset.StandardCharsets;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.KafkaProducer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.ProducerConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.ProducerRecord;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.StringSerializer;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties config <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>KEY_SERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringSerializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>VALUE_SERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringSerializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>ACKS_CONFIG</span>, <span style=color:#e6db74>&#34;all&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>ENABLE_IDEMPOTENCE_CONFIG</span>, <span style=color:#66d9ef>true</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>COMPRESSION_TYPE_CONFIG</span>, <span style=color:#e6db74>&#34;zstd&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>LINGER_MS_CONFIG</span>, 5);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (KafkaProducer<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> producer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> KafkaProducer<span style=color:#f92672>&lt;&gt;</span>(config)) {
+</span></span><span style=display:flex><span>    ProducerRecord<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> record <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> ProducerRecord<span style=color:#f92672>&lt;&gt;</span>(<span style=color:#e6db74>&#34;orders&#34;</span>, <span style=color:#e6db74>&#34;customer-42&#34;</span>, <span style=color:#e6db74>&#34;{\&#34;orderId\&#34;:123}&#34;</span>);
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>record</span><span style=color:#960050;background-color:#1e0010>.</span><span style=color:#a6e22e>headers</span>().<span style=color:#a6e22e>add</span>(<span style=color:#e6db74>&#34;schema-version&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;1&#34;</span>.<span style=color:#a6e22e>getBytes</span>(StandardCharsets.<span style=color:#a6e22e>UTF_8</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    producer.<span style=color:#a6e22e>send</span>(record, (metadata, error) <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (error <span style=color:#f92672>!=</span> <span style=color:#66d9ef>null</span>) {
+</span></span><span style=display:flex><span>            System.<span style=color:#a6e22e>err</span>.<span style=color:#a6e22e>println</span>(<span style=color:#e6db74>&#34;Produce failed: &#34;</span> <span style=color:#f92672>+</span> error);
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span>;
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>printf</span>(<span style=color:#e6db74>&#34;%s-%d@%d%n&#34;</span>,
+</span></span><span style=display:flex><span>            metadata.<span style=color:#a6e22e>topic</span>(), metadata.<span style=color:#a6e22e>partition</span>(), metadata.<span style=color:#a6e22e>offset</span>());
+</span></span><span style=display:flex><span>    });
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>关闭生产者会刷新未完成的发送。应用应传播或记录回调失败；客户端缓冲区接受一条
+记录，并不意味着代理已经确认该记录。</p><p>重要的吞吐量和延迟控制项包括：</p><ul><li><code>batch.size</code>：一个分区批次累积的最大字节数；</li><li><code>linger.ms</code>：部分填充的批次可等待的时间；</li><li><code>compression.type</code>：应用于整个批次的压缩方式；</li><li><code>buffer.memory</code>：生产者为未发送记录提供的内存；</li><li><code>delivery.timeout.ms</code>：完成发送的上限时间；以及</li><li><code>max.request.size</code>：客户端接受的最大请求大小。</li></ul><p>较大的批次可以提高压缩率和请求效率，但会消耗内存，并可能增加延迟。代理和主题的
+消息大小限制也必须能够接受生成的批次。</p><h3 id=幂等性和重试>幂等性和重试
+<a href=#%e5%b9%82%e7%ad%89%e6%80%a7%e5%92%8c%e9%87%8d%e8%af%95 class=heading-anchor><span>#</span></a></h3><p>网络故障可能导致生产者无法确定代理是否已经追加请求。盲目重试可能因此产生重复记录。
+幂等生产会附加生产者身份和序列号，使代理能够拒绝生产者会话内的重复重试。</p><p>幂等性不会对两个相互独立的业务请求、由不同生产者实例发送的记录，或应用级重放后
+重新发送的记录进行去重。稳定的业务 ID 和下游幂等性仍然是必要的。</p><h2 id=消费记录>消费记录
+<a href=#%e6%b6%88%e8%b4%b9%e8%ae%b0%e5%bd%95 class=heading-anchor><span>#</span></a></h2><p><code>KafkaConsumer</code> 不是线程安全的。每个消费者应由一个应用线程独占，该线程负责调用
+<code>poll</code>、处理分配回调并提交偏移量。并行处理需要在已完成的工作和偏移量提交之间进行
+谨慎协调。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.time.Duration;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.ConsumerConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.ConsumerRecord;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.ConsumerRecords;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.KafkaConsumer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.StringDeserializer;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties config <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>GROUP_ID_CONFIG</span>, <span style=color:#e6db74>&#34;order-indexer&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>KEY_DESERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringDeserializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>VALUE_DESERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringDeserializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>ENABLE_AUTO_COMMIT_CONFIG</span>, <span style=color:#66d9ef>false</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>AUTO_OFFSET_RESET_CONFIG</span>, <span style=color:#e6db74>&#34;earliest&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (KafkaConsumer<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> consumer <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> KafkaConsumer<span style=color:#f92672>&lt;&gt;</span>(config)) {
+</span></span><span style=display:flex><span>    consumer.<span style=color:#a6e22e>subscribe</span>(List.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;orders&#34;</span>));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>while</span> (<span style=color:#f92672>!</span>Thread.<span style=color:#a6e22e>currentThread</span>().<span style=color:#a6e22e>isInterrupted</span>()) {
+</span></span><span style=display:flex><span>        ConsumerRecords<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> records <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>            consumer.<span style=color:#a6e22e>poll</span>(Duration.<span style=color:#a6e22e>ofSeconds</span>(1));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>for</span> (ConsumerRecord<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> record : records) {
+</span></span><span style=display:flex><span>            indexOrder(record.<span style=color:#a6e22e>key</span>(), record.<span style=color:#a6e22e>value</span>());
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// Commits the next offsets after the complete batch succeeds.</span>
+</span></span><span style=display:flex><span>        consumer.<span style=color:#a6e22e>commitSync</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>该示例提供至少一次处理语义：如果 <code>indexOrder</code> 成功后、<code>commitSync</code> 执行前发生故障，
+就会发生重放。因此，<code>indexOrder</code> 必须是幂等的，或者目标系统必须通过稳定事件 ID
+进行去重。</p><p><code>auto.offset.reset</code> 仅在组没有有效的已提交偏移量时生效。它不会强制已建立的组重新读取
+主题。若要有意进行重放，请使用 <code>seek</code>、新的组 ID 或 consumer-groups 重置操作。</p><h2 id=消费者组和再平衡>消费者组和再平衡
+<a href=#%e6%b6%88%e8%b4%b9%e8%80%85%e7%bb%84%e5%92%8c%e5%86%8d%e5%b9%b3%e8%a1%a1 class=heading-anchor><span>#</span></a></h2><p>具有相同 <code>group.id</code> 的消费者组成一个组。每个分区在该组中最多分配给一个活跃消费者：</p><ul><li>消费者少于分区时，一些消费者会拥有多个分区；</li><li>数量相等时，每个消费者拥有一个分区；以及</li><li>消费者多于分区时，多余消费者处于空闲状态。</li></ul><p>不同的组会分别接收主题历史的独立副本。因此，欺诈检测器和搜索索引器应使用不同的组 ID。</p><p>成员关系或订阅发生变化时，分配会更新。协作式分配器可以减少分区移动，而静态成员
+关系可以避免短时间重启期间不必要的重新分配。但应用仍必须停止处理已撤销的分区，
+并且只提交已完成的偏移量。</p><p>使用以下命令检查分配和滞后：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>bin/kafka-consumer-groups.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --describe --group order-indexer</span></span></code></pre></div></div></div><p>滞后量是 <code>log-end-offset - committed-offset</code>。它衡量的是未提交距离，而不是处理延迟。
+低流量分区可能具有较小的滞后量，但其中最早的未处理记录可能已经很旧，因此应同时
+监控记录滞后和基于时间的服务目标。</p><p><code>max.poll.interval.ms</code> 限制两次 <code>poll</code> 调用之间的时间。同步处理大型批次可能超过该
+间隔，并使消费者从组中移除。可以使用 <code>max.poll.records</code> 限制批次，为合理的慢速工作
+增加间隔，或在暂停分区并仅提交连续完成的偏移量的同时，将工作转移到执行器。</p><h2 id=交付语义>交付语义
+<a href=#%e4%ba%a4%e4%bb%98%e8%af%ad%e4%b9%89 class=heading-anchor><span>#</span></a></h2><p>Kafka 应用可以实现三种结果：</p><ul><li><strong>至多一次：</strong> 在处理前推进或提交，接受故障后的数据丢失。</li><li><strong>至少一次：</strong> 在提交前处理，接受重放和重复。</li><li><strong>Kafka 精确一次处理：</strong> 使用 Kafka 事务原子地提交已生成的记录和已消费的偏移量。</li></ul><p>Kafka 事务不会使数据库写入、电子邮件或 HTTP 调用具备原子性。外部作用需要幂等键、
+outbox/inbox 设计、去重或其他协调协议。</p><h3 id=事务性-consume-transform-produce>事务性 Consume-Transform-Produce
+<a href=#%e4%ba%8b%e5%8a%a1%e6%80%a7-consume-transform-produce class=heading-anchor><span>#</span></a></h3><p>每个运行中的生产者实例都需要一个稳定且唯一的 <code>transactional.id</code>。并发复用同一个 ID
+会隔离旧生产者，从而阻止两个实例以同一个事务所有者的身份提交。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.time.Duration;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.HashMap;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.List;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Map;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.ConsumerConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.KafkaConsumer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.consumer.OffsetAndMetadata;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.KafkaProducer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.ProducerConfig;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.clients.producer.ProducerRecord;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.KafkaException;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.TopicPartition;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.errors.ProducerFencedException;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.StringDeserializer;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.StringSerializer;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties consumerConfig <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>GROUP_ID_CONFIG</span>, <span style=color:#e6db74>&#34;order-normalizer&#34;</span>);
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>ENABLE_AUTO_COMMIT_CONFIG</span>, <span style=color:#66d9ef>false</span>);
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>ISOLATION_LEVEL_CONFIG</span>, <span style=color:#e6db74>&#34;read_committed&#34;</span>);
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>KEY_DESERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringDeserializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>consumerConfig.<span style=color:#a6e22e>put</span>(ConsumerConfig.<span style=color:#a6e22e>VALUE_DESERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringDeserializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties producerConfig <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>producerConfig.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>producerConfig.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>TRANSACTIONAL_ID_CONFIG</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;order-normalizer-instance-1&#34;</span>);
+</span></span><span style=display:flex><span>producerConfig.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>KEY_SERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringSerializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>producerConfig.<span style=color:#a6e22e>put</span>(ProducerConfig.<span style=color:#a6e22e>VALUE_SERIALIZER_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    StringSerializer.<span style=color:#a6e22e>class</span>.<span style=color:#a6e22e>getName</span>());
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>try</span> (KafkaConsumer<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> consumer <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>         <span style=color:#66d9ef>new</span> KafkaConsumer<span style=color:#f92672>&lt;&gt;</span>(consumerConfig);
+</span></span><span style=display:flex><span>     KafkaProducer<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span> producer <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>         <span style=color:#66d9ef>new</span> KafkaProducer<span style=color:#f92672>&lt;&gt;</span>(producerConfig)) {
+</span></span><span style=display:flex><span>    consumer.<span style=color:#a6e22e>subscribe</span>(List.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;orders&#34;</span>));
+</span></span><span style=display:flex><span>    producer.<span style=color:#a6e22e>initTransactions</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>while</span> (<span style=color:#66d9ef>true</span>) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> records <span style=color:#f92672>=</span> consumer.<span style=color:#a6e22e>poll</span>(Duration.<span style=color:#a6e22e>ofSeconds</span>(1));
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (records.<span style=color:#a6e22e>isEmpty</span>()) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>continue</span>;
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>            producer.<span style=color:#a6e22e>beginTransaction</span>();
+</span></span><span style=display:flex><span>            Map<span style=color:#f92672>&lt;</span>TopicPartition, OffsetAndMetadata<span style=color:#f92672>&gt;</span> offsets <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> HashMap<span style=color:#f92672>&lt;&gt;</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>for</span> (<span style=color:#66d9ef>var</span> record : records) {
+</span></span><span style=display:flex><span>                producer.<span style=color:#a6e22e>send</span>(<span style=color:#66d9ef>new</span> ProducerRecord<span style=color:#f92672>&lt;&gt;</span>(
+</span></span><span style=display:flex><span>                    <span style=color:#e6db74>&#34;normalized-orders&#34;</span>, record.<span style=color:#a6e22e>key</span>(),
+</span></span><span style=display:flex><span>                    normalize(record.<span style=color:#a6e22e>value</span>())));
+</span></span><span style=display:flex><span>                offsets.<span style=color:#a6e22e>put</span>(
+</span></span><span style=display:flex><span>                    <span style=color:#66d9ef>new</span> TopicPartition(record.<span style=color:#a6e22e>topic</span>(), record.<span style=color:#a6e22e>partition</span>()),
+</span></span><span style=display:flex><span>                    <span style=color:#66d9ef>new</span> OffsetAndMetadata(record.<span style=color:#a6e22e>offset</span>() <span style=color:#f92672>+</span> 1)
+</span></span><span style=display:flex><span>                );
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>            producer.<span style=color:#a6e22e>sendOffsetsToTransaction</span>(
+</span></span><span style=display:flex><span>                offsets, consumer.<span style=color:#a6e22e>groupMetadata</span>());
+</span></span><span style=display:flex><span>            producer.<span style=color:#a6e22e>commitTransaction</span>();
+</span></span><span style=display:flex><span>        } <span style=color:#66d9ef>catch</span> (ProducerFencedException fatal) {
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>throw</span> fatal;
+</span></span><span style=display:flex><span>        } <span style=color:#66d9ef>catch</span> (KafkaException retryableBatchFailure) {
+</span></span><span style=display:flex><span>            producer.<span style=color:#a6e22e>abortTransaction</span>();
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>必须隐藏已中止记录的消费者应使用 <code>isolation.level=read_committed</code>。事务会增加协调成本
+和延迟，因此应在确实需要 Kafka 读-处理-写行为具备原子性时使用，而不应默认替代
+幂等处理。</p><h2 id=kafka-streams>Kafka Streams
+<a href=#kafka-streams class=heading-anchor><span>#</span></a></h2><p>Kafka Streams 是可嵌入的 Java 库，而不是独立的集群服务。每个应用实例加入一个消费者组，
+将工作划分为任务，并存储由变更日志主题支持的本地状态。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> java.util.Properties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.common.serialization.Serdes;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.streams.KafkaStreams;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.streams.StreamsBuilder;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.apache.kafka.streams.StreamsConfig;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Properties config <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Properties();
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>APPLICATION_ID_CONFIG</span>, <span style=color:#e6db74>&#34;paid-order-counts&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>BOOTSTRAP_SERVERS_CONFIG</span>, <span style=color:#e6db74>&#34;broker:9092&#34;</span>);
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>DEFAULT_KEY_SERDE_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    Serdes.<span style=color:#a6e22e>String</span>().<span style=color:#a6e22e>getClass</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>DEFAULT_VALUE_SERDE_CLASS_CONFIG</span>,
+</span></span><span style=display:flex><span>    Serdes.<span style=color:#a6e22e>String</span>().<span style=color:#a6e22e>getClass</span>());
+</span></span><span style=display:flex><span>config.<span style=color:#a6e22e>put</span>(StreamsConfig.<span style=color:#a6e22e>PROCESSING_GUARANTEE_CONFIG</span>, <span style=color:#e6db74>&#34;exactly_once_v2&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>StreamsBuilder builder <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> StreamsBuilder();
+</span></span><span style=display:flex><span>builder.<span style=color:#f92672>&lt;</span>String, String<span style=color:#f92672>&gt;</span>stream(<span style=color:#e6db74>&#34;orders&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>filter</span>((customerId, json) <span style=color:#f92672>-&gt;</span> json.<span style=color:#a6e22e>contains</span>(<span style=color:#e6db74>&#34;\&#34;status\&#34;:\&#34;PAID\&#34;&#34;</span>))
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>groupByKey</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>count</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>toStream</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>to</span>(<span style=color:#e6db74>&#34;paid-orders-per-customer&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>KafkaStreams streams <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> KafkaStreams(builder.<span style=color:#a6e22e>build</span>(), config);
+</span></span><span style=display:flex><span>Runtime.<span style=color:#a6e22e>getRuntime</span>().<span style=color:#a6e22e>addShutdownHook</span>(<span style=color:#66d9ef>new</span> Thread(streams::close));
+</span></span><span style=display:flex><span>streams.<span style=color:#a6e22e>start</span>();</span></span></code></pre></div></div></div><p>更改 <code>application.id</code> 会创建新的处理身份，并使用不同的消费者组、内部主题和状态目录。
+应将其视为持久化的应用状态，而不是显示名称。</p><h2 id=kafka-connect-和复制>Kafka Connect 和复制
+<a href=#kafka-connect-%e5%92%8c%e5%a4%8d%e5%88%b6 class=heading-anchor><span>#</span></a></h2><p>Kafka Connect 运行可复用的源连接器和汇连接器。源连接器从外部系统导入记录；
+汇连接器导出 Kafka 记录。分布式工作器将连接器配置、偏移量和状态存储在 Kafka 主题中，
+并在工作器之间重新平衡连接器任务。</p><p>Connect 简化了标准集成，但不会消除定义以下内容的必要性：</p><ul><li>记录键和分区策略；</li><li>模式兼容性；</li><li>删除和墓碑记录语义；</li><li>重试和死信行为；</li><li>目标系统的幂等性；以及</li><li>凭据和网络边界。</li></ul><p>MirrorMaker 2 使用 Connect 在 Kafka 集群之间复制主题。复制是异步的，并不会将两个
+集群变成一个同步共识系统。灾难恢复流程必须考虑复制滞后、消费者偏移量转换、主题配置
+和故障恢复切换。</p><h2 id=模式和演进>模式和演进
+<a href=#%e6%a8%a1%e5%bc%8f%e5%92%8c%e6%bc%94%e8%bf%9b class=heading-anchor><span>#</span></a></h2><p>Kafka 存储字节，不强制应用模式。Avro、Protobuf、JSON Schema 或其他编码可以定义
+记录结构。模式注册表可以将模式 ID 与负载关联，并拒绝不兼容的变更。</p><p>兼容性规则应反映数据的重放方式：</p><ul><li>新消费者可能会遇到保留数月的旧记录；</li><li>生产者发生变化时，旧消费者可能仍在运行；</li><li>压缩主题可能无限期保留旧值；以及</li><li>从归档恢复可能重新引入旧模式。</li></ul><p>添加具有定义默认值的可选字段，比改变字段含义或重新使用字段名称更容易演进。即使
+序列化格式允许机械式变更，事件名称和字段语义仍然构成长期契约。</p><h2 id=安全性>安全性
+<a href=#%e5%ae%89%e5%85%a8%e6%80%a7 class=heading-anchor><span>#</span></a></h2><p>Kafka 将传输安全、身份验证和授权分离：</p><ul><li>TLS 加密流量，并向客户端验证代理身份。</li><li>mTLS 或 SASL 机制验证客户端身份。</li><li>ACL 为主题、组、事务 ID 和集群资源上的操作授权。</li></ul><p>可以通过属性提供 TLS 客户端配置：</p><div class=jose-wrapper><div class=jose-tools><span>properties</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-properties data-lang=properties><span style=display:flex><span><span style=color:#a6e22e>security.protocol</span><span style=color:#f92672>=</span><span style=color:#e6db74>SSL</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.truststore.location</span><span style=color:#f92672>=</span><span style=color:#e6db74>/run/secrets/kafka.truststore.p12</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.truststore.password</span><span style=color:#f92672>=</span><span style=color:#e6db74>${TRUSTSTORE_PASSWORD}</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.keystore.location</span><span style=color:#f92672>=</span><span style=color:#e6db74>/run/secrets/client.keystore.p12</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.keystore.password</span><span style=color:#f92672>=</span><span style=color:#e6db74>${KEYSTORE_PASSWORD}</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ssl.key.password</span><span style=color:#f92672>=</span><span style=color:#e6db74>${KEY_PASSWORD}</span></span></span></code></pre></div></div></div><p>不要将真实密码放入已提交的属性文件。应通过部署平台的密钥机制注入密码，并限制
+文件系统访问权限。</p><h2 id=分区和容量规划>分区和容量规划
+<a href=#%e5%88%86%e5%8c%ba%e5%92%8c%e5%ae%b9%e9%87%8f%e8%a7%84%e5%88%92 class=heading-anchor><span>#</span></a></h2><p>分区数量限制消费者组的并行度，但更多分区并非没有代价。每个分区都会增加元数据、
+打开的文件、拉取副本的工作量、选举和恢复流量。可根据以下因素估算初始分区数量：</p><ol><li>峰值入口和出口吞吐量；</li><li>最大有效消费者并发数；</li><li>每个代理的网络和磁盘吞吐量；</li><li>键的倾斜程度；</li><li>复制和恢复目标；以及</li><li>在可以接受重新分区之前的预期增长量。</li></ol><p>保留容量大致为：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ingress bytes/second × retention seconds × replication factor</span></span></code></pre></div></div></div><p>还应为段粒度、索引、压缩、临时不均衡、重新分配和代理恢复预留余量。能够处理稳定状态
+流量、但无法在恢复目标内重建故障代理的集群，容量不足。</p><h2 id=运维和故障诊断>运维和故障诊断
+<a href=#%e8%bf%90%e7%bb%b4%e5%92%8c%e6%95%85%e9%9a%9c%e8%af%8a%e6%96%ad class=heading-anchor><span>#</span></a></h2><p>至少监控：</p><ul><li>离线分区和副本不足的分区；</li><li>控制器和代理的可用性；</li><li>produce 和 fetch 的延迟及错误率；</li><li>请求处理线程和网络线程的饱和度；</li><li>磁盘使用量和磁盘延迟；</li><li>副本拉取滞后；</li><li>消费者偏移量滞后和记录年龄；</li><li>事务和身份验证失败；以及</li><li>分区不均衡和重新分配进度。</li></ul><p>有用的诊断命令包括：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#75715e># Observe records without joining an application consumer group.</span>
+</span></span><span style=display:flex><span>bin/kafka-console-consumer.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --topic orders --from-beginning <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --property print.key<span style=color:#f92672>=</span>true --property print.offset<span style=color:#f92672>=</span>true
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Inspect one group&#39;s committed offsets and lag.</span>
+</span></span><span style=display:flex><span>bin/kafka-consumer-groups.sh --bootstrap-server broker:9092 <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span>  --group order-indexer --describe
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Read broker API compatibility information.</span>
+</span></span><span style=display:flex><span>bin/kafka-broker-api-versions.sh --bootstrap-server broker:9092</span></span></code></pre></div></div></div><p>不可用的领导者、同步副本不足、无法访问的公布监听器、授权失败以及过载的代理，
+都可能在应用侧表现为发送超时。在更改重试上限之前，应将客户端异常与代理指标、
+分区状态和控制器事件进行关联。</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://kafka.apache.org/documentation/>Apache Kafka Documentation</a></li><li><a href=https://kafka.apache.org/protocol>Kafka Protocol</a></li><li><a href=https://kafka.apache.org/documentation/#api>Kafka Java API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/apache-kafka/ class=language-option data-lang=en>English
+</a><a href=/ja/apache-kafka/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/apache-kafka/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/apache-kafka/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

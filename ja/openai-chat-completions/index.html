@@ -1,0 +1,246 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>OpenAI Chat Completions と Spring AI</title></head><body><main><article><div class=article-header><h1>OpenAI Chat Completions と Spring AI</h1><div class=aux>最終更新: 2025-04-20 05:43:09 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/ai/>Ai</a>
+|
+<a href=/ja/tags/llm/>Llm</a>
+|
+<a href=/ja/tags/openai/>Openai</a>
+|
+<a href=/ja/tags/spring-ai/>Spring-Ai</a>
+|
+<a href=/ja/tags/api/>Api</a>
+|
+<a href=/ja/tags/json/>Json</a></div></div><div class="translation-notice machine-translated"><a href=/openai-chat-completions/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>OpenAI Chat Completions API は、会話型言語モデル向けに広く実装されている JSON over HTTP インターフェースです。クライアントはメッセージと生成オプションの順序付きリストを送信し、サーバーはメタデータとトークン使用量を含む 1 つ以上のアシスタントメッセージを返します。</p><p>基本的な構造は次のとおりです。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>HTTP client
+</span></span><span style=display:flex><span>  -&gt; POST /v1/chat/completions
+</span></span><span style=display:flex><span>  -&gt; request JSON containing messages and options
+</span></span><span style=display:flex><span>  -&gt; model inference
+</span></span><span style=display:flex><span>  &lt;- response JSON containing choices and usage</span></span></code></pre></div></div></div><p>多くのゲートウェイやモデルサーバーは、基盤モデルが OpenAI でホストされていない場合でも、OpenAI 互換エンドポイントを実装しています。そのため、この形式は事実上の相互運用 API として有用ですが、HTTP、JSON-RPC、MCP のような独立した正式標準ではありません。互換プロバイダーによって、サポートするフィールド、モデル、制限、エラー形式、拡張機能が異なる場合があります。</p><p>Spring AI は、このワイヤー形式の上に、Java アプリケーション向けのプロバイダー中立なモデルを提供します。アプリケーションコードは <code>Prompt</code>、<code>Message</code>、<code>ChatOptions</code>、<code>ChatResponse</code> を扱い、OpenAI または OpenAI 互換アダプターがこれらのオブジェクトとプロバイダーの JSON の相互変換を行います。</p><h2 id=http-リクエスト>HTTP リクエスト
+<a href=#http-%e3%83%aa%e3%82%af%e3%82%a8%e3%82%b9%e3%83%88 class=heading-anchor><span>#</span></a></h2><p>簡略化したリクエストは次のとおりです。</p><div class=jose-wrapper><div class=jose-tools><span>http</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#a6e22e>POST</span> /v1/chat/completions <span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span>
+</span></span><span style=display:flex><span>Host<span style=color:#f92672>:</span> <span style=color:#ae81ff>api.example.com</span>
+</span></span><span style=display:flex><span>Authorization<span style=color:#f92672>:</span> <span style=color:#ae81ff>Bearer ...</span>
+</span></span><span style=display:flex><span>Content-Type<span style=color:#f92672>:</span> <span style=color:#ae81ff>application/json</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;model&#34;</span>: <span style=color:#e6db74>&#34;gpt-4.1&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;messages&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;system&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;Answer concisely.&#34;</span>
+</span></span><span style=display:flex><span>    },
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;Explain optimistic locking.&#34;</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;temperature&#34;</span>: <span style=color:#ae81ff>0.3</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;max_tokens&#34;</span>: <span style=color:#ae81ff>1000</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;stream&#34;</span>: <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>model</code> と <code>messages</code> は、実行対象と、そのモデルが参照する会話コンテキストを識別します。残りのフィールドは生成を制御します。一部のゲートウェイでは、リクエスト本文で <code>model</code> を要求する代わりに、設定、デプロイメント名、URL、またはヘッダーによってモデルを選択します。</p><h3 id=メッセージ>メッセージ
+<a href=#%e3%83%a1%e3%83%83%e3%82%bb%e3%83%bc%e3%82%b8 class=heading-anchor><span>#</span></a></h3><p><code>messages</code> は順序付きです。その順序自体がプロンプトの一部になります。</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>[
+</span></span><span style=display:flex><span>  {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;system&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;You are a support assistant.&#34;</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;Where is order 42?&#34;</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;I need to look up that order.&#34;</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;It belongs to account 7.&#34;</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>]</span></span></code></pre></div></div></div><p>一般的なロールは次のとおりです。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Role</th><th>Meaning</th></tr></thead><tbody><tr><td><code>system</code></td><td>アプリケーションの指示と動作</td></tr><tr><td><code>developer</code></td><td>新しいモデル API がサポートする開発者向け指示</td></tr><tr><td><code>user</code></td><td>ユーザーが提供した入力</td></tr><tr><td><code>assistant</code></td><td>以前に生成された、または新たに生成されたモデル出力</td></tr><tr><td><code>tool</code></td><td>アプリケーションによるツール呼び出しの結果</td></tr></tbody></table></div></div><p>テキストは通常、文字列として表現されます。マルチモーダルをサポートするモデルでは、テキスト、画像、音声、その他のメディアを含む型付きコンテンツパートの配列を受け付ける場合があります。</p><p>エンドポイントは通常ステートレスです。呼び出し元が会話 ID を再利用しただけでは、モデルは以前の HTTP リクエストを記憶しません。会話を継続するには、クライアントが選択した過去のメッセージを再度送信する必要があります。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>load conversation history
+</span></span><span style=display:flex><span>  -&gt; append current user message
+</span></span><span style=display:flex><span>  -&gt; send all selected messages
+</span></span><span style=display:flex><span>  -&gt; receive assistant message
+</span></span><span style=display:flex><span>  -&gt; save new user and assistant messages</span></span></code></pre></div></div></div><p>モデルのコンテキスト制限内に収めるため、履歴は切り詰めたり、要約したり、外部ストレージから取得したりできます。</p><h3 id=生成オプション>生成オプション
+<a href=#%e7%94%9f%e6%88%90%e3%82%aa%e3%83%97%e3%82%b7%e3%83%a7%e3%83%b3 class=heading-anchor><span>#</span></a></h3><p>頻繁に実装されるリクエストフィールドには次のものがあります。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Field</th><th>Purpose</th></tr></thead><tbody><tr><td><code>model</code></td><td>モデルまたはデプロイメント識別子</td></tr><tr><td><code>temperature</code></td><td>サンプリングのランダム性を制御</td></tr><tr><td><code>top_p</code></td><td>nucleus sampling のしきい値</td></tr><tr><td><code>max_tokens</code></td><td>旧式または互換 API で生成トークン数を制限</td></tr><tr><td><code>max_completion_tokens</code></td><td>一部のモデルで使用される新しい完了トークン数の上限</td></tr><tr><td><code>n</code></td><td>候補選択肢の数</td></tr><tr><td><code>frequency_penalty</code></td><td>頻繁に使用されたトークンの繰り返しを抑制</td></tr><tr><td><code>presence_penalty</code></td><td>まだ使用されていないトークンの導入を促進</td></tr><tr><td><code>stop</code></td><td>設定されたシーケンスで生成を停止</td></tr><tr><td><code>stream</code></td><td>完全なレスポンスを 1 つ返すか、チャンクをストリームするかを選択</td></tr><tr><td><code>response_format</code></td><td>サポートされる場合に JSON またはスキーマ制約付き出力を要求</td></tr><tr><td><code>tools</code></td><td>モデルが要求できる関数を記述</td></tr><tr><td><code>tool_choice</code></td><td>選択可能なツール、またはツールを選択するかどうかを制約</td></tr></tbody></table></div></div><p>プロバイダーのサポートと意味は異なります。ある互換エンドポイントが受け付けるフィールドが、別のエンドポイントでは拒否、無視、改名されたり、異なる意味で解釈されたりする場合があります。同じエンドポイントの背後にあるモデルのバージョンによっても異なる可能性があります。</p><p>サンプリングオプションも相互作用します。アプリケーションでは、評価なしに <code>temperature</code> と <code>top_p</code> の両方を変更するのではなく、通常はいずれか一方を調整します。</p><h2 id=http-レスポンス>HTTP レスポンス
+<a href=#http-%e3%83%ac%e3%82%b9%e3%83%9d%e3%83%b3%e3%82%b9 class=heading-anchor><span>#</span></a></h2><p>ストリーミングしないレスポンスを簡略化すると、次のようになります。</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;id&#34;</span>: <span style=color:#e6db74>&#34;chatcmpl-123&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;object&#34;</span>: <span style=color:#e6db74>&#34;chat.completion&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;created&#34;</span>: <span style=color:#ae81ff>1784778339</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;model&#34;</span>: <span style=color:#e6db74>&#34;gpt-4.1&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;choices&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;index&#34;</span>: <span style=color:#ae81ff>0</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;message&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;Optimistic locking detects concurrent updates...&#34;</span>
+</span></span><span style=display:flex><span>      },
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;finish_reason&#34;</span>: <span style=color:#e6db74>&#34;stop&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;logprobs&#34;</span>: <span style=color:#66d9ef>null</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;usage&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;prompt_tokens&#34;</span>: <span style=color:#ae81ff>25</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;completion_tokens&#34;</span>: <span style=color:#ae81ff>18</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;total_tokens&#34;</span>: <span style=color:#ae81ff>43</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>主なフィールドは次のとおりです。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody><tr><td><code>id</code></td><td>プロバイダーが生成したリクエストまたは完了の識別子</td></tr><tr><td><code>object</code></td><td>レスポンスタイプ。通常は <code>chat.completion</code></td></tr><tr><td><code>created</code></td><td>プロバイダーが割り当てた Unix タイムスタンプ</td></tr><tr><td><code>model</code></td><td>結果を生成したモデル</td></tr><tr><td><code>choices</code></td><td>アシスタント出力の候補</td></tr><tr><td><code>usage</code></td><td>入力、出力、合計トークンの使用量</td></tr><tr><td><code>system_fingerprint</code></td><td>プロバイダー側のモデル設定を示すオプションの識別子</td></tr></tbody></table></div></div><p>各 choice には通常、<code>index</code>、アシスタントの <code>message</code>、<code>finish_reason</code>、およびオプションの対数確率が含まれます。一般的な終了理由は次のとおりです。</p><ul><li><code>stop</code>: 通常の完了</li><li><code>length</code>: 出力またはコンテキストの上限に到達</li><li><code>tool_calls</code>: モデルが 1 つ以上のツールを要求</li><li><code>content_filter</code>: 安全性フィルターによって生成が停止</li></ul><p>HTTP レスポンスが成功したからといって、回答が正しいとは限りません。成功は、プロバイダーがリクエストを受け付け、構文的に有効なモデル結果を生成したことを意味します。</p><h3 id=プロバイダー拡張>プロバイダー拡張
+<a href=#%e3%83%97%e3%83%ad%e3%83%90%e3%82%a4%e3%83%80%e3%83%bc%e6%8b%a1%e5%bc%b5 class=heading-anchor><span>#</span></a></h3><p>OpenAI 互換であることは、バイト単位で同一であることを意味しません。たとえば次のような違いがあります。</p><ul><li>Azure 互換レスポンスには <code>prompt_filter_results</code> や <code>content_filter_results</code> が含まれる場合があります。</li><li>ゲートウェイがレイテンシーチェックポイント、ルーティング情報、キャッシュ統計、サービス階層のメタデータを追加する場合があります。</li><li>トークンの詳細で、推論、音声、キャッシュ、受理された予測、拒否された予測のトークンを区別する場合があります。</li><li>エラーレスポンスとレート制限ヘッダーはプロバイダーごとに異なります。</li></ul><p>可能な場合、アプリケーションは未知のフィールドを無視し、すべてのプロバイダー拡張にドメインモデルを結合しないようにします。拡張が必要な場合は、プロバイダー固有の設定またはメタデータとして明示的に表現します。</p><h2 id=スキーマ内のツール呼び出し>スキーマ内のツール呼び出し
+<a href=#%e3%82%b9%e3%82%ad%e3%83%bc%e3%83%9e%e5%86%85%e3%81%ae%e3%83%84%e3%83%bc%e3%83%ab%e5%91%bc%e3%81%b3%e5%87%ba%e3%81%97 class=heading-anchor><span>#</span></a></h2><p>リクエストにはツール定義を含めることができます。</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;model&#34;</span>: <span style=color:#e6db74>&#34;gpt-4.1&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;messages&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;user&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;What is the status of order 42?&#34;</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ],
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;tools&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;function&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;function&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;name&#34;</span>: <span style=color:#e6db74>&#34;find_order&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;description&#34;</span>: <span style=color:#e6db74>&#34;Look up an order by ID&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;parameters&#34;</span>: {
+</span></span><span style=display:flex><span>          <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;object&#34;</span>,
+</span></span><span style=display:flex><span>          <span style=color:#f92672>&#34;properties&#34;</span>: {
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&#34;order_id&#34;</span>: {
+</span></span><span style=display:flex><span>              <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;string&#34;</span>,
+</span></span><span style=display:flex><span>              <span style=color:#f92672>&#34;description&#34;</span>: <span style=color:#e6db74>&#34;Canonical order ID&#34;</span>
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>          },
+</span></span><span style=display:flex><span>          <span style=color:#f92672>&#34;required&#34;</span>: [
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;order_id&#34;</span>
+</span></span><span style=display:flex><span>          ]
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>モデルは関数を実行しません。代わりに、構造化されたリクエストを含むアシスタントメッセージを返せます。</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#66d9ef>null</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;tool_calls&#34;</span>: [
+</span></span><span style=display:flex><span>    {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;id&#34;</span>: <span style=color:#e6db74>&#34;call_123&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;type&#34;</span>: <span style=color:#e6db74>&#34;function&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;function&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;name&#34;</span>: <span style=color:#e6db74>&#34;find_order&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;arguments&#34;</span>: <span style=color:#e6db74>&#34;{\&#34;order_id\&#34;:\&#34;42\&#34;}&#34;</span>
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  ]
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>ホストアプリケーションは引数を検証し、ローカルまたはリモートの処理を呼び出し、後続のリクエストで結果を送信します。</p><div class=jose-wrapper><div class=jose-tools><span>json</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;role&#34;</span>: <span style=color:#e6db74>&#34;tool&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;tool_call_id&#34;</span>: <span style=color:#e6db74>&#34;call_123&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;content&#34;</span>: <span style=color:#e6db74>&#34;{\&#34;status\&#34;:\&#34;SHIPPED\&#34;}&#34;</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>したがって、通常の通信は次のようになります。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>model request with tool schemas
+</span></span><span style=display:flex><span>  &lt;- assistant tool-call request
+</span></span><span style=display:flex><span>application executes tool
+</span></span><span style=display:flex><span>  -&gt; model request with tool result
+</span></span><span style=display:flex><span>  &lt;- final assistant answer</span></span></code></pre></div></div></div><p>ツール呼び出しには、少なくとも 2 回のモデルとの往復が必要になることがよくあります。認可、検証、冪等性、タイムアウト、副作用について責任を持つのはモデルではなくアプリケーションです。</p><h2 id=ストリーミングレスポンス>ストリーミングレスポンス
+<a href=#%e3%82%b9%e3%83%88%e3%83%aa%e3%83%bc%e3%83%9f%e3%83%b3%e3%82%b0%e3%83%ac%e3%82%b9%e3%83%9d%e3%83%b3%e3%82%b9 class=heading-anchor><span>#</span></a></h2><p><code>"stream": true</code> の場合、サーバーは通常、増分的な <code>chat.completion.chunk</code> オブジェクトをデータとして含む Server-Sent Events を返します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>data: {&#34;object&#34;:&#34;chat.completion.chunk&#34;,&#34;choices&#34;:[{&#34;delta&#34;:{&#34;role&#34;:&#34;assistant&#34;}}]}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>data: {&#34;object&#34;:&#34;chat.completion.chunk&#34;,&#34;choices&#34;:[{&#34;delta&#34;:{&#34;content&#34;:&#34;Optimistic&#34;}}]}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>data: {&#34;object&#34;:&#34;chat.completion.chunk&#34;,&#34;choices&#34;:[{&#34;delta&#34;:{&#34;content&#34;:&#34; locking&#34;}}]}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>data: [DONE]</span></span></code></pre></div></div></div><p>チャンクには完全なメッセージではなく差分が含まれます。クライアントは、提供される場合、コンテンツ、ツール呼び出しの断片、終了理由、使用量を集約する必要があります。ストリーミングは最初に表示可能な出力が得られるまでの時間を短縮しますが、合計レイテンシーやトークンコストを必ずしも削減するわけではありません。</p><h2 id=spring-ai-のオブジェクトモデル>Spring AI のオブジェクトモデル
+<a href=#spring-ai-%e3%81%ae%e3%82%aa%e3%83%96%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88%e3%83%a2%e3%83%87%e3%83%ab class=heading-anchor><span>#</span></a></h2><p>Spring AI は、アプリケーション向けのチャット概念とプロバイダーのワイヤー DTO を分離します。主な型は次のとおりです。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Spring AI type</th><th>Responsibility</th></tr></thead><tbody><tr><td><code>ChatClient</code></td><td>プロンプト、Advisor、ツール、出力変換向けの流暢なアプリケーション API</td></tr><tr><td><code>ChatModel</code></td><td>チャットモデルを呼び出すプロバイダー中立インターフェース</td></tr><tr><td><code>Prompt</code></td><td>順序付きメッセージとリクエストオプション</td></tr><tr><td><code>Message</code></td><td>会話内の 1 エントリを表す共通インターフェース</td></tr><tr><td><code>SystemMessage</code></td><td>system ロールの指示</td></tr><tr><td><code>UserMessage</code></td><td>user ロールの入力</td></tr><tr><td><code>AssistantMessage</code></td><td>アシスタントのテキストとオプションのツール呼び出し</td></tr><tr><td><code>ToolResponseMessage</code></td><td>アシスタントのツール呼び出しに対応する結果</td></tr><tr><td><code>ChatOptions</code></td><td>移植可能なリクエストオプション</td></tr><tr><td><code>OpenAiChatOptions</code></td><td>OpenAI アダプター使用時の OpenAI 固有オプション</td></tr><tr><td><code>ChatResponse</code></td><td>生成結果とメタデータを含むプロバイダー中立レスポンス</td></tr><tr><td><code>Generation</code></td><td>アシスタント候補の 1 つ</td></tr><tr><td><code>ChatResponseMetadata</code></td><td>モデル、使用量、レート制限、プロバイダーのメタデータ</td></tr><tr><td><code>Usage</code></td><td>入力、出力、合計トークン数</td></tr></tbody></table></div></div><p>低レベルのアプリケーションフローは次のとおりです。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatOptions options <span style=color:#f92672>=</span> OpenAiChatOptions.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>model</span>(<span style=color:#e6db74>&#34;gpt-4.1&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>temperature</span>(0.<span style=color:#a6e22e>3</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>maxTokens</span>(1000)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Prompt prompt <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Prompt(
+</span></span><span style=display:flex><span>    List.<span style=color:#a6e22e>of</span>(
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> SystemMessage(<span style=color:#e6db74>&#34;Answer concisely.&#34;</span>),
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>new</span> UserMessage(<span style=color:#e6db74>&#34;Explain optimistic locking.&#34;</span>)
+</span></span><span style=display:flex><span>    ),
+</span></span><span style=display:flex><span>    options
+</span></span><span style=display:flex><span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ChatResponse response <span style=color:#f92672>=</span> chatModel.<span style=color:#a6e22e>call</span>(prompt);
+</span></span><span style=display:flex><span>AssistantMessage answer <span style=color:#f92672>=</span> response.<span style=color:#a6e22e>getResult</span>().<span style=color:#a6e22e>getOutput</span>();</span></span></code></pre></div></div></div><p><code>ChatClient</code> は、より高レベルな流暢な同等 API を提供します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatResponse response <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>system</span>(<span style=color:#e6db74>&#34;Answer concisely.&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(<span style=color:#e6db74>&#34;Explain optimistic locking.&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>options</span>(options)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>chatResponse</span>();</span></span></code></pre></div></div></div><p><code>call()</code> は同期的な終端操作です。プロンプト構築メソッドはリクエストを設定するだけであり、<code>call()</code> が Advisor チェーンとモデルアダプターを呼び出して完了を待機します。代わりに <code>stream()</code> はリアクティブストリームを返します。</p><h2 id=spring-ai-によるリクエストのシリアライズ>Spring AI によるリクエストのシリアライズ
+<a href=#spring-ai-%e3%81%ab%e3%82%88%e3%82%8b%e3%83%aa%e3%82%af%e3%82%a8%e3%82%b9%e3%83%88%e3%81%ae%e3%82%b7%e3%83%aa%e3%82%a2%e3%83%a9%e3%82%a4%e3%82%ba class=heading-anchor><span>#</span></a></h2><p>Spring AI は通常、<code>Prompt.toString()</code> を HTTP 本文としてシリアライズしません。プロバイダーアダプターがマッピングを実行します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Spring AI Prompt
+</span></span><span style=display:flex><span>  messages:
+</span></span><span style=display:flex><span>    SystemMessage
+</span></span><span style=display:flex><span>    UserMessage
+</span></span><span style=display:flex><span>    AssistantMessage
+</span></span><span style=display:flex><span>    ToolResponseMessage
+</span></span><span style=display:flex><span>  options:
+</span></span><span style=display:flex><span>    ChatOptions
+</span></span><span style=display:flex><span>       |
+</span></span><span style=display:flex><span>       v
+</span></span><span style=display:flex><span>OpenAI adapter
+</span></span><span style=display:flex><span>  OpenAI request DTOs
+</span></span><span style=display:flex><span>  role/content conversion
+</span></span><span style=display:flex><span>  option and tool-schema conversion
+</span></span><span style=display:flex><span>       |
+</span></span><span style=display:flex><span>       v
+</span></span><span style=display:flex><span>JSON serializer
+</span></span><span style=display:flex><span>       |
+</span></span><span style=display:flex><span>       v
+</span></span><span style=display:flex><span>POST /v1/chat/completions</span></span></code></pre></div></div></div><p>Spring AI OpenAI 統合では、トランスポート型は <code>OpenAiApi</code> 配下に表現され、リクエスト、メッセージ、choice、completion の構造を含みます。アプリケーションでは通常、これらのトランスポート DTO を直接構築するのではなく、移植可能な型を使用すべきです。</p><p>レスポンスは逆方向に進みます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>HTTP response JSON
+</span></span><span style=display:flex><span>  -&gt; OpenAI response DTOs
+</span></span><span style=display:flex><span>  -&gt; AssistantMessage
+</span></span><span style=display:flex><span>  -&gt; Generation
+</span></span><span style=display:flex><span>  -&gt; ChatResponseMetadata and Usage
+</span></span><span style=display:flex><span>  -&gt; ChatResponse</span></span></code></pre></div></div></div><p>この境界があるため、<code>ChatClientRequest</code> をログに記録すると Java のレコードまたは <code>Prompt</code> 表現が表示される一方、HTTP ワイヤーログには具体的な OpenAI 互換 JSON が表示されます。前者は変換前のプロバイダー中立リクエストであり、後者は変換後にシリアライズされたトランスポート本文です。</p><h2 id=advisor-と会話メモリ>Advisor と会話メモリ
+<a href=#advisor-%e3%81%a8%e4%bc%9a%e8%a9%b1%e3%83%a1%e3%83%a2%e3%83%aa class=heading-anchor><span>#</span></a></h2><p><code>ChatMemory</code> は OpenAI のワイヤースキーマの一部ではありません。これはアプリケーション側の抽象化です。メモリ Advisor はモデル呼び出し前にメッセージを読み込み、呼び出し後に新しいメッセージを保存します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatMemory memory <span style=color:#f92672>=</span> MessageWindowChatMemory.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>maxMessages</span>(20)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ChatClient client <span style=color:#f92672>=</span> builder
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>defaultAdvisors</span>(
+</span></span><span style=display:flex><span>        MessageChatMemoryAdvisor.<span style=color:#a6e22e>builder</span>(memory).<span style=color:#a6e22e>build</span>()
+</span></span><span style=display:flex><span>    )
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>各リクエストでは会話キーを指定します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ChatResponse response <span style=color:#f92672>=</span> client.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(question)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>advisors</span>(spec <span style=color:#f92672>-&gt;</span> spec.<span style=color:#a6e22e>param</span>(
+</span></span><span style=display:flex><span>        ChatMemory.<span style=color:#a6e22e>CONVERSATION_ID</span>,
+</span></span><span style=display:flex><span>        conversationId
+</span></span><span style=display:flex><span>    ))
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>chatResponse</span>();</span></span></code></pre></div></div></div><p>概念的には、Advisor は次の処理を実行します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>ChatMemory.get(conversationId)
+</span></span><span style=display:flex><span>  -&gt; add historical messages to Prompt
+</span></span><span style=display:flex><span>  -&gt; ChatModel.call(Prompt)
+</span></span><span style=display:flex><span>  -&gt; ChatMemory.add(current user and assistant messages)</span></span></code></pre></div></div></div><p>その結果、シリアライズされた <code>messages</code> 配列には、選択された会話ウィンドウ全体が含まれる場合があります。会話 ID、ストレージ、保持期間、アクセス制御はホストアプリケーションに属し、Chat Completions API はそれらを定義しません。</p><h2 id=spring-ai-のツールシリアライズ>Spring AI のツールシリアライズ
+<a href=#spring-ai-%e3%81%ae%e3%83%84%e3%83%bc%e3%83%ab%e3%82%b7%e3%83%aa%e3%82%a2%e3%83%a9%e3%82%a4%e3%82%ba class=heading-anchor><span>#</span></a></h2><p>Spring AI は実行可能な機能を <code>ToolCallback</code> として表現します。アノテーション付きの Java メソッドを検出してコールバックに変換できます。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderTools</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Tool</span>(description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Look up an order by ID&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderStatus <span style=color:#a6e22e>findOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Canonical order ID&#34;</span>) String orderId) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orderService.<span style=color:#a6e22e>find</span>(orderId);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>オブジェクトを登録します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>String answer <span style=color:#f92672>=</span> chatClient.<span style=color:#a6e22e>prompt</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>user</span>(<span style=color:#e6db74>&#34;Where is order 42?&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>tools</span>(orderTools)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>call</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>content</span>();</span></span></code></pre></div></div></div><p>これにより、Spring AI は次の処理を行います。</p><ol><li>アノテーション付きメソッドを検査する。</li><li><code>ToolCallback</code> を作成する。</li><li>引数の JSON Schema を導出する。</li><li>コールバック定義をプロバイダーの <code>tools</code> 配列にマッピングする。</li><li>返された <code>tool_calls</code> を <code>AssistantMessage.ToolCall</code> の値にマッピングする。</li><li>自動ツール実行が有効な場合、ホストアプリケーション内でコールバックを呼び出す。</li><li>次のモデルリクエスト向けに、結果をツールメッセージとしてシリアライズする。</li></ol><p>LLM が認識するのは、名前、説明、スキーマだけです。JVM をリフレクションしたり、任意のメソッドを呼び出したりすることはできません。</p><h2 id=2-つの表現のロギング>2 つの表現のロギング
+<a href=#2-%e3%81%a4%e3%81%ae%e8%a1%a8%e7%8f%be%e3%81%ae%e3%83%ad%e3%82%ae%e3%83%b3%e3%82%b0 class=heading-anchor><span>#</span></a></h2><p>Spring AI の Advisor ロギングと HTTP ワイヤーロギングは、異なる問いに答えます。</p><p><code>SimpleLoggerAdvisor</code> などの Advisor は、次の内容を表示できます。</p><ul><li>それ以前の Advisor がリクエストを変更した後の Spring AI メッセージ</li><li><code>ChatOptions</code></li><li>会話 ID などの Advisor コンテキスト</li><li>プロバイダー中立の <code>ChatResponse</code></li></ul><p>リクエストが Java の <code>toString()</code> 出力のように見えるのは、最終的な HTTP 本文ではなく <code>ChatClientRequest</code> を記録しているためです。</p><p>HTTP クライアントロギングでは、次の内容を表示できます。</p><ul><li>URL とヘッダー</li><li>最終的にシリアライズされた JSON リクエスト</li><li>プロバイダー固有のフィールドとデフォルト値</li><li>生の JSON レスポンス</li><li>ストリーミングチャンク</li></ul><p>ワイヤーロギングは、プロバイダーアダプターがトランスポート DTO を作成した後に発生します。したがって、シリアライズやプロバイダー互換性を診断する適切な層です。ただし危険性もあります。メッセージ、取得したドキュメント、ツール結果、認証ヘッダー、Cookie、個人データがログに現れる可能性があります。完全なペイロードロギングは、管理された開発環境でのみ有効化し、秘匿化と保持期間の制限を適用してください。</p><h2 id=互換性の境界>互換性の境界
+<a href=#%e4%ba%92%e6%8f%9b%e6%80%a7%e3%81%ae%e5%a2%83%e7%95%8c class=heading-anchor><span>#</span></a></h2><p>OpenAI 互換エンドポイントは、同一の動作を保証するものではなく、プロバイダー契約として扱うべきです。次の項目を検証してください。</p><ul><li>エンドポイントパスと認証</li><li>サポートされるメッセージロールとコンテンツ型</li><li>モデル名とデプロイメント選択</li><li>リクエストオプションの名前と制限</li><li>ツール呼び出しと構造化出力のサポート</li><li>ストリーミングイベント形式</li><li>トークン使用量の計算</li><li>安全性および拒否フィールド</li><li>エラー本文と HTTP ステータスコード</li><li>プロバイダー固有の拡張</li></ul><p>Spring AI は、これらの詳細をモデルアダプター内に保持することで、アプリケーションの結合を減らします。ただし、互換性のないプロバイダー動作を同一にすることはできません。サポートする各ゲートウェイとモデルを、個別の実行パスとしてテストしてください。</p><p>Advisor、RAG、ベクトルストア、メモリリポジトリ、可観測性、本番アーキテクチャを含む、より広範なアプリケーションモデルについては、<a href=/spring-ai/>Spring AI</a> を参照してください。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/openai-chat-completions/ class=language-option data-lang=en>English
+</a><a href=/ja/openai-chat-completions/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/openai-chat-completions/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/openai-chat-completions/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

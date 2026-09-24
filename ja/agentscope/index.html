@@ -1,0 +1,335 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>AgentScope</title></head><body><main><article><div class=article-header><h1>AgentScope</h1><div class=aux>最終更新: 2023-05-05 11:54:52 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/ai/>Ai</a>
+|
+<a href=/ja/tags/agents/>Agents</a>
+|
+<a href=/ja/tags/java/>Java</a>
+|
+<a href=/ja/tags/spring-boot/>Spring-Boot</a>
+|
+<a href=/ja/tags/llm/>Llm</a></div></div><div class="translation-notice machine-translated"><a href=/agentscope/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p><a href=https://github.com/agentscope-ai/agentscope>AgentScope</a> は、大規模言語モデルが推論し、ツールを呼び出し、状態を保持し、ユーザーや他のエージェントと協調できるアプリケーションを構築・運用するためのオープンソースフレームワークです。Alibaba によって開始され、Python 向けと Java 向けの個別プロジェクトとして提供されています。</p><p>通常のモデル呼び出しは、アプリケーションが制御する短い経路を持ちます。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>application -&gt; prompt -&gt; model -&gt; response</span></span></code></pre></div></div></div><p>エージェントは実行ループを追加します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>user goal
+</span></span><span style=display:flex><span>   |
+</span></span><span style=display:flex><span>   v
+</span></span><span style=display:flex><span>model reasons -&gt; chooses a tool -&gt; application executes it
+</span></span><span style=display:flex><span>      ^                                  |
+</span></span><span style=display:flex><span>      +----------- tool result &lt;---------+
+</span></span><span style=display:flex><span>   |
+</span></span><span style=display:flex><span>   v
+</span></span><span style=display:flex><span>final answer, interruption, or next action</span></span></code></pre></div></div></div><p>モデル自体が Java や Python の関数を実行するわけではありません。モデルは構造化されたリクエストを出力し、AgentScope はツールシステムを通じてそのリクエストを検証・ディスパッチします。フレームワークは、このループを取り巻くメッセージ、イベントストリーム、権限、セッション状態、繰り返しのモデル呼び出しも管理します。</p><p>この記事では AgentScope 2.0 を説明し、<a href=https://github.com/agentscope-ai/agentscope-java>AgentScope Java</a> 2.0.0 に焦点を当てます。AgentScope は急速に進化しているため、以前の 1.x API 向けの例は変更なしでは動作しない場合があります。</p><h2 id=python-と-java-は別々の実装>Python と Java は別々の実装
+<a href=#python-%e3%81%a8-java-%e3%81%af%e5%88%a5%e3%80%85%e3%81%ae%e5%ae%9f%e8%a3%85 class=heading-anchor><span>#</span></a></h2><p>AgentScope という名前は、すべての言語で変更なしに実行できる 1 つのライブラリではなく、エコシステムを指します。</p><p><a href=https://docs.agentscope.io/>Python プロジェクト</a> には Python 3.11 以降が必要です。非同期エージェントフレームワーク、イベントシステム、ツールとリソースの権限、ミドルウェア、ワークスペース、サンドボックス統合、マルチセッションサービス、マルチエージェントチームを提供します。</p><p><a href=https://java.agentscope.io/>AgentScope Java</a> は JDK 17 以降を必要とするネイティブ JVM 実装です。ノンブロッキング実行 API に Project Reactor を使用し、Java ネイティブのモデル、ツール、メッセージ、イベント、状態ストア、ミドルウェア、権限、ワークスペース、サンドボックス、分散デプロイ用コンポーネントを提供します。</p><p>2 つの実装は設計思想を共有しますが、インプロセスのオブジェクトやソース互換 API は共有しません。Java アプリケーションには、次の 2 つの妥当な統合方法があります。</p><ol><li>AgentScope Java を JVM に直接組み込む。</li><li>Python AgentScope アプリケーションをサービスとして実行し、バージョン管理されたネットワーク API または A2A などのエージェントプロトコル経由で呼び出す。</li></ol><p>リクエストごとに Python インタープリターを起動したり、実行中の Python エージェントを Java にシリアライズしようとしたりしないでください。プロセス境界には、明示的なサービス契約、認証、タイムアウト動作、セッション所有権が必要です。</p><h2 id=コア概念>コア概念
+<a href=#%e3%82%b3%e3%82%a2%e6%a6%82%e5%bf%b5 class=heading-anchor><span>#</span></a></h2><h3 id=メッセージとコンテンツ>メッセージとコンテンツ
+<a href=#%e3%83%a1%e3%83%83%e3%82%bb%e3%83%bc%e3%82%b8%e3%81%a8%e3%82%b3%e3%83%b3%e3%83%86%e3%83%b3%e3%83%84 class=heading-anchor><span>#</span></a></h3><p>メッセージはエージェントを介して入力と出力を運びます。AgentScope Java は <code>UserMessage</code> でユーザー入力を表し、テキスト、画像、ファイル、音声、動画、ツール呼び出し、ツール結果向けの型付きコンテンツブロックをサポートします。</p><p>ロールの検証は重要です。モデルのレスポンス、ユーザー指示、ツール結果は信頼レベルが異なるため、1 つの非構造化プロンプトに平坦化すべきではありません。</p><h3 id=モデル>モデル
+<a href=#%e3%83%a2%e3%83%87%e3%83%ab class=heading-anchor><span>#</span></a></h3><p>モデル層は、プロバイダー固有の拡張を備えた共通のチャットモデル契約を提供します。AgentScope Java 2.0 には、次のようなプロバイダー向けモジュールが含まれます。</p><ul><li>Alibaba DashScope と Qwen</li><li>OpenAI および OpenAI 互換エンドポイント</li><li>Anthropic Claude</li><li>Google Gemini</li><li>Ollama</li><li>サポートされている拡張経由で公開されるその他のプロバイダー</li></ul><p>抽象化により Java API の境界でモデルを置き換えられますが、モデルの動作は同一ではありません。ツール呼び出しの品質、構造化出力、マルチモーダル対応、コンテキスト制限、推論制御、ストリーミングのセマンティクスは、選択したモデルに依存します。</p><h3 id=ツールとツールキット>ツールとツールキット
+<a href=#%e3%83%84%e3%83%bc%e3%83%ab%e3%81%a8%e3%83%84%e3%83%bc%e3%83%ab%e3%82%ad%e3%83%83%e3%83%88 class=heading-anchor><span>#</span></a></h3><p>ツールは、モデルがリクエストできる機能です。AgentScope はツール定義から JSON スキーマを生成し、そのスキーマをモデルに送信し、モデルのツールリクエストを解析して Java 実装を呼び出します。</p><p><code>Toolkit</code> はエージェントが利用できるツールをまとめます。ツールキットの制限は最も重要なセキュリティ制御の 1 つです。エージェントからツールが見えなければ、フレームワークにそのツールを呼び出させることもできません。</p><p>ツールの説明は、モデルに対する運用上の指示です。操作の内容、引数の意味、外部作用や不可逆な作用の有無を記述してください。曖昧な説明は誤った呼び出しにつながります。</p><h3 id=react-ループ>ReAct ループ
+<a href=#react-%e3%83%ab%e3%83%bc%e3%83%97 class=heading-anchor><span>#</span></a></h3><p><code>ReActAgent</code> は AgentScope Java の基本的な推論・行動エージェントです。1 回の実行中に、次の処理を繰り返します。</p><ol><li>システムプロンプト、メッセージ、利用可能なツールからモデルコンテキストを構築する。</li><li>モデルを呼び出す。</li><li>型付きイベントを出力する。</li><li>許可された場合、要求されたツールを実行する。</li><li>ツール結果をコンテキストに追加する。</li><li>最終結果を生成するか停止条件に到達するまで続行する。</li></ol><p>アプリケーションが周辺インフラの大部分を自ら制御し、集中的な会話ループまたはツール呼び出しループを必要とする場合は <code>ReActAgent</code> を使用します。</p><h3 id=harnessagent>HarnessAgent
+<a href=#harnessagent class=heading-anchor><span>#</span></a></h3><p><code>HarnessAgent</code> は同じ推論コアを基盤として、長時間にわたるオープンエンドな作業に対応します。ハーネスには次の機能を追加できます。</p><ul><li>ワークスペースとファイルシステム抽象化</li><li>コンテキスト圧縮</li><li>階層化メモリ</li><li>再利用可能なスキル</li><li>計画</li><li>サブエージェント</li><li>サンドボックス実行</li><li>永続状態とリカバリ</li></ul><p>3 つの業務サービスを呼び出すカスタマーサポートアシスタントには <code>ReActAgent</code> だけで十分な場合があります。一方、リポジトリを 1 時間探索し、ファイルを編集し、レビューを委譲し、再起動後も処理を継続するコーディングエージェントには <code>HarnessAgent</code> が適しています。自律性が高まるほどリスクも増えるため、機能が多いという理由だけで大きなハーネスをデフォルトにすべきではありません。</p><h3 id=イベント>イベント
+<a href=#%e3%82%a4%e3%83%99%e3%83%b3%e3%83%88 class=heading-anchor><span>#</span></a></h3><p>エージェントの実行は型付きイベントストリームを生成します。イベントには、テキスト差分、モデル呼び出し、ツール呼び出し、結果、確認要求、エラー、最終結果が含まれます。そのため、Web UI はログテキストを解析せずに進捗を表示できます。</p><p>イベントストリームは、可観測性と監査ロジックを接続する場所としても適しています。本番アプリケーションでは通常、ツール名、所要時間、結果、モデル使用量、セッション、認証済み主体を記録し、秘密情報を含む可能性があるメッセージとツールの内容はマスキングします。</p><h3 id=ランタイムコンテキストと状態>ランタイムコンテキストと状態
+<a href=#%e3%83%a9%e3%83%b3%e3%82%bf%e3%82%a4%e3%83%a0%e3%82%b3%e3%83%b3%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88%e3%81%a8%e7%8a%b6%e6%85%8b class=heading-anchor><span>#</span></a></h3><p><code>RuntimeContext</code> は 1 回の呼び出しを識別します。<code>userId</code>、<code>sessionId</code>、型付きのアプリケーションオブジェクトを保持できます。Java ツールは、そのようなオブジェクトをモデルに送信する JSON スキーマに公開せず受け取れます。</p><p>この区別により、重大な認可ミスを防止できます。モデルは <code>orderId</code> を指定できますが、その注文の認可に使う信頼済みの <code>tenantId</code> やユーザー ID を指定してはいけません。アプリケーションは Spring Security から ID を取得し、<code>RuntimeContext</code> 経由で注入します。</p><p>会話履歴やその他の復元可能な状態は <code>AgentStateStore</code> に保存します。ローカル JSON ストレージは開発に有用です。複数レプリカ構成では、別のレプリカが同じセッションを再開できるよう、サポートされている Redis 実装やリレーショナルデータベース実装などの共有ストレージが必要です。</p><h2 id=最小限の-python-エージェント>最小限の Python エージェント
+<a href=#%e6%9c%80%e5%b0%8f%e9%99%90%e3%81%ae-python-%e3%82%a8%e3%83%bc%e3%82%b8%e3%82%a7%e3%83%b3%e3%83%88 class=heading-anchor><span>#</span></a></h2><p>次のコマンドで Python フレームワークをインストールします。</p><div class=jose-wrapper><div class=jose-tools><span>bash</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>pip install agentscope</span></span></code></pre></div></div></div><p>AgentScope Python 2.0 は非同期 API を使用します。最小限のエージェントは次のようになります。</p><div class=jose-wrapper><div class=jose-tools><span>python</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> asyncio
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> os
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> agentscope.agent <span style=color:#f92672>import</span> Agent
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> agentscope.credential <span style=color:#f92672>import</span> DashScopeCredential
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> agentscope.message <span style=color:#f92672>import</span> UserMsg
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> agentscope.model <span style=color:#f92672>import</span> DashScopeChatModel
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>async</span> <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>main</span>() <span style=color:#f92672>-&gt;</span> <span style=color:#66d9ef>None</span>:
+</span></span><span style=display:flex><span>    agent <span style=color:#f92672>=</span> Agent(
+</span></span><span style=display:flex><span>        name<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;assistant&#34;</span>,
+</span></span><span style=display:flex><span>        system_prompt<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;You are a concise technical assistant.&#34;</span>,
+</span></span><span style=display:flex><span>        model<span style=color:#f92672>=</span>DashScopeChatModel(
+</span></span><span style=display:flex><span>            credential<span style=color:#f92672>=</span>DashScopeCredential(
+</span></span><span style=display:flex><span>                api_key<span style=color:#f92672>=</span>os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#34;DASHSCOPE_API_KEY&#34;</span>],
+</span></span><span style=display:flex><span>            ),
+</span></span><span style=display:flex><span>            model<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;qwen3.6-plus&#34;</span>,
+</span></span><span style=display:flex><span>        ),
+</span></span><span style=display:flex><span>    )
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>for</span> event <span style=color:#f92672>in</span> agent<span style=color:#f92672>.</span>reply_stream(
+</span></span><span style=display:flex><span>        UserMsg(<span style=color:#e6db74>&#34;alice&#34;</span>, <span style=color:#e6db74>&#34;Explain optimistic locking.&#34;</span>),
+</span></span><span style=display:flex><span>    ):
+</span></span><span style=display:flex><span>        print(event)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>asyncio<span style=color:#f92672>.</span>run(main())</span></span></code></pre></div></div></div><p>実際のアプリケーションでは通常、型によってイベントを選択し、意図的に制限したツールキットを登録し、セッション状態を永続化し、ユーザーにエージェントを公開する前に権限を設定します。</p><h2 id=agentscope-java-を始める>AgentScope Java を始める
+<a href=#agentscope-java-%e3%82%92%e5%a7%8b%e3%82%81%e3%82%8b class=heading-anchor><span>#</span></a></h2><h3 id=依存関係を追加する>依存関係を追加する
+<a href=#%e4%be%9d%e5%ad%98%e9%96%a2%e4%bf%82%e3%82%92%e8%bf%bd%e5%8a%a0%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>AgentScope Java 2.0 には JDK 17 以降が必要です。基本的な <code>ReActAgent</code> には、コアモジュールと 1 つのモデルプロバイダー拡張が必要です。</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>io.agentscope<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>agentscope-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>2.0.0<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>io.agentscope<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>agentscope-core<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;groupId&gt;</span>io.agentscope<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;artifactId&gt;</span>agentscope-extensions-model-dashscope<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencies&gt;</span></span></span></code></pre></div></div></div><p><code>HarnessAgent</code> とそのワークスペース指向の機能が必要な場合は、コア依存関係の代わりに、またはコア依存関係に加えて <code>agentscope-harness</code> を使用します。その他のモデル拡張には、<code>agentscope-extensions-model-openai</code>、<code>agentscope-extensions-model-anthropic</code>、<code>agentscope-extensions-model-gemini</code>、<code>agentscope-extensions-model-ollama</code> などがあります。</p><h3 id=エージェントを作成する>エージェントを作成する
+<a href=#%e3%82%a8%e3%83%bc%e3%82%b8%e3%82%a7%e3%83%b3%e3%83%88%e3%82%92%e4%bd%9c%e6%88%90%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>次のプログラムは DashScope を使用します。API キーはソースコードではなく環境変数から読み取ります。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.ReActAgent;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.message.Msg;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.message.UserMessage;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>FirstAgent</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>main</span>(String<span style=color:#f92672>[]</span> args) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> model <span style=color:#f92672>=</span> DashScopeChatModel.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>apiKey</span>(System.<span style=color:#a6e22e>getenv</span>(<span style=color:#e6db74>&#34;DASHSCOPE_API_KEY&#34;</span>))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>modelName</span>(<span style=color:#e6db74>&#34;qwen-plus&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>stream</span>(<span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>var</span> agent <span style=color:#f92672>=</span> ReActAgent.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;technical-assistant&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>sysPrompt</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        You are a technical assistant.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Distinguish facts from assumptions.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Ask before performing a destructive operation.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>model</span>(model)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        Msg result <span style=color:#f92672>=</span> agent.<span style=color:#a6e22e>call</span>(
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>new</span> UserMessage(<span style=color:#e6db74>&#34;Explain write skew in two paragraphs.&#34;</span>)
+</span></span><span style=display:flex><span>        ).<span style=color:#a6e22e>block</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        System.<span style=color:#a6e22e>out</span>.<span style=color:#a6e22e>println</span>(result.<span style=color:#a6e22e>getTextContent</span>());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>AgentScope は Reactor 型を公開します。コマンドラインプログラムの外側の境界で <code>block()</code> を呼び出すことは許容されます。リアクティブサーバーでは、リクエストスレッドをブロックせずに <code>Mono</code> または <code>Flux</code> を返してください。</p><h2 id=java-ツールを追加する>Java ツールを追加する
+<a href=#java-%e3%83%84%e3%83%bc%e3%83%ab%e3%82%92%e8%bf%bd%e5%8a%a0%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h2><p>アプリケーションに既存の <code>OrderService</code> があるとします。エージェントアダプターは、ビジネスロジックを複製したり、アプリケーション自身の REST エンドポイントを呼び出したりせず、そのサービスに委譲すべきです。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.tool.Tool;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.tool.ToolParam;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>final</span> <span style=color:#66d9ef>class</span> <span style=color:#a6e22e>OrderTools</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderService orders;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> <span style=color:#a6e22e>OrderTools</span>(OrderService orders) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>orders</span> <span style=color:#f92672>=</span> orders;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Tool</span>(
+</span></span><span style=display:flex><span>            name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;get_order&#34;</span>,
+</span></span><span style=display:flex><span>            description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Get the current state of an order visible to the caller&#34;</span>,
+</span></span><span style=display:flex><span>            readOnly <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderView <span style=color:#a6e22e>getOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(
+</span></span><span style=display:flex><span>                    name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;order_id&#34;</span>,
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Numeric order ID&#34;</span>)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>long</span> orderId,
+</span></span><span style=display:flex><span>            RequestIdentity identity) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>get</span>(identity.<span style=color:#a6e22e>tenantId</span>(), identity.<span style=color:#a6e22e>userId</span>(), orderId);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Tool</span>(
+</span></span><span style=display:flex><span>            name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;cancel_order&#34;</span>,
+</span></span><span style=display:flex><span>            description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                    Cancel an order that has not shipped. This changes business
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                    state and must be approved by the user before execution.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                    &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>public</span> OrderView <span style=color:#a6e22e>cancelOrder</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(
+</span></span><span style=display:flex><span>                    name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;order_id&#34;</span>,
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Numeric order ID&#34;</span>)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>long</span> orderId,
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@ToolParam</span>(
+</span></span><span style=display:flex><span>                    name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;reason&#34;</span>,
+</span></span><span style=display:flex><span>                    description <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Business reason for cancellation&#34;</span>)
+</span></span><span style=display:flex><span>            String reason,
+</span></span><span style=display:flex><span>            RequestIdentity identity) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> orders.<span style=color:#a6e22e>cancel</span>(
+</span></span><span style=display:flex><span>                identity.<span style=color:#a6e22e>tenantId</span>(),
+</span></span><span style=display:flex><span>                identity.<span style=color:#a6e22e>userId</span>(),
+</span></span><span style=display:flex><span>                orderId,
+</span></span><span style=display:flex><span>                reason);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>orderId</code> と <code>reason</code> には <code>@ToolParam</code> が付いているため、モデルはこれらをツールスキーマ内で認識します。<code>RequestIdentity</code> にはアノテーションが付いていません。AgentScope は呼び出しごとの <code>RuntimeContext</code> からこれを注入するため、モデルはこの引数を偽造して別のテナントになりすますことができません。</p><p>ツールオブジェクトをツールキットに登録します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Toolkit toolkit <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Toolkit();
+</span></span><span style=display:flex><span>toolkit.<span style=color:#a6e22e>registerTool</span>(<span style=color:#66d9ef>new</span> OrderTools(orderService));
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ReActAgent agent <span style=color:#f92672>=</span> ReActAgent.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;order-assistant&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>sysPrompt</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                Help users inspect their orders.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                Never cancel an order without explicit approval.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>model</span>(model)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>toolkit</span>(toolkit)
+</span></span><span style=display:flex><span>        .<span style=color:#a6e22e>build</span>();</span></span></code></pre></div></div></div><p>Java アノテーションにより、単純な同期ツールを便利に作成できます。権限チェック、非同期実行、構造化メタデータをより細かく制御するために、AgentScope Java は低レベルのツール抽象化も提供します。</p><h2 id=agentscope-java-と-spring-boot-の統合>AgentScope Java と Spring Boot の統合
+<a href=#agentscope-java-%e3%81%a8-spring-boot-%e3%81%ae%e7%b5%b1%e5%90%88 class=heading-anchor><span>#</span></a></h2><p>AgentScope Java はフレームワークに依存しないため、Spring Boot アプリケーションには通常の Java オブジェクトとして統合します。推奨される境界は次のとおりです。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>REST or WebSocket controller
+</span></span><span style=display:flex><span>        |
+</span></span><span style=display:flex><span>        v
+</span></span><span style=display:flex><span>AgentScope agent factory
+</span></span><span style=display:flex><span>        |
+</span></span><span style=display:flex><span>        +----&gt; model provider
+</span></span><span style=display:flex><span>        +----&gt; application tools ----&gt; existing Spring services
+</span></span><span style=display:flex><span>        +----&gt; shared state store</span></span></code></pre></div></div></div><p>次の例では、SSE チャットエンドポイントを公開します。各呼び出しで新しい <code>ReActAgent</code> を意図的に作成します。<code>ReActAgent</code> インスタンスは並行呼び出しに対して安全ではありませんが、モデルと状態ストアは共有できます。ツールキットはエージェント構築時にコピーされます。</p><h3 id=共有コンポーネントを構成する>共有コンポーネントを構成する
+<a href=#%e5%85%b1%e6%9c%89%e3%82%b3%e3%83%b3%e3%83%9d%e3%83%bc%e3%83%8d%e3%83%b3%e3%83%88%e3%82%92%e6%a7%8b%e6%88%90%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.ReActAgent;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.state.AgentStateStore;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.state.JsonFileAgentStateStore;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.tool.Toolkit;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.nio.file.Path;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.context.properties.ConfigurationProperties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.boot.context.properties.EnableConfigurationProperties;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.context.annotation.Bean;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.context.annotation.Configuration;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@ConfigurationProperties</span>(prefix <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;app.agent&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>AgentProperties</span>(String apiKey, String model) {
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@Configuration</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@EnableConfigurationProperties</span>(AgentProperties.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>AgentConfiguration</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>    DashScopeChatModel <span style=color:#a6e22e>agentModel</span>(AgentProperties properties) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> DashScopeChatModel.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>apiKey</span>(properties.<span style=color:#a6e22e>apiKey</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>modelName</span>(properties.<span style=color:#a6e22e>model</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>stream</span>(<span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>    AgentStateStore <span style=color:#a6e22e>agentStateStore</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> JsonFileAgentStateStore(
+</span></span><span style=display:flex><span>                Path.<span style=color:#a6e22e>of</span>(<span style=color:#e6db74>&#34;.agentscope&#34;</span>, <span style=color:#e6db74>&#34;sessions&#34;</span>));
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>    Toolkit <span style=color:#a6e22e>orderToolkit</span>(OrderService orders) {
+</span></span><span style=display:flex><span>        Toolkit toolkit <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> Toolkit();
+</span></span><span style=display:flex><span>        toolkit.<span style=color:#a6e22e>registerTool</span>(<span style=color:#66d9ef>new</span> OrderTools(orders));
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> toolkit;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@Bean</span>
+</span></span><span style=display:flex><span>    OrderAgentFactory <span style=color:#a6e22e>orderAgentFactory</span>(
+</span></span><span style=display:flex><span>            DashScopeChatModel model,
+</span></span><span style=display:flex><span>            AgentStateStore stateStore,
+</span></span><span style=display:flex><span>            Toolkit orderToolkit) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>new</span> OrderAgentFactory(model, stateStore, orderToolkit);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>非秘密の値は通常どおり構成し、API キーはシークレットマネージャーまたは環境変数から提供します。</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>app</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>agent</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>model</span>: <span style=color:#ae81ff>qwen-plus</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>api-key</span>: <span style=color:#ae81ff>${DASHSCOPE_API_KEY}</span></span></span></code></pre></div></div></div><p>モデルの認証情報をブラウザーに公開しないでください。</p><p>ファクトリは安全なインフラストラクチャを再利用しながら、分離されたエージェント実行を作成します。</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#66d9ef>public</span> <span style=color:#66d9ef>record</span> <span style=color:#a6e22e>OrderAgentFactory</span>(
+</span></span><span style=display:flex><span>        DashScopeChatModel model,
+</span></span><span style=display:flex><span>        AgentStateStore stateStore,
+</span></span><span style=display:flex><span>        Toolkit toolkit) {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    ReActAgent <span style=color:#a6e22e>create</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> ReActAgent.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>name</span>(<span style=color:#e6db74>&#34;order-assistant&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>sysPrompt</span>(<span style=color:#e6db74>&#34;&#34;&#34;
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Help the authenticated user inspect orders.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Use tools for current order data.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        Never claim that a mutation succeeded unless its tool
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        returned a successful result.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>                        &#34;&#34;&#34;</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>model</span>(model)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>stateStore</span>(stateStore)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>toolkit</span>(toolkit)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>ローカル開発では <code>JsonFileAgentStateStore</code> で十分です。複数のアプリケーションレプリカを実行する前に、サポートされている共有状態ストアに置き換えてください。コンテナ内のローカルディレクトリは、耐久性のあるセッションストレージではありません。</p><h3 id=sse-エンドポイントを公開する>SSE エンドポイントを公開する
+<a href=#sse-%e3%82%a8%e3%83%b3%e3%83%89%e3%83%9d%e3%82%a4%e3%83%b3%e3%83%88%e3%82%92%e5%85%ac%e9%96%8b%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.agent.RuntimeContext;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.event.TextBlockDeltaEvent;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> io.agentscope.core.message.UserMessage;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> java.security.Principal;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.http.MediaType;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.PostMapping;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RequestBody;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RequestMapping;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> org.springframework.web.bind.annotation.RestController;
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> reactor.core.publisher.Flux;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>ChatRequest</span>(String sessionId, String message) {
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>record</span> <span style=color:#a6e22e>RequestIdentity</span>(String tenantId, String userId) {
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RestController</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@RequestMapping</span>(<span style=color:#e6db74>&#34;/api/assistant&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>AgentController</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> OrderAgentFactory agents;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>private</span> <span style=color:#66d9ef>final</span> TenantResolver tenants;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    AgentController(OrderAgentFactory agents, TenantResolver tenants) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>agents</span> <span style=color:#f92672>=</span> agents;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>this</span>.<span style=color:#a6e22e>tenants</span> <span style=color:#f92672>=</span> tenants;
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@PostMapping</span>(
+</span></span><span style=display:flex><span>            path <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;/messages&#34;</span>,
+</span></span><span style=display:flex><span>            produces <span style=color:#f92672>=</span> MediaType.<span style=color:#a6e22e>TEXT_EVENT_STREAM_VALUE</span>)
+</span></span><span style=display:flex><span>    Flux<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span> <span style=color:#a6e22e>chat</span>(
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>@RequestBody</span> ChatRequest request,
+</span></span><span style=display:flex><span>            Principal principal) {
+</span></span><span style=display:flex><span>        String userId <span style=color:#f92672>=</span> principal.<span style=color:#a6e22e>getName</span>();
+</span></span><span style=display:flex><span>        String tenantId <span style=color:#f92672>=</span> tenants.<span style=color:#a6e22e>currentTenant</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        RuntimeContext context <span style=color:#f92672>=</span> RuntimeContext.<span style=color:#a6e22e>builder</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>userId</span>(userId)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>sessionId</span>(request.<span style=color:#a6e22e>sessionId</span>())
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>put</span>(
+</span></span><span style=display:flex><span>                        RequestIdentity.<span style=color:#a6e22e>class</span>,
+</span></span><span style=display:flex><span>                        <span style=color:#66d9ef>new</span> RequestIdentity(tenantId, userId))
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>build</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> agents.<span style=color:#a6e22e>create</span>()
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>streamEvents</span>(
+</span></span><span style=display:flex><span>                        <span style=color:#66d9ef>new</span> UserMessage(request.<span style=color:#a6e22e>message</span>()),
+</span></span><span style=display:flex><span>                        context)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>filter</span>(TextBlockDeltaEvent.<span style=color:#a6e22e>class</span>::isInstance)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>cast</span>(TextBlockDeltaEvent.<span style=color:#a6e22e>class</span>)
+</span></span><span style=display:flex><span>                .<span style=color:#a6e22e>map</span>(TextBlockDeltaEvent::getDelta);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>アプリケーションは、送信されたセッションが認証済みユーザーに属することを検証する必要があります。多くのシステムでは、任意のクライアント生成 ID を受け入れるのではなく、サーバーが不透明なセッション ID を発行して所有権を保存すべきです。<code>RuntimeContext.userId</code> が異なっていても、2 人のユーザーが同じ <code>sessionId</code> を使用すると、選択したストアのパーティション方法によっては会話が漏えいするおそれがあります。</p><p>単純な UI ではテキスト差分だけをストリーミングする方法が便利ですが、より豊かな API ではイベント型を保持すべきです。ブラウザーは、モデルテキスト、ツールの進捗、承認要求、復旧可能なエラー、完了を区別する必要がある場合があります。AG-UI またはアプリケーション固有のイベントエンベロープは、文字列だけのストリームより表現力があります。</p><h3 id=ブロッキングツールを処理する>ブロッキングツールを処理する
+<a href=#%e3%83%96%e3%83%ad%e3%83%83%e3%82%ad%e3%83%b3%e3%82%b0%e3%83%84%e3%83%bc%e3%83%ab%e3%82%92%e5%87%a6%e7%90%86%e3%81%99%e3%82%8b class=heading-anchor><span>#</span></a></h3><p>エージェント API はリアクティブですが、アノテーション付きツールがブロッキングデータベースドライバーやレガシー HTTP クライアントを呼び出すことがあります。リアクティブ型を使っても、その操作はノンブロッキングにはなりません。次のいずれかを行ってください。</p><ul><li>ノンブロッキングの依存関係と非同期ツール API を使用する。</li><li>ブロッキング処理を境界付きワーカープールでスケジュールする。</li><li>明示的に並行性を制限した従来型のリクエストモデルを使用する。</li></ul><p>Reactor のイベントループスレッド上で、境界のないブロッキング処理を実行しないでください。また、モデル呼び出し、ツール呼び出し、エージェント実行全体に対して個別にタイムアウトを設定します。エージェントは複数のモデル呼び出しとツール呼び出しを行う可能性があるため、総レイテンシは 1 回のモデルリクエストより大きくなります。</p><h2 id=権限と人による承認>権限と人による承認
+<a href=#%e6%a8%a9%e9%99%90%e3%81%a8%e4%ba%ba%e3%81%ab%e3%82%88%e3%82%8b%e6%89%bf%e8%aa%8d class=heading-anchor><span>#</span></a></h2><p>「削除前に確認する」といったプロンプト指示は有用ですが、強制にはなりません。モデルが誤解する可能性があり、取得したコンテンツがプロンプトインジェクションを試みる可能性もあり、将来のプロンプト編集で制御が弱まる可能性もあります。</p><p>AgentScope Java の権限エンジンでは、ツール呼び出しを次のように分類できます。</p><ul><li><strong>allow</strong>: 中断せずに実行する。</li><li><strong>ask</strong>: 一時停止してユーザーの判断を求める。</li><li><strong>deny</strong>: 操作を拒否する。</li></ul><p>承認が必要な呼び出しでは、エージェントが確認状態を出力または返します。アプリケーションは正確な操作と引数を表示し、ユーザーの判断を記録し、その判断で実行を再開します。ヘッドレス環境では、承認が必要な操作は、黙って許可に変えるのではなく、デフォルトで拒否すべきです。</p><p>権限ルールは、通常のアプリケーション認可を補完します。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>permission rule:
+</span></span><span style=display:flex><span>  Is this category of tool allowed in this agent flow?
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>OrderService authorization:
+</span></span><span style=display:flex><span>  May this authenticated user cancel this specific order?</span></span></code></pre></div></div></div><p>両方のチェックが必要です。権限ルールは、テナントチェック、所有権チェック、トランザクション不変条件、データベース制約の代わりにはなりません。</p><h2 id=メモリワークスペースサンドボックス>メモリ、ワークスペース、サンドボックス
+<a href=#%e3%83%a1%e3%83%a2%e3%83%aa%e3%83%af%e3%83%bc%e3%82%af%e3%82%b9%e3%83%9a%e3%83%bc%e3%82%b9%e3%82%b5%e3%83%b3%e3%83%89%e3%83%9c%e3%83%83%e3%82%af%e3%82%b9 class=heading-anchor><span>#</span></a></h2><p>これらの概念は異なる問題を解決します。</p><p><strong>会話状態</strong> は、セッションを継続するために必要なメッセージとエージェント状態を保持します。</p><p><strong>長期メモリ</strong> は、会話をまたいで選択した事実や要約を保存します。保持、訂正、削除、テナント分離に関するポリシーが必要です。すべてのモデル発話を永久保存しても、メモリ戦略にはなりません。</p><p><strong>ワークスペース</strong> は、ハーネスに計画、成果物、スキル、大規模なツール結果のための永続領域を提供します。ユーザーやツールが内容に影響を与えられる場合、ワークスペースファイルは信頼できない入力として扱ってください。</p><p><strong>サンドボックス</strong> は、コードとコマンドの実行を分離します。異なるプロセス ID を持つだけで、ローカルサブプロセスが強力なセキュリティ境界になるわけではありません。モデルが生成したコマンドを本番で実行する場合は、リソースとネットワークを制限した、適切に強化されたコンテナ、Kubernetes、またはサポートされているリモートサンドボックスを使用してください。</p><h2 id=マルチエージェントシステム>マルチエージェントシステム
+<a href=#%e3%83%9e%e3%83%ab%e3%83%81%e3%82%a8%e3%83%bc%e3%82%b8%e3%82%a7%e3%83%b3%e3%83%88%e3%82%b7%e3%82%b9%e3%83%86%e3%83%a0 class=heading-anchor><span>#</span></a></h2><p>AgentScope はエージェントチームとサブエージェントをサポートしますが、エージェントを複数にすれば自動的に単一エージェントより優れるわけではありません。モデル呼び出し、状態遷移、障害モード、調整コストが増加します。</p><p>次のように、明確な境界が実際に存在する場合にサブエージェントを使用します。</p><ul><li>異なるツールと権限セット</li><li>専門化されたコンテキストまたはシステムプロンプト</li><li>独立した並列調査</li><li>個別に復元可能な長時間タスク</li><li>分離を必要とする信頼境界</li></ul><p>決定論的な順序付けには、通常の Java メソッドまたはワークフローコードを使用します。2 つの数を足すために、あるモデルから別のモデルに依頼させると、関数を呼び出すより遅く、信頼性も低くなります。</p><p>独立してデプロイされたエージェント間の通信には、サービス契約を使用します。<a href=/ja/a2a-protocol/>A2A</a> は、エージェント間のディスカバリ、メッセージ、タスク、成果物を目的としています。<a href=/mcp/>MCP</a> はエージェントをツールとリソースに接続しますが、目標を自律的なリモートエージェントに委譲するものではありません。</p><h2 id=python-agentscope-サービスとの統合>Python AgentScope サービスとの統合
+<a href=#python-agentscope-%e3%82%b5%e3%83%bc%e3%83%93%e3%82%b9%e3%81%a8%e3%81%ae%e7%b5%b1%e5%90%88 class=heading-anchor><span>#</span></a></h2><p>組織によっては、AgentScope Python で記述したエージェントをすでに運用している場合があります。Java サービスは、それをリモートシステムとして扱うべきです。</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Spring Boot service
+</span></span><span style=display:flex><span>    -&gt; authenticated HTTP, A2A, or messaging contract
+</span></span><span style=display:flex><span>    -&gt; Python AgentScope service
+</span></span><span style=display:flex><span>    -&gt; model and tools</span></span></code></pre></div></div></div><p>次の項目を定義します。</p><ul><li>リクエスト、イベント、成果物のスキーマ</li><li>プロトコルとバージョン</li><li>認証とテナント伝播</li><li>セッション ID を作成・所有する主体</li><li>冪等性の動作</li><li>ストリーミングと再接続の動作</li><li>キャンセルとタイムアウトのセマンティクス</li><li>エラーマッピング</li></ul><p>Python サービスが標準的な REST API を提供する場合は、OpenAPI 契約から Java HTTP クライアントを生成します。リモートコンポーネントが長時間タスクとマルチターンのネゴシエーションを持つ独立したエージェントである場合は、A2A を使用します。Java サービスが Python の実装クラスを認識しない構成を維持してください。</p><p>組み込み Java 方式とリモート Python 方式は共存できます。たとえば、Spring Boot の注文エージェントが低レイテンシの業務処理にはローカル Java ツールを使用し、専門的な文書分析タスクを A2A 経由で Python エージェントに委譲できます。</p><h2 id=agentscope-java-と-spring-ai>AgentScope Java と Spring AI
+<a href=#agentscope-java-%e3%81%a8-spring-ai class=heading-anchor><span>#</span></a></h2><p><a href=/spring-ai/>Spring AI</a> と AgentScope Java には重複する領域がありますが、中心となる問題は異なります。</p><p>Spring AI は、移植可能なモデル API、<code>ChatClient</code>、Advisors、検索拡張生成、ベクトルストア、構造化出力、ツール、可観測性、MCP のための Spring ネイティブなインフラストラクチャです。既存の Spring アーキテクチャ内で主にモデル機能を必要とするアプリケーションには自然な選択肢です。</p><p>AgentScope Java は、エージェント実行ランタイムに重点を置きます。繰り返しの推論と行動、型付きライフサイクルイベント、権限、中断、ハーネスワークスペース、サブエージェント、再開可能なセッション、分散エージェント運用が対象です。</p><p>アプリケーションの主な課題に基づいて選択します。</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>要件</th><th>開始点として考えられるもの</th></tr></thead><tbody><tr><td>Spring サービスにチャット、RAG、またはツール呼び出しを追加する</td><td>Spring AI</td></tr><tr><td>長時間実行され、中断可能で、ツールを使用するエージェントを実行する</td><td>AgentScope Java</td></tr><tr><td>複数の AI ホストにツールを公開する</td><td>MCP サーバー</td></tr><tr><td>独立してデプロイされたエージェントと協調する</td><td>A2A</td></tr></tbody></table></div></div><p>両ライブラリのモデル、メッセージ、ツールのインターフェースは互換性がありません。1 つの推論ループでフレームワークを混在させるためだけにアダプターを書かないでください。統合は、共有 Spring ビジネスサービス、MCP ツール、A2A、アプリケーション API など、安定した境界で行う方が明確です。</p><h2 id=本番チェックリスト>本番チェックリスト
+<a href=#%e6%9c%ac%e7%95%aa%e3%83%81%e3%82%a7%e3%83%83%e3%82%af%e3%83%aa%e3%82%b9%e3%83%88 class=heading-anchor><span>#</span></a></h2><p>AgentScope アプリケーションを実ユーザーに公開する前に、次を確認します。</p><ol><li>すべてのエントリーポイントを認証し、信頼できるコンテキストから ID を導出する。</li><li>セッション、状態、メモリ、ワークスペース、キャッシュをテナントとユーザー単位で分離する。</li><li>各エージェントには、その役割に必要なツールだけを与える。</li><li>認可をプロンプトだけでなく、ビジネスサービス内部で強制する。</li><li>金銭的、破壊的、外部への作用を伴う操作には明示的な承認を要求する。</li><li>モデルが生成したコードをサンドボックス化し、ファイルシステムとネットワークへのアクセスを制限する。</li><li>モデルターン、ツール呼び出し、トークン、実行時間、結果サイズ、並行性に上限を設ける。</li><li>リトライが発生し得る状態変更ツールを冪等にする。</li><li>複数レプリカへスケールする前に、再開可能な状態を共有ストレージに保存する。</li><li>秘密情報と個人データをマスキングしながら、モデルとツールのイベントをトレースする。</li><li>最終的な文章回答だけでなく、完全な軌跡を評価する。</li><li>キャンセル、モデル障害、ツールタイムアウト、再起動、重複配信の経路をテストする。</li></ol><p>エージェントフレームワークは実行機構を提供しますが、どの操作が安全か、ユーザーがどのデータにアクセスできるか、モデルの回答が正しいかは決定しません。これらは引き続きアプリケーションと運用の責任です。</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.agentscope.io/>AgentScope Python ドキュメント</a></li><li><a href=https://github.com/agentscope-ai/agentscope>AgentScope Python リポジトリ</a></li><li><a href=https://java.agentscope.io/>AgentScope Java ドキュメント</a></li><li><a href=https://github.com/agentscope-ai/agentscope-java>AgentScope Java リポジトリ</a></li><li><a href=/spring-ai/>Spring AI</a></li><li><a href=/mcp/>Model Context Protocol</a></li><li><a href=/ja/a2a-protocol/>Agent2Agent Protocol</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/agentscope/ class=language-option data-lang=en>English
+</a><a href=/ja/agentscope/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/agentscope/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/agentscope/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

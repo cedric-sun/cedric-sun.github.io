@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Memory-Management on cesun.life</title><link>https://example.org/zh-tw/tags/memory-management/</link><description>Recent content in Memory-Management on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Wed, 28 Feb 2024 10:22:21 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/memory-management/index.xml" rel="self" type="application/rss+xml"/><item><title>C++ 智慧指標與所有權</title><link>https://example.org/zh-tw/cpp-smart-pointers/</link><pubDate>Wed, 28 Feb 2024 10:22:21 +0800</pubDate><guid>https://example.org/zh-tw/cpp-smart-pointers/</guid><description>&lt;p&gt;智慧指標讓介面中的所有權清楚可見。但它們不會取代僅用於借用物件的參照與原始指標；對於這類物件，其生命週期由其他位置保證。應根據生命週期契約選擇指標型別，並在 API 邊界明確表達所有權轉移與物件觀察。&lt;/p&gt;
+&lt;h2 id="唯一所有權"&gt;
+ 唯一所有權
+ &lt;a href="#%e5%94%af%e4%b8%80%e6%89%80%e6%9c%89%e6%ac%8a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::unique_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 擁有一個物件，且只能移動。普通的 &lt;code&gt;new&lt;/code&gt; 與預設刪除器適用時，應使用 &lt;code&gt;std::make_unique&lt;/code&gt; 建立；若要轉移所有權，應以值傳遞或以值回傳。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;memory&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;unique_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Connection&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; open_connection(Address address);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;install_connection&lt;/span&gt;(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;unique_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Connection&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; connection);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;install_connection(open_connection(address));&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;自訂刪除器是 &lt;code&gt;unique_ptr&lt;/code&gt; 型別的一部分，因此可能影響其大小以及 API 接受的型別。刪除器必須符合所有權協定，且不得在解構過程中擲出例外。&lt;/p&gt;
+&lt;p&gt;即使 &lt;code&gt;T&lt;/code&gt; 是不完整型別，&lt;code&gt;unique_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 也可以出現在標頭檔中。不過，預設刪除器要求在實例化銷毀物件的操作處，&lt;code&gt;T&lt;/code&gt; 已是完整型別；這通常是擁有該物件之類別的類別外解構函式。&lt;code&gt;unique_ptr&amp;lt;T[]&amp;gt;&lt;/code&gt; 表示陣列配置，但不會保留陣列長度；對於擁有的序列，應優先使用 &lt;code&gt;std::vector&amp;lt;T&amp;gt;&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="共用所有權與觀察"&gt;
+ 共用所有權與觀察
+ &lt;a href="#%e5%85%b1%e7%94%a8%e6%89%80%e6%9c%89%e6%ac%8a%e8%88%87%e8%a7%80%e5%af%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::shared_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 共用一個控制區塊，其中包含所有權狀態，通常也包含刪除器與配置器。複製 &lt;code&gt;shared_ptr&lt;/code&gt; 會延長所有權；最後一個擁有物件的指標會銷毀受管理物件。&lt;code&gt;std::make_shared&lt;/code&gt; 可以同時配置物件與控制區塊，從而減少配置次數。由於弱觀察者會保留控制區塊，這種合併配置可能導致物件的儲存空間直到觀察者消失後才可釋放。&lt;/p&gt;
+&lt;p&gt;別名建構函式在儲存不同指標的同時共用既有的控制區塊：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; owner &lt;span style="color:#f92672"&gt;=&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;make_shared&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Record&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;shared_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Member&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; member(owner, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;owner&lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt;member);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;member.get()&lt;/code&gt; 指向子物件，但其生命週期由 &lt;code&gt;owner&lt;/code&gt; 所擁有的 &lt;code&gt;Record&lt;/code&gt; 控制。不要從同一個原始指標建構彼此無關的 &lt;code&gt;shared_ptr&lt;/code&gt; 實例；每個實例都會認為自己獨立擁有該物件。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;std::weak_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 會觀察控制區塊，但不會延長物件的生命週期。解參照前，應使用 &lt;code&gt;lock()&lt;/code&gt; 取得暫時的擁有指標。當所有權循環會使物件圖無限期存活時，應使用 &lt;code&gt;weak_ptr&lt;/code&gt; 對反向邊與快取進行建模。&lt;/p&gt;
+&lt;h2 id="api-契約"&gt;
+ API 契約
+ &lt;a href="#api-%e5%a5%91%e7%b4%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用能夠說明預期關係的簽章：&lt;/p&gt;</description></item></channel></rss>

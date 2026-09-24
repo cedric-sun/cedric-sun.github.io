@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Classloading on cesun.life</title><link>https://example.org/zh-cn/tags/classloading/</link><description>Recent content in Classloading on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sat, 25 Feb 2023 22:30:58 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/classloading/index.xml" rel="self" type="application/rss+xml"/><item><title>Java 类加载</title><link>https://example.org/zh-cn/java-class-loading/</link><pubDate>Sat, 25 Feb 2023 22:30:58 +0800</pubDate><guid>https://example.org/zh-cn/java-class-loading/</guid><description>&lt;p&gt;类加载将二进制表示转换为 &lt;code&gt;Class&lt;/code&gt; 对象。链接和初始化是独立步骤，
+因此加载类型并不意味着其静态初始化器已经运行。&lt;/p&gt;
+&lt;h2 id="加载器和类型身份"&gt;
+ 加载器和类型身份
+ &lt;a href="#%e5%8a%a0%e8%bd%bd%e5%99%a8%e5%92%8c%e7%b1%bb%e5%9e%8b%e8%ba%ab%e4%bb%bd" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JDK 提供引导、平台和应用程序类加载器。引导加载器定义核心平台类，
+在部分 API 中用 &lt;code&gt;null&lt;/code&gt; 表示；平台加载器定义平台模块；应用程序加载器从类路径或模块路径
+加载应用程序类。自定义加载器通常使用双亲优先委派：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;重用已经加载的定义；&lt;/li&gt;
+&lt;li&gt;请求父加载器加载二进制名称；然后&lt;/li&gt;
+&lt;li&gt;查找字节并调用 &lt;code&gt;defineClass&lt;/code&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;双亲优先委派保护平台类型身份。它是一种约定而不是绝对规则：
+插件系统有时会在严格排除特定软件包的情况下使用子优先加载。
+运行时类型由其二进制名称和定义它的加载器共同标识。
+因此，两个加载器可以定义不同的 &lt;code&gt;com.example.Plugin&lt;/code&gt; 类型，实例也不能在两者之间强制转换。&lt;/p&gt;
+&lt;h2 id="加载链接和初始化"&gt;
+ 加载、链接和初始化
+ &lt;a href="#%e5%8a%a0%e8%bd%bd%e9%93%be%e6%8e%a5%e5%92%8c%e5%88%9d%e5%a7%8b%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JVM 规范将生命周期分为以下阶段：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;加载&lt;/strong&gt;获取字节，创建 &lt;code&gt;Class&lt;/code&gt; 对象，并关联定义加载器。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;链接&lt;/strong&gt;包括验证、准备和可选解析。验证检查结构和类型安全约束。
+准备为静态字段分配空间并赋予默认值。解析将符号引用转换为运行时引用；
+实现可以推迟解析。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;初始化&lt;/strong&gt;执行合成的 &lt;code&gt;&amp;lt;clinit&amp;gt;&lt;/code&gt; 方法，其中包含静态字段初始化器和按源代码顺序排列的静态块。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;编译期常量在准备阶段赋值，因此读取常量变量可能避免初始化其声明类。
+不要根据某个实现的日志输出推断可移植的解析调度。&lt;/p&gt;
+&lt;h2 id="精确的初始化触发条件"&gt;
+ 精确的初始化触发条件
+ &lt;a href="#%e7%b2%be%e7%a1%ae%e7%9a%84%e5%88%9d%e5%a7%8b%e5%8c%96%e8%a7%a6%e5%8f%91%e6%9d%a1%e4%bb%b6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JLS §12.4.1 要求在首次主动使用类之前立即初始化类：
+创建实例、调用静态方法、赋值静态字段，或读取不是常量变量的静态字段。
+主动使用还包括执行需要该类的 &lt;code&gt;static&lt;/code&gt; 断言、选定的反射操作以及规范规定的方法句柄行为。
+&lt;code&gt;Class.forName&lt;/code&gt; 默认会初始化；使用三参数重载并传入 &lt;code&gt;false&lt;/code&gt;，可以加载但不请求初始化。&lt;/p&gt;
+&lt;p&gt;类 &lt;code&gt;C&lt;/code&gt; 初始化前，其超类会先初始化；随后在适用时，按照 JLS 定义的顺序初始化声明默认方法的超接口。
+初始化一个类不会初始化它实现的任意接口。读取 &lt;code&gt;Child.value&lt;/code&gt; 会初始化实际声明 &lt;code&gt;value&lt;/code&gt; 的类，
+不一定是 &lt;code&gt;Child&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="失败和并发"&gt;
+ 失败和并发
+ &lt;a href="#%e5%a4%b1%e8%b4%a5%e5%92%8c%e5%b9%b6%e5%8f%91" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JVM 会为每个类或接口串行化初始化。一个线程运行 &lt;code&gt;&amp;lt;clinit&amp;gt;&lt;/code&gt; 时，其他线程会等待；
+同一线程发起的递归请求则被允许。如果初始化异常结束，VM 会将该类型记录为错误，
+向触发使用报告初始化失败，之后的主动使用会以 &lt;code&gt;NoClassDefFoundError&lt;/code&gt; 失败。
+必须重启进程或使用独立加载器，才能获得另一次初始化尝试。&lt;/p&gt;</description></item></channel></rss>

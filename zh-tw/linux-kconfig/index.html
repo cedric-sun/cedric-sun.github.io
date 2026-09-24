@@ -1,0 +1,67 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux Kconfig</title></head><body><main><article><div class=article-header><h1>Linux Kconfig</h1><div class=aux>最後更新: 2022-07-06 20:06:54 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/kconfig/>Kconfig</a>
+|
+<a href=/zh-tw/tags/kernel/>Kernel</a>
+|
+<a href=/zh-tw/tags/linux/>Linux</a></div></div><div class="translation-notice machine-translated"><a href=/linux-kconfig/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>Kconfig 描述建置 Linux 核心設定時所做的選擇。核心開發者編輯 <code>Kconfig</code> 檔案來定義符號與其關係；使用者透過 <code>make menuconfig</code>、<code>make nconfig</code>、<code>make xconfig</code> 等前端，或 <code>olddefconfig</code> 等非互動目標選取值。</p><p>產生的 <code>.config</code> 是 Kbuild 的輸入，而不是完整的建置指令碼。設定同步會產生由 Make 與 C 消費的檔案，包括 <code>include/config/auto.conf</code> 與 <code>include/generated/autoconf.h</code>。</p><h2 id=從根檔案到單一設定>從根檔案到單一設定
+<a href=#%e5%be%9e%e6%a0%b9%e6%aa%94%e6%a1%88%e5%88%b0%e5%96%ae%e4%b8%80%e8%a8%ad%e5%ae%9a class=heading-anchor><span>#</span></a></h2><p>解析從頂層 <code>Kconfig</code> 開始。它的 <code>source</code> 陳述式會包含子系統檔案，而架構選擇會引入 <code>arch/$(SRCARCH)/Kconfig</code>。其他包含形式為：</p><ul><li><code>rsource</code>，其路徑相對於包含檔案；</li><li><code>osource</code>，忽略遺失的檔案；</li><li><code>orsource</code>，結合相對與選用行為。</li></ul><p><code>mainmenu</code> 設定前端標題。<code>menu</code>／<code>endmenu</code>、<code>if</code>／<code>endif</code>、<code>choice</code>／<code>endchoice</code>、<code>comment</code>、<code>config</code> 與 <code>menuconfig</code> 建立項目結構。</p><p>同一符號可以在多個包含檔案中定義。Kconfig 會組合符號的屬性，不會建立架構本機變數。定義必須使用一致型別，依賴子句會累積，而預設值順序仍然重要。因此，共用檔案可以宣告不可見功能，而架構定義會選取它。</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig># lib/Kconfig
+config HAVE_FAST_CHECKSUM
+    bool
+
+config FAST_CHECKSUM
+    bool &#34;Use the generic fast checksum implementation&#34;
+    depends on HAVE_FAST_CHECKSUM
+
+# arch/example/Kconfig
+config EXAMPLE
+    bool
+    select HAVE_FAST_CHECKSUM</code></pre></div></div><p><code>HAVE_*</code> 符號表達實作能力。接著，使用者可見功能依賴該能力，避免使用 <code>select</code> 繞過功能的實際相依性。</p><h2 id=巨集與前處理器層>巨集與前處理器層
+<a href=#%e5%b7%a8%e9%9b%86%e8%88%87%e5%89%8d%e8%99%95%e7%90%86%e5%99%a8%e5%b1%a4 class=heading-anchor><span>#</span></a></h2><p>Kconfig 會在選單項目語言處理一行之前執行文字展開。其變數語法類似 Make：</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span>immediate <span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>deferred <span style=color:#f92672>=</span> <span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>message <span style=color:#f92672>=</span> architecture <span style=color:#66d9ef>$(</span>1<span style=color:#66d9ef>)</span>, compiler <span style=color:#66d9ef>$(</span>2<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>$(</span>info,configuring <span style=color:#66d9ef>$(</span>immediate<span style=color:#66d9ef>))</span>
+</span></span><span style=display:flex><span>label <span style=color:#f92672>:=</span> <span style=color:#66d9ef>$(</span>message,<span style=color:#66d9ef>$(</span>ARCH<span style=color:#66d9ef>)</span>,<span style=color:#66d9ef>$(</span>CC<span style=color:#66d9ef>))</span>
+</span></span></code></pre></div></div></div><ul><li><code>:=</code> 會立即展開右側。</li><li><code>=</code> 儲存遞迴展開的值。</li><li><code>+=</code> 依變數現有的展開風格附加內容。</li><li><code>$(name)</code> 展開變數。</li><li><code>$(name,arg1,arg2)</code> 展開參數化變數，其中 <code>$(1)</code>、<code>$(2)</code> 等是位置引數。</li></ul><p>與 Make 不同，參數化 Kconfig 變數會直接呼叫；沒有 <code>$(call ...)</code>。逗號分隔函式引數。內建函式包括 <code>shell</code>、<code>info</code>、<code>warning-if</code>、<code>error-if</code>、<code>filename</code> 與 <code>lineno</code>。核心透過 Kconfig 函式機制加入編譯器選項探測等函式。</p><p>巨集展開是文字性的，因此引號與空白對接收結果的語言仍然重要。使用前處理來處理小型重複運算式與功能探測，而不是產生大型、難以稽核的選單片段。</p><h2 id=符號型別與提示>符號、型別與提示
+<a href=#%e7%ac%a6%e8%99%9f%e5%9e%8b%e5%88%a5%e8%88%87%e6%8f%90%e7%a4%ba class=heading-anchor><span>#</span></a></h2><p><code>config NAME</code> 定義名為 <code>NAME</code> 的符號；<code>.config</code> 與 C 將它暴露為 <code>CONFIG_NAME</code>。<code>menuconfig</code> 定義相同種類的符號，但會告訴相容前端該項目預期包含子選單。</p><p>可用的符號型別有五種：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>型別</th><th><code>.config</code> 中的範例</th><th>產生的 C 形式</th></tr></thead><tbody><tr><td><code>bool</code></td><td><code>CONFIG_FOO=y</code> 或 <code># CONFIG_FOO is not set</code></td><td><code>#define CONFIG_FOO 1</code> 或不存在</td></tr><tr><td><code>tristate</code></td><td><code>CONFIG_FOO=y</code>、<code>CONFIG_FOO=m</code> 或未設定</td><td><code>CONFIG_FOO</code>、<code>CONFIG_FOO_MODULE</code> 或兩者皆無</td></tr><tr><td><code>string</code></td><td><code>CONFIG_FOO="value"</code></td><td>加引號的字串巨集</td></tr><tr><td><code>int</code></td><td><code>CONFIG_FOO=42</code></td><td>整數巨集</td></tr><tr><td><code>hex</code></td><td><code>CONFIG_FOO=0x2a</code></td><td>十六進位整數巨集</td></tr></tbody></table></div></div><p><code>bool "Enable foo"</code> 與 <code>tristate "Build foo"</code> 將型別與 <code>prompt</code> 結合。沒有可見提示的符號無法在設定前端編輯，但預設值、<code>select</code> 或其他運算式仍可為它提供值。</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig>config FOO
+    tristate &#34;Foo transport&#34;
+    depends on NET
+    default m if MODULES
+    help
+      Build support for the Foo transport.</code></pre></div></div><p><code>def_bool EXPR</code> 與 <code>def_tristate EXPR</code> 是型別加上 <code>default EXPR</code> 的縮寫。當選用條件為真時，<code>range MIN MAX</code> 會限制 <code>int</code> 或 <code>hex</code> 符號。</p><h2 id=tristate-運算式>Tristate 運算式
+<a href=#tristate-%e9%81%8b%e7%ae%97%e5%bc%8f class=heading-anchor><span>#</span></a></h2><p>邏輯 Kconfig 運算式使用有序值 <code>n = 0</code>、<code>m = 1</code> 與 <code>y = 2</code>。因此：</p><ul><li><code>A && B</code> 是兩個值的最小值；</li><li><code>A || B</code> 是最大值；</li><li><code>!A</code> 是 <code>2 - A</code>。</li></ul><p>比較會產生 tristate 結果。括號控制分組，而加引號的常值表示字串值。<code>bool</code> 不能保留 <code>m</code>；模組相關運算式會依符號型別與是否啟用模組而折疊。</p><p>直接相依性會施加上限：</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig>config USB_WIDGET
+    tristate &#34;USB widget&#34;
+    depends on USB &amp;&amp; HAS_IOMEM</code></pre></div></div><p>若 <code>USB=m</code>，<code>USB_WIDGET</code> 不能成為 <code>y</code>。提示上的選用條件會影響提示是否可見，而符號的直接相依性無論前端如何呈現都會限制其值。</p><h2 id=預設值反向相依性與可見性>預設值、反向相依性與可見性
+<a href=#%e9%a0%90%e8%a8%ad%e5%80%bc%e5%8f%8d%e5%90%91%e7%9b%b8%e4%be%9d%e6%80%a7%e8%88%87%e5%8f%af%e8%a6%8b%e6%80%a7 class=heading-anchor><span>#</span></a></h2><p>屬性解決不同問題：</p><ul><li><code>default VALUE if CONDITION</code> 只在使用者尚未設定時提供值。若多個預設值可見，第一個可見預設值勝出。預設值不會覆寫現有 <code>.config</code> 中保留的值。</li><li><code>depends on EXPR</code> 限制符號最大值與提示可見性。</li><li><code>select TARGET if CONDITION</code> 建立反向相依性，並將 <code>TARGET</code> 提升到至少選取運算式的值。它<strong>不會</strong>遵守 <code>TARGET</code> 自己的直接相依性，因此只應選取前置條件已確定滿足的簡單不可見符號。</li><li><code>imply TARGET if CONDITION</code> 是弱反向相依性。它提供仍可被可見使用者選擇降低的下限，而目標的直接相依性仍會限制結果。</li><li><code>visible if EXPR</code> 限制 <code>menu</code> 區塊的可見性，但不改變其中符號的值。</li></ul><p>例如：</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig>config DRIVER_FOO
+    tristate &#34;Foo device&#34;
+    depends on PCI
+    select CRC32
+    imply FW_LOADER</code></pre></div></div><p><code>CRC32</code> 應該是沒有未滿足相依性的內部輔助工具。<code>FW_LOADER</code> 只是受到鼓勵，因為驅動程式沒有它也能運作。加入 <code>select</code> 來修復相依性循環是不正確的，因為 Kconfig 會拒絕遞迴相依性，且不使用 SAT solver 推導偏好解。</p><h2 id=選單位置不是相依性圖>選單位置不是相依性圖
+<a href=#%e9%81%b8%e5%96%ae%e4%bd%8d%e7%bd%ae%e4%b8%8d%e6%98%af%e7%9b%b8%e4%be%9d%e6%80%a7%e5%9c%96 class=heading-anchor><span>#</span></a></h2><p>來源順序與明確容器決定大部分顯示位置：</p><div class=jose-wrapper><div class=jose-tools><span>kconfig</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-kconfig data-lang=kconfig>menu &#34;Network drivers&#34;
+    visible if NET
+
+config NET_VENDOR_EXAMPLE
+    bool &#34;Example devices&#34;
+
+if NET_VENDOR_EXAMPLE
+source &#34;drivers/net/ethernet/example/Kconfig&#34;
+endif
+
+endmenu</code></pre></div></div><p>當後續項目強烈依賴前一項，使子項目只有在父項目可見時才能可見，前端也會推導隱含子選單。語言文件描述精確的提示相依規則。</p><p>除此之外，相依性不會重新定位項目。符號可以依賴顯示於不同區段的另一個符號，而 <code>select</code> 不會使目標出現在選取器下方。因此，選單配置傳達導覽，而相依性運算式傳達有效值。將前者視為後者的渲染結果，會產生令人困惑的 Kconfig 檔案。</p><h2 id=產生的設定構件>產生的設定構件
+<a href=#%e7%94%a2%e7%94%9f%e7%9a%84%e8%a8%ad%e5%ae%9a%e6%a7%8b%e4%bb%b6 class=heading-anchor><span>#</span></a></h2><p>前端寫入 <code>.config</code> 後，Kbuild 會同步產生的輸入。重要表示如下：</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>.config
+</span></span><span style=display:flex><span>include/config/auto.conf
+</span></span><span style=display:flex><span>include/generated/autoconf.h</span></span></code></pre></div></div></div><p><code>.config</code> 是持久且面向使用者的指派檔案。<code>auto.conf</code> 將指派呈現給 Make，讓規則可以使用以下運算式：</p><div class=jose-wrapper><div class=jose-tools><span>makefile</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-makefile data-lang=makefile><span style=display:flex><span>obj-$(CONFIG_USB_WIDGET) <span style=color:#f92672>+=</span> usb-widget.o
+</span></span></code></pre></div></div></div><p><code>autoconf.h</code> 將啟用的符號呈現給 C 前處理。核心 C 程式碼應包含一般核心標頭，而不是直接包含 <code>autoconf.h</code>。<code>IS_ENABLED(CONFIG_FOO)</code> 等輔助工具能處理內建與模組形式，而不必自行撰寫每種前處理組合。</p><p>設定更新可以加入較新樹引入的符號。<code>make oldconfig</code> 會詢問新的選擇，而 <code>make olddefconfig</code> 接受它們的預設值。<code>make savedefconfig</code> 會相對於預設值寫入最小 defconfig；它不能與封存完整 <code>.config</code> 互換。</p><h2 id=參考資料>參考資料
+<a href=#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.kernel.org/kbuild/kconfig-language.html>核心文件：Kconfig 語言</a></li><li><a href=https://docs.kernel.org/kbuild/kconfig-macro-language.html>核心文件：Kconfig 巨集語言</a></li><li><a href=https://docs.kernel.org/kbuild/kconfig.html>核心文件：Kconfig 提示</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-kconfig/ class=language-option data-lang=en>English
+</a><a href=/ja/linux-kconfig/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/linux-kconfig/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/linux-kconfig/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

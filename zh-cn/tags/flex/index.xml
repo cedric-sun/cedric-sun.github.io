@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Flex on cesun.life</title><link>https://example.org/zh-cn/tags/flex/</link><description>Recent content in Flex on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Tue, 10 Jan 2023 06:39:13 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/flex/index.xml" rel="self" type="application/rss+xml"/><item><title>Flex</title><link>https://example.org/zh-cn/flex/</link><pubDate>Tue, 10 Jan 2023 06:39:13 +0800</pubDate><guid>https://example.org/zh-cn/flex/</guid><description>&lt;p&gt;Flex 根据将输入文本映射到 C 或 C++ 动作的规则生成扫描器。扫描器通常向解析器提供令牌，但也可以转换文本或验证正则语言格式。&lt;a href="https://westes.github.io/flex/manual/"&gt;Flex 手册&lt;/a&gt; 定义了生成的接口以及各选项的行为。&lt;/p&gt;
+&lt;h2 id="规范结构"&gt;
+ 规范结构
+ &lt;a href="#%e8%a7%84%e8%8c%83%e7%bb%93%e6%9e%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;.l&lt;/code&gt; 文件包含三个由 &lt;code&gt;%%&lt;/code&gt; 分隔的部分：定义、规则和用户代码。定义部分包含 C 声明、命名正则表达式和开始条件。规则部分将模式与动作配对。最后一个部分提供辅助函数，并在需要时提供驱动程序。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;lex&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-lex" data-lang="lex"&gt;%option noyywrap
+%{
+#include &amp;#34;parser.h&amp;#34;
+%}
+
+identifier [[:alpha:]_][[:alnum:]_]*
+%%
+[[:space:]]+ ;
+{identifier} return IDENTIFIER;
+&amp;#34;+&amp;#34; return &amp;#39;+&amp;#39;;
+. return INVALID;
+%%&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Flex 选择与输入文本中&lt;strong&gt;最长&lt;/strong&gt;部分匹配的规则。当多个规则匹配相同长度时，选择书写在前面的规则。默认规则会将未匹配的字符复制到标准输出；当必须报告未匹配输入时，应使用显式的兜底规则或 &lt;code&gt;-s&lt;/code&gt;/&lt;code&gt;%option nodefault&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="正则表达式与扫描器状态"&gt;
+ 正则表达式与扫描器状态
+ &lt;a href="#%e6%ad%a3%e5%88%99%e8%a1%a8%e8%be%be%e5%bc%8f%e4%b8%8e%e6%89%ab%e6%8f%8f%e5%99%a8%e7%8a%b6%e6%80%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Flex 模式描述正则语言。命名定义可以减少重复，字符类用于表达与区域设置相关的分组，带引号的文本用于匹配字面字符串。当语言令牌需要按字面使用元字符时，请对其进行转义或加引号。&lt;/p&gt;
+&lt;p&gt;开始条件可以划分规则集。使用 &lt;code&gt;%s&lt;/code&gt; 声明包含式条件，使用 &lt;code&gt;%x&lt;/code&gt; 声明排他式条件；使用 &lt;code&gt;&amp;lt;STATE&amp;gt;&lt;/code&gt; 为规则添加限定。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;lex&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-lex" data-lang="lex"&gt;%x COMMENT
+%%
+&amp;#34;/*&amp;#34; BEGIN(COMMENT);
+&amp;lt;COMMENT&amp;gt;&amp;#34;*/&amp;#34; BEGIN(INITIAL);
+&amp;lt;COMMENT&amp;gt;\n ++line;
+&amp;lt;COMMENT&amp;gt;. ;
+&amp;lt;COMMENT&amp;gt;&amp;lt;&amp;lt;EOF&amp;gt;&amp;gt; return UNTERMINATED_COMMENT;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;包含式条件会保留未限定的规则，而排他式条件只运行针对该条件或所有状态显式限定的规则。除非使用 &lt;code&gt;%option nodefault&lt;/code&gt; 或显式兜底规则替换，否则 Flex 生成的默认规则在每个状态中都保持有效。使用 &lt;code&gt;BEGIN&lt;/code&gt; 更改状态；当动作需要检查当前状态时，使用 &lt;code&gt;YY_START&lt;/code&gt;。对于可能提前结束输入的状态，应处理 &lt;code&gt;&amp;lt;&amp;lt;EOF&amp;gt;&amp;gt;&lt;/code&gt;。应将字符串、注释、缩进或词法模式建模为显式状态，而不是试图在一个模式中表达上下文相关的结构。&lt;/p&gt;</description></item></channel></rss>

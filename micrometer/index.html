@@ -1,0 +1,218 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Micrometer Application Observability</title></head><body><main><article><div class=article-header><h1>Micrometer Application Observability</h1><div class=aux>Last update: 2021-03-16 06:20:21 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/tags/micrometer/>Micrometer</a>
+|
+<a href=/tags/java/>Java</a>
+|
+<a href=/tags/prometheus/>Prometheus</a>
+|
+<a href=/tags/observability/>Observability</a>
+|
+<a href=/tags/tracing/>Tracing</a></div></div><div class=article-content><p><a href=https://micrometer.io/>Micrometer</a> is a collection of Java libraries for
+instrumenting applications. It provides vendor-neutral APIs for metrics,
+observations, and distributed tracing, along with adapters that connect those
+APIs to monitoring systems such as Prometheus and tracing implementations such
+as OpenTelemetry.</p><p>Micrometer is not a monitoring server. It does not store telemetry, execute
+PromQL, render dashboards, or deliver alerts. It runs inside an application and
+produces telemetry for other systems to collect:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Java application
+</span></span><span style=display:flex><span>  -&gt; Micrometer instrumentation
+</span></span><span style=display:flex><span>  -&gt; Prometheus, OTLP, Datadog, or another registry
+</span></span><span style=display:flex><span>  -&gt; Grafana or another observability interface</span></span></code></pre></div></div></div><p>The relationship is similar to a database abstraction library and a database:
+Micrometer supplies the application-facing API, while Prometheus and other
+backends supply storage and querying.</p><h2 id=why-micrometer-exists>Why Micrometer Exists
+<a href=#why-micrometer-exists class=heading-anchor><span>#</span></a></h2><p>Without an instrumentation facade, application code might depend directly on a
+vendor SDK:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>prometheusCounter.<span style=color:#a6e22e>inc</span>();</span></span></code></pre></div></div></div><p>Changing the monitoring system would then require changing instrumentation
+throughout the application and its libraries. Micrometer instead exposes a
+common model:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>registry.<span style=color:#a6e22e>counter</span>(<span style=color:#e6db74>&#34;orders.created&#34;</span>, <span style=color:#e6db74>&#34;region&#34;</span>, region).<span style=color:#a6e22e>increment</span>();</span></span></code></pre></div></div></div><p>A registry implementation decides how that meter is exported. The same
+instrumentation can publish to Prometheus in one application and to an OTLP or
+commercial backend in another.</p><p>This separation is especially useful to library authors. A library can
+instrument its behavior with Micrometer without deciding which monitoring
+system its users must operate.</p><h2 id=the-micrometer-project-family>The Micrometer Project Family
+<a href=#the-micrometer-project-family class=heading-anchor><span>#</span></a></h2><p>The Micrometer ecosystem has four central concepts and projects:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Component</th><th>Purpose</th></tr></thead><tbody><tr><td>Micrometer Metrics</td><td>Records dimensional counters, gauges, timers, and distributions</td></tr><tr><td>Micrometer Observation</td><td>Instruments an operation once and lets handlers produce multiple signals</td></tr><tr><td>Micrometer Tracing</td><td>Provides a facade over tracing implementations such as OpenTelemetry and Brave</td></tr><tr><td>Micrometer Context Propagation</td><td>Transfers observation and tracing context across threads and reactive execution</td></tr></tbody></table></div></div><p>The project also publishes registry adapters, tracing bridges, test utilities,
+dependency-management BOMs, and documentation-generation support.</p><h2 id=micrometer-metrics>Micrometer Metrics
+<a href=#micrometer-metrics class=heading-anchor><span>#</span></a></h2><p>Micrometer Metrics is the foundation of the project. Its central interface is
+<code>MeterRegistry</code>, which creates and maintains meters.</p><p>The main meter types are:</p><ul><li><strong>Counter:</strong> A cumulative number of events.</li><li><strong>Gauge:</strong> A sampled value that can increase or decrease.</li><li><strong>Timer:</strong> A count and distribution of durations.</li><li><strong>Distribution summary:</strong> A count and distribution of arbitrary values, such
+as response sizes.</li><li><strong>Long task timer:</strong> The number and duration of operations that are still
+running.</li></ul><p>Add the core API with a build dependency:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>io.micrometer<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>micrometer-core<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>Create and update a counter:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Counter counter <span style=color:#f92672>=</span> Counter.<span style=color:#a6e22e>builder</span>(<span style=color:#e6db74>&#34;orders.created&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>description</span>(<span style=color:#e6db74>&#34;Number of successfully created orders&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>tag</span>(<span style=color:#e6db74>&#34;region&#34;</span>, <span style=color:#e6db74>&#34;eu-west&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>register</span>(registry);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>counter.<span style=color:#a6e22e>increment</span>();</span></span></code></pre></div></div></div><p>Micrometer converts its dot-separated naming convention to the convention of
+the selected backend. A Prometheus registry may expose the preceding meter as:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>orders_created_total{region=&#34;eu-west&#34;} 42</span></span></code></pre></div></div></div><h3 id=timers>Timers
+<a href=#timers class=heading-anchor><span>#</span></a></h3><p>A timer records both how many operations completed and how long they took:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Timer timer <span style=color:#f92672>=</span> Timer.<span style=color:#a6e22e>builder</span>(<span style=color:#e6db74>&#34;checkout.duration&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>description</span>(<span style=color:#e6db74>&#34;Checkout processing time&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>tag</span>(<span style=color:#e6db74>&#34;result&#34;</span>, <span style=color:#e6db74>&#34;success&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>publishPercentileHistogram</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>register</span>(registry);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>timer.<span style=color:#a6e22e>record</span>(() <span style=color:#f92672>-&gt;</span> checkout(order));</span></span></code></pre></div></div></div><p>For Prometheus, a histogram-capable timer can produce counters, sums, and
+buckets that PromQL can aggregate:</p><div class=jose-wrapper><div class=jose-tools><span>promql</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-promql data-lang=promql><span style=display:flex><span><span style=color:#66d9ef>histogram_quantile</span><span style=color:#f92672>(</span>
+</span></span><span style=display:flex><span>  <span style=color:#ae81ff>0.95</span>,
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>sum</span> <span style=color:#66d9ef>by</span> <span style=color:#f92672>(</span>le<span style=color:#f92672>)</span> <span style=color:#f92672>(</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>rate</span><span style=color:#f92672>(</span>checkout_duration_seconds_bucket[<span style=color:#e6db74>5m</span>]<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>)</span></span></span></code></pre></div></div></div><p>Prefer histogram buckets when percentiles must be aggregated across application
+instances. Client-calculated percentiles generally cannot be meaningfully
+combined after export.</p><h3 id=gauges>Gauges
+<a href=#gauges class=heading-anchor><span>#</span></a></h3><p>A gauge observes an existing object&rsquo;s current value:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>AtomicInteger queueSize <span style=color:#f92672>=</span> registry.<span style=color:#a6e22e>gauge</span>(
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;checkout.queue.size&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>new</span> AtomicInteger()
+</span></span><span style=display:flex><span>);</span></span></code></pre></div></div></div><p>Micrometer normally keeps only a weak reference to the observed object. The
+application must retain a strong reference, as <code>queueSize</code> does here, or the
+object may be garbage-collected and the gauge may disappear.</p><p>A gauge should represent current state. Do not use a gauge for a value that
+should only increase; use a counter instead.</p><h2 id=registry-implementations>Registry Implementations
+<a href=#registry-implementations class=heading-anchor><span>#</span></a></h2><p><code>MeterRegistry</code> is the abstraction. A registry module adapts meters to a
+specific monitoring system.</p><p>For Prometheus:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>io.micrometer<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>micrometer-registry-prometheus<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>The Prometheus registry exposes a text representation that an HTTP endpoint can
+return for Prometheus to scrape:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>PrometheusMeterRegistry registry <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>new</span> PrometheusMeterRegistry(PrometheusConfig.<span style=color:#a6e22e>DEFAULT</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>String responseBody <span style=color:#f92672>=</span> registry.<span style=color:#a6e22e>scrape</span>();</span></span></code></pre></div></div></div><p>Micrometer also supplies registry modules for OTLP and numerous commercial and
+open-source monitoring systems. Registries fall broadly into two models:</p><ul><li><strong>Pull registries:</strong> A monitoring system, such as Prometheus, scrapes the
+application.</li><li><strong>Push or step registries:</strong> The application periodically publishes
+aggregated measurements to a backend.</li></ul><p>Application instrumentation should not assume one model. The registry handles
+backend-specific naming, temporality, aggregation, and transport behavior.</p><h3 id=composite-registries>Composite Registries
+<a href=#composite-registries class=heading-anchor><span>#</span></a></h3><p>A <code>CompositeMeterRegistry</code> can publish the same meters through multiple
+registries:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>CompositeMeterRegistry composite <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> CompositeMeterRegistry();
+</span></span><span style=display:flex><span>composite.<span style=color:#a6e22e>add</span>(prometheusRegistry);
+</span></span><span style=display:flex><span>composite.<span style=color:#a6e22e>add</span>(anotherRegistry);</span></span></code></pre></div></div></div><p>This is useful during a backend migration, but it also increases resource use
+and can expose differences in how backends represent the same meter.</p><h3 id=filters-and-common-tags>Filters and Common Tags
+<a href=#filters-and-common-tags class=heading-anchor><span>#</span></a></h3><p><code>MeterFilter</code> can rename meters, add tags, configure distributions, or deny
+undesired meters:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>registry.<span style=color:#a6e22e>config</span>()
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>commonTags</span>(<span style=color:#e6db74>&#34;service&#34;</span>, <span style=color:#e6db74>&#34;checkout&#34;</span>, <span style=color:#e6db74>&#34;environment&#34;</span>, <span style=color:#e6db74>&#34;production&#34;</span>);</span></span></code></pre></div></div></div><p>Common tags identify the application consistently, but they should remain
+bounded. A request ID, user ID, email address, or raw URL must not become a
+metric tag. Each unique tag combination creates another time series.</p><h2 id=micrometer-observation>Micrometer Observation
+<a href=#micrometer-observation class=heading-anchor><span>#</span></a></h2><p>Metrics answer aggregate questions, while tracing describes individual
+operations. Instrumenting the same operation independently for both signals can
+duplicate lifecycle and metadata code.</p><p>The Observation API represents one observable operation:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>Observation.<span style=color:#a6e22e>createNotStarted</span>(<span style=color:#e6db74>&#34;checkout&#34;</span>, observationRegistry)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>lowCardinalityKeyValue</span>(<span style=color:#e6db74>&#34;result&#34;</span>, <span style=color:#e6db74>&#34;success&#34;</span>)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>highCardinalityKeyValue</span>(<span style=color:#e6db74>&#34;order.id&#34;</span>, orderId)
+</span></span><span style=display:flex><span>    .<span style=color:#a6e22e>observe</span>(() <span style=color:#f92672>-&gt;</span> checkout(order));</span></span></code></pre></div></div></div><p>An observation has a lifecycle:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>create -&gt; start -&gt; open scope -&gt; event/error -&gt; close scope -&gt; stop</span></span></code></pre></div></div></div><p>Registered <code>ObservationHandler</code> implementations react to that lifecycle. One
+handler can record a timer, another can create a trace span, and another can
+place correlation identifiers into logging context. Application code describes
+the operation once instead of calling every telemetry API separately.</p><h3 id=low--and-high-cardinality-key-values>Low- and High-Cardinality Key Values
+<a href=#low--and-high-cardinality-key-values class=heading-anchor><span>#</span></a></h3><p>The Observation API distinguishes two kinds of metadata:</p><ul><li><strong>Low-cardinality key values</strong> have a small, bounded set of values. They may
+be used as metric tags and trace attributes.</li><li><strong>High-cardinality key values</strong> may have many unique values. They may be
+attached to individual trace spans but must not become metric tags.</li></ul><p>For example:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Low cardinality:  method=GET, route=/orders/{id}, result=success
+</span></span><span style=display:flex><span>High cardinality: order.id=8f27..., request.id=90ac...</span></span></code></pre></div></div></div><p>This distinction lets one observation safely produce both metrics and traces.</p><h3 id=observation-conventions>Observation Conventions
+<a href=#observation-conventions class=heading-anchor><span>#</span></a></h3><p>An <code>ObservationConvention</code> centralizes an observation&rsquo;s name and key values.
+Frameworks and libraries can provide a default convention while applications
+replace it with a custom one.</p><p>Conventions keep instrumentation stable and prevent names or tags from being
+assembled differently at every call site. They can also be documented and
+tested as part of an application&rsquo;s observability contract.</p><h2 id=micrometer-tracing>Micrometer Tracing
+<a href=#micrometer-tracing class=heading-anchor><span>#</span></a></h2><p>Micrometer Tracing is a vendor-neutral facade for distributed tracing. It was
+created from the tracing functionality of Spring Cloud Sleuth and is not tied
+to Spring.</p><p>Its API covers concepts such as:</p><ul><li>Tracers and spans</li><li>Current trace context</li><li>Baggage</li><li>Context injection and extraction</li><li>Sampling and span reporting integration</li></ul><p>Micrometer Tracing does not implement a complete tracing system by itself.
+Bridge modules connect it to a tracer implementation:</p><ul><li><strong>OpenTelemetry bridge:</strong> Uses the OpenTelemetry SDK and ecosystem.</li><li><strong>Brave bridge:</strong> Uses the Brave tracing library.</li></ul><p>An application normally chooses one bridge, not both:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>io.micrometer<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>micrometer-tracing-bridge-otel<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>or:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;groupId&gt;</span>io.micrometer<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;artifactId&gt;</span>micrometer-tracing-bridge-brave<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependency&gt;</span></span></span></code></pre></div></div></div><p>Reporter and exporter configuration then sends completed spans to a backend
+such as Tempo, Zipkin, Jaeger through a compatible protocol, or another
+OpenTelemetry-compatible service.</p><h3 id=observation-and-tracing-together>Observation and Tracing Together
+<a href=#observation-and-tracing-together class=heading-anchor><span>#</span></a></h3><p>Micrometer provides an observation handler that creates a span for each
+observation:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Observation starts -&gt; span starts
+</span></span><span style=display:flex><span>Observation receives an error -&gt; span records the error
+</span></span><span style=display:flex><span>Observation stops -&gt; span stops and is reported</span></span></code></pre></div></div></div><p>This is the normal application-level integration. Direct use of the tracing API
+is still useful when explicit child spans or tracing-specific behavior is
+needed.</p><h2 id=context-propagation>Context Propagation
+<a href=#context-propagation class=heading-anchor><span>#</span></a></h2><p>Telemetry context must cross execution boundaries. A trace started on an HTTP
+request thread is otherwise lost when work moves to an executor, a callback, or
+a reactive pipeline.</p><p>The Micrometer Context Propagation library provides abstractions that transfer
+values among context mechanisms, including:</p><ul><li>Java <code>ThreadLocal</code> values</li><li>Reactor <code>Context</code></li><li>Other context carriers connected through accessors</li></ul><p>Its principal concepts include:</p><ul><li><strong>Context accessor:</strong> Reads and writes values in a particular context type.</li><li><strong>Thread-local accessor:</strong> Reads, writes, and clears a <code>ThreadLocal</code> value.</li><li><strong>Context registry:</strong> Keeps the registered accessors.</li><li><strong>Context snapshot:</strong> Captures values from one execution context and restores
+them in another.</li></ul><p>A simplified executor example looks like:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>ContextSnapshot snapshot <span style=color:#f92672>=</span> ContextSnapshot.<span style=color:#a6e22e>captureAll</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>executor.<span style=color:#a6e22e>execute</span>(() <span style=color:#f92672>-&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>try</span> (ContextSnapshot.<span style=color:#a6e22e>Scope</span> scope <span style=color:#f92672>=</span> snapshot.<span style=color:#a6e22e>setThreadLocals</span>()) {
+</span></span><span style=display:flex><span>        performWork();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>});</span></span></code></pre></div></div></div><p>Framework integrations can perform this work automatically. Manual propagation
+is needed when an application creates an execution boundary that the framework
+does not instrument.</p><p>Context propagation should be scoped carefully. Failing to restore previous
+thread-local values can leak one request&rsquo;s trace or security context into
+another task executed by the same pooled thread.</p><h2 id=test-and-documentation-support>Test and Documentation Support
+<a href=#test-and-documentation-support class=heading-anchor><span>#</span></a></h2><p>Micrometer publishes utilities that help libraries treat instrumentation as a
+testable API rather than incidental behavior.</p><p>A <code>SimpleMeterRegistry</code> stores measurements in memory and is useful in unit
+tests:</p><div class=jose-wrapper><div class=jose-tools><span>java</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-java data-lang=java><span style=display:flex><span>SimpleMeterRegistry registry <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> SimpleMeterRegistry();
+</span></span><span style=display:flex><span>CheckoutService service <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> CheckoutService(registry);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>service.<span style=color:#a6e22e>checkout</span>(order);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>assertThat(registry.<span style=color:#a6e22e>counter</span>(<span style=color:#e6db74>&#34;orders.created&#34;</span>).<span style=color:#a6e22e>count</span>()).<span style=color:#a6e22e>isEqualTo</span>(1.<span style=color:#a6e22e>0</span>);</span></span></code></pre></div></div></div><p>Observation test support can assert that observations started, stopped, and
+carried the expected key values. Tracing test support provides test-oriented
+tracer and span-handler implementations.</p><p>The Micrometer documentation generator can produce reference documentation from
+observation conventions and meter definitions. This helps framework and library
+authors publish the names, tags, and meanings of their instrumentation without
+maintaining a separate list by hand.</p><p>Micrometer also publishes BOMs so related module versions can be managed
+together:</p><div class=jose-wrapper><div class=jose-tools><span>xml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-xml data-lang=xml><span style=display:flex><span><span style=color:#f92672>&lt;dependencyManagement&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;dependencies&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;dependency&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;groupId&gt;</span>io.micrometer<span style=color:#f92672>&lt;/groupId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;artifactId&gt;</span>micrometer-bom<span style=color:#f92672>&lt;/artifactId&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;version&gt;</span>${micrometer.version}<span style=color:#f92672>&lt;/version&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;type&gt;</span>pom<span style=color:#f92672>&lt;/type&gt;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&lt;scope&gt;</span>import<span style=color:#f92672>&lt;/scope&gt;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&lt;/dependency&gt;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&lt;/dependencies&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>&lt;/dependencyManagement&gt;</span></span></span></code></pre></div></div></div><p>Framework dependency-management platforms may already import an appropriate
+Micrometer BOM. In that case, applications should normally let the framework
+select compatible versions.</p><h2 id=micrometer-in-spring-boot>Micrometer in Spring Boot
+<a href=#micrometer-in-spring-boot class=heading-anchor><span>#</span></a></h2><p>Micrometer is independent of Spring, but Spring Boot provides its most familiar
+integration. Spring Boot Actuator configures registries and instruments many
+framework components automatically.</p><p>With the Actuator and Prometheus registry dependencies, an application can
+expose metrics at:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>/actuator/prometheus</span></span></code></pre></div></div></div><p>Prometheus scrapes that endpoint. Grafana then queries Prometheus; it does not
+query Micrometer directly.</p><p>Spring Boot can also configure observation handlers, tracing bridges,
+propagation formats, sampling, and exporters. Application code should first use
+the framework&rsquo;s existing observations and only add custom instrumentation for
+business operations that the framework cannot understand.</p><p>Micrometer is also used outside Spring. Other JVM frameworks and libraries can
+integrate <code>MeterRegistry</code>, <code>ObservationRegistry</code>, and the tracing APIs without
+depending on the Spring container.</p><h2 id=micrometer-and-opentelemetry>Micrometer and OpenTelemetry
+<a href=#micrometer-and-opentelemetry class=heading-anchor><span>#</span></a></h2><p>Micrometer and OpenTelemetry overlap, but they are not identical:</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th>Area</th><th>Micrometer</th><th>OpenTelemetry</th></tr></thead><tbody><tr><td>Primary scope</td><td>JVM application instrumentation facade</td><td>Cross-language telemetry APIs, SDKs, protocols, and collector</td></tr><tr><td>Metrics model</td><td>Mature Java meter abstractions and registry integrations</td><td>OpenTelemetry metrics API and SDK</td></tr><tr><td>Tracing</td><td>Facade over tracer implementations</td><td>Native tracing API and SDK</td></tr><tr><td>Unified operation API</td><td>Observation API</td><td>Separate signal APIs with shared context</td></tr><tr><td>Export</td><td>Registry modules and tracing bridges</td><td>OTLP and exporter ecosystem</td></tr><tr><td>Collector process</td><td>None</td><td>OpenTelemetry Collector</td></tr></tbody></table></div></div><p>They can be used together. Micrometer metrics can publish through an OTLP
+registry, and Micrometer Tracing can bridge to the OpenTelemetry SDK. This lets
+an application retain Micrometer&rsquo;s Java-facing APIs while using OpenTelemetry
+for propagation and export.</p><p>Choose APIs deliberately rather than instrumenting the same operation through
+both systems independently, which can create duplicate metrics and spans.</p><h2 id=a-practical-prometheus-setup>A Practical Prometheus Setup
+<a href=#a-practical-prometheus-setup class=heading-anchor><span>#</span></a></h2><p>For a Java service monitored by Prometheus:</p><ol><li>Instrument application-specific behavior with Micrometer meters or
+observations.</li><li>Add <code>micrometer-registry-prometheus</code>.</li><li>Expose the registry&rsquo;s scrape output through an HTTP endpoint.</li><li>Configure Prometheus to scrape that endpoint.</li><li>Query the resulting series with PromQL.</li><li>Build Grafana dashboards and Prometheus alerting rules.</li></ol><p>The responsibilities remain distinct:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>Micrometer  -&gt; creates and exposes measurements
+</span></span><span style=display:flex><span>Prometheus  -&gt; scrapes, stores, and queries measurements
+</span></span><span style=display:flex><span>Grafana     -&gt; visualizes queries
+</span></span><span style=display:flex><span>Alertmanager -&gt; routes notifications</span></span></code></pre></div></div></div><p>For distributed tracing, add one Micrometer Tracing bridge and configure its
+exporter separately. Prometheus stores metrics, not trace spans.</p><h2 id=instrumentation-guidelines>Instrumentation Guidelines
+<a href=#instrumentation-guidelines class=heading-anchor><span>#</span></a></h2><ol><li>Measure business operations, not merely low-level implementation details.</li><li>Give every meter a stable name, unit, and description.</li><li>Keep metric tags low-cardinality and bounded.</li><li>Use normalized routes such as <code>/orders/{id}</code>, not raw paths.</li><li>Use timers for duration and counters for event totals.</li><li>Prefer aggregatable histograms when fleet-wide percentiles are required.</li><li>Use observations when one operation should produce both metrics and spans.</li><li>Propagate context at every asynchronous boundary.</li><li>Test meter names and observation conventions as public interfaces.</li><li>Avoid registering new meters dynamically on every request.</li></ol><p>Micrometer&rsquo;s main value is separation of concerns. Application and library code
+describe what should be observed; registry adapters and tracing bridges decide
+where that telemetry goes. This keeps instrumentation portable while allowing
+Prometheus, OpenTelemetry, and commercial backends to evolve independently from
+the code being measured.</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/micrometer/ class=language-option data-lang=en>English</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

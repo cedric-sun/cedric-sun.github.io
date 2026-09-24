@@ -1,0 +1,49 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Kubernetes Access Control</title></head><body><main><article><div class=article-header><h1>Kubernetes Access Control</h1><div class=aux>最終更新: 2022-06-27 04:47:20 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/kubernetes/>Kubernetes</a>
+|
+<a href=/ja/tags/oidc/>Oidc</a>
+|
+<a href=/ja/tags/rbac/>Rbac</a>
+|
+<a href=/ja/tags/security/>Security</a></div></div><div class="translation-notice machine-translated"><a href=/kubernetes-access-control/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>Kubernetes は API リクエストを認証、認可、アドミッション制御の順に処理します。認証はアイデンティティを確立し、
+認可はそのアイデンティティが操作を実行できるかを決定し、アドミッションは受け入れたオブジェクトを検証または変更できます。
+これらは別個の制御であり、個別に設定・監査すべきです。</p><h2 id=oidc-による認証>OIDC による認証
+<a href=#oidc-%e3%81%ab%e3%82%88%e3%82%8b%e8%aa%8d%e8%a8%bc class=heading-anchor><span>#</span></a></h2><p>OpenID Connect（OIDC）により、API サーバーは外部アイデンティティプロバイダーが発行したベアラートークンを検証できます。
+API サーバーには issuer URL、クライアント ID、任意のユーザー名・グループクレームのマッピングを設定します。
+issuer は API サーバーから到達可能であり、TLS 証明書が検証できなければなりません。</p><p>アイデンティティプロバイダーがユーザーライフサイクルと多要素認証を管理し、Kubernetes は有効なトークンからユーザー名とグループを受け取ります。
+人に共有静的トークンを使ってはいけません。<code>kubectl</code> では承認済みの OIDC ログインプラグインまたは exec credential provider を使い、
+長期資格情報を kubeconfig ファイルに保存せず短命トークンを更新します。</p><h2 id=rbac-による認可>RBAC による認可
+<a href=#rbac-%e3%81%ab%e3%82%88%e3%82%8b%e8%aa%8d%e5%8f%af class=heading-anchor><span>#</span></a></h2><p>RBAC は <code>Role</code> と <code>ClusterRole</code> オブジェクトを通じてリソース型に対する verb を許可し、バインディングで権限を関連付けます。
+<code>Role</code> は名前空間スコープであり、<code>ClusterRole</code> はクラスタースコープのアクセスを許可するか、名前空間内でバインドできます。</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>apiVersion</span>: <span style=color:#ae81ff>rbac.authorization.k8s.io/v1</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>kind</span>: <span style=color:#ae81ff>Role</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>metadata</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>name</span>: <span style=color:#ae81ff>deployment-reader</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>namespace</span>: <span style=color:#ae81ff>payments</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>rules</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#f92672>apiGroups</span>: [<span style=color:#e6db74>&#34;apps&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>resources</span>: [<span style=color:#e6db74>&#34;deployments&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>verbs</span>: [<span style=color:#e6db74>&#34;get&#34;</span>, <span style=color:#e6db74>&#34;list&#34;</span>, <span style=color:#e6db74>&#34;watch&#34;</span>]
+</span></span><span style=display:flex><span>---
+</span></span><span style=display:flex><span><span style=color:#f92672>apiVersion</span>: <span style=color:#ae81ff>rbac.authorization.k8s.io/v1</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>kind</span>: <span style=color:#ae81ff>RoleBinding</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>metadata</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>name</span>: <span style=color:#ae81ff>developers-can-read-deployments</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>namespace</span>: <span style=color:#ae81ff>payments</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>subjects</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#f92672>kind</span>: <span style=color:#ae81ff>Group</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>payments-developers</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>apiGroup</span>: <span style=color:#ae81ff>rbac.authorization.k8s.io</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>roleRef</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>kind</span>: <span style=color:#ae81ff>Role</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>name</span>: <span style=color:#ae81ff>deployment-reader</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>apiGroup</span>: <span style=color:#ae81ff>rbac.authorization.k8s.io</span></span></span></code></pre></div></div></div><p>必要な verb、リソース、名前空間、非リソース URL だけを最小範囲で許可します。厳格に管理されたプラットフォーム管理を除き、
+<code>cluster-admin</code>、ワイルドカードの verb、ワイルドカードのリソースは避けます。提案した許可は <code>kubectl auth can-i</code> で確認します。</p><h2 id=リソースとサービスアカウントの制御>リソースとサービスアカウントの制御
+<a href=#%e3%83%aa%e3%82%bd%e3%83%bc%e3%82%b9%e3%81%a8%e3%82%b5%e3%83%bc%e3%83%93%e3%82%b9%e3%82%a2%e3%82%ab%e3%82%a6%e3%83%b3%e3%83%88%e3%81%ae%e5%88%b6%e5%be%a1 class=heading-anchor><span>#</span></a></h2><p><code>ResourceQuota</code> は名前空間全体の消費量を制限し、<code>LimitRange</code> はコンテナ単位の requests と limits を設定または制約します。
+クォータだけでは公平なスケジューリングは保証されません。ワークロードは CPU とメモリの requests を指定し、名前空間には運用監視が必要です。</p><p>サービスアカウントはワークロードのアイデンティティです。不要な場所では自動トークンマウントを無効にし、
+投影された短命トークンを使い、各ワークロードのサービスアカウントを最小権限のロールにバインドします。
+アプリケーションに default サービスアカウントの広範な権限を与えてはいけません。アドミッションポリシー、Pod Security Standards、
+ネットワークポリシー、イメージ制御は RBAC を補完しますが、置き換えるものはありません。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/kubernetes-access-control/ class=language-option data-lang=en>English
+</a><a href=/ja/kubernetes-access-control/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/kubernetes-access-control/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/kubernetes-access-control/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

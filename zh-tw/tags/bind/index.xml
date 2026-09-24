@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Bind on cesun.life</title><link>https://example.org/zh-tw/tags/bind/</link><description>Recent content in Bind on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 15 Jan 2026 18:06:05 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/bind/index.xml" rel="self" type="application/rss+xml"/><item><title>BIND 9 權威與遞迴 DNS</title><link>https://example.org/zh-tw/bind-9-dns/</link><pubDate>Thu, 15 Jan 2026 18:06:05 +0800</pubDate><guid>https://example.org/zh-tw/bind-9-dns/</guid><description>&lt;p&gt;BIND 9 會執行 &lt;code&gt;named&lt;/code&gt; 名稱伺服器。其設定決定它是否以權威方式回答、提供遞迴、傳送區域，或接受動態更新。將這些角色分開處理，因為面向網際網路的權威伺服器不應成為開放的遞迴解析器。&lt;/p&gt;
+&lt;h2 id="伺服器設定"&gt;
+ 伺服器設定
+ &lt;a href="#%e4%bc%ba%e6%9c%8d%e5%99%a8%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;named.conf&lt;/code&gt; 定義全域選項、存取控制清單、區域與記錄。最小的權威設定會限制遞迴與區域傳送：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;named&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-named" data-lang="named"&gt;acl trusted-recursors { 192.0.2.0/24; 2001:db8:1::/48; };
+
+options {
+ directory &amp;#34;/var/named&amp;#34;;
+ listen-on { any; };
+ listen-on-v6 { any; };
+ recursion no;
+ allow-transfer { none; };
+ minimal-responses yes;
+};
+
+zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/example.net&amp;#34;;
+ allow-transfer { 192.0.2.53; };
+};&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;遞迴解析器需要 &lt;code&gt;recursion yes&lt;/code&gt;，以及限制於其用戶端的 &lt;code&gt;allow-recursion&lt;/code&gt; 或 &lt;code&gt;allow-query-cache&lt;/code&gt; ACL。除非部署明確提供具有濫用控制的公開解析器，否則絕不要讓不受信任的網路使用遞迴。&lt;/p&gt;
+&lt;p&gt;ACL 可以由 &lt;code&gt;allow-query&lt;/code&gt;、&lt;code&gt;allow-recursion&lt;/code&gt;、&lt;code&gt;allow-query-cache&lt;/code&gt;、&lt;code&gt;allow-transfer&lt;/code&gt; 與 &lt;code&gt;match-clients&lt;/code&gt; 重複使用。BIND &lt;code&gt;view&lt;/code&gt; 陳述式會依來源位址、目的位址或 TSIG 身分，呈現不同的區域與遞迴政策：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;named&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-named" data-lang="named"&gt;view &amp;#34;internal&amp;#34; {
+ match-clients { trusted-recursors; };
+ recursion yes;
+ allow-recursion { trusted-recursors; };
+
+ zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/internal/example.net&amp;#34;;
+ };
+};
+
+view &amp;#34;external&amp;#34; {
+ match-clients { any; };
+ recursion no;
+
+ zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/external/example.net&amp;#34;;
+ };
+};&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;啟用 view 時，請在適用的 view 中定義每個用戶端可見的區域。將最具體的 &lt;code&gt;match-clients&lt;/code&gt; 規則放在前面，因為 BIND 會選取第一個相符的 view。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Dependency-Injection on cesun.life</title><link>https://example.org/ja/tags/dependency-injection/</link><description>Recent content in Dependency-Injection on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Mon, 17 Nov 2025 23:19:46 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/dependency-injection/index.xml" rel="self" type="application/rss+xml"/><item><title>Spring Beanのライフサイクルとプロトタイプスコープ</title><link>https://example.org/ja/spring-bean-lifecycle/</link><pubDate>Mon, 17 Nov 2025 23:19:46 +0800</pubDate><guid>https://example.org/ja/spring-bean-lifecycle/</guid><description>&lt;p&gt;SpringはBeanのメタデータとBeanインスタンスを分離します。&lt;code&gt;BeanDefinition&lt;/code&gt;は
+オブジェクトの作成方法を記述し、&lt;code&gt;BeanFactory&lt;/code&gt;はオブジェクトが要求されたときに
+その定義を適用します。&lt;code&gt;ApplicationContext&lt;/code&gt;は、協調的な起動、
+後処理、イベント、リソース読み込み、シャットダウンを追加します。&lt;/p&gt;
+&lt;h2 id="コンテキストのリフレッシュ中に行われる処理"&gt;
+ コンテキストのリフレッシュ中に行われる処理
+ &lt;a href="#%e3%82%b3%e3%83%b3%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88%e3%81%ae%e3%83%aa%e3%83%95%e3%83%ac%e3%83%83%e3%82%b7%e3%83%a5%e4%b8%ad%e3%81%ab%e8%a1%8c%e3%82%8f%e3%82%8c%e3%82%8b%e5%87%a6%e7%90%86" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;AbstractApplicationContext.refresh()&lt;/code&gt;は、アプリケーションのシングルトンを
+利用可能にする前に、環境とBeanファクトリを準備します。主なステージは次のとおりです。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;BeanFactory&lt;/code&gt;を準備または取得し、Bean定義を読み込む。&lt;/li&gt;
+&lt;li&gt;定義をまだ変更できる段階で、設定クラスの処理を含む
+&lt;code&gt;BeanFactoryPostProcessor&lt;/code&gt;sを呼び出す。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;BeanPostProcessor&lt;/code&gt;sを検出して登録する。&lt;/li&gt;
+&lt;li&gt;メッセージ解決、イベント、コンテキスト固有のリソースなどの
+コンテキスト基盤を初期化する。&lt;/li&gt;
+&lt;li&gt;残りの非遅延初期化シングルトンBeanをインスタンス化する。&lt;/li&gt;
+&lt;li&gt;リフレッシュ済みの状態と&lt;code&gt;ContextRefreshedEvent&lt;/code&gt;を公開する。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;BeanFactoryPostProcessor&lt;/code&gt;はメタデータを変更します。一方、
+&lt;code&gt;BeanPostProcessor&lt;/code&gt;はインスタンスを認識し、フィールドを注入したり、
+ライフサイクルアノテーションを呼び出したり、Beanをプロキシに置き換えたりできます。
+すべてのポストプロセッサが登録される前にインスタンス化される可能性があるため、
+ファクトリポストプロセッサから通常のアプリケーションBeanを作成するのは安全ではありません。&lt;/p&gt;
+&lt;h2 id="依存関係の順序とdepends-on"&gt;
+ 依存関係の順序と&lt;code&gt;depends-on&lt;/code&gt;
+ &lt;a href="#%e4%be%9d%e5%ad%98%e9%96%a2%e4%bf%82%e3%81%ae%e9%a0%86%e5%ba%8f%e3%81%a8depends-on" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;コンテナは、依存するBeanより前に、そのBeanのコンストラクタ依存関係と
+プロパティ依存関係を作成します。したがって、コンストラクタインジェクションは
+必須の関係と作成順序の両方を表します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Component&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;ReportService&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; ReportRepository repository;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ReportService(ReportRepository repository) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;this&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;repository&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; repository;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;@DependsOn(&amp;quot;schemaInitializer&amp;quot;)&lt;/code&gt;またはXMLの&lt;code&gt;depends-on&lt;/code&gt;は、共有外部リソースの
+初期化など、インジェクション関係が存在しない場合に順序を追加します。
+シングルトンBeanの場合、破棄順序も逆転します。つまり、依存するBeanは、
+それが依存するBeanより先に破棄されます。&lt;code&gt;depends-on&lt;/code&gt;はクラスが使用するものを
+隠してしまうため、実際の型付き依存関係の代わりに使用すべきではありません。&lt;/p&gt;
+&lt;h2 id="インスタンスの初期化"&gt;
+ インスタンスの初期化
+ &lt;a href="#%e3%82%a4%e3%83%b3%e3%82%b9%e3%82%bf%e3%83%b3%e3%82%b9%e3%81%ae%e5%88%9d%e6%9c%9f%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;通常のBeanに対して、Springは次の処理を行います。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;通常はコンストラクタまたはファクトリメソッドを呼び出して、オブジェクトをインスタンス化する。&lt;/li&gt;
+&lt;li&gt;プロパティとフィールドを解決して注入する。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;BeanNameAware&lt;/code&gt;、&lt;code&gt;BeanFactoryAware&lt;/code&gt;、&lt;code&gt;ApplicationContextAware&lt;/code&gt;などの
+awareコールバックを呼び出す。&lt;/li&gt;
+&lt;li&gt;初期化前に各&lt;code&gt;BeanPostProcessor&lt;/code&gt;を呼び出す。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;@PostConstruct&lt;/code&gt;、続いて&lt;code&gt;InitializingBean.afterPropertiesSet()&lt;/code&gt;、
+さらに設定されたカスタムinitメソッドを呼び出す。&lt;/li&gt;
+&lt;li&gt;初期化後に各&lt;code&gt;BeanPostProcessor&lt;/code&gt;を呼び出す。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Springの基盤は、ポストプロセッサを通じてこのシーケンスの一部を実装します。
+そのため、カスタムプロセッサは順序に関する契約を遵守する必要があります。
+初期化後のプロセッサは、元のオブジェクトではなくプロキシを返す場合があります。
+呼び出し元が準備済みの、場合によってはアドバイスされたオブジェクトを受け取るのは、
+チェーン全体が完了した後だけです。&lt;/p&gt;
+&lt;p&gt;必須の不変条件を確立する場所としては、コンストラクタインジェクションが最も安全です。
+&lt;code&gt;@PostConstruct&lt;/code&gt;は、初期化が注入されたプロパティや、コンストラクタでは利用できない
+コンテナサービスに依存する場合に適しています。&lt;/p&gt;</description></item><item><title>Spring コンテナーの型</title><link>https://example.org/ja/spring-container-types/</link><pubDate>Thu, 14 Dec 2023 04:20:44 +0800</pubDate><guid>https://example.org/ja/spring-container-types/</guid><description>&lt;p&gt;Spring のコンテナー API には、Bean メタデータ、そのメタデータからオブジェクトを
+作成するファクトリ、ファクトリとアプリケーションサービスを調整するアプリケーション
+コンテキストという 3 つの層があります。これらの層を分離すると、Spring のソース
+コードと拡張ポイントを理解しやすくなります。&lt;/p&gt;
+&lt;h2 id="bean-定義とレジストリ"&gt;
+ Bean 定義とレジストリ
+ &lt;a href="#bean-%e5%ae%9a%e7%be%a9%e3%81%a8%e3%83%ac%e3%82%b8%e3%82%b9%e3%83%88%e3%83%aa" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;BeanDefinition&lt;/code&gt; は 1 つの Bean の可変メタデータです。Bean クラスまたはクラス名、
+スコープ、コンストラクター引数、プロパティ値、修飾子、ファクトリメソッド、
+ライフサイクルメソッド、役割、ソース位置、明示的な依存関係を記録します。
+親子メタデータ関係は Java 継承から独立しています。&lt;/p&gt;
+&lt;p&gt;一般的な実装は異なる登録経路に対応します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;RootBeanDefinition&lt;/code&gt; は Bean ファクトリが使用するマージ済み定義を表します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ChildBeanDefinition&lt;/code&gt; は名前付き親定義からメタデータを継承します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;GenericBeanDefinition&lt;/code&gt; はマージ前に、スタンドアロンまたは親由来のメタデータを表現できます。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;AnnotatedGenericBeanDefinition&lt;/code&gt; は登録されたクラスのアノテーションメタデータを公開します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ScannedGenericBeanDefinition&lt;/code&gt; はコンポーネントクラスを先にロードせず、クラスパス
+スキャン時に読み取ったメタデータを公開します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;BeanDefinitionRegistry&lt;/code&gt; は Bean 名で定義を保存します。中心的な操作は定義の登録、
+削除、問い合わせです。&lt;code&gt;DefaultListableBeanFactory&lt;/code&gt; と &lt;code&gt;GenericApplicationContext&lt;/code&gt; が
+重要な実装です。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;AnnotatedBeanDefinitionReader&lt;/code&gt; は明示的に指定されたコンポーネントクラスを登録します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; GenericApplicationContext();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; reader &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; AnnotatedBeanDefinitionReader(context);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;reader.&lt;span style="color:#a6e22e"&gt;register&lt;/span&gt;(OrderService.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;context.&lt;span style="color:#a6e22e"&gt;refresh&lt;/span&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;ClassPathBeanDefinitionScanner&lt;/code&gt; はパッケージから候補コンポーネントを検索し、その
+定義を登録します。どちらの仕組みもアノテーションスコープ、命名、修飾子、条件、
+&lt;code&gt;BeanDefinitionCustomizer&lt;/code&gt; コールバックを適用します。カスタマイザーはレジストリ
+ポストプロセッサーを実装せず、登録時に対象を絞ったメタデータ変更を行えます。&lt;/p&gt;
+&lt;h2 id="beanfactoryfactorybeanobjectfactory"&gt;
+ &lt;code&gt;BeanFactory&lt;/code&gt;、&lt;code&gt;FactoryBean&lt;/code&gt;、&lt;code&gt;ObjectFactory&lt;/code&gt;
+ &lt;a href="#beanfactoryfactorybeanobjectfactory" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;BeanFactory&lt;/code&gt; は実行時レジストリと依存関係解決 API です。定義を検索し、Bean を作成し、
+協働オブジェクトを解決し、シングルトンの同一性を管理し、ライフサイクルプロセッサーを
+適用します。&lt;code&gt;ListableBeanFactory&lt;/code&gt; は列挙を追加し、&lt;code&gt;HierarchicalBeanFactory&lt;/code&gt; は親検索
+を追加し、&lt;code&gt;ConfigurableListableBeanFactory&lt;/code&gt; はフレームワーク基盤へコンテナー設定を
+公開します。アプリケーションコードはサービスロケーターとして &lt;code&gt;getBean()&lt;/code&gt; を呼ぶ
+のではなく、ドメインの協働オブジェクトに依存します。&lt;/p&gt;</description></item></channel></rss>

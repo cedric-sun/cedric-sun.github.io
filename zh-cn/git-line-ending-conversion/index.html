@@ -1,0 +1,38 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Git 行尾转换</title></head><body><main><article><div class=article-header><h1>Git 行尾转换</h1><div class=aux>最后更新: 2026-04-29 00:23:56 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/git/>Git</a>
+|
+<a href=/zh-cn/tags/version-control/>Version-Control</a></div></div><div class="translation-notice machine-translated"><a href=/git-line-ending-conversion/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Git 可以在仓库边界将文本规范化为 LF，同时在工作树中呈现 LF 或 CRLF。
+稳定的 <code>.gitattributes</code> 策略可避免生成取决于平台的提交，并使编辑器只负责检出后的形式。</p><h2 id=区分-head索引和工作树中的字节>区分 HEAD、索引和工作树中的字节
+<a href=#%e5%8c%ba%e5%88%86-head%e7%b4%a2%e5%bc%95%e5%92%8c%e5%b7%a5%e4%bd%9c%e6%a0%91%e4%b8%ad%e7%9a%84%e5%ad%97%e8%8a%82 class=heading-anchor><span>#</span></a></h2><p>一个被跟踪的路径有三种相关表示：</p><ol><li><code>HEAD</code> 指向当前提交所存储的 blob。</li><li>索引保存拟用于下一次提交的 blob。</li><li>工作树保存供编辑器和构建工具使用的字节。</li></ol><p>对于已规范化的文本，<code>git add</code> 会执行从 CRLF 到 LF 的清理转换。
+检出会执行污化转换，将索引中的 LF 转换为选定的工作树行尾。现有提交不会被重写。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git ls-files --eol -- path/to/file
+</span></span><span style=display:flex><span>git show HEAD:path/to/file | od -An -t x1
+</span></span><span style=display:flex><span>git check-attr -a -- path/to/file</span></span></code></pre></div></div></div><p><code>git ls-files --eol</code> 会报告索引、工作树和有效属性的形式。
+在处理转换警告之前，应检查这些形式。</p><h2 id=使用-gitattributes-声明仓库策略>使用 <code>.gitattributes</code> 声明仓库策略
+<a href=#%e4%bd%bf%e7%94%a8-gitattributes-%e5%a3%b0%e6%98%8e%e4%bb%93%e5%ba%93%e7%ad%96%e7%95%a5 class=heading-anchor><span>#</span></a></h2><p>应提交属性文件，因为这样每个克隆都会共享该策略：</p><div class=jose-wrapper><div class=jose-tools><span>gitattributes</span>
+<button>Copy</button></div><div class=jose-inner><pre tabindex=0><code class=language-gitattributes data-lang=gitattributes>*       text=auto
+*.sh    text eol=lf
+*.py    text eol=lf
+*.bat   text eol=crlf
+*.png   binary
+*.pdf   binary</code></pre></div></div><p><code>text=auto</code> 允许 Git 对未明确指定的路径进行分类。<code>text</code> 强制执行规范化；
+<code>-text</code> 将其禁用；<code>binary</code> 则是 <code>-diff -merge -text</code> 的内置属性宏。
+显式指定 <code>eol=lf</code> 或 <code>eol=crlf</code> 会将路径标记为文本，并控制其检出形式。
+应将归档文件、图像、生成的二进制格式和签名制品标记为非文本，因为转换会改变其字节。</p><h2 id=仅将配置用作后备方案>仅将配置用作后备方案
+<a href=#%e4%bb%85%e5%b0%86%e9%85%8d%e7%bd%ae%e7%94%a8%e4%bd%9c%e5%90%8e%e5%a4%87%e6%96%b9%e6%a1%88 class=heading-anchor><span>#</span></a></h2><p><code>core.autocrlf</code> 和 <code>core.eol</code> 会影响未由属性作出更具体决定的路径：</p><div class=table-wrapper><div class=table-toolbar><button class=table-expand-button type=button aria-expanded=false>
+Expand table</button></div><div class=table-scroll><table><thead><tr><th><code>core.autocrlf</code></th><th>清理后写入索引</th><th>从索引检出</th></tr></thead><tbody><tr><td><code>false</code></td><td>不执行 autocrlf 转换</td><td>不执行 autocrlf 转换</td></tr><tr><td><code>input</code></td><td>CRLF 转换为 LF</td><td>LF 保持为 LF</td></tr><tr><td><code>true</code></td><td>CRLF 转换为 LF</td><td>LF 转换为 CRLF</td></tr></tbody></table></div></div><p><code>core.eol</code> 可选择 <code>lf</code>、<code>crlf</code> 或 <code>native</code>，用于没有显式 <code>eol</code> 属性的规范化文本。
+<code>core.safecrlf=true</code> 会拒绝不可逆转换；<code>warn</code> 会报告这些转换。这两项设置都不能替代已提交的属性策略。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git config --show-origin --get core.autocrlf
+</span></span><span style=display:flex><span>git config --show-origin --get core.eol
+</span></span><span style=display:flex><span>git config --show-origin --get core.safecrlf</span></span></code></pre></div></div></div><h2 id=安全地重新规范化>安全地重新规范化
+<a href=#%e5%ae%89%e5%85%a8%e5%9c%b0%e9%87%8d%e6%96%b0%e8%a7%84%e8%8c%83%e5%8c%96 class=heading-anchor><span>#</span></a></h2><p>添加或修正属性后，应从干净的工作树开始，或先保存未提交的工作。
+然后暂存一次有意为之的规范化，并检查其结果：</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>git add --renormalize .
+</span></span><span style=display:flex><span>git diff --cached --check
+</span></span><span style=display:flex><span>git diff --cached</span></span></code></pre></div></div></div><p>应将行尾规范化与语义编辑分别提交，因为单独的提交可以保证代码审查、追溯和回滚的质量。
+该操作更新索引，但不会更改被忽略或未跟踪的文件。</p><p>应使编辑器设置与检出策略保持一致，尤其是对于强制使用 CRLF 的文件。
+编辑器配置影响工作树中的字节，而 <code>.gitattributes</code> 定义版本控制的边界。
+不要为了试验而对有价值的未提交文件反复执行添加和检出；应先检查有效属性并保存工作。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/git-line-ending-conversion/ class=language-option data-lang=en>English
+</a><a href=/ja/git-line-ending-conversion/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/git-line-ending-conversion/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/git-line-ending-conversion/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

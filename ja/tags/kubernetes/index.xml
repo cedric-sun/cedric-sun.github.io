@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Kubernetes on cesun.life</title><link>https://example.org/ja/tags/kubernetes/</link><description>Recent content in Kubernetes on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 02 Oct 2025 07:12:04 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/kubernetes/index.xml" rel="self" type="application/rss+xml"/><item><title>Kubectl</title><link>https://example.org/ja/kubectl/</link><pubDate>Thu, 02 Oct 2025 07:12:04 +0800</pubDate><guid>https://example.org/ja/kubectl/</guid><description>&lt;p&gt;&lt;code&gt;kubectl&lt;/code&gt; は Kubernetes のコマンドラインクライアントです。kubeconfig から接続情報と認証情報を読み取り、コンテキストと名前空間を選択して、API サーバーにリクエストを送信します。kubeconfig ファイルにはベアラートークン、クライアント証明書、秘密鍵が含まれる可能性があるため、機密情報として扱ってください。&lt;/p&gt;
+&lt;h2 id="構成とコンテキストを選択する"&gt;
+ 構成とコンテキストを選択する
+ &lt;a href="#%e6%a7%8b%e6%88%90%e3%81%a8%e3%82%b3%e3%83%b3%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88%e3%82%92%e9%81%b8%e6%8a%9e%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;kubectl&lt;/code&gt; はまず明示的に指定された &lt;code&gt;--kubeconfig&lt;/code&gt; ファイルを使用し、次に &lt;code&gt;KUBECONFIG&lt;/code&gt; で指定されたファイル群を使用し、その後に &lt;code&gt;$HOME/.kube/config&lt;/code&gt; を使用します。変更を行う前に、アクティブな対象を確認してください。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;kubectl config current-context
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;kubectl config view --minify
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;kubectl config view --minify -o jsonpath&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;{..namespace}&amp;#39;&lt;/span&gt;; echo&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;周囲の状態に依存してはならないスクリプトでは、&lt;code&gt;--context&lt;/code&gt; と &lt;code&gt;--namespace&lt;/code&gt; を使用してください。マシン間で有効期間の長い管理者認証情報をコピーするよりも、短期間のみ有効な exec 認証情報または OIDC 認証を優先してください。&lt;/p&gt;
+&lt;h2 id="作成適用パッチ置換"&gt;
+ 作成、適用、パッチ、置換
+ &lt;a href="#%e4%bd%9c%e6%88%90%e9%81%a9%e7%94%a8%e3%83%91%e3%83%83%e3%83%81%e7%bd%ae%e6%8f%9b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;これらのコマンドは、所有権と更新のセマンティクスがそれぞれ異なります。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;kubectl create -f object.yaml&lt;/code&gt; はオブジェクトを作成し、すでに存在する場合は失敗します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;kubectl apply -f object.yaml&lt;/code&gt; は宣言的な適用を実行します。サーバーサイド適用はフィールドの所有権を追跡するため、複数のライターによる宣言的なワークフローでは一般に優先されます。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;kubectl patch&lt;/code&gt; は既存オブジェクトの選択したフィールドを変更します。通常は運用上の例外に使用します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;kubectl replace -f object.yaml&lt;/code&gt; はオブジェクト仕様を置き換え、オブジェクトが存在している必要があります。日常的な更新のための安全な近道ではありません。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;kubectl delete&lt;/code&gt; はオブジェクトを削除し、依存するオブジェクトの連鎖的な削除を引き起こす可能性があります。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;宣言的な変更を適用する前にプレビューします。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;kubectl diff -f manifests/
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;kubectl apply --server-side --dry-run&lt;span style="color:#f92672"&gt;=&lt;/span&gt;server -f manifests/
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;kubectl apply --server-side -f manifests/&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;フィールドの所有権を理解しないまま、クライアントサイド適用、サーバーサイド適用、命令型パッチ、および同じフィールドを扱う複数のコントローラーを混在させないでください。競合は、別のアクターがそのフィールドを所有していることを示す有用な証拠になる場合があります。&lt;/p&gt;</description></item><item><title>Istio</title><link>https://example.org/ja/istio/</link><pubDate>Fri, 28 Apr 2023 08:11:31 +0800</pubDate><guid>https://example.org/ja/istio/</guid><description>&lt;p&gt;Istio は、Envoy プロキシとコントロールプレーンの設定を通じて、ワークロードにトラフィックポリシー、アイデンティティ、テレメトリ、セキュリティポリシーを適用します。これらの横断的な要件が、追加される運用面を正当化する場合にのみ採用してください。&lt;/p&gt;
+&lt;h2 id="データプレーンとコントロールプレーン"&gt;
+ データプレーンとコントロールプレーン
+ &lt;a href="#%e3%83%87%e3%83%bc%e3%82%bf%e3%83%97%e3%83%ac%e3%83%bc%e3%83%b3%e3%81%a8%e3%82%b3%e3%83%b3%e3%83%88%e3%83%ad%e3%83%bc%e3%83%ab%e3%83%97%e3%83%ac%e3%83%bc%e3%83%b3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;データプレーンは、Envoy サイドカー、またはノードごとの ztunnel とオプションの waypoint プロキシで構成されるアンビエントデプロイメントで構成されます。&lt;code&gt;istiod&lt;/code&gt; は、xDS を通じてサービスディスカバリ、証明書、トラフィック設定を計算して配布します。ワークロードのパスは、選択したモードに応じてインバウンドおよびアウトバウンドトラフィックを捕捉します。このパスをバイパスするトラフィックはメッシュポリシーで管理できません。アンビエントモードとサイドカーでは L4/L7 の適用位置が異なるため、移行時には各ポリシーがどこで実行されるかを検証する必要があります。&lt;/p&gt;
+&lt;h2 id="トラフィック管理"&gt;
+ トラフィック管理
+ &lt;a href="#%e3%83%88%e3%83%a9%e3%83%95%e3%82%a3%e3%83%83%e3%82%af%e7%ae%a1%e7%90%86" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;Gateway&lt;/code&gt; と &lt;code&gt;VirtualService&lt;/code&gt; リソースは、イングレスリスナーとルーティングルールを定義します。&lt;code&gt;DestinationRule&lt;/code&gt; は、宛先に対するサブセット、ロードバランシング、接続、TLS のポリシーを定義します。&lt;code&gt;version&lt;/code&gt; などの安定したラベルでルーティングし、サブセットで使用するラベルがワークロードに存在することを確認してください。&lt;/p&gt;
+&lt;p&gt;重み付きルートを使用すると、測定した割合のトラフィックを安定版サブセットからカナリアへ移行できます。ヘッダーまたはアイデンティティのマッチ条件を使用して、最初にテストトラフィックを振り分けることもできます。各変更は、プロキシ設定の収束とワークロードの健全性を確認してから進めてください。ルートの重みでは、エンドポイントの欠落や誤ったサブセットセレクターを補償できません。&lt;/p&gt;
+&lt;p&gt;リトライ、タイムアウト、サーキットブレーカー、フォールトインジェクションは、障害時の挙動を変更します。呼び出し元のデッドラインに応じて予算を設定してください。制限のないリトライポリシーは、過負荷を増幅し、べき等でない処理を重複実行する可能性があります。&lt;/p&gt;
+&lt;h2 id="アイデンティティとセキュリティ"&gt;
+ アイデンティティとセキュリティ
+ &lt;a href="#%e3%82%a2%e3%82%a4%e3%83%87%e3%83%b3%e3%83%86%e3%82%a3%e3%83%86%e3%82%a3%e3%81%a8%e3%82%bb%e3%82%ad%e3%83%a5%e3%83%aa%e3%83%86%e3%82%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Istio は Kubernetes のサービスアカウントに基づくワークロードアイデンティティを発行し、プロキシ間の相互 TLS を使用できます。必要なすべてのワークロードがメッシュに参加していることを確認したうえで、&lt;code&gt;AuthorizationPolicy&lt;/code&gt; による認可を適用してください。移行時は、管理対象外のトラフィックを特定する目的に限って permissive から開始し、その後、明示的な移行計画に基づいて strict な相互 TLS に移行します。&lt;/p&gt;
+&lt;p&gt;mTLS の状態には &lt;code&gt;PeerAuthentication&lt;/code&gt; を使用し、必要に応じてエンドユーザーの JWT を検証するには &lt;code&gt;RequestAuthentication&lt;/code&gt; を使用し、アクセス判断には &lt;code&gt;AuthorizationPolicy&lt;/code&gt; を使用します。ワークロードアイデンティティは、テナントやビジネス権限に対するアプリケーション認可の代替にはなりません。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;istiod&lt;/code&gt; は認証局として動作するか、外部 CA と統合し、短期間有効なワークロード証明書を有効期限前にローテーションします。発行、ルートの移行、トラストドメインの設定、クロックスキューを監視してください。ルートをローテーションする際は、リーフ証明書を置き換える前に重複する信頼関係を配布し、古いワークロードと新しいワークロードが相互に認証できるようにします。&lt;/p&gt;
+&lt;h2 id="運用"&gt;
+ 運用
+ &lt;a href="#%e9%81%8b%e7%94%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;メッシュのコントロールプレーンとデータプレーンのバージョンを意図的に管理し、ロールアウト前にアナライザーの出力を確認して、プロキシのリソース使用量、証明書の有効期限、設定の収束を監視してください。意図した YAML に依存するのではなく、&lt;code&gt;istioctl proxy-status&lt;/code&gt; と &lt;code&gt;istioctl proxy-config&lt;/code&gt; を使用して、プロキシが受信した内容を診断します。&lt;/p&gt;
+&lt;p&gt;Envoy は、テレメトリ設定に従ってリクエストメトリクス、アクセスログ、トレースを出力します。イングレス、waypoint またはサイドカー、アプリケーション間でリクエスト ID とサンプリングポリシーを保持してください。テレメトリが欠落している場合、トラフィックがプロキシをバイパスした、設定が収束していない、または収集に失敗した可能性があります。&lt;/p&gt;</description></item><item><title>Kubernetes Access Control</title><link>https://example.org/ja/kubernetes-access-control/</link><pubDate>Mon, 27 Jun 2022 04:47:20 +0800</pubDate><guid>https://example.org/ja/kubernetes-access-control/</guid><description>&lt;p&gt;Kubernetes は API リクエストを認証、認可、アドミッション制御の順に処理します。認証はアイデンティティを確立し、
+認可はそのアイデンティティが操作を実行できるかを決定し、アドミッションは受け入れたオブジェクトを検証または変更できます。
+これらは別個の制御であり、個別に設定・監査すべきです。&lt;/p&gt;
+&lt;h2 id="oidc-による認証"&gt;
+ OIDC による認証
+ &lt;a href="#oidc-%e3%81%ab%e3%82%88%e3%82%8b%e8%aa%8d%e8%a8%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;OpenID Connect（OIDC）により、API サーバーは外部アイデンティティプロバイダーが発行したベアラートークンを検証できます。
+API サーバーには issuer URL、クライアント ID、任意のユーザー名・グループクレームのマッピングを設定します。
+issuer は API サーバーから到達可能であり、TLS 証明書が検証できなければなりません。&lt;/p&gt;
+&lt;p&gt;アイデンティティプロバイダーがユーザーライフサイクルと多要素認証を管理し、Kubernetes は有効なトークンからユーザー名とグループを受け取ります。
+人に共有静的トークンを使ってはいけません。&lt;code&gt;kubectl&lt;/code&gt; では承認済みの OIDC ログインプラグインまたは exec credential provider を使い、
+長期資格情報を kubeconfig ファイルに保存せず短命トークンを更新します。&lt;/p&gt;
+&lt;h2 id="rbac-による認可"&gt;
+ RBAC による認可
+ &lt;a href="#rbac-%e3%81%ab%e3%82%88%e3%82%8b%e8%aa%8d%e5%8f%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;RBAC は &lt;code&gt;Role&lt;/code&gt; と &lt;code&gt;ClusterRole&lt;/code&gt; オブジェクトを通じてリソース型に対する verb を許可し、バインディングで権限を関連付けます。
+&lt;code&gt;Role&lt;/code&gt; は名前空間スコープであり、&lt;code&gt;ClusterRole&lt;/code&gt; はクラスタースコープのアクセスを許可するか、名前空間内でバインドできます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;yaml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-yaml" data-lang="yaml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io/v1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Role&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;metadata&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;deployment-reader&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;namespace&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;rules&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; - &lt;span style="color:#f92672"&gt;apiGroups&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;apps&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;resources&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;deployments&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;verbs&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;get&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;list&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;watch&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;---
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io/v1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;RoleBinding&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;metadata&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;developers-can-read-deployments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;namespace&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;subjects&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; - &lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Group&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments-developers&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;apiGroup&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;roleRef&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Role&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;deployment-reader&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;apiGroup&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;必要な verb、リソース、名前空間、非リソース URL だけを最小範囲で許可します。厳格に管理されたプラットフォーム管理を除き、
+&lt;code&gt;cluster-admin&lt;/code&gt;、ワイルドカードの verb、ワイルドカードのリソースは避けます。提案した許可は &lt;code&gt;kubectl auth can-i&lt;/code&gt; で確認します。&lt;/p&gt;</description></item><item><title>Kubernetes を一から構築する</title><link>https://example.org/ja/kubernetes-from-scratch/</link><pubDate>Mon, 30 May 2022 07:31:00 +0800</pubDate><guid>https://example.org/ja/kubernetes-from-scratch/</guid><description>&lt;p&gt;Kubernetes をソースからビルドする方法は、コンポーネントの学習や、パッチを適用した
+コンポーネントのテストに適している。本番クラスターには、サポートされたアップグレード手順、
+証明書のローテーション、バックアップからの復旧、ネットワーク、ストレージ、監視、
+インシデント対応手順も必要になる。&lt;/p&gt;
+&lt;h2 id="オブジェクトモデルと-api-パス"&gt;
+ オブジェクトモデルと API パス
+ &lt;a href="#%e3%82%aa%e3%83%96%e3%82%b8%e3%82%a7%e3%82%af%e3%83%88%e3%83%a2%e3%83%87%e3%83%ab%e3%81%a8-api-%e3%83%91%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Kubernetes は、クラスターの操作をリソースに対する CRUD としてモデル化する。各オブジェクトは、
+UID、型、その型の中で一意な名前、インデックスを利用した選択のためのラベル、および
+識別には使われないメタデータのためのアノテーションを持つ。&lt;/p&gt;
+&lt;p&gt;リソースは API グループに分類される。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;コアグループは &lt;code&gt;/api/v1&lt;/code&gt; 以下で公開される。&lt;/li&gt;
+&lt;li&gt;名前付きグループは &lt;code&gt;/apis/&amp;lt;group&amp;gt;/&amp;lt;version&amp;gt;&lt;/code&gt; 以下で公開される。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;GET /api&lt;/code&gt;、&lt;code&gt;GET /apis&lt;/code&gt;、&lt;code&gt;/openapi/v3&lt;/code&gt; などのディスカバリーエンドポイントは、
+クラスターがサポートするリソースを記述する。リソース一覧の各エントリーは、
+正規名、&lt;code&gt;kind&lt;/code&gt;、名前空間のスコープ、verb、および &lt;code&gt;pvc&lt;/code&gt; などの短縮名を公開する。&lt;/p&gt;
+&lt;p&gt;一般的な verb は次のように HTTP メソッドに対応する。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;get&lt;/code&gt;、&lt;code&gt;list&lt;/code&gt;、&lt;code&gt;watch&lt;/code&gt; は &lt;code&gt;GET&lt;/code&gt; を使用する。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;create&lt;/code&gt; は &lt;code&gt;POST&lt;/code&gt; を使用する。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;update&lt;/code&gt; は &lt;code&gt;PUT&lt;/code&gt; を使用する。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;patch&lt;/code&gt; は &lt;code&gt;PATCH&lt;/code&gt; を使用する。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;delete&lt;/code&gt; と &lt;code&gt;deletecollection&lt;/code&gt; は &lt;code&gt;DELETE&lt;/code&gt; を使用する。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;このオブジェクトモデルにより、&lt;code&gt;Service&lt;/code&gt; は多数の Pod をバックエンドとする安定した
+エンドポイントになる一方、Pod 自体は一時的な存在であり、再作成されると新しい
+ネットワーク ID を取得する。&lt;/p&gt;
+&lt;h2 id="バイナリのビルドと記録"&gt;
+ バイナリのビルドと記録
+ &lt;a href="#%e3%83%90%e3%82%a4%e3%83%8a%e3%83%aa%e3%81%ae%e3%83%93%e3%83%ab%e3%83%89%e3%81%a8%e8%a8%98%e9%8c%b2" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;ドキュメントで指定された Go ツールチェーンを使い、タグが付けられた Kubernetes の
+ソースリビジョンからビルドする。すべてのバイナリについて、ソースコミット、
+ツールチェーンのバージョン、ビルドフラグ、チェックサムを記録する。選択したコマンドは
+&lt;code&gt;make WHAT=...&lt;/code&gt; でビルドするか、リリース用ビルドプロセスを使用する。
+コントロールプレーンのホストに出所不明のバイナリをダウンロードしてはならない。&lt;/p&gt;</description></item><item><title>Helm と Argo CD</title><link>https://example.org/ja/helm-and-argocd/</link><pubDate>Tue, 08 Mar 2022 13:40:19 +0800</pubDate><guid>https://example.org/ja/helm-and-argocd/</guid><description>&lt;p&gt;Helm は、チャート、値、およびテンプレートからバージョン管理された Kubernetes マニフェストをレンダリングします。Helm はリリースメタデータをクラスターに記録しますが、Kubernetes は生成されたリソースのみを調整します。Kubernetes は Helm のテンプレートを理解も管理もしません。&lt;/p&gt;
+&lt;h2 id="helm-リリース"&gt;
+ Helm リリース
+ &lt;a href="#helm-%e3%83%aa%e3%83%aa%e3%83%bc%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;デフォルト値は &lt;code&gt;values.yaml&lt;/code&gt; に保持し、環境固有の値ファイルまたは明示的な &lt;code&gt;--set&lt;/code&gt; 値の使用は控えめにし、適用する前にレンダリング結果を検証します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm lint charts/orders
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm template orders charts/orders -f values-production.yaml
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm upgrade --install orders charts/orders -f values-production.yaml --namespace orders --create-namespace --atomic&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;--atomic&lt;/code&gt; は、Helm が失敗を判定できる場合、失敗したアップグレードをロールバックしますが、外部管理されている状態をトランザクションとして扱うことはありません。フック、CRD、データベースのマイグレーション、およびロールバックの動作を明示的に定義してください。&lt;/p&gt;
+&lt;h2 id="argo-cd-による調整"&gt;
+ Argo CD による調整
+ &lt;a href="#argo-cd-%e3%81%ab%e3%82%88%e3%82%8b%e8%aa%bf%e6%95%b4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Argo CD は宣言された Git リビジョンを監視し、レンダリングされた望ましい状態とクラスターの状態を調整します。Argo CD の Helm ソースはチャートのレンダリングを提供します。GitOps で管理されるアプリケーションでは、オペレーターのローカル Helm クライアントではなく、Argo CD が調整を担う必要があります。&lt;/p&gt;
+&lt;p&gt;アクセス制御とリリース頻度が異なる場合は、アプリケーションのソースとデプロイ構成に別々のリポジトリまたはディレクトリを使用します。Argo CD のプロジェクト、リポジトリ、宛先、およびサービスアカウントを制限してください。自動プルーニングを有効にする前にドリフトを確認してください。プルーニングを行うと、望ましいマニフェストセットに存在しないリソースが削除されるためです。&lt;/p&gt;</description></item><item><title>Helm の運用と Argo CD の移行</title><link>https://example.org/ja/helm-operations-and-argocd-migrations/</link><pubDate>Fri, 05 Nov 2021 13:57:33 +0800</pubDate><guid>https://example.org/ja/helm-operations-and-argocd-migrations/</guid><description>&lt;p&gt;静的な Kubernetes マニフェストを Helm に移し、さらに Argo CD に移すことは、テンプレートだけでなく所有権も変更します。稼働中のリソースを棚卸しし、不変の名前とストレージを保持し、自動プルーニングを有効にする前に望ましい状態を再現可能にします。&lt;/p&gt;
+&lt;h2 id="helm-のリリースモデルを理解する"&gt;
+ Helm のリリースモデルを理解する
+ &lt;a href="#helm-%e3%81%ae%e3%83%aa%e3%83%aa%e3%83%bc%e3%82%b9%e3%83%a2%e3%83%87%e3%83%ab%e3%82%92%e7%90%86%e8%a7%a3%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;直接の Helm リリースでは、アップグレードによって以前のリリースマニフェスト、新しくレンダリングされたマニフェスト、稼働中のオブジェクトが比較されます。両方のマニフェストに存在するリソースは、フィールドが許す場合に更新され、新しいマニフェストだけに存在するリソースは作成され、チャートから削除されたリソースは通常削除されます。不変フィールドには明示的な置換戦略が必要になることがあります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm upgrade --install web ./chart &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --namespace web --create-namespace &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --values environments/production.yaml &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --dry-run --debug&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;既存のツールチェーンで利用できる場合は &lt;code&gt;helm diff&lt;/code&gt; を使用し、アップグレード後に &lt;code&gt;helm get manifest&lt;/code&gt; と &lt;code&gt;helm history&lt;/code&gt; を確認します。&lt;code&gt;helm.sh/resource-policy: keep&lt;/code&gt; アノテーションはアンインストール時にリソースを保持できますが、一般的な安全策ではなく、意図的なライフサイクル上の判断にしてください。&lt;/p&gt;
+&lt;h2 id="静的マニフェストを段階的に移行する"&gt;
+ 静的マニフェストを段階的に移行する
+ &lt;a href="#%e9%9d%99%e7%9a%84%e3%83%9e%e3%83%8b%e3%83%95%e3%82%a7%e3%82%b9%e3%83%88%e3%82%92%e6%ae%b5%e9%9a%8e%e7%9a%84%e3%81%ab%e7%a7%bb%e8%a1%8c%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;まず、ソース管理から実際に望ましい仕様を取得し、稼働中のオブジェクトと比較します。イメージバージョン、ホスト名、リソース制限、ストレージクラスなど、本当の環境差だけをパラメーター化し、すべてのフィールドをパラメーター化しないでください。チャートをレンダリングし、既存のリソースと比較します。&lt;/p&gt;
+&lt;p&gt;最初の移行では、安定した &lt;code&gt;metadata.name&lt;/code&gt;、名前空間、セレクター、永続ボリューム要求名を維持します。セレクターを変更すると Pod が取り残される可能性があり、PVC 名を変更すると新しい要求が作成され、データは移動しません。ステートフルワークロードでは、所有権を移行する前に、本番環境ではないクラスターでバックアップ、リストア、ロールバック手順をリハーサルします。&lt;/p&gt;
+&lt;h2 id="argo-cd-に安全に引き渡す"&gt;
+ Argo CD に安全に引き渡す
+ &lt;a href="#argo-cd-%e3%81%ab%e5%ae%89%e5%85%a8%e3%81%ab%e5%bc%95%e3%81%8d%e6%b8%a1%e3%81%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Argo CD が Helm チャートをレンダリングするときは、同じリソースに対して別の &lt;code&gt;helm upgrade&lt;/code&gt; を実行しないでください。&lt;code&gt;Application&lt;/code&gt; を設定し、レンダリングされたマニフェストと差分を確認し、最初はプルーニングなしで同期してから、アプリケーションが正常で、範囲内に無関係なリソースがないことを確認した後にのみプルーニングを有効にします。&lt;/p&gt;
+&lt;p&gt;リソース名の変更や削除ガードを伴う依存関係グラフには、段階的な移行を使用します。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;古いリソースを保持したまま新しいリソースを追加する。&lt;/li&gt;
+&lt;li&gt;利用者を更新し、ヘルスチェックを待つ。&lt;/li&gt;
+&lt;li&gt;古い依存リソースを削除する。&lt;/li&gt;
+&lt;li&gt;後の同期で古い親リソースを削除する。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Argo CD の同期ウェーブは通常の適用とプルーンの順序を設定できますが、データ移行、アドミッション Webhook、外部クライアントが関係する場合は、段階的な変更の方が明確です。&lt;/p&gt;</description></item><item><title>Kubernetes Federation</title><link>https://example.org/ja/kubernetes-federation/</link><pubDate>Sat, 28 Aug 2021 08:15:01 +0800</pubDate><guid>https://example.org/ja/kubernetes-federation/</guid><description>&lt;p&gt;Kubernetes Federation は、フェデレーションコントロールプレーンから複数クラスター
+にまたがるワークロードを管理する初期の試みでした。Federation v1 は非推奨となり、
+CRD ベースの後継である KubeFed または Federation v2 と呼ばれるものも、現在は
+Kubernetes のアクティブなプロジェクトではありません。新しいプラットフォームの
+基盤ではなく、歴史的な技術として扱う必要があります。&lt;/p&gt;
+&lt;h2 id="federation-が解決しようとした問題"&gt;
+ Federation が解決しようとした問題
+ &lt;a href="#federation-%e3%81%8c%e8%a7%a3%e6%b1%ba%e3%81%97%e3%82%88%e3%81%86%e3%81%a8%e3%81%97%e3%81%9f%e5%95%8f%e9%a1%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;このモデルではメンバークラスターを登録し、選択したリソースをメンバークラスターへ
+伝播しました。独立したクラスターを維持しながら、配置、レプリカ分散、サービス
+ディスカバリー、設定を一元化することを目指していました。難しい点は、競合処理、
+クラスター障害、ネットワーク、ID、バージョンのずれ、そして単一のグローバル API
+が別の可用性依存要因になり得ることでした。&lt;/p&gt;
+&lt;p&gt;初期実装では、独立したフェデレーション API サーバーを使用していました。その後の
+取り組みでは、フェデレーションの動作をカスタムリソースとコントローラーへ移し、
+拡張しやすくなりましたが、クラスター間の状態を運用する複雑さは解消されませんでした。&lt;/p&gt;
+&lt;h2 id="現行の代替手段を使用する"&gt;
+ 現行の代替手段を使用する
+ &lt;a href="#%e7%8f%be%e8%a1%8c%e3%81%ae%e4%bb%a3%e6%9b%bf%e6%89%8b%e6%ae%b5%e3%82%92%e4%bd%bf%e7%94%a8%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;問題に応じて代替手段を選択します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;GitOps フリート:&lt;/strong&gt; Argo CD ApplicationSet と Flux は、登録された多数のクラスター
+にアプリケーションをレンダリングして調整できます。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ワークロードスケジューリング:&lt;/strong&gt; Karmada はマルチクラスターのスケジューリングと
+伝播 API を提供します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;フリート管理:&lt;/strong&gt; Open Cluster Management は、管理対象クラスターの登録、ポリシー、
+配置のプリミティブを提供します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;クラスター間ネットワーク:&lt;/strong&gt; Cilium Cluster Mesh、Submariner、サービスメッシュの
+マルチクラスター機能は接続性を扱いますが、デプロイオーケストレーションを置き
+換えるものではありません。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;これらのツールは異なるコントロールプレーンと障害モードを持ちます。マルチクラスター
+デプロイメントマネージャーを選択すれば、グローバルなサービスディスカバリー、
+ネットワーク到達性、共有 ID も提供されると想定しないでください。&lt;/p&gt;
+&lt;h2 id="独立したクラスター向けに設計する"&gt;
+ 独立したクラスター向けに設計する
+ &lt;a href="#%e7%8b%ac%e7%ab%8b%e3%81%97%e3%81%9f%e3%82%af%e3%83%a9%e3%82%b9%e3%82%bf%e3%83%bc%e5%90%91%e3%81%91%e3%81%ab%e8%a8%ad%e8%a8%88%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;各クラスターを、独立して運用可能な障害ドメインとして扱います。認証情報をどのように
+ローテーションするか、コントロールプレーン切断中にアプリケーションがどのように
+動作するか、ワークロードを 1 つのクラスターでアクティブにするか複数でアクティブに
+するかを定義します。データストア自体に検証済みのレプリケーションとフェイルオーバー
+設計がある場合を除き、クラスターごとの永続データを優先します。中央管理プレーンは、
+ローカル復旧を不可能にすることなく、一貫性と可視性を向上させる必要があります。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Lzw on cesun.life</title><link>https://example.org/ja/tags/lzw/</link><description>Recent content in Lzw on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Fri, 04 Apr 2025 21:50:25 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/lzw/index.xml" rel="self" type="application/rss+xml"/><item><title>Unix compress と LZW</title><link>https://example.org/ja/unix-compress/</link><pubDate>Fri, 04 Apr 2025 21:50:25 +0800</pubDate><guid>https://example.org/ja/unix-compress/</guid><description>&lt;p&gt;歴史的な Unix &lt;code&gt;compress&lt;/code&gt; ユーティリティは、慣例的に
+&lt;code&gt;.Z&lt;/code&gt; という名前のファイルを書き出します。これは DEFLATE ではなく、LZW 系の辞書符号化方式を使用します。&lt;code&gt;uncompress&lt;/code&gt; と
+&lt;code&gt;zcat&lt;/code&gt; は、この形式を提供するシステム上で互換性のあるコマンドラインインターフェースを公開しています。&lt;/p&gt;
+&lt;h2 id="lzw-の初期化と同期"&gt;
+ LZW の初期化と同期
+ &lt;a href="#lzw-%e3%81%ae%e5%88%9d%e6%9c%9f%e5%8c%96%e3%81%a8%e5%90%8c%e6%9c%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;LZW エンコーダーは、1 バイトのアルファベット用エントリから開始します。現在のフレーズ &lt;code&gt;w&lt;/code&gt; を保持し、次のバイト &lt;code&gt;k&lt;/code&gt; を読み取り、そのフレーズが &lt;code&gt;w + k&lt;/code&gt; 辞書に存在する間は処理を続けます。そのフレーズが存在しない場合は、&lt;code&gt;w&lt;/code&gt; のコードを出力し、&lt;code&gt;w + k&lt;/code&gt; を追加して、&lt;code&gt;k&lt;/code&gt; から開始します。デコーダーは各コードに対応する文字列を出力し、最初のコードの後は、直前に復号した文字列と現在の文字列の先頭バイトを連結したエントリを追加します。入力を使い果たした後、エンコーダーは最後のフレーズを出力します。したがって、エンコーダーとデコーダーは、1 コード遅れて同じエントリを追加します。&lt;/p&gt;
+&lt;p&gt;よく知られた &lt;code&gt;KwKwK&lt;/code&gt; のケースは、コードが次の辞書インデックスと等しい場合に発生します。このときデコーダーはそれを &lt;code&gt;previous + first(previous)&lt;/code&gt; として展開します。このケースを拒否すると有効なストリームを拒否することになり、次のインデックスを超えるコードを受け入れると辞書の同期が失われます。&lt;/p&gt;
+&lt;h2 id="z-ビットストリーム"&gt;
+ &lt;code&gt;.Z&lt;/code&gt; ビットストリーム
+ &lt;a href="#z-%e3%83%93%e3%83%83%e3%83%88%e3%82%b9%e3%83%88%e3%83%aa%e3%83%bc%e3%83%a0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;.Z&lt;/code&gt; ストリームは &lt;code&gt;1f 9d&lt;/code&gt; とフラグバイトで始まります。下位 5 ビットは最大コード幅を指定し、通常は 9 ～ 16 ビットです。ビット 7 はブロックモードを有効にします。残りの予約ビットは、実装の互換性規則に従って処理する必要があります。コードは 9 ビットから始まり、辞書が現在の幅の容量に達すると幅が広がります。ブロックモードでは、コード 256 は &lt;code&gt;CLEAR&lt;/code&gt; です。エンコーダーはこのコードを出力してエントリを破棄し、初期アルファベットで再開できます。デコーダーは同じ時点でリセットし、その後 9 ビットのコードを再開する必要があります。非ブロックモードのストリームには、そのリセットコードはありません。&lt;/p&gt;
+&lt;p&gt;コード幅の遷移規則は &lt;code&gt;.Z&lt;/code&gt; 方言の一部であるため、読み取り側は次のコードから推測するのではなく、形式で指定されたタイミングに従う必要があります。歴史的な実装はエッジケースで異なるため、対象の &lt;code&gt;compress&lt;/code&gt; 実装との相互運用性テストが適切です。&lt;/p&gt;</description></item></channel></rss>

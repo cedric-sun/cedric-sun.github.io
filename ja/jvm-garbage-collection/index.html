@@ -1,0 +1,50 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>JVMガベージコレクション</title></head><body><main><article><div class=article-header><h1>JVMガベージコレクション</h1><div class=aux>最終更新: 2025-01-27 11:37:11 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/garbage-collection/>Garbage-Collection</a>
+|
+<a href=/ja/tags/java/>Java</a>
+|
+<a href=/ja/tags/jvm/>Jvm</a></div></div><div class="translation-notice machine-translated"><a href=/jvm-garbage-collection/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>JVM仕様は自動ストレージ管理を要求しますが、コレクタやヒープレイアウトを
+規定していません。したがって、コレクタの動作は、実行されるJVM、リリース、
+フラグ、ヒープサイズ、ワークロードの特性です。</p><h2 id=到達可能性とメモリプール>到達可能性とメモリプール
+<a href=#%e5%88%b0%e9%81%94%e5%8f%af%e8%83%bd%e6%80%a7%e3%81%a8%e3%83%a1%e3%83%a2%e3%83%aa%e3%83%97%e3%83%bc%e3%83%ab class=heading-anchor><span>#</span></a></h2><p>トレーシングはGCルートから開始されます。GCルートには、実行中スレッドの
+スタックとレジスタ、staticフィールド、JNIハンドル、VMランタイム構造体などが
+含まれます。ルートから強く到達可能なオブジェクトは生存し続けます。
+ソフト参照はメモリ逼迫時にクリアされる可能性があり、弱参照は参照先を保持せず、
+ファントム参照は<code>ReferenceQueue</code>を通じた事後処理の調整を支援します。これらは
+いずれも決定的なリソース解放の代替ではありません。try-with-resourcesを使用し、
+<code>Cleaner</code>は安全網としてのみ使用してください。ファイナライゼーションは削除予定
+として非推奨です。</p><p>Javaヒープにはオブジェクトと配列が格納されます。HotSpotでは、メタスペース、
+コードキャッシュ、スレッドスタック、ダイレクトバッファ、GCの管理情報、
+ネイティブライブラリがヒープ外のメモリを消費します。<code>-Xmx</code>が上限を設定するのは
+Javaヒープだけなので、コンテナの制限ではネイティブメモリ用の余裕を確保する必要が
+あります。プール名とメモリ使用量の集計方法は、コレクタおよび実装に依存します。</p><h2 id=世代別管理と割り当て>世代別管理と割り当て
+<a href=#%e4%b8%96%e4%bb%a3%e5%88%a5%e7%ae%a1%e7%90%86%e3%81%a8%e5%89%b2%e3%82%8a%e5%bd%93%e3%81%a6 class=heading-anchor><span>#</span></a></h2><p>世代別コレクタは、多くの割り当てが短時間で不要になるという事実を利用します。
+新しいオブジェクトは若い領域に割り当てられ、生存したオブジェクトはサバイバー
+領域を移動し、古い領域へ昇格することがあります。若い世代の各コレクションで
+すべての古いオブジェクトを走査することを避けるため、ライトバリアは古い世代から
+若い世代へのポインタをカードテーブルまたはリメンバードセットに記録します。
+割り当て率、生存集合のサイズ、昇格率、利用可能な退避領域は、ヒープ使用率だけよりも
+メモリ逼迫を適切に予測します。</p><h2 id=hotspotコレクタのトレードオフ>HotSpotコレクタのトレードオフ
+<a href=#hotspot%e3%82%b3%e3%83%ac%e3%82%af%e3%82%bf%e3%81%ae%e3%83%88%e3%83%ac%e3%83%bc%e3%83%89%e3%82%aa%e3%83%95 class=heading-anchor><span>#</span></a></h2><p>HotSpotは異なる目的を持つコレクタを提供します。</p><ul><li><strong>Serial</strong>は、小さなヒープで実装オーバーヘッドを最小化します。</li><li><strong>Parallel</strong>は、並列のstop-the-world処理によりスループットを優先します。</li><li><strong>G1</strong>はヒープをリージョンに分割し、並行処理と退避処理のバランスを取りながら、
+ポーズ時間の目標に向けて動作します。</li><li><strong>ZGC</strong>は、バリアと並行処理によるリソース使用を伴う代わりに、マーキングと
+再配置の大部分を並行して実行し、短いポーズを目指します。</li><li>選択したディストリビューションが提供する場合、<strong>Shenandoah</strong>も並行退避を実行し、
+ポーズ時間を短縮します。</li></ul><p>コレクタの可用性とデフォルトは、JDKベンダーおよびリリースによって変わります。
+過去のデフォルトを運用ガイダンスに埋め込むのではなく、
+<code>java -XX:+PrintCommandLineFlags -version</code>と、使用しているリリースのドキュメントで
+実行中のランタイムを確認してください。</p><p>すべてのトレーシングコレクタには、調整のためのポイントが必要です。ルート処理、
+リマーク、一部の退避処理では、アプリケーションスレッドを停止することがあります
+（STW）。並行フェーズはポーズ時間を短縮しますが、CPUとメモリ帯域幅を消費し、
+バリアを必要とし、再配置用の空き領域を必要とします。したがって、ポーズ目標を
+短くすると、スループットが低下したり、割り当て圧力下で失敗したりする可能性があります。</p><h2 id=証拠に基づくチューニング>証拠に基づくチューニング
+<a href=#%e8%a8%bc%e6%8b%a0%e3%81%ab%e5%9f%ba%e3%81%a5%e3%81%8f%e3%83%81%e3%83%a5%e3%83%bc%e3%83%8b%e3%83%b3%e3%82%b0 class=heading-anchor><span>#</span></a></h2><p>統合ログを有効にし、アプリケーションのレイテンシおよびリソースメトリクスと
+相関させます。</p><div class=jose-wrapper><div class=jose-tools><span>sh</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-sh data-lang=sh><span style=display:flex><span>java -Xlog:gc*,safepoint:file<span style=color:#f92672>=</span>gc.log:time,uptime,level,tags ...
+</span></span><span style=display:flex><span>java -XX:StartFlightRecording<span style=color:#f92672>=</span>filename<span style=color:#f92672>=</span>recording.jfr ...</span></span></code></pre></div></div></div><p>JFRの割り当てイベント、<code>jcmd</code>、保持が疑われる場合のヒープダンプ、CPUおよび
+コンテナのメトリクスを使用して、過剰な割り当て、増加する生存集合、断片化、
+ネイティブメモリの枯渇を区別します。次の順序でチューニングします。</p><ol><li>意図しない保持と割り当てホットスポットを排除する。</li><li>測定した生存集合と割り当てバーストに合わせてヒープサイズを設定する。</li><li>測定したレイテンシおよびスループットの目標に適したコレクタを選択する。</li><li>文書化された目標を少数だけ変更する。その後、</li><li>代表的な負荷測定を繰り返す。</li></ol><p><code>System.gc()</code>は要求であり、正しさを保証する仕組みではありません。また、性能に
+大きな影響を与える処理を引き起こす可能性があります。アプリケーションの動作は
+コレクションのタイミングに依存してはなりません。</p><h2 id=参考資料>参考資料
+<a href=#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.5.3>JVMS §2.5.3, Heap</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html>JDK Unified Logging</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/docs/api/jdk.jfr/jdk/jfr/package-summary.html>JDK Flight Recorder</a></li><li><a href=https://docs.oracle.com/en/java/javase/21/gctuning/>OpenJDK G1 GC Tuning Guide</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/jvm-garbage-collection/ class=language-option data-lang=en>English
+</a><a href=/ja/jvm-garbage-collection/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/jvm-garbage-collection/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/jvm-garbage-collection/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

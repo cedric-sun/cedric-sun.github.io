@@ -1,0 +1,37 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Kubernetes 存取控制</title></head><body><main><article><div class=article-header><h1>Kubernetes 存取控制</h1><div class=aux>最後更新: 2022-06-27 04:47:20 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/kubernetes/>Kubernetes</a>
+|
+<a href=/zh-tw/tags/oidc/>Oidc</a>
+|
+<a href=/zh-tw/tags/rbac/>Rbac</a>
+|
+<a href=/zh-tw/tags/security/>Security</a></div></div><div class="translation-notice machine-translated"><a href=/kubernetes-access-control/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>Kubernetes 會依序透過驗證、授權與准入控制處理 API 請求。驗證建立身分；授權決定該身分是否能執行某項動作；准入控制則可以驗證或變更已接受的物件。這些是分開的控制項，應分別設定與稽核。</p><h2 id=使用-oidc-進行驗證>使用 OIDC 進行驗證
+<a href=#%e4%bd%bf%e7%94%a8-oidc-%e9%80%b2%e8%a1%8c%e9%a9%97%e8%ad%89 class=heading-anchor><span>#</span></a></h2><p>OpenID Connect（OIDC）讓 API server 驗證由外部身分提供者簽發的 bearer token。API server 會設定簽發者 URL、用戶端 ID，以及選用的使用者名稱與群組宣告對映。API server 必須能連線到簽發者，且其 TLS 憑證必須通過驗證。</p><p>身分提供者負責使用者生命週期與多因素驗證；Kubernetes 從有效 token 接收使用者名稱與群組。不要為人員使用共用的靜態 token。在 <code>kubectl</code> 中，使用核准的 OIDC 登入外掛程式或 exec 憑證提供者，讓短期 token 能在不將長期憑證儲存在 kubeconfig 檔案中的情況下更新。</p><h2 id=使用-rbac-進行授權>使用 RBAC 進行授權
+<a href=#%e4%bd%bf%e7%94%a8-rbac-%e9%80%b2%e8%a1%8c%e6%8e%88%e6%ac%8a class=heading-anchor><span>#</span></a></h2><p>RBAC 透過 <code>Role</code> 與 <code>ClusterRole</code> 物件授予資源型別上的動詞，再透過繫結附加這些權限。<code>Role</code> 的範圍是命名空間；<code>ClusterRole</code> 可以授予叢集範圍的存取權，或在命名空間內繫結。</p><div class=jose-wrapper><div class=jose-tools><span>yaml</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>apiVersion</span>: <span style=color:#ae81ff>rbac.authorization.k8s.io/v1</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>kind</span>: <span style=color:#ae81ff>Role</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>metadata</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>name</span>: <span style=color:#ae81ff>deployment-reader</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>namespace</span>: <span style=color:#ae81ff>payments</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>rules</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#f92672>apiGroups</span>: [<span style=color:#e6db74>&#34;apps&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>resources</span>: [<span style=color:#e6db74>&#34;deployments&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#f92672>verbs</span>: [<span style=color:#e6db74>&#34;get&#34;</span>, <span style=color:#e6db74>&#34;list&#34;</span>, <span style=color:#e6db74>&#34;watch&#34;</span>]
+</span></span><span style=display:flex><span>---
+</span></span><span style=display:flex><span><span style=color:#f92672>apiVersion</span>: <span style=color:#ae81ff>rbac.authorization.k8s.io/v1</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>kind</span>: <span style=color:#ae81ff>RoleBinding</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>metadata</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>name</span>: <span style=color:#ae81ff>developers-can-read-deployments</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>namespace</span>: <span style=color:#ae81ff>payments</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>subjects</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#f92672>kind</span>: <span style=color:#ae81ff>Group</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>name</span>: <span style=color:#ae81ff>payments-developers</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>apiGroup</span>: <span style=color:#ae81ff>rbac.authorization.k8s.io</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>roleRef</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>kind</span>: <span style=color:#ae81ff>Role</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>name</span>: <span style=color:#ae81ff>deployment-reader</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>apiGroup</span>: <span style=color:#ae81ff>rbac.authorization.k8s.io</span></span></span></code></pre></div></div></div><p>只授予所需的最小動詞、資源、命名空間與非資源 URL。除非是受到嚴格控管的平台管理，否則避免使用 <code>cluster-admin</code>、萬用字元動詞與萬用字元資源。使用 <code>kubectl auth can-i</code> 檢查預計授予的權限。</p><h2 id=控制資源與服務帳戶>控制資源與服務帳戶
+<a href=#%e6%8e%a7%e5%88%b6%e8%b3%87%e6%ba%90%e8%88%87%e6%9c%8d%e5%8b%99%e5%b8%b3%e6%88%b6 class=heading-anchor><span>#</span></a></h2><p><code>ResourceQuota</code> 限制命名空間的彙總使用量；<code>LimitRange</code> 提供或限制每個容器的要求與限制。單靠配額無法保證公平排程：工作負載應指定 CPU 與記憶體要求，命名空間也需要作業監控。</p><p>服務帳戶是工作負載身分。不需要時停用自動掛載 token，使用投影的短期 token，並將每個工作負載服務帳戶繫結至最小角色。絕不要讓應用程式取得預設服務帳戶的廣泛權限。准入政策、Pod Security Standards、網路政策與映像控制都能補足 RBAC；但沒有任何一項能取代 RBAC。</p></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/kubernetes-access-control/ class=language-option data-lang=en>English
+</a><a href=/ja/kubernetes-access-control/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/kubernetes-access-control/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/kubernetes-access-control/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

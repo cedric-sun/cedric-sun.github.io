@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Api on cesun.life</title><link>https://example.org/zh-tw/tags/api/</link><description>Recent content in Api on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sun, 20 Apr 2025 05:43:09 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/api/index.xml" rel="self" type="application/rss+xml"/><item><title>OpenAI Chat Completions 與 Spring AI</title><link>https://example.org/zh-tw/openai-chat-completions/</link><pubDate>Sun, 20 Apr 2025 05:43:09 +0800</pubDate><guid>https://example.org/zh-tw/openai-chat-completions/</guid><description>&lt;p&gt;OpenAI Chat Completions API 是一種廣泛實作、以 JSON over HTTP 為基礎的對話式語言模型介面。用戶端會傳送依序排列的訊息清單與生成選項；伺服器則回傳一則或多則包含中繼資料與權杖用量的 assistant 訊息。&lt;/p&gt;
+&lt;p&gt;其基本結構如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP client
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; POST /v1/chat/completions
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; request JSON containing messages and options
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -&amp;gt; model inference
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &amp;lt;- response JSON containing choices and usage&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;許多閘道與模型伺服器即使底層模型並非由 OpenAI 託管，也會實作 OpenAI 相容端點。因此，這種格式可作為事實上的互通 API，但它不是像 HTTP、JSON-RPC 或 MCP 那樣獨立的正式標準。不同的相容提供者可能支援不同的欄位、模型、限制、錯誤格式或擴充功能。&lt;/p&gt;
+&lt;p&gt;Spring AI 在這種線上格式之上，為 Java 應用程式提供與提供者無關的模型。應用程式程式碼使用 &lt;code&gt;Prompt&lt;/code&gt;、&lt;code&gt;Message&lt;/code&gt;、&lt;code&gt;ChatOptions&lt;/code&gt; 和 &lt;code&gt;ChatResponse&lt;/code&gt;；OpenAI 或 OpenAI 相容介面卡負責在這些物件與提供者 JSON 之間進行轉換。&lt;/p&gt;
+&lt;h2 id="http-請求"&gt;
+ HTTP 請求
+ &lt;a href="#http-%e8%ab%8b%e6%b1%82" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;簡化後的請求如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;POST&lt;/span&gt; /v1/chat/completions &lt;span style="color:#66d9ef"&gt;HTTP&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;1.1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Host&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;api.example.com&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Authorization&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;Bearer ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Type&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;application/json&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;{
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;model&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;gpt-4.1&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;messages&amp;#34;&lt;/span&gt;: [
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;role&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;system&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;content&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Answer concisely.&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; },
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;role&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;user&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;content&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Explain optimistic locking.&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ],
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;temperature&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;0.3&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;max_tokens&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;1000&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;stream&amp;#34;&lt;/span&gt;: &lt;span style="color:#66d9ef"&gt;false&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;model&lt;/code&gt; 和 &lt;code&gt;messages&lt;/code&gt; 用來識別應執行的模型，以及模型應該看到的對話內容。其餘欄位則控制生成行為。有些閘道會透過設定、部署名稱、URL 或標頭選取模型，而不是要求請求本文包含 &lt;code&gt;model&lt;/code&gt;。&lt;/p&gt;</description></item><item><title>Swagger 與 OpenAPI</title><link>https://example.org/zh-tw/swagger-and-openapi/</link><pubDate>Tue, 21 Jan 2025 00:13:14 +0800</pubDate><guid>https://example.org/zh-tw/swagger-and-openapi/</guid><description>&lt;h2 id="概觀openapidefinition"&gt;
+ 概觀：@OpenAPIDefinition
+ &lt;a href="#%e6%a6%82%e8%a7%80openapidefinition" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;標註於任何類別上（通常是 @SpringBootApplication 類別），以提供應用程式 API 的概觀。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;info = info/Info.class
+&lt;ul&gt;
+&lt;li&gt;contact = info/Contact.class&lt;/li&gt;
+&lt;li&gt;license = info/License.class&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;ExternalDocumentation.class&lt;/li&gt;
+&lt;li&gt;servers/Server.class
+&lt;ul&gt;
+&lt;li&gt;servers/Servers.class&lt;/li&gt;
+&lt;li&gt;servers/ServerVariable.class&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;tags/Tag.class
+&lt;ul&gt;
+&lt;li&gt;tags/Tags.class&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;security/SecurityRequirement.class
+&lt;ul&gt;
+&lt;li&gt;security/SecurityRequirements.class&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="operation"&gt;
+ @Operation：
+ &lt;a href="#operation" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;tags: @Tag
+externalDocs: @ExternalDocumentation
+parameters: @Parameter
+responses: @ApiResponse
+requestBody: @RequestBody
+security: @SecurityRequirement
+servers: @Server
+extensions: @Extension
+hidden: @Hidden&lt;/p&gt;
+&lt;h2 id="其他"&gt;
+ 其他
+ &lt;a href="#%e5%85%b6%e4%bb%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Hidden.class
+OpenAPI31.class&lt;/p&gt;
+&lt;p&gt;StringToClassMapItem.class
+Webhook.class
+Webhooks.class&lt;/p&gt;
+&lt;p&gt;callbacks/Callback.class
+callbacks/Callbacks.class&lt;/p&gt;
+&lt;p&gt;enums/Explode.class
+enums/ParameterIn.class
+enums/ParameterStyle.class
+enums/SecuritySchemeIn.class
+enums/SecuritySchemeType.class&lt;/p&gt;
+&lt;p&gt;extensions/Extension.class
+extensions/ExtensionProperty.class
+extensions/Extensions.class&lt;/p&gt;
+&lt;p&gt;headers/Header.class&lt;/p&gt;
+&lt;p&gt;links/Link.class
+links/LinkParameter.class
+media/ArraySchema.class
+media/Content.class
+media/DependentRequired.class
+media/DependentRequiredMap.class
+media/DependentSchema.class
+media/DependentSchemas.class
+media/DiscriminatorMapping.class
+media/Encoding.class
+media/ExampleObject.class
+media/PatternProperties.class
+media/PatternProperty.class
+media/Schema.class
+media/Schema.class
+media/Schema.class
+media/Schema.class
+media/Schema.class
+media/Schema.class
+media/SchemaProperties.class
+media/SchemaProperty.class&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,99 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>Linux 核心資料結構</title></head><body><main><article><div class=article-header><h1>Linux 核心資料結構</h1><div class=aux>最後更新: 2023-02-18 08:20:51 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-tw/tags/data-structures/>Data-Structures</a>
+|
+<a href=/zh-tw/tags/kernel/>Kernel</a>
+|
+<a href=/zh-tw/tags/linux/>Linux</a></div></div><div class="translation-notice machine-translated"><a href=/linux-kernel-data-structures/>原文</a>以英文撰寫。您正在閱讀AI翻譯版本。</div><div class=article-content><p>Linux 的串列 API 是侵入式的：連結資訊嵌入由子系統擁有的物件中。侵入式設計移除個別節點配置，並讓一個物件參與數個索引，但容器 API 不擁有記憶體，也不提供同步。</p><h2 id=循環雙向連結串列>循環雙向連結串列
+<a href=#%e5%be%aa%e7%92%b0%e9%9b%99%e5%90%91%e9%80%a3%e7%b5%90%e4%b8%b2%e5%88%97 class=heading-anchor><span>#</span></a></h2><p><code>struct list_head</code> 只包含連結：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>struct</span> list_head {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> list_head <span style=color:#f92672>*</span>next, <span style=color:#f92672>*</span>prev;
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> job {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span> id;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> list_head pending_link;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> list_head owner_link;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>串列頭與嵌入節點具有相同型別。在空串列中，<code>next</code> 與 <code>prev</code> 都指回串列頭。在非空串列中，沿任一方向前進最終都會回到串列頭。因為串列頭是哨兵而不是承載資料的物件，迭代沒有 null 終止符。</p><p>一個物件可以透過不同成員出現在多個串列中。每個操作都必須指定正確成員；混用 <code>pending_link</code> 與 <code>owner_link</code> 會損壞兩個串列。</p><h2 id=初始化與基本變更>初始化與基本變更
+<a href=#%e5%88%9d%e5%a7%8b%e5%8c%96%e8%88%87%e5%9f%ba%e6%9c%ac%e8%ae%8a%e6%9b%b4 class=heading-anchor><span>#</span></a></h2><p>宣告時使用 <code>LIST_HEAD()</code>，初始化現有物件時使用 <code>INIT_LIST_HEAD()</code>：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#a6e22e>LIST_HEAD</span>(pending_jobs);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> queue {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>spinlock_t</span> lock;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> list_head jobs;
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>queue_init</span>(<span style=color:#66d9ef>struct</span> queue <span style=color:#f92672>*</span>queue)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>spin_lock_init</span>(<span style=color:#f92672>&amp;</span>queue<span style=color:#f92672>-&gt;</span>lock);
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>INIT_LIST_HEAD</span>(<span style=color:#f92672>&amp;</span>queue<span style=color:#f92672>-&gt;</span>jobs);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>LIST_HEAD_INIT(name)</code> 是初始化器運算式，適合放在較大的靜態初始化器內。任何串列操作前都必須完成初始化。</p><p>插入位置相對於哨兵：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>list_add</span>(<span style=color:#f92672>&amp;</span>job<span style=color:#f92672>-&gt;</span>pending_link, <span style=color:#f92672>&amp;</span>pending_jobs);      <span style=color:#75715e>/* after head */</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>list_add_tail</span>(<span style=color:#f92672>&amp;</span>job<span style=color:#f92672>-&gt;</span>pending_link, <span style=color:#f92672>&amp;</span>pending_jobs); <span style=color:#75715e>/* before head */</span></span></span></code></pre></div></div></div><p><code>list_add()</code> 實作在前端的堆疊式插入；<code>list_add_tail()</code> 實作在後端的佇列式插入。<code>list_move()</code> 與 <code>list_move_tail()</code> 會解除現有節點的連結，並將它插入目的地的前端或尾端。</p><p><code>list_del()</code> 會解除節點連結並毒化其連結，以暴露意外重複使用。分離節點必須再次成為有效、自連結的空節點時，使用 <code>list_del_init()</code>：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>if</span> (<span style=color:#f92672>!</span><span style=color:#a6e22e>list_empty</span>(<span style=color:#f92672>&amp;</span>pending_jobs)) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> job <span style=color:#f92672>*</span>job <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>list_first_entry</span>(<span style=color:#f92672>&amp;</span>pending_jobs, <span style=color:#66d9ef>struct</span> job, pending_link);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>list_del_init</span>(<span style=color:#f92672>&amp;</span>job<span style=color:#f92672>-&gt;</span>pending_link);
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>finish_job</span>(job);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>不要將一個連結成員加入兩次。自連結節點可以使用 <code>list_empty(&amp;job->pending_link)</code> 檢查，但只有在每次移除都重新初始化節點時，該慣例才有效。</p><h2 id=透過-container_of-恢復所有權>透過 <code>container_of</code> 恢復所有權
+<a href=#%e9%80%8f%e9%81%8e-container_of-%e6%81%a2%e5%be%a9%e6%89%80%e6%9c%89%e6%ac%8a class=heading-anchor><span>#</span></a></h2><p>迭代器會抵達 <code>struct list_head *</code>，但子系統程式碼需要其包含物件。<code>container_of(ptr, type, member)</code> 會從 <code>ptr</code> 減去 <code>member</code> 的編譯期偏移，並保留編譯期型別檢查。<code>list_entry()</code> 專門化該模式：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>#define list_entry(ptr, type, member) \
+</span></span></span><span style=display:flex><span><span style=color:#75715e>    container_of(ptr, type, member)
+</span></span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> job <span style=color:#f92672>*</span>job <span style=color:#f92672>=</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>list_entry</span>(node, <span style=color:#66d9ef>struct</span> job, pending_link);</span></span></code></pre></div></div></div><p>只有當 <code>node</code> 確實表示存活 <code>struct job</code> 的指定成員時，結果才有效。兩個巨集都不會執行動態型別驗證。</p><p>具型別迭代可避免明確轉換：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>struct</span> job <span style=color:#f92672>*</span>job;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>list_for_each_entry</span>(job, <span style=color:#f92672>&amp;</span>pending_jobs, pending_link)
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>run_job</span>(job);</span></span></code></pre></div></div></div><p>較少見的走訪模式有反向與接續變體。請選擇文件化且最窄的巨集，而不要自行撰寫 <code>next</code> 與 <code>prev</code>，因為巨集編碼了哨兵處理。</p><h2 id=迭代時刪除>迭代時刪除
+<a href=#%e8%bf%ad%e4%bb%a3%e6%99%82%e5%88%aa%e9%99%a4 class=heading-anchor><span>#</span></a></h2><p>一般迭代會在迴圈主體後讀取目前節點的下一個連結。刪除目前節點會使該操作失效。<code>_safe</code> 迭代器會先儲存下一個物件：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>struct</span> job <span style=color:#f92672>*</span>job, <span style=color:#f92672>*</span>next;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>list_for_each_entry_safe</span>(job, next, <span style=color:#f92672>&amp;</span>pending_jobs, pending_link) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>job_cancelled</span>(job)) {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>list_del</span>(<span style=color:#f92672>&amp;</span>job<span style=color:#f92672>-&gt;</span>pending_link);
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>kfree</span>(job);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>「安全」表示對此迴圈的刪除安全。它不會防護另一個 CPU、中斷或回呼修改串列，也不會建立 <code>kfree()</code> 合法的條件。外部參照可能需要參照計數、RCU 或其他生命週期協定。</p><h2 id=拼接串列>拼接串列
+<a href=#%e6%8b%bc%e6%8e%a5%e4%b8%b2%e5%88%97 class=heading-anchor><span>#</span></a></h2><p>拼接操作會以常數時間重新連結整個串列：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>LIST_HEAD</span>(batch);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>build_batch</span>(<span style=color:#f92672>&amp;</span>batch);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>list_splice_tail_init</span>(<span style=color:#f92672>&amp;</span>batch, <span style=color:#f92672>&amp;</span>pending_jobs);</span></span></code></pre></div></div></div><ul><li><code>list_splice()</code> 在目的地串列頭之後插入。</li><li><code>list_splice_tail()</code> 在目的地串列頭之前插入。</li><li><code>_init</code> 變體也會重新初始化來源串列頭。</li></ul><p>使用沒有 <code>_init</code> 的 <code>list_splice()</code> 後，來源串列頭仍會指向已轉移的鏈。將該來源視為獨立串列進行迭代可能會錯誤迴圈，因為其連結不再描述分開的循環串列。當所有權轉移且來源必須變空時，請使用 <code>_init</code> 變體。</p><p><code>list_cut_position()</code> 會將前綴移至另一個串列頭。與每個串列變更一樣，呼叫者必須確保所有節點與串列頭都屬於預期串列。</p><h2 id=雜湊單向連結串列>雜湊單向連結串列
+<a href=#%e9%9b%9c%e6%b9%8a%e5%96%ae%e5%90%91%e9%80%a3%e7%b5%90%e4%b8%b2%e5%88%97 class=heading-anchor><span>#</span></a></h2><p>雜湊表需要許多 bucket 頭，因此 <code>hlist</code> 使用單指標串列頭：</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>struct</span> hlist_head {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> hlist_node <span style=color:#f92672>*</span>first;
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> hlist_node {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> hlist_node <span style=color:#f92672>*</span>next;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> hlist_node <span style=color:#f92672>**</span>pprev;
+</span></span><span style=display:flex><span>};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>struct</span> cache_entry {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span> key;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> hlist_node hash_node;
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p><code>pprev</code> 指向指向該節點的連結：可能是 bucket 的 <code>first</code> 成員，或前一個節點的 <code>next</code> 成員。因此，刪除可以在常數時間內更新前驅連結，而不必儲存傳統的 <code>prev</code> 指標。非對稱表示法會在每個 bucket 頭節省一個指標，當表格有許多 bucket 時很重要。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>struct</span> hlist_head table[<span style=color:#ae81ff>256</span>];
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span> <span style=color:#a6e22e>cache_insert</span>(<span style=color:#66d9ef>struct</span> cache_entry <span style=color:#f92672>*</span>entry)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>int</span> bucket <span style=color:#f92672>=</span> <span style=color:#a6e22e>hash_long</span>(entry<span style=color:#f92672>-&gt;</span>key, <span style=color:#ae81ff>8</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>hlist_add_head</span>(<span style=color:#f92672>&amp;</span>entry<span style=color:#f92672>-&gt;</span>hash_node, <span style=color:#f92672>&amp;</span>table[bucket]);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>struct</span> cache_entry <span style=color:#f92672>*</span><span style=color:#a6e22e>cache_find</span>(<span style=color:#66d9ef>unsigned</span> <span style=color:#66d9ef>long</span> key)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> cache_entry <span style=color:#f92672>*</span>entry;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>hlist_for_each_entry</span>(entry, <span style=color:#f92672>&amp;</span>table[<span style=color:#a6e22e>hash_long</span>(key, <span style=color:#ae81ff>8</span>)], hash_node)
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> (entry<span style=color:#f92672>-&gt;</span>key <span style=color:#f92672>==</span> key)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span> entry;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> NULL;
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p>程式依賴 <code>hlist_unhashed()</code> 時，使用 <code>INIT_HLIST_NODE()</code> 初始化獨立節點。使用 <code>hlist_del_init()</code> 進行移除後再使用，當目前迴圈會刪除項目時使用 <code>hlist_for_each_entry_safe()</code>。</p><h2 id=並行與生命週期由呼叫者負責>並行與生命週期由呼叫者負責
+<a href=#%e4%b8%a6%e8%a1%8c%e8%88%87%e7%94%9f%e5%91%bd%e9%80%b1%e6%9c%9f%e7%94%b1%e5%91%bc%e5%8f%ab%e8%80%85%e8%b2%a0%e8%b2%ac class=heading-anchor><span>#</span></a></h2><p>串列與 hlist 操作是指標重寫，而非交易。API 不會隱含提供鎖、參照計數、用於發布承載欄位的記憶體屏障，或回收寬限期。子系統必須定義：</p><ol><li>哪一個鎖會序列化插入與刪除；</li><li>哪些內容可以走訪容器；</li><li>讀取者如何取得物件參照；</li><li>被移除物件何時可以釋放。</li></ol><p>當關鍵區段不能睡眠時，自旋鎖可以保護走訪與變更。在可睡眠程序內容中，互斥鎖較適合。對讀取為主的結構，<code>list_add_rcu()</code>、<code>list_del_rcu()</code> 與 <code>hlist_for_each_entry_rcu()</code> 等 RCU 特定 API 允許無鎖讀取者，但只能搭配必要的發布原語，以及寬限期後的延遲回收。沒有完整協定就混用一般與 RCU 變體並不安全。</p><p><code>_safe</code> 迭代尾碼與 <code>_rcu</code> 尾碼解決不同問題：<code>_safe</code> 會在本機刪除期間保留迴圈游標，而 <code>_rcu</code> 會參與並行讀取者的生命週期方案。</p><h2 id=參考資料>參考資料
+<a href=#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.kernel.org/core-api/list.html>核心文件：連結串列</a></li><li><a href=https://github.com/torvalds/linux/blob/master/include/linux/list.h>核心原始碼：<code>include/linux/list.h</code></a></li><li><a href=https://docs.kernel.org/RCU/listRCU.html>核心文件：RCU 串列 API</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-tw/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/linux-kernel-data-structures/ class=language-option data-lang=en>English
+</a><a href=/ja/linux-kernel-data-structures/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/linux-kernel-data-structures/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/linux-kernel-data-structures/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

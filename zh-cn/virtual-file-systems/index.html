@@ -1,0 +1,82 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>虚拟文件系统</title></head><body><main><article><div class=article-header><h1>虚拟文件系统</h1><div class=aux>最后更新: 2021-04-17 01:39:12 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/zh-cn/tags/filesystems/>Filesystems</a>
+|
+<a href=/zh-cn/tags/kernel/>Kernel</a>
+|
+<a href=/zh-cn/tags/linux/>Linux</a></div></div><div class="translation-notice machine-translated"><a href=/virtual-file-systems/>原文</a>以英文撰写。您正在阅读AI翻译版本。</div><div class=article-content><p>Linux 使用 filesystem interfaces 用于 both stored 数据 和 live 内核 state. The
+Virtual Filesystem Switch (VFS) makes those objects accessible 通过 common system
+calls, 同时 pseudo-filesystems such 作为 procfs 和 sysfs generate their contents from
+kernel objects. Similar path syntax does 不 give a pseudo-file the persistence or
+I/O semantics 的 a disk file.</p><h2 id=vfs-作为内核抽象>VFS 作为内核抽象
+<a href=#vfs-%e4%bd%9c%e4%b8%ba%e5%86%85%e6%a0%b8%e6%8a%bd%e8%b1%a1 class=heading-anchor><span>#</span></a></h2><p>VFS 是 the 内核 layer behind 操作 such 作为 <code>open</code>, <code>read</code>, <code>write</code>,
+<code>stat</code>, 和 <code>mount</code>. It represents mounted filesystems 通过 common 对象 types:</p><ul><li>a <strong>superblock</strong> represents a filesystem instance, 同时 a mount attaches that
+instance 在 a location in one mount namespace;</li><li>an <strong>inode</strong> represents an 对象 和 its metadata;</li><li>a <strong>dentry</strong> associates a name，使用 an inode 和 participates in pathname lookup;</li><li>a <strong>file</strong> represents an open instance 和 its current position;</li><li>an <strong>address space</strong> connects cacheable 文件 contents 到 the page cache.</li></ul><p>Filesystem implementations provide operation tables 用于 relevant objects. ext4 can
+map reads 到 persistent blocks, NFS 可以 issue network requests, 和 procfs 可以 format
+a 内核 structure. Callers still receive 文件 descriptors 和 使用 the same system-
+call boundary.</p><p>“Virtual filesystem” 是 therefore ambiguous. <strong>VFS</strong> names the abstraction layer;
+a <strong>pseudo-filesystem</strong> 是 one filesystem 实现 whose objects do not
+correspond 到 durable files 在 a storage volume. tmpfs 是 also memory-backed, but it
+provides ordinary mutable 文件 semantics 和 distinct 数据 per mount. procfs and
+sysfs expose purpose-built 内核 interfaces instead.</p><h2 id=procfs-进程与系统视图>Procfs 进程与系统视图
+<a href=#procfs-%e8%bf%9b%e7%a8%8b%e4%b8%8e%e7%b3%bb%e7%bb%9f%e8%a7%86%e5%9b%be class=heading-anchor><span>#</span></a></h2><p>Procfs 是 conventionally mounted 在 <code>/proc</code>. Numeric directories expose processes,
+while nonnumeric entries expose system-wide state 和 control interfaces:</p><div class=jose-wrapper><div class=jose-tools><span>text</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>/proc/1234/status      formatted state for process 1234
+</span></span><span style=display:flex><span>/proc/1234/fd/         links for its open file descriptors
+</span></span><span style=display:flex><span>/proc/self/            the reading process&#39;s own proc directory
+</span></span><span style=display:flex><span>/proc/meminfo          memory-accounting snapshot
+</span></span><span style=display:flex><span>/proc/sys/             sysctl parameters</span></span></code></pre></div></div></div><p>Files under <code>/proc/&lt;pid></code> 是 checked against 进程 credentials, ptrace access
+rules, capabilities, mount options, 和 security modules. 一个 pathname being readable
+by root in one context does 不 make it public 到 an unprivileged process.</p><h3 id=实例pid-命名空间与挂载命名空间>实例、PID 命名空间与挂载命名空间
+<a href=#%e5%ae%9e%e4%be%8bpid-%e5%91%bd%e5%90%8d%e7%a9%ba%e9%97%b4%e4%b8%8e%e6%8c%82%e8%bd%bd%e5%91%bd%e5%90%8d%e7%a9%ba%e9%97%b4 class=heading-anchor><span>#</span></a></h3><p>Procfs output 是 namespace-sensitive. 一个 procfs mount associated，使用 a PID namespace
+shows tasks visible in namespace; <code>/proc/self</code> 和 <code>/proc/thread-self</code> also
+resolve relative 到 the caller. 一个 进程 creating 或 entering another PID namespace
+must 使用 an appropriate procfs mount 到 obtain a matching 进程 view.</p><p>Mount namespaces independently control where 和 whether procfs instance is
+mounted. Containers 可以 consequently have different <code>/proc</code> mount points, read-only
+settings, 和 visibility options 同时 sharing the same kernel. Options such as
+<code>hidepid</code> restrict access 到 other users&rsquo; 进程 directories, 和 <code>subset=pid</code> can
+hide top-level entries unrelated 到 tasks 在 supporting kernels.</p><p>Procfs 应当 不 be modeled 作为 one global 目录 tree cached 由 pathname. The
+same path 可以 resolve 到 different information 用于 different callers, namespaces,
+credentials, 或 moments in time. Open descriptors 到 a dead 进程 do 不 become
+handles 到 a later 进程 reuses the same PID.</p><h2 id=sysfs-与驱动对象模型>Sysfs 与驱动对象模型
+<a href=#sysfs-%e4%b8%8e%e9%a9%b1%e5%8a%a8%e5%af%b9%e8%b1%a1%e6%a8%a1%e5%9e%8b class=heading-anchor><span>#</span></a></h2><p>Sysfs, conventionally mounted 在 <code>/sys</code>, exports the kernel&rsquo;s 对象 model. A
+registered <code>kobject</code> receives a 目录 beneath its parent, so 目录 hierarchy
+expresses 对象 relationships 和 controls lifetime. Linux 设备 model builds
+devices, drivers, buses, 和 classes 在 infrastructure:</p><ul><li><code>/sys/devices</code> presents devices in their physical 或 firmware-discovered topology.</li><li><code>/sys/bus/&lt;bus>/devices</code> links 到 devices participating in a bus.</li><li><code>/sys/bus/&lt;bus>/drivers</code> presents registered drivers 和 their bindings.</li><li><code>/sys/class/&lt;class></code> groups devices 由 function, such 作为 network 或 block devices.</li></ul><p>Many entries outside <code>/sys/devices</code> 是 symbolic-link views 的 the same underlying
+device object. Scripts 应当 resolve documented attributes rather than infer
+physical topology 来自 a convenient class path.</p><p>A sysfs <strong>attribute</strong> connects a small 文件 到 subsystem-defined <code>show</code> 和 <code>store</code>
+callbacks. core allocates a page-sized buffer 和 asks <code>show</code> 到 render a value
+or passes one write buffer 到 <code>store</code>. Attributes 应当 contain one ASCII value, or
+an array 的 values 的 the same type, because simple text forms 是 inspectable and
+avoid embedding an ad hoc structured protocol. Binary attributes exist 用于 数据 that
+cannot follow convention 和 have separate callbacks.</p><h2 id=将文本文件视为-abi-端点>将文本文件视为 ABI 端点
+<a href=#%e5%b0%86%e6%96%87%e6%9c%ac%e6%96%87%e4%bb%b6%e8%a7%86%e4%b8%ba-abi-%e7%ab%af%e7%82%b9 class=heading-anchor><span>#</span></a></h2><p>Text does 不 mean informal. 一个 documented procfs 或 sysfs 文件 是 a 用户空间 ABI
+with file-specific syntax:</p><ul><li>Read the complete 值 和 parse 仅 forms promised 由 its ABI documentation.</li><li>Include the expected newline 当 writing conventional text attributes.</li><li>Do 不 depend 在 undocumented whitespace, column positions, 目录 ordering,
+或 the presence 的 testing-only interfaces.</li><li>Check write errors 和 short writes; a successful <code>open</code> does 不 imply a
+proposed 值 是 accepted.</li></ul><p>Mode bits 和 文件 permissions 是 仅 one access-control layer. Capability checks,
+ownership, namespaces, lockdown policy, 和 Linux Security Modules 可以 reject an operation.
+World-writable sysfs attributes 是 intentionally discouraged because a write often
+changes live 设备 或 driver state.</p><p>kernel&rsquo;s <code>Documentation/ABI</code> tree classifies interfaces 作为 <code>stable</code>, <code>testing</code>,
+<code>obsolete</code>, 或 <code>removed</code>. Software tied 到 a testing attribute accepts a different
+compatibility commitment 来自 software using a stable one. Feature detection should
+check 用于 a documented path 和 handle <code>ENOENT</code>; 内核 version comparisons cannot
+account 用于 vendor backports 和 配置 choices.</p><h2 id=读取是快照而非事务>读取是快照而非事务
+<a href=#%e8%af%bb%e5%8f%96%e6%98%af%e5%bf%ab%e7%85%a7%e8%80%8c%e9%9d%9e%e4%ba%8b%e5%8a%a1 class=heading-anchor><span>#</span></a></h2><p>Many pseudo-files 是 生成的 当 read. Kernel state 可以 change between opening,
+reading, 和 parsing a file, 或 between reads 的 two related files. Even one large
+procfs report may summarize fields observed 在 slightly different times. Rewinding a
+sysfs attribute 到 offset zero 可以 invoke its <code>show</code> callback again 和 返回 a new
+value.</p><p>Consequently, multiple reads do 不 provide an atomic 系统 snapshot unless the
+specific ABI promises one. Robust consumers should:</p><ol><li>使用 one read operation 或 read loop 用于 a small attribute;</li><li>tolerate processes 和 devices disappearing，使用 <code>ENOENT</code>, <code>ENODEV</code>, 或 related
+errors;</li><li>validate identifiers again 当 acting 在 previously read state;</li><li>使用 a dedicated transactional API 当 consistency across objects 是 required.</li></ol><p>Some sysfs attributes support <code>poll</code>/<code>select</code> notification 当 their subsystem calls
+the sysfs notification mechanism. Such notification 是 opt-in per attribute, 不 a
+property 的 every 文件 under <code>/sys</code>. Consumers generally reopen 或 seek 到 offset
+zero 和 reread 在……之后 an event. Procfs entries likewise have file-specific polling
+semantics.</p><h2 id=伪文件不是持久化存储>伪文件不是持久化存储
+<a href=#%e4%bc%aa%e6%96%87%e4%bb%b6%e4%b8%8d%e6%98%af%e6%8c%81%e4%b9%85%e5%8c%96%e5%ad%98%e5%82%a8 class=heading-anchor><span>#</span></a></h2><p>Several ordinary-file assumptions fail 用于 procfs 和 sysfs:</p><ul><li>reported size 可以 be zero even though <code>read</code> returns data;</li><li><code>mmap</code>, arbitrary seeks, append mode, 或 partial writes may be unsupported;</li><li>目录 entries 可以 appear 和 disappear 作为 processes 和 devices change;</li><li>a successful write 可以 trigger hardware activity rather than store retrievable
+bytes;</li><li>数据 vanishes 在 shutdown 和 是 reconstructed 来自 the next kernel&rsquo;s state.</li></ul><p>Configuration 必须 survive reboot belongs in a persistent 配置 system
+whose startup logic deliberately writes the required 内核 interfaces. Copying
+<code>/proc</code> 或 <code>/sys</code> cannot back up 内核 state, 和 restoring copied files cannot
+recreate processes 或 devices.</p><h2 id=参考资料>参考资料
+<a href=#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.kernel.org/filesystems/vfs.html>Linux kernel VFS documentation</a></li><li><a href=https://docs.kernel.org/filesystems/proc.html>Linux kernel procfs documentation</a></li><li><a href=https://docs.kernel.org/filesystems/sysfs.html>Linux kernel sysfs documentation</a></li><li><a href=https://docs.kernel.org/admin-guide/abi.html>Linux kernel userspace ABI documentation</a></li><li><a href=https://man7.org/linux/man-pages/man5/proc.5.html><code>proc(5)</code> manual</a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/zh-cn/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/virtual-file-systems/ class=language-option data-lang=en>English
+</a><a href=/ja/virtual-file-systems/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/virtual-file-systems/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/virtual-file-systems/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>

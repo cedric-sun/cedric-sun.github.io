@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>System-Calls on cesun.life</title><link>https://example.org/zh-tw/tags/system-calls/</link><description>Recent content in System-Calls on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 07 May 2026 03:47:31 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/system-calls/index.xml" rel="self" type="application/rss+xml"/><item><title>glibc 原始碼內部與系統呼叫包裝器</title><link>https://example.org/zh-tw/glibc-syscall-wrappers/</link><pubDate>Thu, 07 May 2026 03:47:31 +0800</pubDate><guid>https://example.org/zh-tw/glibc-syscall-wrappers/</guid><description>&lt;p&gt;glibc 暴露 &lt;code&gt;read(2)&lt;/code&gt; 與 &lt;code&gt;write(2)&lt;/code&gt; 等 C 函式，而 Linux 暴露架構特定的系統呼叫進入慣例。包裝器連接這些層：它接受公開 C ABI，遵循選定架構的系統呼叫 ABI，轉譯核心錯誤，並可能實作 POSIX 執行緒取消行為。&lt;/p&gt;
+&lt;p&gt;以下範例描述目前的上游原始碼樹。已發布的 glibc 可能選取不同檔案或巨集定義，因此檢查原始碼必須從正在建置的發布版本與目標三元組開始。&lt;/p&gt;
+&lt;h2 id="sysdeps"&gt;
+ &lt;code&gt;sysdeps/&lt;/code&gt; 選取
+ &lt;a href="#sysdeps" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href="https://sourceware.org/git/?p=glibc.git;a=tree;f=sysdeps;hb=HEAD"&gt;&lt;code&gt;sysdeps/&lt;/code&gt; 樹&lt;/a&gt; 保存依作業系統、CPU、ABI、字組大小與功能選取的實作。通用程式碼是後備方案；更具體的目錄可以使用相同相對名稱取代檔案。對 Linux 建置而言，相關路徑包括 &lt;code&gt;sysdeps/unix/sysv/linux/&lt;/code&gt;；架構還可以提供 Linux 特定進入程式碼或 ABI 特定變體。&lt;/p&gt;
+&lt;p&gt;glibc 的設定與建置機制會建立適用系統相依目錄的有序清單。建置規則搜尋該清單，使選取的實作優先於通用後備方案。因此，這種配置不是每個檔案都恰好具有一個維度的分類法：作業系統目錄可能依賴架構標頭，而架構目錄可能包含與作業系統無關的程式碼。不要從單一目錄名稱推論行為，應檢查 &lt;code&gt;config.make&lt;/code&gt;、已設定的建置目錄與選取的原始碼路徑。&lt;/p&gt;
+&lt;h2 id="syscalls-list-and-make-syscalls-sh"&gt;
+ 產生的精簡包裝器
+ &lt;a href="#syscalls-list-and-make-syscalls-sh" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;部分精簡組合語言包裝器會從 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/syscalls.list;hb=HEAD"&gt;&lt;code&gt;syscalls.list&lt;/code&gt;&lt;/a&gt; 產生。每筆記錄會命名輸出、Linux 系統呼叫、引數簽章、強符號，以及選用的弱符號或版本化名稱。建置會呼叫 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/make-syscalls.sh;hb=HEAD"&gt;&lt;code&gt;make-syscalls.sh&lt;/code&gt;&lt;/a&gt;，它會：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;移除被較高優先級 &lt;code&gt;sysdeps&lt;/code&gt; 目錄覆寫的項目；&lt;/li&gt;
+&lt;li&gt;透過目標的 &lt;code&gt;sysdep.h&lt;/code&gt; 解析 &lt;code&gt;SYS_&lt;/code&gt; 編號；&lt;/li&gt;
+&lt;li&gt;從簽章推導參數數量與特殊引數處理；以及&lt;/li&gt;
+&lt;li&gt;使用 &lt;code&gt;syscall-template.S&lt;/code&gt; 產生規則，並在清單要求時包含別名與相容性符號。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;syscalls.list&lt;/code&gt; 不會定義每個公開函式。具有驗證、後備邏輯、取消處理、時間寬度轉換或其他政策的包裝器通常是手寫的。目前 glibc 的 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/write.c;hb=HEAD"&gt;&lt;code&gt;write.c&lt;/code&gt;&lt;/a&gt; 中的 &lt;code&gt;write&lt;/code&gt; 就是這類手寫 C 包裝器；因此它可與產生路徑形成有用對照。&lt;/p&gt;
+&lt;h2 id="write"&gt;
+ &lt;code&gt;write&lt;/code&gt; 與可感知取消的分派
+ &lt;a href="#write" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;概念上，Linux &lt;code&gt;write&lt;/code&gt; 包裝器會執行以下操作：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ssize_t&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;write&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; fd, &lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;buffer, &lt;span style="color:#66d9ef"&gt;size_t&lt;/span&gt; count)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;{
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;cancellation_aware_syscall&lt;/span&gt;(SYS_write, fd, buffer, count);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;實際原始碼會呼叫 &lt;code&gt;SYSCALL_CANCEL (write, fd, buf, nbytes)&lt;/code&gt;。當不需要檢查取消時，該巨集會選取內嵌系統呼叫路徑；否則會暫時變更執行緒的取消型別，發出呼叫，然後還原先前的型別。&lt;code&gt;write&lt;/code&gt; 是 POSIX 取消點，因此此邊界讓待處理的取消得以執行，而不會將每個內部系統呼叫都視為取消點。&lt;/p&gt;</description></item><item><title>Linux 系統呼叫</title><link>https://example.org/zh-tw/linux-system-calls/</link><pubDate>Mon, 15 Jul 2024 08:53:17 +0800</pubDate><guid>https://example.org/zh-tw/linux-system-calls/</guid><description>&lt;p&gt;Linux 系統呼叫在處理程序與核心之間形成架構特定的二進位介面。應用程式碼通常改以 C 函式庫 API 為目標，因為函式庫提供型別、功能測試巨集、相容性行為，以及機器特定的進入序列。&lt;/p&gt;
+&lt;h2 id="函式庫-api-與核心-abi"&gt;
+ 函式庫 API 與核心 ABI
+ &lt;a href="#%e5%87%bd%e5%bc%8f%e5%ba%ab-api-%e8%88%87%e6%a0%b8%e5%bf%83-abi" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;例如 &lt;code&gt;open(path, flags)&lt;/code&gt; 這類原始碼層級的呼叫，並不承諾會執行名為 &lt;code&gt;open&lt;/code&gt; 的核心系統呼叫。glibc 可以使用 &lt;code&gt;openat&lt;/code&gt; 實作它、加入取消檢查，或選取與時間寬度相容的進入點。&lt;code&gt;clock_gettime&lt;/code&gt; 等函式可以在 vDSO 中執行，而不必進入核心。反過來，Linux 也會公開 &lt;code&gt;gettid&lt;/code&gt; 等系統呼叫，但較舊的 C 函式庫並未提供其包裝函式。&lt;/p&gt;
+&lt;p&gt;核心 ABI 包含：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;適用於處理程序架構與 ABI 的系統呼叫編號；&lt;/li&gt;
+&lt;li&gt;以暫存器表示的引數，以及在部分 ABI 中部分位於堆疊上的引數；&lt;/li&gt;
+&lt;li&gt;例如 &lt;code&gt;syscall&lt;/code&gt;、&lt;code&gt;int $0x80&lt;/code&gt;、&lt;code&gt;svc&lt;/code&gt; 或 &lt;code&gt;ecall&lt;/code&gt; 的進入指令；以及&lt;/li&gt;
+&lt;li&gt;用於表示成功與錯誤的原始回傳慣例。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;SYS_name&lt;/code&gt; 中的常數會從 &lt;code&gt;&amp;lt;sys/syscall.h&amp;gt;&lt;/code&gt; 識別目標建置 ABI 所使用的編號。這些編號不會跨架構保持穩定：x86-64 的 &lt;code&gt;write&lt;/code&gt; 是 1，而 i386 的 &lt;code&gt;write&lt;/code&gt; 是 4。在同一個核心上，Compat 與 x32 處理程序還可能使用另一份表格。核心會透過該 ABI 的系統呼叫表分派此編號，交由通常以 &lt;code&gt;SYSCALL_DEFINE*&lt;/code&gt; 巨集宣告的實作處理。&lt;/p&gt;
+&lt;h2 id="暫存器結果與-errno"&gt;
+ 暫存器、結果與 &lt;code&gt;errno&lt;/code&gt;
+ &lt;a href="#%e6%9a%ab%e5%ad%98%e5%99%a8%e7%b5%90%e6%9e%9c%e8%88%87-errno" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;兩種常見的 Linux x86 進入 ABI 展示了這種對應關係：&lt;/p&gt;</description></item></channel></rss>

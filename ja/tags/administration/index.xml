@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Administration on cesun.life</title><link>https://example.org/ja/tags/administration/</link><description>Recent content in Administration on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sat, 07 Oct 2023 01:45:35 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/administration/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 管理ノート</title><link>https://example.org/ja/linux-administration-miscellaneous/</link><pubDate>Sat, 07 Oct 2023 01:45:35 +0800</pubDate><guid>https://example.org/ja/linux-administration-miscellaneous/</guid><description>&lt;p&gt;この文書では、リムーバブルストレージ、ケーパビリティ、ファイルシステムの場所、画像の合成、ELF シンボルバージョンという、いくつかの独立した管理作業を扱います。各セクションでは、自動化で重要となる運用上の境界を示します。&lt;/p&gt;
+&lt;h2 id="リムーバブルデバイスを安全に操作する"&gt;
+ リムーバブルデバイスを安全に操作する
+ &lt;a href="#%e3%83%aa%e3%83%a0%e3%83%bc%e3%83%90%e3%83%96%e3%83%ab%e3%83%87%e3%83%90%e3%82%a4%e3%82%b9%e3%82%92%e5%ae%89%e5%85%a8%e3%81%ab%e6%93%8d%e4%bd%9c%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;リムーバブルメディアの電源を切る前に、マウントされているすべてのファイルシステムをアンマウントしてください。&lt;code&gt;udisksctl&lt;/code&gt; は UDisks サービスを使用するため、デスクトップセッションの認可を適用し、デバイスに対する未仲介のコマンドを発行するのではなく、操作を調整します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;lsblk -o NAME,PATH,TYPE,FSTYPE,MOUNTPOINTS
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;udisksctl unmount -b /dev/sdb1
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;udisksctl power-off -b /dev/sdb&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;unmount&lt;/code&gt; には &lt;code&gt;/dev/sdb1&lt;/code&gt; のようなパーティションを渡しますが、&lt;code&gt;power-off&lt;/code&gt; には &lt;code&gt;/dev/sdb&lt;/code&gt; のようなドライブ全体を渡します。後者はバッファをフラッシュし、カーネルによるデバイスの使用を解除し、ハードウェアが対応している場合はドライブの電源を切ります。デバイス名は接続イベントのたびに変わる可能性があるため、コマンドを実行する直前に確認してください。アンマウントが成功しただけでは、USB エンクロージャの電源が切れたことは保証されません。&lt;/p&gt;
+&lt;h2 id="ケーパビリティによる権限委譲"&gt;
+ ケーパビリティによる権限委譲
+ &lt;a href="#%e3%82%b1%e3%83%bc%e3%83%91%e3%83%93%e3%83%aa%e3%83%86%e3%82%a3%e3%81%ab%e3%82%88%e3%82%8b%e6%a8%a9%e9%99%90%e5%a7%94%e8%ad%b2" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Linux のケーパビリティは、従来の、すべての権限を持つ root 権限を、個別に検査される単位へ分割します。プロセスには permitted、effective、inheritable、bounding、ambient のケーパビリティセットがあり、ファイルには permitted および inheritable のケーパビリティマスクと effective ビットを持たせることもできます。各ケーパビリティが対象とするカーネルチェックは異なるため、&lt;code&gt;capabilities(7)&lt;/code&gt; を参照してください。&lt;/p&gt;
+&lt;p&gt;たとえば、システムクロックを設定する必要がある専用バイナリには &lt;code&gt;CAP_SYS_TIME&lt;/code&gt; を付与できます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo setcap cap_sys_time&lt;span style="color:#f92672"&gt;=&lt;/span&gt;ep /opt/example/bin/clock-setter
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;getcap /opt/example/bin/clock-setter&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;=ep&lt;/code&gt; はケーパビリティをファイルの permitted セットに追加し、実行されたプロセスの effective セットに入るよう要求します。ケーパビリティは、対象を限定した、書き込み不可の実行ファイルに対して最小限のセットだけを付与してください。コピー、パッケージング、または必要な拡張属性をサポートしないファイルシステムによって、ファイルケーパビリティが除去されることがあります。そのため、デプロイ時のチェックでは &lt;code&gt;getcap&lt;/code&gt; を実行してください。&lt;/p&gt;
+&lt;p&gt;ケーパビリティだけでは完全なサンドボックスにはなりません。特に &lt;code&gt;CAP_SYS_ADMIN&lt;/code&gt; は互いに無関係な多数の操作を許可し、特権バイナリにメモリ安全性の問題やコマンドインジェクションのバグがあると、システム侵害につながる可能性があります。委譲内容を監査済みの単一コマンドとして表現できる場合は、制約した &lt;code&gt;sudoers&lt;/code&gt; ルールのほうが検査しやすいことがあります。&lt;/p&gt;</description></item></channel></rss>

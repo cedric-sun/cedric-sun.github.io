@@ -1,0 +1,181 @@
+<!doctype html><html lang=en><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><script>(function(){const e=localStorage.getItem("theme");if(e)document.documentElement.setAttribute("data-theme",e);else{const e=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme",e?"dark":"light")}})()</script><link rel=stylesheet href=/main.min.343a2f90e71959c55299328e86f9ed9494f37d28b74e33d8ec95b266f5c03350.css integrity="sha256-NDovkOcZWcVSmTKOhvntlJTzfSi3TjPY7JWyZvXAM1A="><script src=/main.js></script><title>GLibメインループ</title></head><body><main><article><div class=article-header><h1>GLibメインループ</h1><div class=aux>最終更新: 2026-05-24 01:10:27 +0800 +0800</div><div class=tags-section><span>tags:</span>
+<a href=/ja/tags/glib/>Glib</a>
+|
+<a href=/ja/tags/gtk/>Gtk</a></div></div><div class="translation-notice machine-translated"><a href=/glib-main-loop/>原文</a>は英語で書かれています。あなたはAI翻訳版を読んでいます。</div><div class=article-content><p>GLibのイベントループは、イベントの記述とイベントのディスパッチを分離します。
+<code>GSource</code> は処理の準備が整う条件を記述し、<code>GMainContext</code> はソースの集合を
+所有してスケジュールし、<code>GMainLoop</code> は一つのコンテキストを繰り返し反復します。
+これらの役割を分離することで、コールバックの配置、キャンセル、および
+ライフタイムの規則が明確になります。</p><h2 id=ソースコンテキストループ>ソース、コンテキスト、ループ
+<a href=#%e3%82%bd%e3%83%bc%e3%82%b9%e3%82%b3%e3%83%b3%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88%e3%83%ab%e3%83%bc%e3%83%97 class=heading-anchor><span>#</span></a></h2><p>メインコンテキストの1回の反復には、概念上、次の四つのフェーズがあります。</p><ol><li><strong>準備：</strong> ソースは、すでに準備が整っているか、およびコンテキストが
+スリープできる時間を報告します。</li><li><strong>照会とポーリング：</strong> コンテキストはファイルディスクリプターの集合を作成し、
+イベントまたはタイムアウトによって起こされるまで待機します。</li><li><strong>確認：</strong> ソースはポーリング結果を調べ、準備が整ったかどうかを判断します。</li><li><strong>ディスパッチ：</strong> 準備が整ったソースがコールバックを呼び出します。</li></ol><p><code>g_main_context_iteration()</code> は1回の反復を実行します。より低水準の
+<code>g_main_context_prepare()</code>、<code>g_main_context_query()</code>、
+<code>g_main_context_check()</code>、および <code>g_main_context_dispatch()</code> は、
+別のイベントループとの統合用に存在します。ただし、アプリケーションは
+これらの順序とコンテキスト取得の規則を維持する必要があります。</p><p><code>GMainLoop</code> は、この仕組みに実行中フラグを追加します。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>GMainContext <span style=color:#f92672>*</span>context <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_main_context_new</span>();
+</span></span><span style=display:flex><span>GMainLoop <span style=color:#f92672>*</span>loop <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_main_loop_new</span>(context, FALSE);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_loop_run</span>(loop);
+</span></span><span style=display:flex><span><span style=color:#75715e>/* A callback eventually calls g_main_loop_quit(loop). */</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_loop_unref</span>(loop);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_context_unref</span>(context);</span></span></code></pre></div></div></div><p><code>g_main_loop_quit()</code> は、現在のディスパッチから戻った後にループを停止します。
+コンテキストやそのソースは破棄しません。ネストしたループを含め、複数のループが
+同じコンテキストを反復できるため、ネストした実行では、そのコンテキストに
+接続されたすべてのソースへの再入が可能になります。GTKアプリケーションでは、
+同期処理に見えるコードが無関係なUIコールバックをディスパッチする可能性が
+あるため、ネストしたループより非同期APIを優先すべきです。</p><h2 id=準備状態優先度所有権>準備状態、優先度、所有権
+<a href=#%e6%ba%96%e5%82%99%e7%8a%b6%e6%85%8b%e5%84%aa%e5%85%88%e5%ba%a6%e6%89%80%e6%9c%89%e6%a8%a9 class=heading-anchor><span>#</span></a></h2><p>すべてのソースには整数の優先度があります。小さい数値ほど優先度が高く、
+<code>G_PRIORITY_HIGH</code> は <code>G_PRIORITY_DEFAULT</code> より先に実行され、
+<code>G_PRIORITY_DEFAULT_IDLE</code> の優先度はさらに低くなります。異なる優先度の
+ソースが準備済みの場合、GLibは優先度の高い処理を先にディスパッチします。
+したがって、常に準備済みの高優先度ソースは、低優先度ソースを飢餓状態に
+する可能性があります。同じ優先度のソース間における、文書化されていない
+順序にコードを依存させてはなりません。</p><p>ソースを接続すると、最大一つのコンテキストに関連付けられます。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>GSource <span style=color:#f92672>*</span>source <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_timeout_source_new</span>(<span style=color:#ae81ff>250</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_set_priority</span>(source, G_PRIORITY_DEFAULT);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_set_callback</span>(source, refresh_cache, cache, NULL);
+</span></span><span style=display:flex><span>guint source_id <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_source_attach</span>(source, context);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_unref</span>(source); <span style=color:#75715e>/* The context now keeps the source alive. */</span></span></span></code></pre></div></div></div><p>コールバックは、スケジュールされた状態を維持する場合は <code>G_SOURCE_CONTINUE</code>、
+ディスパッチ後にソースを破棄する場合は <code>G_SOURCE_REMOVE</code> を返します。
+<code>g_source_destroy()</code> は直接的なキャンセル操作であり、別のスレッドから
+呼び出すこともできます。ソースIDはコンテキスト固有で、後に再利用される
+可能性があります。デフォルトでないコンテキストをコードが所有する場合は、
+<code>GSource *</code> を保持する方が曖昧さを減らせます。</p><p>ソースの接続自体は、アプリケーションデータの所有権を移転しません。
+コールバックデータのクリーンアップが必要な場合は、<code>GDestroyNotify</code> を
+<code>g_source_set_callback()</code> または <code>*_add_full()</code> ヘルパーに渡します。notify関数は、
+コールバックが置き換えられたとき、またはソースがファイナライズされたときに
+実行され、特定のスレッドで実行されると仮定してはなりません。</p><h2 id=組み込みソースとカスタムソース>組み込みソースとカスタムソース
+<a href=#%e7%b5%84%e3%81%bf%e8%be%bc%e3%81%bf%e3%82%bd%e3%83%bc%e3%82%b9%e3%81%a8%e3%82%ab%e3%82%b9%e3%82%bf%e3%83%a0%e3%82%bd%e3%83%bc%e3%82%b9 class=heading-anchor><span>#</span></a></h2><p>GLibは、一般的な準備条件に対応するソースコンストラクターを提供します。</p><ul><li><code>g_timeout_source_new()</code> と <code>g_timeout_source_new_seconds()</code> は、
+指定した時間の経過後に準備済みになります。繰り返しタイムアウトは、
+GLibの単調時間計算に基づいて次の間隔をスケジュールします。正確な周期の
+リアルタイムタイマーではありません。</li><li><code>g_idle_source_new()</code> は、優先度がより高い処理が準備済みでないときに
+準備済みになります。<code>G_SOURCE_CONTINUE</code> を返すアイドルコールバックは、
+短時間で制御を返す必要があります。</li><li><code>g_unix_fd_source_new()</code> は、Unixファイルディスクリプターの
+<code>GIOCondition</code> を監視します。子プロセス監視ソースとUnixシグナルソースも、
+同じ接続およびディスパッチモデルに従います。</li><li><code>g_io_create_watch()</code> は <code>GIOChannel</code> を適応させます。ただし、新しい
+Unixコードでは、多くの場合、ノンブロッキングのファイルディスクリプターを
+直接監視できます。</li></ul><p>便利関数 <code>g_timeout_add()</code>、<code>g_idle_add()</code>、<code>g_child_watch_add()</code> は、
+現在のスレッドデフォルトコンテキストではなく、グローバルデフォルト
+コンテキストに接続します。コンテキストを考慮するライブラリコードでは、
+ソースを構築して明示的に接続すべきです。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span>GSource <span style=color:#f92672>*</span>source <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_idle_source_new</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_set_callback</span>(source, publish_result, result, result_free);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_attach</span>(source, target_context);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_source_unref</span>(source);</span></span></code></pre></div></div></div><p>カスタムソースは、先頭フィールドとして <code>GSource</code> を埋め込み、
+<code>GSourceFuncs</code> を提供します。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>typedef</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>  GSource source;
+</span></span><span style=display:flex><span>  gboolean pending;
+</span></span><span style=display:flex><span>} WorkSource;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> gboolean
+</span></span><span style=display:flex><span><span style=color:#a6e22e>work_prepare</span>(GSource <span style=color:#f92672>*</span>source, gint <span style=color:#f92672>*</span>timeout_ms)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  WorkSource <span style=color:#f92672>*</span>work <span style=color:#f92672>=</span> (WorkSource <span style=color:#f92672>*</span>) source;
+</span></span><span style=display:flex><span>  <span style=color:#f92672>*</span>timeout_ms <span style=color:#f92672>=</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> work<span style=color:#f92672>-&gt;</span>pending;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> gboolean
+</span></span><span style=display:flex><span><span style=color:#a6e22e>work_check</span>(GSource <span style=color:#f92672>*</span>source)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> ((WorkSource <span style=color:#f92672>*</span>) source)<span style=color:#f92672>-&gt;</span>pending;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> gboolean
+</span></span><span style=display:flex><span><span style=color:#a6e22e>work_dispatch</span>(GSource <span style=color:#f92672>*</span>source, GSourceFunc callback, gpointer data)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  WorkSource <span style=color:#f92672>*</span>work <span style=color:#f92672>=</span> (WorkSource <span style=color:#f92672>*</span>) source;
+</span></span><span style=display:flex><span>  work<span style=color:#f92672>-&gt;</span>pending <span style=color:#f92672>=</span> FALSE;
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>callback</span>(data);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> GSourceFuncs work_source_funcs <span style=color:#f92672>=</span> {
+</span></span><span style=display:flex><span>  work_prepare, work_check, work_dispatch, NULL
+</span></span><span style=display:flex><span>};</span></span></code></pre></div></div></div><p>インスタンスは <code>g_source_new(&amp;work_source_funcs, sizeof(WorkSource))</code> で
+作成します。カーネルイベントを待つソースは、自身を準備済みとして繰り返し
+報告するのではなく、ポーリング用ディスクリプターを登録すべきです。
+そうしないと、ループがビジーウェイトになります。別のスレッドがカスタム
+ソースの状態を変更する場合は、その状態を保護し、<code>g_main_context_wakeup()</code> を
+呼び出して、ブロック中のポーリングに変更を認識させます。</p><h2 id=スレッドデフォルトコンテキスト>スレッドデフォルトコンテキスト
+<a href=#%e3%82%b9%e3%83%ac%e3%83%83%e3%83%89%e3%83%87%e3%83%95%e3%82%a9%e3%83%ab%e3%83%88%e3%82%b3%e3%83%b3%e3%83%86%e3%82%ad%e3%82%b9%e3%83%88 class=heading-anchor><span>#</span></a></h2><p><code>g_main_context_default()</code> が返すグローバルデフォルトコンテキストは、
+スレッドごとのスレッドデフォルトコンテキストのスタックとは別物です。
+GIOの非同期操作は一般に、呼び出し元スレッドのスレッドデフォルト
+コンテキストを取得し、そこで完了通知を配信します。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>g_main_context_push_thread_default</span>(worker_context);
+</span></span><span style=display:flex><span><span style=color:#a6e22e>start_async_operation</span>();
+</span></span><span style=display:flex><span><span style=color:#a6e22e>g_main_context_pop_thread_default</span>(worker_context);</span></span></code></pre></div></div></div><p>すべてのpushには、同じスレッド内で対応するpopが必要です。スタックが空の場合、
+<code>g_main_context_get_thread_default()</code> は <code>NULL</code> を返します。一方、
+<code>g_main_context_ref_thread_default()</code> は、参照付きのスレッドデフォルト
+コンテキスト、またはグローバルデフォルトを返します。ライブラリは、
+グローバルデフォルトを暗黙に仮定せず、各コールバックとシグナルが配信される
+コンテキストを文書化すべきです。</p><p>一つのコンテキストを同時に取得できるのは一つのスレッドだけですが、
+所有権は反復の間に移動できます。通常は別のスレッドで実行される
+コンテキストへ処理を送るには、<code>g_main_context_invoke_full()</code> を使用します。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#a6e22e>g_main_context_invoke_full</span>(ui_context,
+</span></span><span style=display:flex><span>                           G_PRIORITY_DEFAULT,
+</span></span><span style=display:flex><span>                           apply_worker_result,
+</span></span><span style=display:flex><span>                           result,
+</span></span><span style=display:flex><span>                           result_free);</span></span></code></pre></div></div></div><p>関数は <code>ui_context</code> が所有されている間に実行されます。呼び出し元がすでに
+コンテキストを所有している場合、呼び出しは直接実行される可能性があります。
+また、そのコンテキストが呼び出し元のスレッドデフォルトコンテキストであり、
+呼び出し元が取得できる場合も、直接実行される可能性があります。したがって、
+無条件の非同期キュー操作ではありません。スレッドアフィニティが必要な設計では、
+対象コンテキストを指定したスレッドで実行および所有し続けたうえで、
+<code>g_main_context_is_owner()</code> により期待するコンテキストをアサートしてください。
+特定のワーカースレッドではなくバックグラウンド実行が要件なら、<code>GTask</code> を
+使用します。</p><h2 id=コールバックのライフタイム>コールバックのライフタイム
+<a href=#%e3%82%b3%e3%83%bc%e3%83%ab%e3%83%90%e3%83%83%e3%82%af%e3%81%ae%e3%83%a9%e3%82%a4%e3%83%95%e3%82%bf%e3%82%a4%e3%83%a0 class=heading-anchor><span>#</span></a></h2><p>接続済みソースは、コールバックデータが表すオブジェクトより長く存続する
+可能性があります。GLibは、主に次の二つの所有権戦略を文書化しています。</p><ol><li>ソースを保存し、所有者がdisposeされるときに破棄する。これにより、
+コールバックのライフタイムが所有者に制限されます。</li><li>ソースに強参照を渡し、<code>GDestroyNotify</code> で解放する。これにより
+use-after-freeを防げますが、実行も破棄もされないソースが所有者を
+無期限に存続させる可能性があります。</li></ol><p>対象とともに操作が消えても問題ない場合は、弱参照が有用です。</p><div class=jose-wrapper><div class=jose-tools><span>c</span>
+<button>Copy</button></div><div class=jose-inner><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#66d9ef>typedef</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>  GWeakRef target;
+</span></span><span style=display:flex><span>} PendingUpdate;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> gboolean
+</span></span><span style=display:flex><span><span style=color:#a6e22e>apply_update</span>(gpointer user_data)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  PendingUpdate <span style=color:#f92672>*</span>pending <span style=color:#f92672>=</span> user_data;
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_autoptr</span>(GObject) target <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_weak_ref_get</span>(<span style=color:#f92672>&amp;</span>pending<span style=color:#f92672>-&gt;</span>target);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>if</span> (target <span style=color:#f92672>==</span> NULL)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> G_SOURCE_REMOVE;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#75715e>/* Update target while the temporary strong reference is held. */</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> G_SOURCE_REMOVE;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>pending_update_free</span>(gpointer data)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  PendingUpdate <span style=color:#f92672>*</span>pending <span style=color:#f92672>=</span> data;
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_weak_ref_clear</span>(<span style=color:#f92672>&amp;</span>pending<span style=color:#f92672>-&gt;</span>target);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_free</span>(pending);
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>static</span> <span style=color:#66d9ef>void</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>schedule_update</span>(GObject <span style=color:#f92672>*</span>target, GMainContext <span style=color:#f92672>*</span>target_context)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  PendingUpdate <span style=color:#f92672>*</span>pending <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_new0</span>(PendingUpdate, <span style=color:#ae81ff>1</span>);
+</span></span><span style=display:flex><span>  GSource <span style=color:#f92672>*</span>source <span style=color:#f92672>=</span> <span style=color:#a6e22e>g_idle_source_new</span>();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_weak_ref_init</span>(<span style=color:#f92672>&amp;</span>pending<span style=color:#f92672>-&gt;</span>target, target);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_source_set_callback</span>(source, apply_update, pending, pending_update_free);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_source_attach</span>(source, target_context);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>g_source_unref</span>(source);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div></div><p><code>GWeakRef</code> はスレッドセーフです。<code>g_weak_ref_get()</code> は強参照をアトミックに
+取得するか、<code>NULL</code> を返します。<code>g_object_add_weak_pointer()</code> で設定した
+生の弱ポインターは、このスレッド間保証を提供しません。弱参照が解決するのは
+オブジェクトの有効性であり、同期ではありません。可変状態は引き続き、
+一つのコンテキストへの閉じ込め、または明示的なロックを必要とします。</p><h2 id=アップストリームの参考資料>アップストリームの参考資料
+<a href=#%e3%82%a2%e3%83%83%e3%83%97%e3%82%b9%e3%83%88%e3%83%aa%e3%83%bc%e3%83%a0%e3%81%ae%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99 class=heading-anchor><span>#</span></a></h2><ul><li><a href=https://docs.gtk.org/glib/main-loop.html>GLib：メインイベントループ</a></li><li><a href=https://developer.gnome.org/documentation/tutorials/main-contexts.html>GNOMEメインコンテキスト・チュートリアル</a></li><li><a href=https://docs.gtk.org/glib/struct.MainContext.html><code>GMainContext</code></a> と
+<a href=https://docs.gtk.org/glib/struct.Source.html><code>GSource</code></a></li><li><a href=https://docs.gtk.org/gobject/struct.WeakRef.html><code>GWeakRef</code></a></li></ul></div></article></main><footer>--- end ---</footer><aside id=page-sidebar class=has-sidebar-content><div id=sidebar-content><nav id=post-navigator hidden aria-label="On this page"><div class=post-navigator-title>On this page</div><div class=post-navigator-tree></div></nav></div><div id=toolbar><div id=goto-top><img src=/top-arrow.svg></div><a href=/ja/><img src=/home.svg></a><div id=switch-translate><img src=/translate.svg><div id=language-menu class=hidden><a href=/glib-main-loop/ class=language-option data-lang=en>English
+</a><a href=/ja/glib-main-loop/ class=language-option data-lang=ja>日本語
+</a><a href=/zh-cn/glib-main-loop/ class=language-option data-lang=zh-cn>中文（简体）
+</a><a href=/zh-tw/glib-main-loop/ class=language-option data-lang=zh-tw>中文（繁體）</a></div></div><div id=switch-theme><img src=/moon.svg></div></div></aside></body></html>
