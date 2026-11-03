@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Spi on cesun.life</title><link>https://example.org/zh-tw/tags/spi/</link><description>Recent content in Spi on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Tue, 01 Oct 2024 22:56:33 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/spi/index.xml" rel="self" type="application/rss+xml"/><item><title>Java 服務提供者介面</title><link>https://example.org/zh-tw/java-service-provider-interface/</link><pubDate>Tue, 01 Oct 2024 22:56:33 +0800</pubDate><guid>https://example.org/zh-tw/java-service-provider-interface/</guid><description>&lt;p&gt;Java SPI 將&lt;strong&gt;服務&lt;/strong&gt;契約與一個或多個&lt;strong&gt;提供者&lt;/strong&gt;，以及選取提供者的&lt;strong&gt;使用者&lt;/strong&gt;分離。使用者依賴服務型別並使用&lt;code&gt;ServiceLoader&lt;/code&gt;，因此不必讓應用程式依賴具體類別，即可在部署時新增提供者。&lt;/p&gt;
+&lt;h2 id="類別路徑服務"&gt;
+ 類別路徑服務
+ &lt;a href="#%e9%a1%9e%e5%88%a5%e8%b7%af%e5%be%91%e6%9c%8d%e5%8b%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在模組出現之前，提供者 JAR 會在
+&lt;code&gt;META-INF/services/&amp;lt;fully.qualified.ServiceName&amp;gt;&lt;/code&gt;中列出實作。UTF-8 檔案每行包含一個提供者類別名稱；允許使用空白行和&lt;code&gt;#&lt;/code&gt;註解。每個提供者都必須能被用於探索的載入器存取，並提供 public 無參數建構函式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ServiceLoader&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Codec&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; codecs &lt;span style="color:#f92672"&gt;=&lt;/span&gt; ServiceLoader.&lt;span style="color:#a6e22e"&gt;load&lt;/span&gt;(Codec.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;for&lt;/span&gt; (Codec codec : codecs) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (codec.&lt;span style="color:#a6e22e"&gt;supports&lt;/span&gt;(mediaType)) &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; codec;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;探索與提供者具現化都是延遲執行的。反覆走訪提供者、以串流方式處理提供者，或呼叫&lt;code&gt;Provider.get()&lt;/code&gt;，都可能載入並初始化提供者。因此，格式錯誤的設定、遺失的相依性、無法存取的型別或建構函式失敗，會以&lt;code&gt;ServiceConfigurationError&lt;/code&gt;的形式浮現。應將提供者程式碼視為部署時提供的程式碼，在容器或外掛程式系統中選擇明確的類別載入器，並在受控的啟動邊界以診斷資訊失敗。&lt;/p&gt;
+&lt;h2 id="模組服務"&gt;
+ 模組服務
+ &lt;a href="#%e6%a8%a1%e7%b5%84%e6%9c%8d%e5%8b%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用 JPMS 時，使用者模組宣告&lt;code&gt;uses com.example.Codec&lt;/code&gt;；提供者宣告&lt;code&gt;provides com.example.Codec with com.example.JsonCodec&lt;/code&gt;。模組解析會依照模組系統規則考慮服務提供者。提供者類別不必僅為了&lt;code&gt;ServiceLoader&lt;/code&gt;而匯出；具名模組中的提供者可以具有 public 無參數建構函式或 public static 提供者方法，但必須遵守服務宣告的限制。&lt;code&gt;ServiceLoader.load(service, loader)&lt;/code&gt;遵循所提供載入器的可見性，而模組感知的多載則從模組層運作。載入器與層是服務邊界的一部分，而不是無關緊要的細節。&lt;/p&gt;
+&lt;p&gt;類別路徑設定仍受 unnamed module 和 automatic module 支援，因此可以進行遷移。不要在未測試已解析的提供者集合時同時發布兩種機制，因為重複項目與對順序的假設會使選擇結果無法移植。&lt;/p&gt;
+&lt;h2 id="jdbc-作為演進範例"&gt;
+ JDBC 作為演進範例
+ &lt;a href="#jdbc-%e4%bd%9c%e7%82%ba%e6%bc%94%e9%80%b2%e7%af%84%e4%be%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;早期使用 JDBC 驅動程式時，通常會呼叫&lt;code&gt;Class.forName(&amp;quot;vendor.Driver&amp;quot;)&lt;/code&gt;，以觸發驅動程式向&lt;code&gt;DriverManager&lt;/code&gt;進行 static 註冊。JDBC 4 引入了針對&lt;code&gt;java.sql.Driver&lt;/code&gt;的服務提供者載入機制，使相容的驅動程式 JAR 能從&lt;code&gt;META-INF/services/java.sql.Driver&lt;/code&gt;中被探索。現代應用程式仍應明確設定預期的驅動程式與連線屬性；自動探索移除的是啟動呼叫，而不是資料庫驗證或版本相容性方面的考量。&lt;/p&gt;
+&lt;h2 id="參考資料"&gt;
+ 參考資料
+ &lt;a href="#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ServiceLoader.html"&gt;JDK &lt;code&gt;ServiceLoader&lt;/code&gt; API&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/specs/jar/jar.html#service-providers"&gt;JAR 檔案規格，服務提供者&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DriverManager.html"&gt;JDBC &lt;code&gt;DriverManager&lt;/code&gt; API&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</description></item></channel></rss>

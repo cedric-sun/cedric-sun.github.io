@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Sql on cesun.life</title><link>https://example.org/zh-tw/tags/sql/</link><description>Recent content in Sql on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 03 Sep 2026 15:56:43 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/sql/index.xml" rel="self" type="application/rss+xml"/><item><title>MySQL 交易、隔離與並行</title><link>https://example.org/zh-tw/mysql-transactions/</link><pubDate>Thu, 03 Sep 2026 15:56:43 +0800</pubDate><guid>https://example.org/zh-tw/mysql-transactions/</guid><description>&lt;p&gt;InnoDB 交易透過以原子方式提交相關變更，並控制並行執行的陳述式如何觀察這些變更，來保護資料庫不變量。隔離性不能取代條件約束：對於結構描述能夠表達的不變量，請使用主鍵、唯一條件約束、外部索引鍵條件約束和檢查條件約束，然後針對多陳述式決策選擇交易與鎖定模式。&lt;/p&gt;
+&lt;h2 id="交易邊界與自動提交"&gt;
+ 交易邊界與自動提交
+ &lt;a href="#%e4%ba%a4%e6%98%93%e9%82%8a%e7%95%8c%e8%88%87%e8%87%aa%e5%8b%95%e6%8f%90%e4%ba%a4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL 預設啟用自動提交，因此明確交易之外的每個陳述式都會作為一個交易提交或回復。請明確啟動多陳述式單位，並保持其簡短：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;START&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;-&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;84&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;COMMIT&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在為目的地入帳之前，先檢查第一個更新所影響的資料列數。任何不變量或陳述式失敗時都使用 &lt;code&gt;ROLLBACK&lt;/code&gt;。連線集區在歸還連線之前，必須還原自動提交、隔離層級、存取模式及其他工作階段狀態，因為這些屬性會在交易之間持續存在。&lt;/p&gt;
+&lt;p&gt;許多資料定義陳述式和帳戶管理陳述式會隱含提交。原子 DDL 可使受支援的結構描述陳述式具備當機安全性，但不會使該陳述式成為周圍應用程式交易的一部分。&lt;/p&gt;
+&lt;h2 id="隔離設定"&gt;
+ 隔離設定
+ &lt;a href="#%e9%9a%94%e9%9b%a2%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 在 MySQL 8.4 中的預設值是 &lt;code&gt;REPEATABLE READ&lt;/code&gt;。使用 &lt;code&gt;--transaction-isolation&lt;/code&gt; 或 &lt;code&gt;transaction_isolation&lt;/code&gt; 設定伺服器預設值，並且只在明確指定的範圍內覆寫：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;COMMITTED&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;REPEATABLE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SERIALIZABLE&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.transaction_isolation;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;GLOBAL&lt;/code&gt; 會為新工作階段建立預設值。&lt;code&gt;SESSION&lt;/code&gt; 會套用到該連線上的後續交易。不含限定詞的 &lt;code&gt;SET TRANSACTION&lt;/code&gt; 會套用到下一個交易。也可以在相同陳述式中選取 &lt;code&gt;READ ONLY&lt;/code&gt; 和 &lt;code&gt;READ WRITE&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="mvcc-與一致性讀取"&gt;
+ MVCC 與一致性讀取
+ &lt;a href="#mvcc-%e8%88%87%e4%b8%80%e8%87%b4%e6%80%a7%e8%ae%80%e5%8f%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;只要作用中的快照仍可能需要，InnoDB 就會在 undo 資料中保留較早的資料列版本。一般 &lt;code&gt;SELECT&lt;/code&gt; 通常會執行非鎖定一致性讀取：&lt;/p&gt;</description></item><item><title>Apache Kyuubi 簡介</title><link>https://example.org/zh-tw/apache-kyuubi-introduction/</link><pubDate>Thu, 30 Jul 2026 07:27:00 +0800</pubDate><guid>https://example.org/zh-tw/apache-kyuubi-introduction/</guid><description>&lt;p&gt;Apache Kyuubi 是分散式資料系統的多租戶 SQL 閘道。它為使用者與 BI 工具提供穩定的 JDBC 或 ODBC 端點，而不要求每位使用者管理 Spark 應用程式生命週期、叢集佇列或引擎設定。&lt;/p&gt;
+&lt;p&gt;Kyuubi 將長時間執行的用戶端端點與執行查詢的程序分離。
+這項區分是 Kyuubi 在架構上的主要貢獻：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Kyuubi 伺服器&lt;/strong&gt;負責驗證用戶端、維護通訊協定工作階段、選取引擎，以及轉送作業。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Kyuubi 引擎&lt;/strong&gt;負責執行 SQL 並消耗運算資源。Spark SQL 是最常見的引擎，而 Kyuubi 的各個版本也可以整合其他查詢引擎。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;外部服務&lt;/strong&gt;仍然提供資源管理、詮釋資料、儲存、授權原則和服務探索。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此，Kyuubi 不會取代 Spark、YARN、Kubernetes、Hive metastore 或物件儲存。它負責協調對這些元件的存取。&lt;/p&gt;
+&lt;h2 id="架構"&gt;
+ 架構
+ &lt;a href="#%e6%9e%b6%e6%a7%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;典型的 Spark-on-YARN 部署如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Beeline、BI 工具或應用程式
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | 使用 HiveServer2 通訊協定的 JDBC/ODBC
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Kyuubi 伺服器池
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | `----&amp;gt; ZooKeeper 或其他已設定的探索服務
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | 啟動、探索或重複使用
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Spark SQL 引擎應用程式
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |----&amp;gt; YARN，用於驅動程式和執行器資源
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |----&amp;gt; Hive Metastore，用於資料表詮釋資料
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |----&amp;gt; HDFS 或物件儲存，用於資料表資料
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; `----&amp;gt; Ranger 或其他授權系統&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;由於引擎負責剖析、規劃、掃描、聯結、shuffle 和寫入，Kyuubi 伺服器相對輕量。增加伺服器節點可以提高連線和作業處理容量，但不會因此增加 Spark 執行器。&lt;/p&gt;</description></item><item><title>MyBatis 對映</title><link>https://example.org/zh-tw/mybatis-mapping/</link><pubDate>Tue, 21 Oct 2025 15:55:03 +0800</pubDate><guid>https://example.org/zh-tw/mybatis-mapping/</guid><description>&lt;p&gt;MyBatis 將 Java 呼叫對映至 SQL 陳述式，而參數繫結、陳述式執行與結果集存取則由 JDBC
+負責。對映器應讓這個邊界清楚可見：SQL 欄位名稱屬於陳述式，Java 屬性名稱屬於
+參數對映與結果對映，任何非標準轉換都應由型別處理器在兩者之間執行。&lt;/p&gt;
+&lt;h2 id="參數與結果邊界"&gt;
+ 參數與結果邊界
+ &lt;a href="#%e5%8f%83%e6%95%b8%e8%88%87%e7%b5%90%e6%9e%9c%e9%82%8a%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;簡單參數可以使用 &lt;code&gt;#{id}&lt;/code&gt; 佔位符。物件與 Map 參數會公開具名屬性；對於多個對映器
+參數，應使用 &lt;code&gt;@Param&lt;/code&gt;，使名稱不依賴編譯器中繼資料：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;List&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Task&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;findByState&lt;/span&gt;(&lt;span style="color:#a6e22e"&gt;@Param&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;state&amp;#34;&lt;/span&gt;) State state,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Param&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;limit&amp;#34;&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; limit);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;#{...}&lt;/code&gt; 會建立 JDBC 參數標記並繫結值。&lt;code&gt;${...}&lt;/code&gt; 會在準備 SQL 之前將文字代入 SQL，
+因此僅限於允許清單中的識別碼或無法參數化的片段。絕不能將請求資料直接放入
+&lt;code&gt;${...}&lt;/code&gt; 運算式。&lt;/p&gt;
+&lt;p&gt;當欄位標籤與 Java 屬性相符時，自動結果對映較為簡潔。名稱不同、巢狀物件需要明確
+識別，或聯結可能造成父資料列重複時，應使用 &lt;code&gt;resultMap&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;xml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-xml" data-lang="xml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;resultMap&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;id=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;taskResult&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;type=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;com.example.Task&amp;#34;&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;id&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;property=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;id&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;column=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;task_id&amp;#34;&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;result&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;property=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;name&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;column=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;task_name&amp;#34;&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;result&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;property=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;state&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;column=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;state&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;typeHandler=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;com.example.StateTypeHandler&amp;#34;&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;/resultMap&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;&amp;lt;id&amp;gt;&lt;/code&gt; 對映會識別聯結結果中的物件，並協助 MyBatis 合併重複的父資料。它不會宣告
+資料庫條件約束；結構描述仍必須強制執行識別性。&lt;/p&gt;
+&lt;h2 id="產生的索引鍵"&gt;
+ 產生的索引鍵
+ &lt;a href="#%e7%94%a2%e7%94%9f%e7%9a%84%e7%b4%a2%e5%bc%95%e9%8d%b5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;對於支援產生索引鍵的資料庫與 JDBC 驅動程式，啟用 &lt;code&gt;useGeneratedKeys&lt;/code&gt; 並指定可寫入的
+Java 屬性。MyBatis 會在插入後呼叫 JDBC 產生索引鍵 API，並將產生的主索引鍵指派給
+該屬性。&lt;/p&gt;</description></item><item><title>關聯式資料建模</title><link>https://example.org/zh-tw/mysql-data-modeling/</link><pubDate>Sat, 04 Jan 2025 20:27:25 +0800</pubDate><guid>https://example.org/zh-tw/mysql-data-modeling/</guid><description>&lt;p&gt;實體關係模型會在選擇資料表之前，識別實體類型、其屬性與關係。接著，關聯式綱要會以定義的粒度將每個事實表示一次。例如，&lt;code&gt;order_line&lt;/code&gt; 表示一筆訂單中的一個產品，而 &lt;code&gt;order&lt;/code&gt; 表示訂單標頭。&lt;/p&gt;
+&lt;h2 id="實體鍵與關係"&gt;
+ 實體、鍵與關係
+ &lt;a href="#%e5%af%a6%e9%ab%94%e9%8d%b5%e8%88%87%e9%97%9c%e4%bf%82" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每個資料表都需要一個能唯一識別其資料列的候選鍵。選擇主鍵時，應確保它穩定、不可為 NULL，且適合用於聯結。使用代理鍵並不代表不需要針對自然的業務識別建立唯一性約束，例如帳戶的外部識別碼。&lt;/p&gt;
+&lt;p&gt;依照以下方式對應關係基數：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;對於一對一關係，將 &lt;code&gt;UNIQUE&lt;/code&gt; 外鍵放在可選的一方；如果兩個資料表的生命週期與存取控制一致，也可以合併資料表。&lt;/li&gt;
+&lt;li&gt;對於一對多關係，將外鍵放在多方資料表中。&lt;/li&gt;
+&lt;li&gt;對於多對多關係，建立一個關聯資料表，其中包含指向兩個實體的外鍵，以及屬於該關係的屬性。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div
+ class="goat svg-container"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 448 73"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 0,0 L 88,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,0 L 432,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,16 L 320,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,48 L 88,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,48 L 432,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,0 L 0,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,0 L 88,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,16 L 88,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,0 L 328,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 432,0 L 432,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='328.000000,16.000000 316.000000,10.400000 316.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 320.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;text text-anchor='middle' x='16' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='36' fill='currentColor' style='font-size:1em'&gt;(&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='36' fill='currentColor' style='font-size:1em'&gt;P&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='36' fill='currentColor' style='font-size:1em'&gt;K&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='36' fill='currentColor' style='font-size:1em'&gt;)&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='4' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='4' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='4' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='4' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='4' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='4' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='4' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='36' fill='currentColor' style='font-size:1em'&gt;q&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='36' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='36' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='20' fill='currentColor' style='font-size:1em'&gt;_&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='36' fill='currentColor' style='font-size:1em'&gt;_&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='20' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='408' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='36' fill='currentColor' style='font-size:1em'&gt;F&lt;/text&gt;
+&lt;text text-anchor='middle' x='424' y='36' fill='currentColor' style='font-size:1em'&gt;K&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;p&gt;&lt;code&gt;NOT NULL&lt;/code&gt; 表示必須參與該關係。可為 NULL 的外鍵表示對該資料列而言，該關係是可選的。外鍵約束可以防止孤立參照，而 &lt;code&gt;ON DELETE&lt;/code&gt; 行為必須反映業務規則：限制刪除、串聯刪除、設為 NULL，或在明確的工作流程中處理刪除。&lt;/p&gt;</description></item><item><title>MySQL 字串型別與字元集</title><link>https://example.org/zh-tw/mysql-string-types/</link><pubDate>Sat, 07 Sep 2024 23:40:56 +0800</pubDate><guid>https://example.org/zh-tw/mysql-string-types/</guid><description>&lt;p&gt;MySQL 字串欄位同時具有邏輯字元限制與實體位元組表示。將這兩個概念分開，可以避免多語言文字與索引產生許多意外。&lt;/p&gt;
+&lt;h2 id="char-與-varchar"&gt;
+ &lt;code&gt;CHAR&lt;/code&gt; 與 &lt;code&gt;VARCHAR&lt;/code&gt;
+ &lt;a href="#char-%e8%88%87-varchar" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;CHAR(n)&lt;/code&gt; 是固定長度的字元字串。MySQL 會依宣告長度填補值以符合儲存語意，因此它適合真正固定寬度的值，例如國家代碼。&lt;code&gt;VARCHAR(n)&lt;/code&gt; 是可變長度，通常是名稱、標籤及其他長度會變動的文字之較佳預設選擇。&lt;/p&gt;
+&lt;p&gt;在這兩種型別中，&lt;code&gt;n&lt;/code&gt; 都是最大&lt;strong&gt;字元&lt;/strong&gt;數，而不是位元組數。因此，當字元集支援時，&lt;code&gt;VARCHAR(10)&lt;/code&gt; 欄位可以容納十個表情符號或十個中文字，即使這些字元在磁碟上使用超過十個位元組。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; profile (
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; country_code CHAR(&lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; display_name VARCHAR(&lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;) CHARACTER &lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; utf8mb4;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="text-型別"&gt;
+ &lt;code&gt;TEXT&lt;/code&gt; 型別
+ &lt;a href="#text-%e5%9e%8b%e5%88%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;較大的可變長度文字可使用 &lt;code&gt;TINYTEXT&lt;/code&gt;、&lt;code&gt;TEXT&lt;/code&gt;、&lt;code&gt;MEDIUMTEXT&lt;/code&gt; 或 &lt;code&gt;LONGTEXT&lt;/code&gt;。它們的限制以位元組計算，因此實際字元容量取決於欄位字元集。&lt;code&gt;TEXT&lt;/code&gt; 欄位可以建立索引，但較大的或較舊的 MySQL 設定可能需要索引前綴；在以長文字設計索引前，應檢查儲存引擎與 MySQL 版本。&lt;/p&gt;
+&lt;h2 id="字元集與定序"&gt;
+ 字元集與定序
+ &lt;a href="#%e5%ad%97%e5%85%83%e9%9b%86%e8%88%87%e5%ae%9a%e5%ba%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;字元集定義字元如何編碼為位元組。對新的 MySQL 應用程式而言，&lt;code&gt;utf8mb4&lt;/code&gt; 通常是安全選擇，因為它支援完整的 Unicode 範圍。MySQL 歷史上的 &lt;code&gt;utf8&lt;/code&gt; 名稱可能指三位元組實作，無法表示每個 Unicode 字元。&lt;/p&gt;
+&lt;p&gt;定序定義字元集的比較與排序規則。它決定比較是否區分大小寫或重音，以及字串如何排序。字元集與定序可以在伺服器、資料庫、資料表或欄位層級設定；明確的資料表或欄位設定能讓應用程式的預期更清楚。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; article (
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; title VARCHAR(&lt;span style="color:#ae81ff"&gt;255&lt;/span&gt;) CHARACTER &lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; utf8mb4
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;COLLATE&lt;/span&gt; utf8mb4_0900_ai_ci &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;依應用程式需要的比較方式選擇定序。對識別碼而言，二進位或區分大小寫的比較可能適當；對面向使用者的搜尋而言，不區分重音與大小寫的定序可能較合適。&lt;/p&gt;</description></item><item><title>MySQL 索引</title><link>https://example.org/zh-tw/mysql-indexes/</link><pubDate>Thu, 16 Jun 2022 20:46:43 +0800</pubDate><guid>https://example.org/zh-tw/mysql-indexes/</guid><description>&lt;p&gt;InnoDB 使用 B+ 樹實作主索引與次要索引。當索引順序符合選擇性述詞、聯結、範圍掃描或排序需求時，索引可降低 I/O；但每個已索引資料列都會增加寫入工作與儲存空間。&lt;/p&gt;
+&lt;h2 id="叢集索引與次要索引"&gt;
+ 叢集索引與次要索引
+ &lt;a href="#%e5%8f%a2%e9%9b%86%e7%b4%a2%e5%bc%95%e8%88%87%e6%ac%a1%e8%a6%81%e7%b4%a2%e5%bc%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 資料表會將資料列儲存在其叢集索引中。InnoDB 會選擇宣告的主索引鍵；否則會選擇第一個合適的非 NULL 唯一索引鍵，或建立內部隱藏索引鍵。請宣告短且穩定的主索引鍵，因為每個次要索引項目都會儲存主索引鍵值。&lt;/p&gt;
+&lt;p&gt;次要索引會儲存其索引欄位與主索引鍵值。需要次要索引中不存在欄位的查詢，會為每個相符項目執行叢集索引查詢。只有在能移除已量測成本時才加入涵蓋索引；較寬的索引會降低頁面扇出並增加寫入負荷。&lt;/p&gt;
+&lt;h2 id="複合索引"&gt;
+ 複合索引
+ &lt;a href="#%e8%a4%87%e5%90%88%e7%b4%a2%e5%bc%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;對於 &lt;code&gt;(tenant_id, created_at, id)&lt;/code&gt;，B+ 樹可以有效定位：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;它無法只從 &lt;code&gt;created_at&lt;/code&gt; 有效搜尋，因為樹的順序以 &lt;code&gt;tenant_id&lt;/code&gt; 開始。一般設計會讓等值述詞先於範圍述詞，接著放置滿足排序或涵蓋需求的欄位。請使用 &lt;code&gt;EXPLAIN ANALYZE&lt;/code&gt; 驗證選擇；索引順序取決於實際述詞、資料分布與結果大小。&lt;/p&gt;
+&lt;h2 id="索引類型與診斷"&gt;
+ 索引類型與診斷
+ &lt;a href="#%e7%b4%a2%e5%bc%95%e9%a1%9e%e5%9e%8b%e8%88%87%e8%a8%ba%e6%96%b7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;UNIQUE&lt;/code&gt; 除了建立存取路徑，也會強制執行不變量。大多數 InnoDB 索引都是 B 樹。&lt;code&gt;FULLTEXT&lt;/code&gt; 索引支援以 token 為基礎的文字搜尋，而幾何值上的 &lt;code&gt;SPATIAL&lt;/code&gt; 索引使用 R 樹。MySQL 也描述 &lt;code&gt;MEMORY&lt;/code&gt; 引擎的雜湊索引；InnoDB 不公開一般雜湊索引，但其自適應雜湊索引可以將頻繁存取的 B 樹頁面快取為內部最佳化。前綴索引可以減少長文字鍵的位元組大小，但前提是所選前綴仍具選擇性。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXPLAIN&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ANALYZE&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id, created_at
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; event
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;7&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;2026-01-01&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;LIMIT&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;請檢查實際資料列、迴圈次數與計時，而不要假設會使用索引。統計資料、基數估計與小型結果集可能使資料表掃描比索引走訪更便宜。&lt;/p&gt;</description></item><item><title>MySQL 資料表與檢視表</title><link>https://example.org/zh-tw/mysql-tables-and-views/</link><pubDate>Thu, 09 Sep 2021 08:09:41 +0800</pubDate><guid>https://example.org/zh-tw/mysql-tables-and-views/</guid><description>&lt;p&gt;基礎資料表會持久儲存資料列。檢視表會持久儲存查詢定義，並將其結果呈現為
+類似資料表的物件。&lt;code&gt;SHOW FULL TABLES&lt;/code&gt; 可區分兩者，而
+&lt;code&gt;INFORMATION_SCHEMA.TABLES.TABLE_TYPE&lt;/code&gt; 會回報 &lt;code&gt;BASE TABLE&lt;/code&gt; 或 &lt;code&gt;VIEW&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="innodb-資料列格式"&gt;
+ InnoDB 資料列格式
+ &lt;a href="#innodb-%e8%b3%87%e6%96%99%e5%88%97%e6%a0%bc%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 支援 &lt;code&gt;REDUNDANT&lt;/code&gt;、&lt;code&gt;COMPACT&lt;/code&gt;、&lt;code&gt;DYNAMIC&lt;/code&gt; 和 &lt;code&gt;COMPRESSED&lt;/code&gt; 資料列
+格式。目前的預設值是 &lt;code&gt;DYNAMIC&lt;/code&gt;。對於可變長度欄位，InnoDB 可以將較長的值
+儲存在溢位頁面中，並在叢集索引記錄中保留參照。確切的行內與溢位行為取決於
+資料列格式、頁面大小、欄位型別和值的長度；結構描述設計不應假設
+&lt;code&gt;TEXT&lt;/code&gt; 或 &lt;code&gt;BLOB&lt;/code&gt; 值會在資料列內占用固定大小。&lt;/p&gt;
+&lt;p&gt;檢查資料表的實際設定：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SHOW&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; STATUS &lt;span style="color:#66d9ef"&gt;LIKE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;orders&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SHOW&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; orders;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="檢視表"&gt;
+ 檢視表
+ &lt;a href="#%e6%aa%a2%e8%a6%96%e8%a1%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用穩定且明確的欄位清單建立檢視表：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;VIEW&lt;/span&gt; active_customer_orders &lt;span style="color:#66d9ef"&gt;AS&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; o.id, o.customer_id, o.created_at, o.total
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; orders &lt;span style="color:#66d9ef"&gt;AS&lt;/span&gt; o
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; o.status &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;active&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;檢視表預設不會儲存獨立的資料表。最佳化器可以將可合併的檢視表併入外層
+查詢；當定義有所要求時，也可以將其具體化為暫存資料表，例如使用彙總、
+&lt;code&gt;DISTINCT&lt;/code&gt; 或某些衍生資料表操作時。&lt;code&gt;ALGORITHM = MERGE&lt;/code&gt; 和
+&lt;code&gt;ALGORITHM = TEMPTABLE&lt;/code&gt; 表示偏好的方式，但檢視表定義仍必須符合所選
+演算法的限制。&lt;/p&gt;
+&lt;p&gt;當每個受影響的資料列都能明確對應至一個基礎資料表時，部分檢視表可以更新。
+包含彙總、&lt;code&gt;GROUP BY&lt;/code&gt;、&lt;code&gt;DISTINCT&lt;/code&gt;、視窗函式、集合運算或不可更新聯結的
+檢視表無法更新。若檢視表的更新行為並非必要介面的一部分，請使用基礎資料表
+進行寫入。&lt;/p&gt;</description></item><item><title>MySQL 變數與預備陳述式</title><link>https://example.org/zh-tw/mysql-variables/</link><pubDate>Thu, 24 Jun 2021 18:18:18 +0800</pubDate><guid>https://example.org/zh-tw/mysql-variables/</guid><description>&lt;p&gt;MySQL 區分伺服器系統變數、區域常式變數與工作階段使用者變數。它們的範圍與評估規則不同，因此不應互換使用。&lt;/p&gt;
+&lt;h2 id="系統與使用者變數"&gt;
+ 系統與使用者變數
+ &lt;a href="#%e7%b3%bb%e7%b5%b1%e8%88%87%e4%bd%bf%e7%94%a8%e8%80%85%e8%ae%8a%e6%95%b8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;系統變數使用 &lt;code&gt;@@&lt;/code&gt;，可能具有全域、工作階段或兩者範圍：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.sql_mode;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; sql_safe_updates &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;變更全域變數會影響新的工作階段（當該變數也具有工作階段範圍時）；它不是變更現有連線交易原則的方法。動態變數可在執行時變更，而唯讀變數需要啟動設定。&lt;code&gt;SET PERSIST&lt;/code&gt; 會變更執行期全域值並寫入 &lt;code&gt;mysqld-auto.cnf&lt;/code&gt;；&lt;code&gt;SET PERSIST_ONLY&lt;/code&gt; 會寫入持久化值，但不變更執行期狀態。使用任一形式前，請確認變數可以持久化，並讓檔案擁有權由伺服器維持，不要編輯該產生的檔案。&lt;/p&gt;
+&lt;p&gt;使用者變數使用 &lt;code&gt;@name&lt;/code&gt;，以連線為區域，且沒有宣告型別：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;minimum_total &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id &lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; orders &lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; total &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;minimum_total;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;不要在同一運算式或查詢中指派並讀取相同的使用者變數，以模擬程序式評估。MySQL 不保證能使這類查詢可靠的評估順序。請改用視窗函數、通用表運算式、儲存程式區域變數或應用程式程式碼。值的型別會在指派時衍生，而預備陳述式參照會保留陳述式首次預備時建立的變數型別。需要的 SQL 型別屬於契約時，請明確使用 &lt;code&gt;CAST&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="預備陳述式"&gt;
+ 預備陳述式
+ &lt;a href="#%e9%a0%90%e5%82%99%e9%99%b3%e8%bf%b0%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;用戶端函式庫預備陳述式會將資料與 SQL 語法分開繫結，應是應用程式查詢的預設方式。它們能防止值被解讀為注入的 SQL，並讓伺服器分開剖析陳述式結構。&lt;/p&gt;
+&lt;p&gt;伺服器端 SQL 預備陳述式遵循以連線為範圍的生命週期：&lt;code&gt;PREPARE&lt;/code&gt; 會剖析一個陳述式，&lt;code&gt;EXECUTE&lt;/code&gt; 會重複執行它，而 &lt;code&gt;DEALLOCATE PREPARE&lt;/code&gt; 會釋放它。同名的第二次 &lt;code&gt;PREPARE&lt;/code&gt; 會先解除配置舊陳述式。工作階段結束時，預備陳述式也會被捨棄。當識別碼必須組合時，它們適合用於管理用途的動態 SQL。參數標記會繫結資料值，而不是識別碼、關鍵字或 SQL 片段：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;sql&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;SELECT id FROM orders WHERE customer_id = ?&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;PREPARE&lt;/span&gt; stmt &lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;sql&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;customer_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXECUTE&lt;/span&gt; stmt &lt;span style="color:#66d9ef"&gt;USING&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;customer_id;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;DEALLOCATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;PREPARE&lt;/span&gt; stmt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;將任何動態識別碼串接至 SQL 前，請先驗證或使用允許清單。參數標記不能在每個文法位置代表任意運算式，而預備陳述式數量受 &lt;code&gt;max_prepared_stmt_count&lt;/code&gt; 限制。釋放短生命週期的管理陳述式，並讓應用程式驅動程式管理自己的預備陳述式控制代碼。&lt;/p&gt;</description></item><item><title>MySQL 伺服器與資料型別</title><link>https://example.org/zh-tw/mysql-overview/</link><pubDate>Wed, 06 Jan 2021 12:27:16 +0800</pubDate><guid>https://example.org/zh-tw/mysql-overview/</guid><description>&lt;p&gt;MySQL 將伺服器初始化、結構描述定義與連線設定分開。正式環境安裝應只初始化一次空的資料目錄，將設定儲存在該目錄之外，並透過平台服務管理員管理伺服器。&lt;code&gt;mysqld --initialize&lt;/code&gt; 會建立資料字典與初始管理帳戶，但不會設定應用程式結構描述或權限。&lt;/p&gt;
+&lt;h2 id="帳戶授權與角色"&gt;
+ 帳戶、授權與角色
+ &lt;a href="#%e5%b8%b3%e6%88%b6%e6%8e%88%e6%ac%8a%e8%88%87%e8%a7%92%e8%89%b2" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL 同時根據使用者與主機識別帳戶，因此 &lt;code&gt;'app'@'localhost'&lt;/code&gt; 與 &lt;code&gt;'app'@'10.%'&lt;/code&gt; 是不同的身分。建立帳戶時應明確指定驗證原則：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;USER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;IF&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;EXISTS&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; IDENTIFIED &lt;span style="color:#66d9ef"&gt;WITH&lt;/span&gt; caching_sha2_password &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;generated-secret&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在 MySQL 8 中，&lt;code&gt;CREATE USER&lt;/code&gt; 會建立身分，而 &lt;code&gt;GRANT&lt;/code&gt; 會指派權限；&lt;code&gt;GRANT&lt;/code&gt; 不會建立帳戶。主機比對會在驗證之前進行，之後由角色與直接授予的權限決定授權結果。使用 &lt;code&gt;SHOW GRANTS&lt;/code&gt; 檢查有效權限。角色會將權限分組，以便在多個帳戶之間重複使用：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ROLE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;GRANT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ON&lt;/span&gt; app.orders &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;GRANT&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;DEFAULT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ROLE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;將帳戶管理置於應用程式移轉資料表之外。應用程式結構描述不應依賴臨時的權限變更來維持有效。&lt;/p&gt;
+&lt;h2 id="數值型別"&gt;
+ 數值型別
+ &lt;a href="#%e6%95%b8%e5%80%bc%e5%9e%8b%e5%88%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;應根據取值範圍而非顯示寬度選擇整數型別。&lt;code&gt;TINYINT&lt;/code&gt;、&lt;code&gt;SMALLINT&lt;/code&gt;、&lt;code&gt;MEDIUMINT&lt;/code&gt;、&lt;code&gt;INT&lt;/code&gt; 與 &lt;code&gt;BIGINT&lt;/code&gt; 分別使用 1、2、3、4 與 8 位元組。無號型別會將範圍調整為非負值，但會產生跨資料庫可攜性的疑慮。&lt;code&gt;BOOLEAN&lt;/code&gt; 與 &lt;code&gt;BOOL&lt;/code&gt; 是 &lt;code&gt;TINYINT(1)&lt;/code&gt; 的別名。&lt;/p&gt;
+&lt;p&gt;對於貨幣等需要十進位運算的數量，請使用 &lt;code&gt;DECIMAL(p, s)&lt;/code&gt;。&lt;code&gt;p&lt;/code&gt; 是十進位總位數，&lt;code&gt;s&lt;/code&gt; 是小數點後的位數。&lt;code&gt;FLOAT&lt;/code&gt; 與 &lt;code&gt;DOUBLE&lt;/code&gt; 代表二進位浮點值，可能會對十進位小數進行捨入；請勿將其用於對相等性敏感的貨幣值。&lt;/p&gt;
+&lt;h2 id="時間型別與結構化值"&gt;
+ 時間型別與結構化值
+ &lt;a href="#%e6%99%82%e9%96%93%e5%9e%8b%e5%88%a5%e8%88%87%e7%b5%90%e6%a7%8b%e5%8c%96%e5%80%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DATE&lt;/code&gt; 儲存日曆日期；&lt;code&gt;TIME&lt;/code&gt; 儲存時間或持續時間。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DATETIME&lt;/code&gt; 儲存字面日期與時間，不進行時區轉換。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;TIMESTAMP&lt;/code&gt; 以時間瞬間儲存，並針對支援的值在工作階段時區與 UTC 之間轉換。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;JSON&lt;/code&gt; 會驗證 JSON 並提供 JSON 函式，但其中的值不能取代用於聯結與索引的關聯式欄位。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;當值表示本地預約時，請使用 &lt;code&gt;DATETIME&lt;/code&gt; 加上明確的業務時區。對於事件發生的時間瞬間，請使用 UTC &lt;code&gt;TIMESTAMP&lt;/code&gt; 或 UTC &lt;code&gt;DATETIME&lt;/code&gt;，並明確定義應用程式進行轉換的邊界。&lt;/p&gt;</description></item></channel></rss>

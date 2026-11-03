@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Spring-Boot on cesun.life</title><link>https://example.org/zh-tw/tags/spring-boot/</link><description>Recent content in Spring-Boot on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Mon, 17 Aug 2026 10:18:23 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/spring-boot/index.xml" rel="self" type="application/rss+xml"/><item><title>測試 Spring Boot REST API</title><link>https://example.org/zh-tw/testing-spring-boot-rest-apis/</link><pubDate>Mon, 17 Aug 2026 10:18:23 +0800</pubDate><guid>https://example.org/zh-tw/testing-spring-boot-rest-apis/</guid><description>&lt;p&gt;測試 Spring Boot REST API 需要多個範圍，因為直接的 Java 呼叫、模擬的 MVC 要求，以及透過執行中伺服器發出的要求，會分別驗證不同的失敗邊界。有效的測試套件應將大多數行為檢查放在 Spring 內容之外，然後再加入範圍較窄的 Web 切片測試，以及少量的完整應用程式測試。&lt;/p&gt;
+&lt;p&gt;相依性範例以 Spring Boot 3.x 為目標，因為其測試 starter 使用 JUnit 5。Spring Boot 4 管理 JUnit 6；Jupiter 概念仍然適用，但數個 Boot 測試註解的套件名稱已變更。&lt;/p&gt;
+&lt;h2 id="不使用測試框架進行測試"&gt;
+ 不使用測試框架進行測試
+ &lt;a href="#%e4%b8%8d%e4%bd%bf%e7%94%a8%e6%b8%ac%e8%a9%a6%e6%a1%86%e6%9e%b6%e9%80%b2%e8%a1%8c%e6%b8%ac%e8%a9%a6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;REST API 不需要 JUnit、Spring Test 或 Mockito 也能進行檢查。啟動應用程式，使用 JDK HTTP 用戶端傳送要求，並在回應違反契約時擲出錯誤：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;package&lt;/span&gt; com.example;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import&lt;/span&gt; java.net.URI;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import&lt;/span&gt; java.net.http.HttpClient;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import&lt;/span&gt; java.net.http.HttpRequest;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import&lt;/span&gt; java.net.http.HttpResponse;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;ManualApiCheck&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;main&lt;/span&gt;(String&lt;span style="color:#f92672"&gt;[]&lt;/span&gt; args) &lt;span style="color:#66d9ef"&gt;throws&lt;/span&gt; Exception {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; request &lt;span style="color:#f92672"&gt;=&lt;/span&gt; HttpRequest.&lt;span style="color:#a6e22e"&gt;newBuilder&lt;/span&gt;()
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .&lt;span style="color:#a6e22e"&gt;uri&lt;/span&gt;(URI.&lt;span style="color:#a6e22e"&gt;create&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;http://localhost:8080/greetings/Ada&amp;#34;&lt;/span&gt;))
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .&lt;span style="color:#a6e22e"&gt;header&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;Accept&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;application/json&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .&lt;span style="color:#a6e22e"&gt;GET&lt;/span&gt;()
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .&lt;span style="color:#a6e22e"&gt;build&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; response &lt;span style="color:#f92672"&gt;=&lt;/span&gt; HttpClient.&lt;span style="color:#a6e22e"&gt;newHttpClient&lt;/span&gt;().&lt;span style="color:#a6e22e"&gt;send&lt;/span&gt;(
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; request, HttpResponse.&lt;span style="color:#a6e22e"&gt;BodyHandlers&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;ofString&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (response.&lt;span style="color:#a6e22e"&gt;statusCode&lt;/span&gt;() &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; 200) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;throw&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; AssertionError(&lt;span style="color:#e6db74"&gt;&amp;#34;status: &amp;#34;&lt;/span&gt; &lt;span style="color:#f92672"&gt;+&lt;/span&gt; response.&lt;span style="color:#a6e22e"&gt;statusCode&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (&lt;span style="color:#f92672"&gt;!&lt;/span&gt;response.&lt;span style="color:#a6e22e"&gt;body&lt;/span&gt;().&lt;span style="color:#a6e22e"&gt;equals&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;{\&amp;#34;message\&amp;#34;:\&amp;#34;Hello, Ada\&amp;#34;}&amp;#34;&lt;/span&gt;)) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;throw&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; AssertionError(&lt;span style="color:#e6db74"&gt;&amp;#34;body: &amp;#34;&lt;/span&gt; &lt;span style="color:#f92672"&gt;+&lt;/span&gt; response.&lt;span style="color:#a6e22e"&gt;body&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Java 的 &lt;code&gt;assert&lt;/code&gt; 陳述式可以取代明確檢查，但除非 JVM 以 &lt;code&gt;-ea&lt;/code&gt; 啟動，否則斷言會被停用。因此，明確的 &lt;code&gt;AssertionError&lt;/code&gt; 能提供可靠的程序結束碼。&lt;/p&gt;</description></item><item><title>不使用 Spring MVC 的 Thymeleaf</title><link>https://example.org/zh-tw/thymeleaf-without-mvc/</link><pubDate>Sun, 10 May 2026 10:03:32 +0800</pubDate><guid>https://example.org/zh-tw/thymeleaf-without-mvc/</guid><description>&lt;p&gt;即使不使用 Spring MVC，Thymeleaf 也能在批次工作、命令列程式、郵件服務或報表管線中呈現 HTML。獨立應用程式會設定範本解析器和 &lt;code&gt;TemplateEngine&lt;/code&gt;，提供內容環境，並將呈現後的輸出寫入目的地。&lt;/p&gt;
+&lt;h2 id="選擇整合層級"&gt;
+ 選擇整合層級
+ &lt;a href="#%e9%81%b8%e6%93%87%e6%95%b4%e5%90%88%e5%b1%a4%e7%b4%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;非 Spring 程式需要 Thymeleaf 核心構件：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;xml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-xml" data-lang="xml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;dependency&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;groupId&amp;gt;&lt;/span&gt;org.thymeleaf&lt;span style="color:#f92672"&gt;&amp;lt;/groupId&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;artifactId&amp;gt;&lt;/span&gt;thymeleaf&lt;span style="color:#f92672"&gt;&amp;lt;/artifactId&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;version&amp;gt;&lt;/span&gt;3.1.3.RELEASE&lt;span style="color:#f92672"&gt;&amp;lt;/version&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;/dependency&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Spring 應用程式可以使用 &lt;code&gt;thymeleaf-spring6&lt;/code&gt; 和 &lt;code&gt;SpringTemplateEngine&lt;/code&gt;，以支援 Spring EL、&lt;code&gt;MessageSource&lt;/code&gt;、轉換，以及感知 Spring 的連結行為。Spring Boot 的相依性管理應選擇相符的 Thymeleaf 版本。需要這些整合功能時，&lt;code&gt;spring-boot-starter-thymeleaf&lt;/code&gt; 很方便，但執行核心引擎並不需要它，也不需要 MVC。&lt;/p&gt;
+&lt;h2 id="設定解析器和引擎"&gt;
+ 設定解析器和引擎
+ &lt;a href="#%e8%a8%ad%e5%ae%9a%e8%a7%a3%e6%9e%90%e5%99%a8%e5%92%8c%e5%bc%95%e6%93%8e" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;選擇符合範本管理方式的解析器。&lt;code&gt;ClassLoaderTemplateResolver&lt;/code&gt; 適合封裝在 JAR 中且不可變更的範本；&lt;code&gt;FileTemplateResolver&lt;/code&gt; 適合由操作人員管理的檔案：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; resolver &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ClassLoaderTemplateResolver();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;resolver.&lt;span style="color:#a6e22e"&gt;setPrefix&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;reports/&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;resolver.&lt;span style="color:#a6e22e"&gt;setSuffix&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;.html&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;resolver.&lt;span style="color:#a6e22e"&gt;setTemplateMode&lt;/span&gt;(TemplateMode.&lt;span style="color:#a6e22e"&gt;HTML&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;resolver.&lt;span style="color:#a6e22e"&gt;setCharacterEncoding&lt;/span&gt;(StandardCharsets.&lt;span style="color:#a6e22e"&gt;UTF_8&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;name&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;resolver.&lt;span style="color:#a6e22e"&gt;setCacheable&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;true&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; engine &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; TemplateEngine();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;engine.&lt;span style="color:#a6e22e"&gt;setTemplateResolver&lt;/span&gt;(resolver);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;引擎應設定一次，然後共用。Thymeleaf 文件將完整設定的 &lt;code&gt;TemplateEngine&lt;/code&gt; 說明為具備執行緒安全性；但在開始處理後變更設定並不受支援。對於穩定的正式環境範本，請啟用快取。只有在開發或操作期間必須重新讀取檔案時，才停用快取，或設定有效期受限的快取。&lt;/p&gt;
+&lt;p&gt;解析器上的字元編碼控制範本位元組的解碼方式。輸出 &lt;code&gt;Writer&lt;/code&gt; 使用的編碼則獨立控制產生檔案的位元組，因此請明確設定兩者。&lt;/p&gt;
+&lt;h2 id="呈現異質的報表資料"&gt;
+ 呈現異質的報表資料
+ &lt;a href="#%e5%91%88%e7%8f%be%e7%95%b0%e8%b3%aa%e7%9a%84%e5%a0%b1%e8%a1%a8%e8%b3%87%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;不要在 Java 中建構 HTML，而應公開符合領域模型形狀的值：&lt;/p&gt;</description></item><item><title>AgentScope</title><link>https://example.org/zh-tw/agentscope/</link><pubDate>Fri, 05 May 2023 11:54:52 +0800</pubDate><guid>https://example.org/zh-tw/agentscope/</guid><description>&lt;p&gt;&lt;a href="https://github.com/agentscope-ai/agentscope"&gt;AgentScope&lt;/a&gt; 是一個用於建構與執行應用程式的開放原始碼框架。在這些應用程式中，大型語言模型可以進行推理、呼叫工具、保留狀態，並與使用者或其他代理程式協作。它由阿里巴巴發起，並以獨立的 Python 與 Java 專案形式提供。&lt;/p&gt;
+&lt;p&gt;一般的模型呼叫具有一條由應用程式控制的短路徑：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;application -&amp;gt; prompt -&amp;gt; model -&amp;gt; response&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;代理程式會加入一個執行迴圈：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;user goal
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;model reasons -&amp;gt; chooses a tool -&amp;gt; application executes it
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ^ |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; +----------- tool result &amp;lt;---------+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;final answer, interruption, or next action&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;模型本身仍不會執行 Java 或 Python 函式。它會輸出結構化請求，而 AgentScope 會透過其工具系統驗證並分派該請求。框架也會管理圍繞這個迴圈的訊息、事件串流、權限、工作階段狀態，以及重複的模型呼叫。&lt;/p&gt;
+&lt;p&gt;本文介紹 AgentScope 2.0，並聚焦於 &lt;a href="https://github.com/agentscope-ai/agentscope-java"&gt;AgentScope Java&lt;/a&gt; 2.0.0。AgentScope 發展快速，因此針對早期 1.x API 的範例可能無法直接運作。&lt;/p&gt;
+&lt;h2 id="python-與-java-是分開的實作"&gt;
+ Python 與 Java 是分開的實作
+ &lt;a href="#python-%e8%88%87-java-%e6%98%af%e5%88%86%e9%96%8b%e7%9a%84%e5%af%a6%e4%bd%9c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;AgentScope 這個名稱指的是一個生態系統，而不是一個能在所有語言中原樣執行的函式庫。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Computer Architecture on cesun.life</title><link>https://example.org/ja/tags/computer-architecture/</link><description>Recent content in Computer Architecture on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sat, 07 Jun 2025 09:28:40 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/computer-architecture/index.xml" rel="self" type="application/rss+xml"/><item><title>ARMアーキテクチャ入門</title><link>https://example.org/ja/arm-architecture/</link><pubDate>Sat, 07 Jun 2025 09:28:40 +0800</pubDate><guid>https://example.org/ja/arm-architecture/</guid><description>&lt;p&gt;Armは、単一のプロセッサ実装ではなく、命令セットアーキテクチャ（ISA）のファミリを定義します。アーキテクチャは、プログラマから見える状態、命令の意味論、例外、特権、およびメモリ順序を規定します。コアのパイプライン、キャッシュ階層、分岐予測器は、マイクロアーキテクチャ上の選択です。&lt;/p&gt;
+&lt;p&gt;アーキテクチャプロファイルは、配置要件を分離します。A-profileは仮想メモリを備えたアプリケーションプロセッサを対象とし、R-profileはリアルタイムシステムを対象とし、M-profileはマイクロコントローラを対象とします。以下の実行状態と特権モデルは、特に記載がない限りA-profileシステムについて説明します。&lt;/p&gt;
+&lt;h2 id="実行状態と命令セット"&gt;
+ 実行状態と命令セット
+ &lt;a href="#%e5%ae%9f%e8%a1%8c%e7%8a%b6%e6%85%8b%e3%81%a8%e5%91%bd%e4%bb%a4%e3%82%bb%e3%83%83%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;strong&gt;AArch32&lt;/strong&gt;は32ビットの汎用レジスタを提供し、A32命令セット、または歴史的にThumbと呼ばれていた可変長のT32命令セットを実行できます。Armv8-Aで導入された&lt;strong&gt;AArch64&lt;/strong&gt;は、31本の64ビット汎用レジスタと、固定長のA64命令セットを提供します。&lt;code&gt;X0&lt;/code&gt;から&lt;code&gt;X30&lt;/code&gt;は64ビットレジスタを表し、&lt;code&gt;W0&lt;/code&gt;から&lt;code&gt;W30&lt;/code&gt;はそれぞれの下位32ビットを表します。&lt;code&gt;W&lt;/code&gt;レジスタへの書き込みは、対応する&lt;code&gt;X&lt;/code&gt;レジスタの上位半分をクリアします。&lt;/p&gt;
+&lt;p&gt;プロセッサは複数の実行状態を実装できますが、製品が64ビットに対応していることからサポート状態を推測することはできません。Armv8-Aでは、AArch64オペレーティングシステムがAArch32アプリケーションをサポートすることが認められていましたが、後のアーキテクチャバージョンでは、選択した例外レベルでAArch32を実装しないことが認められています。したがってソフトウェアは、利用可能な状態を判断するために、プラットフォームのドキュメントとオペレーティングシステムのインターフェースを使用する必要があります。&lt;/p&gt;
+&lt;p&gt;実行状態はレジスタ幅だけで構成されるものではありません。AArch32とAArch64では、命令エンコーディング、例外モデル、システムレジスタ、ABIが異なります。通常の分岐で状態を切り替えることはできません。例外からの復帰、またはアーキテクチャで定義された別の遷移によって、遷移先の状態を確立する必要があります。&lt;/p&gt;
+&lt;h2 id="レジスタとプロシージャ呼び出し"&gt;
+ レジスタとプロシージャ呼び出し
+ &lt;a href="#%e3%83%ac%e3%82%b8%e3%82%b9%e3%82%bf%e3%81%a8%e3%83%97%e3%83%ad%e3%82%b7%e3%83%bc%e3%82%b8%e3%83%a3%e5%91%bc%e3%81%b3%e5%87%ba%e3%81%97" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;A64はロード・ストアISAです。算術演算はレジスタ上で実行され、明示的なロード命令とストア命令がメモリにアクセスします。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;asm&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-asm" data-lang="asm"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;ldr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;w0&lt;/span&gt;, [&lt;span style="color:#66d9ef"&gt;x1&lt;/span&gt;] &lt;span style="color:#75715e"&gt;// 32ビット値をロード
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;add&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;w0&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;w0&lt;/span&gt;, &lt;span style="color:#75715e"&gt;#1
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;str&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;w0&lt;/span&gt;, [&lt;span style="color:#66d9ef"&gt;x1&lt;/span&gt;]&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;複数のレジスタ名には、アーキテクチャ上または慣例上の役割があります。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;レジスタ&lt;/th&gt;
+ &lt;th&gt;AAPCS64での役割&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;X0&lt;/code&gt;-&lt;code&gt;X7&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;整数の引数と戻り値&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;X8&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;間接結果格納先レジスタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;X9&lt;/code&gt;-&lt;code&gt;X15&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;呼び出し側保存の一時レジスタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;X16&lt;/code&gt;-&lt;code&gt;X17&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;プロシージャ内呼び出し用の一時レジスタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;X18&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;プラットフォームレジスタまたは一時レジスタ（プラットフォームABIに依存）&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;X19&lt;/code&gt;-&lt;code&gt;X28&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;呼び出し先保存レジスタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;X29&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;慣例上のフレームポインタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;X30&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;リンクレジスタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;SP&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;スタックポインタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;BL&lt;/code&gt;は戻りアドレスを&lt;code&gt;X30&lt;/code&gt;に書き込み、&lt;code&gt;RET&lt;/code&gt;は通常&lt;code&gt;X30&lt;/code&gt;を介して分岐します。Arm 64ビットアーキテクチャのプロシージャ呼び出し標準（AAPCS64）は、浮動小数点／ベクトル引数レジスタ、集約型の受け渡し、呼び出し先保存状態、16バイトのスタックアラインメントも定義します。これらの規則はABIの契約であり、A64命令構文の性質ではありません。コンパイル済みコードと相互運用する手書きアセンブリは、プラットフォームの完全なABIに従う必要があります。&lt;/p&gt;
+&lt;h2 id="例外レベルと遷移"&gt;
+ 例外レベルと遷移
+ &lt;a href="#%e4%be%8b%e5%a4%96%e3%83%ac%e3%83%99%e3%83%ab%e3%81%a8%e9%81%b7%e7%a7%bb" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;A-profileシステムは例外レベルを使用します。数値が大きいほど特権が高くなります。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;EL0&lt;/strong&gt;は非特権アプリケーションを実行します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;EL1&lt;/strong&gt;は通常、オペレーティングシステムカーネルを実行します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;EL2&lt;/strong&gt;はハイパーバイザ向けの仮想化制御を提供します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;EL3&lt;/strong&gt;は、実装されているシステムでセキュアモニタ機能を提供します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;実装がすべてのレベルを提供する必要はありません。セキュリティ状態と仮想化も、ELがアクセスできるリソースに影響します。そのため、EL番号だけでは完全な保護ドメインを表せません。&lt;/p&gt;
+&lt;p&gt;例外には、同期例外、IRQ、FIQ、システムエラーが含まれます。例外を取得すると、復帰アドレスと保存されたプロセッサ状態が&lt;code&gt;ELR_ELx&lt;/code&gt;と&lt;code&gt;SPSR_ELx&lt;/code&gt;に記録され、対象ELのベクタテーブルからエントリが選択され、選択された状態がマスクまたは変更されます。ハンドラがその状態を検証した後、&lt;code&gt;ERET&lt;/code&gt;は保存された状態を復元します。システムコールでは通常、&lt;code&gt;SVC&lt;/code&gt;を使用してEL1に入ります。ハイパーバイザ呼び出しとセキュアモニタ呼び出しでは、有効になっている場合に&lt;code&gt;HVC&lt;/code&gt;と&lt;code&gt;SMC&lt;/code&gt;を使用します。&lt;/p&gt;
+&lt;p&gt;変換テーブルとアクセス制御レジスタがメモリ隔離を強制します。EL2は、EL1ゲストの第1段階マッピングに第2段階変換を追加できます。一方、TrustZoneのセキュリティ状態は、別のアクセス境界を設定できます。利用可能性とレジスタの正確な動作は、実装されているアーキテクチャバージョンに依存します。&lt;/p&gt;
+&lt;h2 id="メモリ順序バリアアトミック操作"&gt;
+ メモリ順序、バリア、アトミック操作
+ &lt;a href="#%e3%83%a1%e3%83%a2%e3%83%aa%e9%a0%86%e5%ba%8f%e3%83%90%e3%83%aa%e3%82%a2%e3%82%a2%e3%83%88%e3%83%9f%e3%83%83%e3%82%af%e6%93%8d%e4%bd%9c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Armは弱順序のメモリモデルを使用します。アーキテクチャ上の同期による制約がない場合、あるコアは、独立したロードとストアをプログラム順序とは異なる順序で観測できます。キャッシュコヒーレンシは、参加するオブザーバが1つの場所への書き込み順序について合意することを保証しますが、コヒーレンシだけでは異なる場所へのアクセス順序は定まりません。&lt;/p&gt;
+&lt;p&gt;並行コードでは、プロトコルに必要な最小限の順序を表現する必要があります。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Acquireロードは、後続のアクセスがAcquireより前に移動することを防ぎます。&lt;/li&gt;
+&lt;li&gt;Releaseストアは、先行するアクセスがReleaseの後に移動することを防ぎます。&lt;/li&gt;
+&lt;li&gt;リード・モディファイ・ライト型アトミック操作は、指定された順序付けを伴う不可分な更新を提供します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DMB&lt;/code&gt;は、選択した共有可能性とアクセスドメイン内で、関連するメモリ観測の順序を付けます。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DSB&lt;/code&gt;は、指定されたメモリ効果が完了するまで待機します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ISB&lt;/code&gt;は命令パイプラインをフラッシュし、先行するコンテキスト変更操作によって確立されたコンテキストで後続の命令を実行します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;AArch64は、&lt;code&gt;LDXR&lt;/code&gt;／&lt;code&gt;STXR&lt;/code&gt;などの排他的ロード／排他的ストアループをサポートします。Large System Extensionsを備えたシステムでは、単一命令のアトミックなリード・モディファイ・ライト操作も提供できます。どちらの形式にも再試行または競合処理が必要であり、言語レベルのデータ競合を修復するものではありません。CおよびC++のプログラムでは、コンパイラがそれらの意味論を適切な命令とバリアにマッピングするため、言語のアトミック操作を使用する必要があります。&lt;/p&gt;
+&lt;h2 id="主な参考資料"&gt;
+ 主な参考資料
+ &lt;a href="#%e4%b8%bb%e3%81%aa%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://developer.arm.com/documentation/ddi0487/latest/"&gt;A-profileアーキテクチャ向けArm Architecture Reference Manual&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst"&gt;Arm 64ビットアーキテクチャのプロシージャ呼び出し標準&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</description></item><item><title>RISC-V アーキテクチャ入門</title><link>https://example.org/ja/risc-v-architecture/</link><pubDate>Sun, 29 Jan 2023 16:47:11 +0800</pubDate><guid>https://example.org/ja/risc-v-architecture/</guid><description>&lt;p&gt;RISC-V は、ベース整数 ISA と、個別にバージョン管理される拡張で構成されたオープンな命令セットアーキテクチャです。ISA は命令の動作と特権実行を定義し、プラットフォームプロファイル、ABI、および実行環境が、相互運用可能なソフトウェアを実行するために必要な要件を追加します。&lt;/p&gt;
+&lt;h2 id="ベース整数-isa-とレジスタ規約"&gt;
+ ベース整数 ISA とレジスタ規約
+ &lt;a href="#%e3%83%99%e3%83%bc%e3%82%b9%e6%95%b4%e6%95%b0-isa-%e3%81%a8%e3%83%ac%e3%82%b8%e3%82%b9%e3%82%bf%e8%a6%8f%e7%b4%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;RV32I&lt;/code&gt; と &lt;code&gt;RV64I&lt;/code&gt; は、それぞれ 32 ビットおよび 64 ビットの整数レジスタを提供します。どちらも &lt;code&gt;x0&lt;/code&gt; から &lt;code&gt;x31&lt;/code&gt; までの 32 個の汎用レジスタを定義します。&lt;code&gt;x0&lt;/code&gt; は常にゼロを読み出し、書き込みを破棄します。プログラムカウンタは、汎用レジスタとしてではなく、制御フローへの影響を通じてアーキテクチャ上可視になります。&lt;/p&gt;
+&lt;p&gt;RISC-V はロード／ストア方式を使用します。整数演算はレジスタオペランドを読み取り、レジスタに書き込みます。ロードとストアは、レジスタとメモリの間で値を移動します。ベース ISA は固定長 32 ビットのエンコーディングを使用します。&lt;code&gt;RV64I&lt;/code&gt; は 64 ビットのレジスタと演算に加え、下位 32 ビット値に対する符号拡張付きの &lt;code&gt;*W&lt;/code&gt; 演算を追加します。したがって、単にアドレスを広くした &lt;code&gt;RV32I&lt;/code&gt; ではありません。&lt;/p&gt;
+&lt;p&gt;標準の整数呼び出し規約は、ABI 名と役割を次のように割り当てます。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;Registers&lt;/th&gt;
+ &lt;th&gt;ABI names&lt;/th&gt;
+ &lt;th&gt;Role&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x0&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;zero&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;定数ゼロ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x1&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;ra&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;戻りアドレス&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x2&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;sp&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;スタックポインタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x5&lt;/code&gt;-&lt;code&gt;x7&lt;/code&gt;, &lt;code&gt;x28&lt;/code&gt;-&lt;code&gt;x31&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;t0&lt;/code&gt;-&lt;code&gt;t6&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;caller-saved 一時レジスタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x8&lt;/code&gt;-&lt;code&gt;x9&lt;/code&gt;, &lt;code&gt;x18&lt;/code&gt;-&lt;code&gt;x27&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;s0&lt;/code&gt;-&lt;code&gt;s11&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;callee-saved レジスタ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x10&lt;/code&gt;-&lt;code&gt;x17&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;a0&lt;/code&gt;-&lt;code&gt;a7&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;引数および戻り値&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;浮動小数点およびベクトルの呼び出し規約には、それぞれ固有の規則があります。コンパイル済みコードと連携するアセンブリは、スタックアラインメント、保存対象の状態、リロケーション、コードモデルを含む完全な psABI に従う必要があります。&lt;/p&gt;</description></item><item><title>x86 と x86-64 アーキテクチャの概要</title><link>https://example.org/ja/x86-overview/</link><pubDate>Sat, 30 Oct 2021 22:12:19 +0800</pubDate><guid>https://example.org/ja/x86-overview/</guid><description>&lt;p&gt;x86 は Intel の 16 ビット 8086 から始まりました。80286 はプロテクトモードを導入し、
+IA-32 は 32 ビットプログラミングモデルとページングを確立し、AMD64 はアーキテクチャ
+を 64 ビット実行へ拡張しました。Intel は統合アーキテクチャを Intel 64 と IA-32 と
+呼び、AMD の文書では AMD64 を使います。ベンダー名だけではすべての機能は決まらない
+ため、ソフトウェアは拡張機能を明示的に検出する必要があります。&lt;/p&gt;
+&lt;h2 id="バイト順序とオペランドサイズ"&gt;
+ バイト順序とオペランドサイズ
+ &lt;a href="#%e3%83%90%e3%82%a4%e3%83%88%e9%a0%86%e5%ba%8f%e3%81%a8%e3%82%aa%e3%83%9a%e3%83%a9%e3%83%b3%e3%83%89%e3%82%b5%e3%82%a4%e3%82%ba" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;x86 はメモリをバイト単位でアドレス指定し、複数バイト整数をリトルエンディアンで
+格納します。最下位バイトが最も低いアドレスを占めます。アドレス &lt;code&gt;p&lt;/code&gt; から始まる
+32 ビット値 &lt;code&gt;0x12345678&lt;/code&gt; のメモリ内容は次のとおりです。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;address p p+1 p+2 p+3
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;byte 78 56 34 12&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;アーキテクチャ用語では、16 ビット値を &lt;strong&gt;word&lt;/strong&gt;、32 ビット値を &lt;strong&gt;doubleword&lt;/strong&gt;、
+64 ビット値を &lt;strong&gt;quadword&lt;/strong&gt;、128 ビット値を &lt;strong&gt;double quadword&lt;/strong&gt; と呼びます。これらの
+名称は C 実装の型サイズとは独立しています。&lt;/p&gt;
+&lt;p&gt;命令オペランドサイズは、実行モード、プレフィックス、オペコード、REX、VEX、EVEX
+フィールドに依存します。64 ビットモードでも、多くの整数命令は 32 ビットオペランド
+がデフォルトで、対応している場合は &lt;code&gt;REX.W&lt;/code&gt; エンコーディングが 64 ビットを選択します。
+アドレスサイズは独立した属性で、実効アドレス計算を制御します。&lt;/p&gt;</description></item><item><title>CPU アーキテクチャの概要</title><link>https://example.org/ja/cpu-overview/</link><pubDate>Thu, 15 Jul 2021 15:11:38 +0800</pubDate><guid>https://example.org/ja/cpu-overview/</guid><description>&lt;p&gt;プロセッサーは命令セットアーキテクチャ（ISA）を実装します。ISA は、命令、レジスター、
+データ型、アドレス形成、例外、特権動作を定義する規約です。&lt;strong&gt;マイクロアーキテクチャ&lt;/strong&gt;は、
+パイプライン、実行ユニット、キャッシュ、予測器、内部キューによって、その規約を実装します。
+プログラムから観測できるのはアーキテクチャ状態ですが、性能はマイクロアーキテクチャ状態に
+依存します。&lt;/p&gt;
+&lt;h2 id="フェッチからリタイアまで"&gt;
+ フェッチからリタイアまで
+ &lt;a href="#%e3%83%95%e3%82%a7%e3%83%83%e3%83%81%e3%81%8b%e3%82%89%e3%83%aa%e3%82%bf%e3%82%a4%e3%82%a2%e3%81%be%e3%81%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;概念上、プロセッサーは命令バイト列をフェッチし、命令をデコードし、オペランドを取得して
+処理を実行し、必要に応じてメモリへアクセスした後、結果をコミットします。単純なプロセッサー
+では、これらの段階を順番に実行できます。パイプライン方式のプロセッサーは複数の命令の
+各段階を重ねて実行するため、すべての命令のレイテンシーを短縮しなくてもスループットを
+向上させられます。&lt;/p&gt;
+&lt;p&gt;アーキテクチャ状態には、汎用レジスター、ステータスレジスター、プログラムカウンター、
+アーキテクチャ上可視なメモリが含まれます。マイクロアーキテクチャ状態には、デコード済み
+オペレーションのキャッシュ、物理レジスター、リオーダーバッファー、分岐履歴、
+キャッシュ置換メタデータが含まれます。コンテキストスイッチでは ABI が保証する
+アーキテクチャ状態を保存する必要がありますが、内部の予測器やパイプラインの全エントリーを
+保存または公開するわけではありません。&lt;/p&gt;
+&lt;p&gt;パイプラインでは、次の 3 種類の依存関係を処理する必要があります。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;データハザード&lt;/strong&gt;は、ある処理が、別の処理でまだ生成されていない結果を使用するときに
+発生します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;構造ハザード&lt;/strong&gt;は、複数の処理が実行ユニット、ポート、キュー、キャッシュリソースを
+競合して使用するときに発生します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;制御ハザード&lt;/strong&gt;は、分岐によって次のフェッチアドレスが変わる可能性があるため発生します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;フォワーディングは、レジスターへの書き戻し前に結果を供給します。レジスターリネーミングは、
+アーキテクチャ上の名前をより大きな物理レジスターセットへ対応付けるため、write-after-read
+および write-after-write の偽の依存関係を取り除きます。リオーダーバッファーにより、
+独立した処理をアウトオブオーダーで実行しながら、正確なアーキテクチャ例外を維持する順序で
+完了した処理をリタイアできます。&lt;/p&gt;
+&lt;h2 id="スーパースカラー実行と投機的実行"&gt;
+ スーパースカラー実行と投機的実行
+ &lt;a href="#%e3%82%b9%e3%83%bc%e3%83%91%e3%83%bc%e3%82%b9%e3%82%ab%e3%83%a9%e3%83%bc%e5%ae%9f%e8%a1%8c%e3%81%a8%e6%8a%95%e6%a9%9f%e7%9a%84%e5%ae%9f%e8%a1%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;スーパースカラー方式のフロントエンドは、1 サイクルに複数の処理をデコードまたは発行
+できます。ディスパッチ幅だけが制約ではありません。真の依存関係、実行ポートへの負荷、
+キャッシュミス、リタイア幅によって、持続可能なスループットが低下する場合があります。&lt;/p&gt;
+&lt;p&gt;分岐予測は、分岐結果が確定する前に可能性の高い制御フローパスを選択します。予測が正しければ
+パイプラインへの供給が維持されます。予測が外れると、後続の投機的な処理を破棄し、確定した
+ターゲットからフェッチを再開します。投機によって誤ったアーキテクチャ状態をコミットしては
+なりませんが、一時的実行はキャッシュやほかの共有マイクロアーキテクチャリソースに影響を
+与える可能性があります。したがって、分離を担うコードは、アーキテクチャ上の特権チェック
+だけに依存せず、一時的実行の脆弱性に関するプラットフォームの指針に従う必要があります。&lt;/p&gt;
+&lt;h2 id="キャッシュ階層とメモリレイテンシー"&gt;
+ キャッシュ階層とメモリレイテンシー
+ &lt;a href="#%e3%82%ad%e3%83%a3%e3%83%83%e3%82%b7%e3%83%a5%e9%9a%8e%e5%b1%a4%e3%81%a8%e3%83%a1%e3%83%a2%e3%83%aa%e3%83%ac%e3%82%a4%e3%83%86%e3%83%b3%e3%82%b7%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;高速な記憶装置は高コストで物理的制約もあるため、プロセッサーコアは階層を介して DRAM に
+アクセスします。L1 命令キャッシュと L1 データキャッシュは小さく、コアの近くにあります。
+より大きな L2 キャッシュと最終レベルキャッシュは、レイテンシーと容量をトレードオフします。
+キャッシュラインは隣接するバイトをまとめて転送するため、シーケンシャルアクセスは空間的
+局所性を、再利用は時間的局所性を活用します。&lt;/p&gt;
+&lt;p&gt;キャッシュはアドレスをタグ、セットインデックス、ラインオフセットに分割します。
+セットアソシアティビティにより 1 つのセットへ複数のラインを格納できるため、タグ比較と
+置換処理の複雑性を代償として競合ミスを減らせます。ハードウェアプリフェッチャーは予測可能な
+レイテンシーを隠蔽できますが、ポインターチェイシングや容量ミスでは、下位キャッシュまたは
+DRAM の遅延が依然として顕在化します。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Nginx on cesun.life</title><link>https://example.org/zh-cn/tags/nginx/</link><description>Recent content in Nginx on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Mon, 19 Dec 2022 02:06:42 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/nginx/index.xml" rel="self" type="application/rss+xml"/><item><title>Nginx 管理与内部机制</title><link>https://example.org/zh-cn/nginx/</link><pubDate>Mon, 19 Dec 2022 02:06:42 +0800</pubDate><guid>https://example.org/zh-cn/nginx/</guid><description>&lt;p&gt;Nginx 是事件驱动的 HTTP、流和邮件代理及服务器。应将配置、进程权限和上游超时视为生产代码：重新加载前验证变更，并保留一份已知可用的配置。&lt;/p&gt;
+&lt;h2 id="事件驱动-io"&gt;
+ 事件驱动 I/O
+ &lt;a href="#%e4%ba%8b%e4%bb%b6%e9%a9%b1%e5%8a%a8-io" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Nginx 围绕非阻塞事件循环构建。主进程读取配置并启动工作进程；每个工作进程随后等待 epoll、kqueue 或平台上等效的就绪事件后端。工作进程为每个对端维护一条连接记录，并且仅在套接字就绪时推进相应请求。&lt;/p&gt;
+&lt;p&gt;因此，一个事件循环无需为每个请求分配一个线程就能处理大量连接。该模型也解释了日志记录和缓冲策略的重要性：上游、客户端与磁盘写入独立推进时，工作进程必须保持响应。&lt;/p&gt;
+&lt;h2 id="隔离配置"&gt;
+ 隔离配置
+ &lt;a href="#%e9%9a%94%e7%a6%bb%e9%85%8d%e7%bd%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;测试本地构建时，应使用明确的前缀和配置运行实例。日志和临时文件等相对路径以该前缀为基准解析。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;nginx -p &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$PWD&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; -c nginx.conf
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;nginx -t -p &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$PWD&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; -c nginx.conf&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;对于非特权本地进程，应使用非特权监听端口，并将 &lt;code&gt;pid&lt;/code&gt;、日志以及所有请求正文或上游临时路径设置为可写位置。&lt;code&gt;daemon off;&lt;/code&gt; 和 &lt;code&gt;master_process off;&lt;/code&gt; 可简化前台调试，但并非生产环境设置。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;include&lt;/code&gt; 指令以文本方式引入相对于前缀的配置或绝对路径配置。使用 &lt;code&gt;nginx -t&lt;/code&gt; 验证完整的包含关系图，并使用 &lt;code&gt;nginx -T&lt;/code&gt; 检查展开后的配置。重新加载时，主进程解析并验证新配置；成功后启动新工作进程，并要求旧工作进程在完成当前工作后退出。解析或资源获取失败时，旧配置会继续提供流量服务。&lt;/p&gt;
+&lt;h2 id="虚拟服务器与-cors"&gt;
+ 虚拟服务器与 CORS
+ &lt;a href="#%e8%99%9a%e6%8b%9f%e6%9c%8d%e5%8a%a1%e5%99%a8%e4%b8%8e-cors" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Nginx 根据监听器和 &lt;code&gt;Host&lt;/code&gt; 标头选择 HTTP 虚拟服务器。在同一监听器内，选择顺序依次为精确的 &lt;code&gt;server_name&lt;/code&gt;、最长的前导通配符、最长的尾随通配符，最后是第一个匹配的正则表达式。&lt;code&gt;server_name .example.com&lt;/code&gt; 是根域名和 &lt;code&gt;*.example.com&lt;/code&gt; 的简写；仅 &lt;code&gt;*.example.com&lt;/code&gt; 无法匹配根域名。&lt;/p&gt;
+&lt;p&gt;选定服务器后，Nginx 根据前缀和正则表达式规则查找 location。精确 location 会立即胜出；否则 Nginx 记住最长前缀，并按顺序评估符合条件的正则表达式。&lt;code&gt;^~&lt;/code&gt; 修饰符会在该前缀匹配后阻止正则表达式检查。内部重写可能重新开始 location 搜索，因此代理行为与可见请求不同时，应跟踪最终 URI。&lt;/p&gt;</description></item></channel></rss>

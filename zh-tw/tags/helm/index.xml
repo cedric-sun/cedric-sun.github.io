@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Helm on cesun.life</title><link>https://example.org/zh-tw/tags/helm/</link><description>Recent content in Helm on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Tue, 08 Mar 2022 13:40:19 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/helm/index.xml" rel="self" type="application/rss+xml"/><item><title>Helm 與 Argo CD</title><link>https://example.org/zh-tw/helm-and-argocd/</link><pubDate>Tue, 08 Mar 2022 13:40:19 +0800</pubDate><guid>https://example.org/zh-tw/helm-and-argocd/</guid><description>&lt;p&gt;Helm 會根據 chart、values 與範本，呈現具版本的 Kubernetes 資訊清單。Helm 會在叢集中記錄發布中繼資料，而 Kubernetes 只會協調最終產生的資源；Kubernetes 不理解也不維護 Helm 範本。&lt;/p&gt;
+&lt;h2 id="helm-發布"&gt;
+ Helm 發布
+ &lt;a href="#helm-%e7%99%bc%e5%b8%83" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;將預設值保留在 &lt;code&gt;values.yaml&lt;/code&gt; 中，謹慎使用環境專用的值檔案或明確的 &lt;code&gt;--set&lt;/code&gt; 值，並在套用前驗證呈現的輸出：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm lint charts/orders
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm template orders charts/orders -f values-production.yaml
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm upgrade --install orders charts/orders -f values-production.yaml --namespace orders --create-namespace --atomic&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;--atomic&lt;/code&gt; 會在 Helm 能判定升級失敗時復原失敗的升級，但不會使外部管理的狀態具備交易性。明確定義 hooks、CRD、資料庫移轉與復原行為。&lt;/p&gt;
+&lt;h2 id="argo-cd-協調"&gt;
+ Argo CD 協調
+ &lt;a href="#argo-cd-%e5%8d%94%e8%aa%bf" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Argo CD 會監看宣告的 Git 修訂版本，並將呈現的期望狀態與叢集狀態進行協調。Argo CD 中的 Helm 來源負責提供 chart 呈現；對於由 GitOps 管理的應用程式，應由 Argo CD 而非操作人員本機的 Helm 用戶端負責協調。&lt;/p&gt;</description></item><item><title>Helm 操作與 Argo CD 遷移</title><link>https://example.org/zh-tw/helm-operations-and-argocd-migrations/</link><pubDate>Fri, 05 Nov 2021 13:57:33 +0800</pubDate><guid>https://example.org/zh-tw/helm-operations-and-argocd-migrations/</guid><description>&lt;p&gt;將靜態 Kubernetes 清單移至 Helm，再移至 Argo CD，不只是範本化，也會改變所有權。請盤點執行中的資源、保留不可變更的名稱與儲存體，並在啟用自動修剪前，讓期望狀態可重現。&lt;/p&gt;
+&lt;h2 id="了解-helm-的發布模型"&gt;
+ 了解 Helm 的發布模型
+ &lt;a href="#%e4%ba%86%e8%a7%a3-helm-%e7%9a%84%e7%99%bc%e5%b8%83%e6%a8%a1%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;對直接 Helm 發布而言，升級會比較先前的發布清單、新產生的清單與執行中的物件。兩份清單都存在的資源會在其欄位允許時更新；只存在於新清單的資源會建立；從 chart 移除的資源通常會刪除。不可變更的欄位可能需要明確的取代策略。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm upgrade --install web ./chart &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --namespace web --create-namespace &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --values environments/production.yaml &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --dry-run --debug&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;工具鏈已有 &lt;code&gt;helm diff&lt;/code&gt; 時請使用它，並在升級後檢查 &lt;code&gt;helm get manifest&lt;/code&gt; 與 &lt;code&gt;helm history&lt;/code&gt;。&lt;code&gt;helm.sh/resource-policy: keep&lt;/code&gt; 註解可以在解除安裝期間保留資源，但它應是刻意的生命週期決策，而不是一般性的安全措施。&lt;/p&gt;
+&lt;h2 id="漸進式遷移靜態清單"&gt;
+ 漸進式遷移靜態清單
+ &lt;a href="#%e6%bc%b8%e9%80%b2%e5%bc%8f%e9%81%b7%e7%a7%bb%e9%9d%9c%e6%85%8b%e6%b8%85%e5%96%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;首先，從原始碼控制擷取實際的期望規格，並與執行中的物件比較。將真正的環境差異參數化，例如映像版本、主機名稱、資源限制與儲存類別，而不是將每個欄位都參數化。產生 chart，並與現有資源比較。&lt;/p&gt;
+&lt;p&gt;首次遷移期間，請維持穩定的 &lt;code&gt;metadata.name&lt;/code&gt;、命名空間、選取器與持久性磁碟區宣告名稱。變更選取器可能使 Pod 失去管理；變更 PVC 名稱會建立新的宣告，且不會搬移資料。對具狀態工作負載而言，在非正式環境叢集進行任何所有權轉移前，先演練備份、還原與復原程序。&lt;/p&gt;
+&lt;h2 id="安全地交接至-argo-cd"&gt;
+ 安全地交接至 Argo CD
+ &lt;a href="#%e5%ae%89%e5%85%a8%e5%9c%b0%e4%ba%a4%e6%8e%a5%e8%87%b3-argo-cd" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;當 Argo CD 產生 Helm chart 時，避免對相同資源執行個別的 &lt;code&gt;helm upgrade&lt;/code&gt;。設定 &lt;code&gt;Application&lt;/code&gt;、驗證產生的清單與差異、先在不修剪的情況下同步，只有在應用程式健康且範圍內沒有不相關資源後，才啟用修剪。&lt;/p&gt;</description></item></channel></rss>

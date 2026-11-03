@@ -1,0 +1,573 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Databases on cesun.life</title><link>https://example.org/ja/tags/databases/</link><description>Recent content in Databases on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 03 Sep 2026 15:56:43 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/databases/index.xml" rel="self" type="application/rss+xml"/><item><title>MySQL トランザクション、分離、同時実行性</title><link>https://example.org/ja/mysql-transactions/</link><pubDate>Thu, 03 Sep 2026 15:56:43 +0800</pubDate><guid>https://example.org/ja/mysql-transactions/</guid><description>&lt;p&gt;InnoDB トランザクションは、関連する変更をアトミックにコミットし、同時実行されるステートメントからの見え方を制御することで、データベースの不変条件を保護します。分離レベルは制約の代替ではありません。スキーマで表現できる不変条件には、主キー、一意制約、外部キー制約、チェック制約を使用し、そのうえで複数ステートメントによる判断に適したトランザクションとロックのパターンを選択します。&lt;/p&gt;
+&lt;h2 id="トランザクション境界と自動コミット"&gt;
+ トランザクション境界と自動コミット
+ &lt;a href="#%e3%83%88%e3%83%a9%e3%83%b3%e3%82%b6%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3%e5%a2%83%e7%95%8c%e3%81%a8%e8%87%aa%e5%8b%95%e3%82%b3%e3%83%9f%e3%83%83%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL ではデフォルトで自動コミットが有効になっているため、明示的なトランザクションの外側で実行される各ステートメントは、1 つのトランザクションとしてコミットまたはロールバックされます。複数ステートメントの単位は明示的に開始し、短く保ちます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;START&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;-&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;84&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;COMMIT&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;宛先に入金する前に、最初の更新で影響を受けた行数を確認します。不変条件またはステートメントが失敗した場合は &lt;code&gt;ROLLBACK&lt;/code&gt; を使用します。接続プールは、接続を返却する前に自動コミット、分離レベル、アクセスモード、その他のセッション状態を復元する必要があります。これらのプロパティはトランザクション間でも保持されるためです。&lt;/p&gt;
+&lt;p&gt;多くのデータ定義ステートメントおよびアカウント管理ステートメントは暗黙的にコミットします。アトミック DDL は、サポートされるスキーマステートメントをクラッシュセーフにしますが、そのステートメントを周囲のアプリケーショントランザクションの一部にするものではありません。&lt;/p&gt;
+&lt;h2 id="分離レベルの設定"&gt;
+ 分離レベルの設定
+ &lt;a href="#%e5%88%86%e9%9b%a2%e3%83%ac%e3%83%99%e3%83%ab%e3%81%ae%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB における MySQL 8.4 のデフォルトは &lt;code&gt;REPEATABLE READ&lt;/code&gt; です。サーバーのデフォルトは &lt;code&gt;--transaction-isolation&lt;/code&gt; または &lt;code&gt;transaction_isolation&lt;/code&gt; で設定し、意図したスコープでのみ上書きします。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;COMMITTED&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;REPEATABLE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SERIALIZABLE&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.transaction_isolation;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;GLOBAL&lt;/code&gt; は新しいセッションに対するデフォルトを設定します。&lt;code&gt;SESSION&lt;/code&gt; は、その接続で後続のトランザクションに適用されます。修飾子のない &lt;code&gt;SET TRANSACTION&lt;/code&gt; は、次のトランザクションに適用されます。同じステートメントで &lt;code&gt;READ ONLY&lt;/code&gt; と &lt;code&gt;READ WRITE&lt;/code&gt; も選択できます。&lt;/p&gt;
+&lt;h2 id="mvcc-と一貫性読み取り"&gt;
+ MVCC と一貫性読み取り
+ &lt;a href="#mvcc-%e3%81%a8%e4%b8%80%e8%b2%ab%e6%80%a7%e8%aa%ad%e3%81%bf%e5%8f%96%e3%82%8a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB は、アクティブなスナップショットが必要とする可能性がある間、以前の行バージョンを undo データに保持します。通常、通常の &lt;code&gt;SELECT&lt;/code&gt; はロックを取得しない一貫性読み取りを実行します。&lt;/p&gt;</description></item><item><title>Redis のキャッシュと調整パターン</title><link>https://example.org/ja/redis-overview/</link><pubDate>Thu, 03 Sep 2026 15:56:43 +0800</pubDate><guid>https://example.org/ja/redis-overview/</guid><description>&lt;p&gt;Redis は読み取りを高速化し、有界操作を調整できるインメモリデータ構造サーバーです。
+本番設計では、信頼できる情報源、一貫性ウィンドウ、容量ポリシー、障害動作、すべての
+キーの所有権を定義する必要があります。永続化とレプリケーションは復旧の選択肢を
+改善しますが、キャッシュにソースデータベースのトランザクション不変条件を与える
+ものではありません。&lt;/p&gt;
+&lt;h2 id="cache-aside-と一貫性ウィンドウ"&gt;
+ Cache-Aside と一貫性ウィンドウ
+ &lt;a href="#cache-aside-%e3%81%a8%e4%b8%80%e8%b2%ab%e6%80%a7%e3%82%a6%e3%82%a3%e3%83%b3%e3%83%89%e3%82%a6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Cache-aside は読み取りと書き込みのポリシーをアプリケーションに残します。&lt;/p&gt;
+&lt;div
+ class="goat svg-container goat--sized" style="--goat-width: 65%;"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 384 105"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 64,16 L 144,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 256,16 L 296,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 32,64 L 200,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 200,64 L 296,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 32,32 L 32,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 200,32 L 200,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='40.000000,32.000000 28.000000,26.400000 28.000000,37.599998' fill='currentColor' transform='rotate(270.000000, 32.000000, 32.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='152.000000,16.000000 140.000000,10.400000 140.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 144.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='304.000000,16.000000 292.000000,10.400000 292.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 296.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='304.000000,64.000000 292.000000,58.400002 292.000000,69.599998' fill='currentColor' transform='rotate(0.000000, 296.000000, 64.000000)'&gt;&lt;/polygon&gt;
+&lt;text text-anchor='middle' x='8' y='20' fill='currentColor' style='font-size:1em'&gt;C&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='20' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='4' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='4' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='4' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='4' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='84' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='84' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='84' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='84' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='84' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='84' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='20' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='84' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='20' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='84' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='20' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='20' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='20' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='52' fill='currentColor' style='font-size:1em'&gt;S&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='52' fill='currentColor' style='font-size:1em'&gt;E&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='52' fill='currentColor' style='font-size:1em'&gt;T&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='52' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='4' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='52' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='4' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='52' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='4' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='52' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='4' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='52' fill='currentColor' style='font-size:1em'&gt;E&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='52' fill='currentColor' style='font-size:1em'&gt;X&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='20' fill='currentColor' style='font-size:1em'&gt;D&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='68' fill='currentColor' style='font-size:1em'&gt;R&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='68' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='68' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='52' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='68' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='20' fill='currentColor' style='font-size:1em'&gt;b&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='68' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;p&gt;アプリケーションは Redis を読み、ミスをデータベースからロードし、TTL 付きで結果を
+保存して返します。ソースへの書き込みでは、影響を受けるキーを無効化または更新する
+必要があります。データベースコミットとキャッシュ変更は 1 つのアトミック操作では
+ないため、読み取り側はその間に古いデータを観測できます。許容するウィンドウを定義し、
+キャッシュ無効化をプロセス障害後も維持する必要がある場合は、トランザクショナル
+アウトボックスまたは変更データストリームを使います。&lt;/p&gt;</description></item><item><title>リレーショナルデータモデリング</title><link>https://example.org/ja/mysql-data-modeling/</link><pubDate>Sat, 04 Jan 2025 20:27:25 +0800</pubDate><guid>https://example.org/ja/mysql-data-modeling/</guid><description>&lt;p&gt;エンティティ・リレーションシップモデルは、テーブルを選択する前にエンティティ型、その属性、およびリレーションシップを特定します。その後、リレーショナルスキーマは各事実を定義された粒度で一度だけ表現します。たとえば、&lt;code&gt;order_line&lt;/code&gt; は1つの注文に含まれる1つの商品を表し、&lt;code&gt;order&lt;/code&gt; は注文ヘッダーを表します。&lt;/p&gt;
+&lt;h2 id="エンティティキーおよびリレーションシップ"&gt;
+ エンティティ、キー、およびリレーションシップ
+ &lt;a href="#%e3%82%a8%e3%83%b3%e3%83%86%e3%82%a3%e3%83%86%e3%82%a3%e3%82%ad%e3%83%bc%e3%81%8a%e3%82%88%e3%81%b3%e3%83%aa%e3%83%ac%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3%e3%82%b7%e3%83%83%e3%83%97" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;すべてのテーブルには、行を一意に識別する候補キーが必要です。主キーには、安定していて、NULLにならず、結合に適したものを選択します。代理キーを使用しても、アカウントの外部識別子など、自然な業務上の識別子に対する一意性制約は不要になりません。&lt;/p&gt;
+&lt;p&gt;リレーションシップのカーディナリティは、次のようにマッピングします。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;1対1のリレーションシップでは、任意側に &lt;code&gt;UNIQUE&lt;/code&gt; 外部キーを配置するか、ライフサイクルとアクセス制御が一致する場合はテーブルを統合します。&lt;/li&gt;
+&lt;li&gt;1対多では、多側のテーブルに外部キーを配置します。&lt;/li&gt;
+&lt;li&gt;多対多では、両方のエンティティへの外部キーと、リレーションシップに属する属性を含む関連テーブルを作成します。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div
+ class="goat svg-container"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 448 73"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 0,0 L 88,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,0 L 432,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,16 L 320,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,48 L 88,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,48 L 432,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,0 L 0,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,0 L 88,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,16 L 88,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,0 L 328,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 432,0 L 432,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='328.000000,16.000000 316.000000,10.400000 316.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 320.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;text text-anchor='middle' x='16' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='36' fill='currentColor' style='font-size:1em'&gt;(&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='36' fill='currentColor' style='font-size:1em'&gt;P&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='36' fill='currentColor' style='font-size:1em'&gt;K&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='36' fill='currentColor' style='font-size:1em'&gt;)&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='4' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='4' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='4' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='4' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='4' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='4' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='4' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='36' fill='currentColor' style='font-size:1em'&gt;q&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='36' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='36' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='20' fill='currentColor' style='font-size:1em'&gt;_&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='36' fill='currentColor' style='font-size:1em'&gt;_&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='20' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='408' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='36' fill='currentColor' style='font-size:1em'&gt;F&lt;/text&gt;
+&lt;text text-anchor='middle' x='424' y='36' fill='currentColor' style='font-size:1em'&gt;K&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;p&gt;&lt;code&gt;NOT NULL&lt;/code&gt; は必須参加を表します。NULL許容の外部キーは、その行にとってリレーションシップが任意であることを意味します。外部キー制約は孤立した参照を防ぎますが、&lt;code&gt;ON DELETE&lt;/code&gt; の動作は業務ルールを反映する必要があります。つまり、制限、カスケード、NULL設定、または明示的なワークフローでの削除処理のいずれかです。&lt;/p&gt;</description></item><item><title>MySQL の文字列型と文字セット</title><link>https://example.org/ja/mysql-string-types/</link><pubDate>Sat, 07 Sep 2024 23:40:56 +0800</pubDate><guid>https://example.org/ja/mysql-string-types/</guid><description>&lt;p&gt;MySQL の文字列カラムには、論理的な文字数制限と物理的なバイト表現の両方があります。これらの考えを分けて扱うと、多言語テキストやインデックスに関する多くの問題を防げます。&lt;/p&gt;
+&lt;h2 id="char-と-varchar"&gt;
+ &lt;code&gt;CHAR&lt;/code&gt; と &lt;code&gt;VARCHAR&lt;/code&gt;
+ &lt;a href="#char-%e3%81%a8-varchar" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;CHAR(n)&lt;/code&gt; は固定長の文字列です。MySQL はストレージ上の意味として値を宣言された長さにパディングするため、国コードなど、本当に固定幅の値に適しています。&lt;code&gt;VARCHAR(n)&lt;/code&gt; は可変長であり、名前、ラベル、その他の長さが変化するテキストには通常こちらが適しています。&lt;/p&gt;
+&lt;p&gt;どちらの場合も、&lt;code&gt;n&lt;/code&gt; はバイト数ではなく最大 &lt;strong&gt;文字数&lt;/strong&gt; です。したがって、文字セットが対応していれば、&lt;code&gt;VARCHAR(10)&lt;/code&gt; カラムには 10 個の絵文字または 10 個の中国語文字を格納できます。ただし、これらの文字はディスク上で 10 バイトを超えて使用します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; profile (
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; country_code CHAR(&lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; display_name VARCHAR(&lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;) CHARACTER &lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; utf8mb4;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="text-型"&gt;
+ &lt;code&gt;TEXT&lt;/code&gt; 型
+ &lt;a href="#text-%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;大きな可変長テキストには、&lt;code&gt;TINYTEXT&lt;/code&gt;、&lt;code&gt;TEXT&lt;/code&gt;、&lt;code&gt;MEDIUMTEXT&lt;/code&gt;、&lt;code&gt;LONGTEXT&lt;/code&gt; を使用します。制限はバイト単位で測定されるため、実際に格納できる文字数はカラムの文字セットによって異なります。&lt;code&gt;TEXT&lt;/code&gt; カラムにはインデックスを付けられますが、大きな構成や古い MySQL 構成ではインデックスプレフィックスが必要になる場合があります。長いテキストを中心にインデックスを設計する前に、エンジンと MySQL のバージョンを確認してください。&lt;/p&gt;
+&lt;h2 id="文字セットと照合順序"&gt;
+ 文字セットと照合順序
+ &lt;a href="#%e6%96%87%e5%ad%97%e3%82%bb%e3%83%83%e3%83%88%e3%81%a8%e7%85%a7%e5%90%88%e9%a0%86%e5%ba%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;文字セットは、文字をバイトとしてエンコードする方法を定義します。新しい MySQL アプリケーションでは、Unicode の全範囲をサポートする &lt;code&gt;utf8mb4&lt;/code&gt; が一般に安全な選択です。MySQL の歴史的な &lt;code&gt;utf8&lt;/code&gt; という名前は 3 バイト実装を指すことがあり、すべての Unicode 文字を表すものではありません。&lt;/p&gt;
+&lt;p&gt;照合順序は、文字セットの比較とソートの規則を定義します。比較で大文字と小文字、アクセントを区別するかどうか、および文字列のソート方法を決定します。文字セットと照合順序は、サーバー、データベース、テーブル、カラムのレベルで設定できます。テーブルまたはカラムに明示的な設定を行うと、アプリケーションの期待が明確になります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; article (
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; title VARCHAR(&lt;span style="color:#ae81ff"&gt;255&lt;/span&gt;) CHARACTER &lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; utf8mb4
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;COLLATE&lt;/span&gt; utf8mb4_0900_ai_ci &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;アプリケーションが必要とする比較に基づいて照合順序を選択します。識別子にはバイナリまたは大文字と小文字を区別する比較が適切な場合があり、人間向けの検索にはアクセントと大文字と小文字を区別しない照合順序が適している場合があります。&lt;/p&gt;</description></item><item><title>Redis のデータ型とコマンド</title><link>https://example.org/ja/redis-commands/</link><pubDate>Tue, 02 Jan 2024 17:43:06 +0800</pubDate><guid>https://example.org/ja/redis-commands/</guid><description>&lt;p&gt;Redis は各キーを 1 つのデータ型に関連付けます。誤った型のキーに対して発行されたコマンドは失敗するため、キーの命名と値の所有権によってデータモデルを明示すべきです。&lt;/p&gt;
+&lt;p&gt;Redis は各コマンドをサーバースレッド上でアトミックに実行します。したがって、&lt;code&gt;INCR&lt;/code&gt;、&lt;code&gt;HSET&lt;/code&gt;、&lt;code&gt;SADD&lt;/code&gt;、&lt;code&gt;ZADD&lt;/code&gt; などの単一コマンドは 1 キーの状態変更に対して安全ですが、複数段階の読み取り・変更・書き込みシーケンスを 1 単位として動作させる必要がある場合は、&lt;code&gt;MULTI&lt;/code&gt;/&lt;code&gt;EXEC&lt;/code&gt;、&lt;code&gt;WATCH&lt;/code&gt;、または Lua が必要です。&lt;/p&gt;
+&lt;h2 id="キーのライフサイクル"&gt;
+ キーのライフサイクル
+ &lt;a href="#%e3%82%ad%e3%83%bc%e3%81%ae%e3%83%a9%e3%82%a4%e3%83%95%e3%82%b5%e3%82%a4%e3%82%af%e3%83%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;DEL&lt;/code&gt; は値を同期的に回収するため、大きな集約値では処理をブロックする可能性があります。&lt;code&gt;UNLINK&lt;/code&gt; はキーを切り離し、Redis がメモリーを非同期に回収できるようにします。&lt;code&gt;EXPIRE&lt;/code&gt;、&lt;code&gt;PEXPIRE&lt;/code&gt;、&lt;code&gt;TTL&lt;/code&gt;、&lt;code&gt;PTTL&lt;/code&gt; で有効期限を設定および確認します。&lt;code&gt;TTL&lt;/code&gt; は、有効期限のないキーに対して &lt;code&gt;-1&lt;/code&gt;、存在しないキーに対して &lt;code&gt;-2&lt;/code&gt; を返します。&lt;/p&gt;
+&lt;p&gt;本番規模のキースペースに対して &lt;code&gt;KEYS *&lt;/code&gt; を使用してはなりません。1 つのコマンドでキースペース全体を走査するためです。代わりに &lt;code&gt;SCAN&lt;/code&gt; で反復します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;redis&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-redis" data-lang="redis"&gt;SCAN 0 MATCH user:* COUNT 1000&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;返されたカーソルが &lt;code&gt;0&lt;/code&gt; になるまで続けます。スキャンは重複を返す場合があり、反復中に作成または削除されたキーを見逃す場合もあります。一意の結果を必要とする呼び出し側は、重複を除去する必要があります。&lt;/p&gt;
+&lt;h2 id="主要な型"&gt;
+ 主要な型
+ &lt;a href="#%e4%b8%bb%e8%a6%81%e3%81%aa%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;文字列&lt;/strong&gt;は &lt;code&gt;GET&lt;/code&gt;、&lt;code&gt;SET&lt;/code&gt;、アトミックな &lt;code&gt;INCRBY&lt;/code&gt;、およびバイナリーセーフな値をサポートします。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;リスト&lt;/strong&gt;は、キューや作業ストリームに使用する、順序付きで左右の端からアクセスするコレクションです。&lt;code&gt;LPUSH&lt;/code&gt; と &lt;code&gt;RPUSH&lt;/code&gt; は先頭または末尾に追加します。&lt;code&gt;LPOP&lt;/code&gt; と &lt;code&gt;RPOP&lt;/code&gt; は空のリストに対して &lt;code&gt;nil&lt;/code&gt; を返し、最後の要素がなくなるとキーを削除します。&lt;code&gt;BLPOP&lt;/code&gt; と &lt;code&gt;BRPOP&lt;/code&gt; は、列挙したキーのいずれかが空でなくなるまでブロックします。&lt;code&gt;LRANGE&lt;/code&gt; は両端を含み、末尾からの負のインデックスを受け付けます。無制限の範囲は非常に大きなペイロードを返す可能性があります。&lt;code&gt;RPOPLPUSH&lt;/code&gt; と &lt;code&gt;BRPOPLPUSH&lt;/code&gt; は、1 つの末尾要素を別のリストへアトミックに移動します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;集合&lt;/strong&gt;は、一意のメンバーを保持し、ハッシュテーブルによる包含検査を提供します。&lt;code&gt;SADD&lt;/code&gt;、&lt;code&gt;SREM&lt;/code&gt;、&lt;code&gt;SCARD&lt;/code&gt;、&lt;code&gt;SISMEMBER&lt;/code&gt;、&lt;code&gt;SMEMBERS&lt;/code&gt;、&lt;code&gt;SPOP&lt;/code&gt;、&lt;code&gt;SRANDMEMBER&lt;/code&gt; を使用します。&lt;code&gt;SINTER&lt;/code&gt;、&lt;code&gt;SUNION&lt;/code&gt;、&lt;code&gt;SDIFF&lt;/code&gt; などの集合演算コマンドは、入力を変更せずに読み取ります。&lt;code&gt;*STORE&lt;/code&gt; 形式は出力先集合をアトミックに置き換えます。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ソート済み集合&lt;/strong&gt;は、一意の各メンバーを浮動小数点スコアに関連付けます。&lt;code&gt;ZADD&lt;/code&gt; はメンバーをアトミックに追加または更新するため、同じメンバーを繰り返すと重複を作らず、以前のスコアを置き換えます。順序付きルックアップには &lt;code&gt;ZRANGE&lt;/code&gt;、&lt;code&gt;ZREVRANGE&lt;/code&gt;、&lt;code&gt;ZRANK&lt;/code&gt;、&lt;code&gt;ZREVRANK&lt;/code&gt;、およびスコア範囲コマンドを使用し、削除には &lt;code&gt;ZREM&lt;/code&gt; または &lt;code&gt;ZREMRANGEBYRANK&lt;/code&gt;/&lt;code&gt;ZREMRANGEBYSCORE&lt;/code&gt; を使用します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ハッシュ&lt;/strong&gt;は、1 つのキーの下にフィールドと値のペアをまとめます。&lt;code&gt;HSET&lt;/code&gt; はフィールドをアトミックに作成または更新します。&lt;code&gt;HGET&lt;/code&gt;、&lt;code&gt;HMGET&lt;/code&gt;、&lt;code&gt;HDEL&lt;/code&gt;、&lt;code&gt;HINCRBY&lt;/code&gt;、&lt;code&gt;HGETALL&lt;/code&gt; は、ネストされたオブジェクトではなく名前付きフィールドを操作します。&lt;code&gt;HGETALL&lt;/code&gt; は結果が大きくなる可能性があるため、少数のフィールドだけが必要な場合は対象を絞った読み取りを優先してください。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ストリーム&lt;/strong&gt;は、順序付き ID の下にフィールドと値のエントリーを追加します。&lt;code&gt;XADD&lt;/code&gt; はエントリーを書き込み、&lt;code&gt;XRANGE&lt;/code&gt; は ID 範囲を読み取り、&lt;code&gt;XREAD&lt;/code&gt; はカーソルより後のエントリーを待ちます。コンシューマーグループは &lt;code&gt;XREADGROUP&lt;/code&gt; でエントリーを分配します。コンシューマーは完了した作業を &lt;code&gt;XACK&lt;/code&gt; で確認し、放棄された保留中エントリーを意図的に回収する必要があります。ストリームは永続的なデータ構造であり、一時的な Pub/Sub 配信ではありません。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;HGETALL&lt;/code&gt;、&lt;code&gt;SMEMBERS&lt;/code&gt;、および無制限の &lt;code&gt;LRANGE&lt;/code&gt; はすべての要素を返すため、大きなレスポンスを生成する可能性があります。リクエスト処理では、カーソルベースのハッシュおよび集合のスキャン、または範囲を制限した読み取りを使用してください。&lt;/p&gt;</description></item><item><title>MySQL InnoDB Internals</title><link>https://example.org/ja/mysql-internals/</link><pubDate>Sun, 14 Aug 2022 15:11:43 +0800</pubDate><guid>https://example.org/ja/mysql-internals/</guid><description>&lt;p&gt;InnoDB はテーブルデータとインデックスを、テーブルスペースに編成されたページへ保存します。
+テーブルスペースのページサイズは固定で、データディレクトリの初期化時に選択されます。既定のページサイズは 16 KiB です。
+ページ指向 I/O により、インデックス局所性、バッファープール容量、行幅がクエリコストに影響する理由を説明できます。&lt;/p&gt;
+&lt;h2 id="データディクショナリとメタデータ"&gt;
+ データディクショナリとメタデータ
+ &lt;a href="#%e3%83%87%e3%83%bc%e3%82%bf%e3%83%87%e3%82%a3%e3%82%af%e3%82%b7%e3%83%a7%e3%83%8a%e3%83%aa%e3%81%a8%e3%83%a1%e3%82%bf%e3%83%87%e3%83%bc%e3%82%bf" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL 8 はトランザクション型データディクショナリを InnoDB に保存します。そのためスキーマ、テーブル、列、インデックス、
+ストアドプログラム、権限を含むサーバーメタデータはクラッシュセーフであり、アトミックなデータ定義操作に参加します。
+アプリケーションはメタデータを調べるために &lt;code&gt;INFORMATION_SCHEMA&lt;/code&gt;、Performance Schema、または &lt;code&gt;SHOW&lt;/code&gt; 文を使う必要があります。
+内部ディクショナリテーブルはアプリケーションインターフェースではありません。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;INFORMATION_SCHEMA&lt;/code&gt; はメタデータに対する SQL ビューを公開します。&lt;code&gt;sys&lt;/code&gt; スキーマは Performance Schema と Information Schema のデータに、
+コストの高いステートメントや未使用インデックスなど、人間向けのビューを追加します。&lt;/p&gt;
+&lt;p&gt;データ定義操作がアトミック DDL に対応している場合、ディクショナリメタデータとストレージエンジン状態を 1 つのアトミック DDL トランザクションとして更新します。
+ディクショナリレコードはサーバー内部にとどまり、基盤の InnoDB テーブルを直接読み書きすることはサポートされません。&lt;/p&gt;
+&lt;h2 id="テーブルスペース"&gt;
+ テーブルスペース
+ &lt;a href="#%e3%83%86%e3%83%bc%e3%83%96%e3%83%ab%e3%82%b9%e3%83%9a%e3%83%bc%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB のインストールでは次を使用できます。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;システムテーブルスペース&lt;/strong&gt;（変更バッファーデータとその他の共有 InnoDB 構造用）。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;innodb_file_per_table&lt;/code&gt; を有効にしたとき InnoDB テーブルごとに作成される
+&lt;strong&gt;file-per-table テーブルスペース&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;管理者が作成し、互換性のあるテーブルへ割り当てる &lt;strong&gt;一般テーブルスペース&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;InnoDB が管理する独立した undo テーブルスペースと一時テーブルスペース。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;すべての構成で、1 テーブルが 1 つのオペレーティングシステムファイルに安全に対応するわけではありません。
+一貫したデータベースはデータファイル、redo ログ、メタデータにまたがるため、バックアップと復元には MySQL 対応ツールまたは文書化された物理バックアップ手順を使います。&lt;/p&gt;</description></item><item><title>MySQL のインデックス</title><link>https://example.org/ja/mysql-indexes/</link><pubDate>Thu, 16 Jun 2022 20:46:43 +0800</pubDate><guid>https://example.org/ja/mysql-indexes/</guid><description>&lt;p&gt;InnoDB は主インデックスとセカンダリインデックスを B+ 木で実装します。インデックスの順序が選択性の高い述語、結合、範囲スキャン、または順序付け要件と一致すると I/O を削減できますが、インデックス付きのすべての行に対する書き込み処理とストレージが増加します。&lt;/p&gt;
+&lt;h2 id="クラスター化インデックスとセカンダリインデックス"&gt;
+ クラスター化インデックスとセカンダリインデックス
+ &lt;a href="#%e3%82%af%e3%83%a9%e3%82%b9%e3%82%bf%e3%83%bc%e5%8c%96%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9%e3%81%a8%e3%82%bb%e3%82%ab%e3%83%b3%e3%83%80%e3%83%aa%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB テーブルは行データをクラスター化インデックスに格納します。InnoDB は宣言された主キーを選択し、そうでなければ最初の適切な非 NULL 一意キーを選択し、どちらもなければ内部の隠しキーを作成します。各セカンダリインデックスエントリには主キー値が格納されるため、短く安定した主キーを宣言してください。&lt;/p&gt;
+&lt;p&gt;セカンダリインデックスには、インデックス対象の列と主キー値が格納されます。クエリがセカンダリインデックスにない列を必要とする場合、一致する各エントリについてクラスター化インデックスのルックアップが実行されます。測定されたコストを削減できる場合にのみカバリングインデックスを追加してください。幅の広いインデックスはページのファンアウトを減らし、書き込みオーバーヘッドを増加させます。&lt;/p&gt;
+&lt;h2 id="複合インデックス"&gt;
+ 複合インデックス
+ &lt;a href="#%e8%a4%87%e5%90%88%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;(tenant_id, created_at, id)&lt;/code&gt; では、B+ 木は次を効率的に検索できます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;ツリーの順序は &lt;code&gt;tenant_id&lt;/code&gt; から始まるため、&lt;code&gt;created_at&lt;/code&gt; だけから効率的にシークすることはできません。一般的な設計では、等値述語を範囲述語より前に置き、その後に順序付けまたはカバレッジを満たすために必要な列を置きます。実際の述語、データ分布、結果サイズによってインデックス順序は変わるため、&lt;code&gt;EXPLAIN ANALYZE&lt;/code&gt; で選択を検証してください。&lt;/p&gt;
+&lt;h2 id="インデックスの種類と診断"&gt;
+ インデックスの種類と診断
+ &lt;a href="#%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9%e3%81%ae%e7%a8%ae%e9%a1%9e%e3%81%a8%e8%a8%ba%e6%96%ad" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;UNIQUE&lt;/code&gt; は不変条件を適用すると同時にアクセスパスを作成します。InnoDB のインデックスの大半は B ツリーです。&lt;code&gt;FULLTEXT&lt;/code&gt; インデックスはトークンベースのテキスト検索をサポートし、ジオメトリ値に対する &lt;code&gt;SPATIAL&lt;/code&gt; インデックスは R ツリーを使用します。MySQL は &lt;code&gt;MEMORY&lt;/code&gt; エンジン向けのハッシュインデックスも説明しています。InnoDB は一般的なハッシュインデックスを公開しませんが、アダプティブハッシュインデックスは内部最適化として頻繁にアクセスされる B ツリーページをキャッシュできます。プレフィックスインデックスは長いテキストキーのバイトサイズを削減できますが、選択したプレフィックスが選択性を維持する場合に限ります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXPLAIN&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ANALYZE&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id, created_at
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; event
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;7&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;2026-01-01&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;LIMIT&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;インデックスが使用されると仮定せず、実際の行数、ループ回数、時間を確認します。統計情報、カーディナリティの推定、少ない結果セットによって、インデックス走査よりテーブルスキャンが安価になることがあります。&lt;/p&gt;</description></item><item><title>MySQL のテーブルとビュー</title><link>https://example.org/ja/mysql-tables-and-views/</link><pubDate>Thu, 09 Sep 2021 08:09:41 +0800</pubDate><guid>https://example.org/ja/mysql-tables-and-views/</guid><description>&lt;p&gt;ベーステーブルは行を永続化します。ビューはクエリ定義を永続化し、その結果を
+テーブルのようなオブジェクトとして提示します。&lt;code&gt;SHOW FULL TABLES&lt;/code&gt; で両者を区別でき、
+&lt;code&gt;INFORMATION_SCHEMA.TABLES.TABLE_TYPE&lt;/code&gt; は &lt;code&gt;BASE TABLE&lt;/code&gt; または &lt;code&gt;VIEW&lt;/code&gt; を返します。&lt;/p&gt;
+&lt;h2 id="innodb-の行フォーマット"&gt;
+ InnoDB の行フォーマット
+ &lt;a href="#innodb-%e3%81%ae%e8%a1%8c%e3%83%95%e3%82%a9%e3%83%bc%e3%83%9e%e3%83%83%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB は &lt;code&gt;REDUNDANT&lt;/code&gt;、&lt;code&gt;COMPACT&lt;/code&gt;、&lt;code&gt;DYNAMIC&lt;/code&gt;、&lt;code&gt;COMPRESSED&lt;/code&gt; の各行フォーマットを
+サポートします。現在のデフォルトは &lt;code&gt;DYNAMIC&lt;/code&gt; です。可変長カラムでは、InnoDB は
+長い値をオーバーフローページに格納し、クラスタ化レコード内に参照を保持できます。
+インラインとオーバーフローの厳密な動作は、行フォーマット、ページサイズ、カラム型、
+値の長さによって異なります。そのため、スキーマ設計では &lt;code&gt;TEXT&lt;/code&gt; または &lt;code&gt;BLOB&lt;/code&gt; の値が
+行内で固定サイズを占めると仮定すべきではありません。&lt;/p&gt;
+&lt;p&gt;テーブルに適用されている設定を確認します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SHOW&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; STATUS &lt;span style="color:#66d9ef"&gt;LIKE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;orders&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SHOW&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; orders;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="ビュー"&gt;
+ ビュー
+ &lt;a href="#%e3%83%93%e3%83%a5%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;安定した明示的なカラムリストを指定してビューを作成します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;VIEW&lt;/span&gt; active_customer_orders &lt;span style="color:#66d9ef"&gt;AS&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; o.id, o.customer_id, o.created_at, o.total
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; orders &lt;span style="color:#66d9ef"&gt;AS&lt;/span&gt; o
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; o.status &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;active&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;デフォルトでは、ビューは別個のテーブルを格納しません。オプティマイザーは、
+マージ可能なビューを外側のクエリにマージできます。一方、集約、&lt;code&gt;DISTINCT&lt;/code&gt;、
+一部の派生テーブル操作など、定義上必要な場合は一時テーブルを実体化できます。
+&lt;code&gt;ALGORITHM = MERGE&lt;/code&gt; と &lt;code&gt;ALGORITHM = TEMPTABLE&lt;/code&gt; は優先する方式を表しますが、
+ビュー定義は選択したアルゴリズムの制約を満たす必要があります。&lt;/p&gt;
+&lt;p&gt;影響を受ける各行が単一のベーステーブルに明確に対応する場合、一部のビューは
+更新可能です。集約、&lt;code&gt;GROUP BY&lt;/code&gt;、&lt;code&gt;DISTINCT&lt;/code&gt;、ウィンドウ関数、集合演算、
+または更新不可能な結合を含むビューは更新できません。ビューの更新動作が
+必須インターフェイスの一部でない場合は、書き込みにベーステーブルを使用します。&lt;/p&gt;</description></item><item><title>MongoDB ビュー</title><link>https://example.org/ja/mongodb-views/</link><pubDate>Sun, 25 Jul 2021 21:42:07 +0800</pubDate><guid>https://example.org/ja/mongodb-views/</guid><description>&lt;p&gt;MongoDB ビューは、コレクションまたは別のビューに対する読み取り専用のクエリ定義
+です。ビューが保存するのは集約パイプラインであり、その結果ではないため、読み取り
+ごとに現在のソースデータへパイプラインが適用されます。したがって標準ビューは
+マテリアライズドビューのキャッシュを提供しません。&lt;/p&gt;
+&lt;h2 id="ビューを作成する"&gt;
+ ビューを作成する
+ &lt;a href="#%e3%83%93%e3%83%a5%e3%83%bc%e3%82%92%e4%bd%9c%e6%88%90%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;db.createView()&lt;/code&gt; は対象コレクション名、ソース名前空間、集約パイプラインを受け取ります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;javascript&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-javascript" data-lang="javascript"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;db&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;createView&lt;/span&gt;(
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;active_orders&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;orders&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; [
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; { &lt;span style="color:#a6e22e"&gt;$match&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; { &lt;span style="color:#a6e22e"&gt;status&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;active&amp;#34;&lt;/span&gt; } },
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; { &lt;span style="color:#a6e22e"&gt;$project&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; { &lt;span style="color:#a6e22e"&gt;customerId&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;, &lt;span style="color:#a6e22e"&gt;total&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;, &lt;span style="color:#a6e22e"&gt;createdAt&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt; } }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;)&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;クライアントはコレクションと同じように &lt;code&gt;active_orders&lt;/code&gt; をクエリします。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;javascript&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-javascript" data-lang="javascript"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;db&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;active_orders&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;find&lt;/span&gt;({ &lt;span style="color:#a6e22e"&gt;customerId&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;customerId&lt;/span&gt; })&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;サーバーはビュー定義とクライアントクエリを組み合わせ、ソースコレクションに対して
+結果を計画します。標準ビューは基盤となるコレクションのインデックスを使用します。
+汎用インデックスを標準ビューへ直接作成、削除、再構築することはできません。選択性
+の高い &lt;code&gt;$match&lt;/code&gt; ステージを先頭に置き、パイプラインとクライアントクエリが使うソース
+フィールドにインデックスを設定します。&lt;/p&gt;
+&lt;p&gt;Views can also be created with &lt;code&gt;db.createCollection()&lt;/code&gt;:&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;javascript&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-javascript" data-lang="javascript"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;db&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;createCollection&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;recent_orders&amp;#34;&lt;/span&gt;, {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;viewOn&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;orders&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;pipeline&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; [
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; { &lt;span style="color:#a6e22e"&gt;$match&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; { &lt;span style="color:#a6e22e"&gt;createdAt&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; { &lt;span style="color:#a6e22e"&gt;$gte&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;ISODate&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;2026-01-01&amp;#34;&lt;/span&gt;) } } }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ],
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;collation&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; { &lt;span style="color:#a6e22e"&gt;locale&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;en&amp;#34;&lt;/span&gt;, &lt;span style="color:#a6e22e"&gt;strength&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;})&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;ビューとそのソースは同じデータベースに存在しなければなりません。ビューのデフォルト
+照合順序は作成時に固定され、クエリで別の照合順序に上書きすることはできません。&lt;/p&gt;</description></item><item><title>MySQL の変数とプリペアドステートメント</title><link>https://example.org/ja/mysql-variables/</link><pubDate>Thu, 24 Jun 2021 18:18:18 +0800</pubDate><guid>https://example.org/ja/mysql-variables/</guid><description>&lt;p&gt;MySQL は、サーバーシステム変数、ローカルルーチン変数、セッションユーザー変数を区別します。スコープと評価規則が異なるため、相互に置き換えて使用すべきではありません。&lt;/p&gt;
+&lt;h2 id="システム変数とユーザー変数"&gt;
+ システム変数とユーザー変数
+ &lt;a href="#%e3%82%b7%e3%82%b9%e3%83%86%e3%83%a0%e5%a4%89%e6%95%b0%e3%81%a8%e3%83%a6%e3%83%bc%e3%82%b6%e3%83%bc%e5%a4%89%e6%95%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;システム変数は &lt;code&gt;@@&lt;/code&gt; を使用し、グローバル、セッション、または両方のスコープを持ちます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.sql_mode;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; sql_safe_updates &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;グローバル変数を変更すると、その変数がセッションスコープも持つ場合は新しいセッションに影響します。既存の接続のトランザクションポリシーを変更する方法ではありません。動的変数は実行時に変更できますが、読み取り専用変数には起動時の設定が必要です。&lt;code&gt;SET PERSIST&lt;/code&gt; は実行時のグローバル値を変更して &lt;code&gt;mysqld-auto.cnf&lt;/code&gt; に書き込みます。&lt;code&gt;SET PERSIST_ONLY&lt;/code&gt; は実行時の状態を変更せずに永続化された値を書き込みます。どちらかを使用する前に変数が永続化可能であることを確認し、生成されたファイルの所有権はサーバーに保持し、そのファイルを直接編集しないでください。&lt;/p&gt;
+&lt;p&gt;ユーザー変数は &lt;code&gt;@name&lt;/code&gt; を使用し、接続ローカルで、宣言された型を持ちません。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;minimum_total &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id &lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; orders &lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; total &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;minimum_total;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;手続き型評価を模倣するために、1 つの式またはクエリ内で同じユーザー変数を代入して読み取らないでください。MySQL は、そのようなクエリを信頼できるものにする評価順序を保証しません。代わりにウィンドウ関数、共通テーブル式、ストアドプログラムのローカル変数、またはアプリケーションコードを使用します。値の型は代入時に導出され、プリペアドステートメントの参照は、そのステートメントが最初に準備されたときに確立された変数型を保持します。必要な SQL 型が契約の一部である場合は、値を明示的に &lt;code&gt;CAST&lt;/code&gt; してください。&lt;/p&gt;
+&lt;h2 id="プリペアドステートメント"&gt;
+ プリペアドステートメント
+ &lt;a href="#%e3%83%97%e3%83%aa%e3%83%9a%e3%82%a2%e3%83%89%e3%82%b9%e3%83%86%e3%83%bc%e3%83%88%e3%83%a1%e3%83%b3%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;クライアントライブラリのプリペアドステートメントは、データを SQL 構文から分離してバインドするため、アプリケーションクエリではデフォルトにすべきです。これにより、値が注入された SQL として解釈されるのを防ぎ、サーバーがステートメント構造を個別に解析できるようにします。&lt;/p&gt;
+&lt;p&gt;サーバー側 SQL のプリペアドステートメントは、接続スコープのライフサイクルに従います。&lt;code&gt;PREPARE&lt;/code&gt; は 1 つのステートメントを解析し、&lt;code&gt;EXECUTE&lt;/code&gt; はそれを繰り返し実行し、&lt;code&gt;DEALLOCATE PREPARE&lt;/code&gt; は解放します。同じ名前で 2 回目の &lt;code&gt;PREPARE&lt;/code&gt; を実行すると、最初に古いステートメントが解放されます。セッション終了時にもプリペアドステートメントは破棄されます。識別子を組み立てる必要がある管理用の動的 SQL で便利です。パラメータマーカーがバインドするのはデータ値であり、識別子、キーワード、SQL フラグメントではありません。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;sql&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;SELECT id FROM orders WHERE customer_id = ?&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;PREPARE&lt;/span&gt; stmt &lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;sql&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;customer_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXECUTE&lt;/span&gt; stmt &lt;span style="color:#66d9ef"&gt;USING&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;customer_id;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;DEALLOCATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;PREPARE&lt;/span&gt; stmt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;動的な識別子を SQL に連結する前に、検証または許可リスト化してください。パラメータマーカーはすべての文法上の位置で任意の式を表せるわけではなく、プリペアドステートメントは &lt;code&gt;max_prepared_stmt_count&lt;/code&gt; によって制限されます。短期間の管理用ステートメントは解放し、アプリケーションドライバーには独自のプリペアドステートメントハンドルを管理させます。&lt;/p&gt;</description></item><item><title>MySQL サーバーとデータ型</title><link>https://example.org/ja/mysql-overview/</link><pubDate>Wed, 06 Jan 2021 12:27:16 +0800</pubDate><guid>https://example.org/ja/mysql-overview/</guid><description>&lt;p&gt;MySQL は、サーバーの初期化、スキーマ定義、接続設定を分離しています。本番環境へのインストールでは、空のデータディレクトリを一度だけ初期化し、そのディレクトリの外部に設定を保存し、プラットフォームのサービスマネージャーを通じてサーバーを管理する必要があります。&lt;code&gt;mysqld --initialize&lt;/code&gt; はデータディクショナリと初期管理アカウントを作成しますが、アプリケーションスキーマや権限は設定しません。&lt;/p&gt;
+&lt;h2 id="アカウント権限付与ロール"&gt;
+ アカウント、権限付与、ロール
+ &lt;a href="#%e3%82%a2%e3%82%ab%e3%82%a6%e3%83%b3%e3%83%88%e6%a8%a9%e9%99%90%e4%bb%98%e4%b8%8e%e3%83%ad%e3%83%bc%e3%83%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL はユーザーとホストの両方でアカウントを識別するため、&lt;code&gt;'app'@'localhost'&lt;/code&gt; と &lt;code&gt;'app'@'10.%'&lt;/code&gt; は別個のIDです。明示的な認証ポリシーを指定してアカウントを作成します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;USER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;IF&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;EXISTS&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; IDENTIFIED &lt;span style="color:#66d9ef"&gt;WITH&lt;/span&gt; caching_sha2_password &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;generated-secret&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;MySQL 8 では、&lt;code&gt;CREATE USER&lt;/code&gt; がIDを作成し、&lt;code&gt;GRANT&lt;/code&gt; が権限を割り当てます。&lt;code&gt;GRANT&lt;/code&gt; はアカウントを作成しません。ホストの照合は認証前に行われ、その後、ロールと直接付与された権限によって認可が決まります。実効権限を確認するには &lt;code&gt;SHOW GRANTS&lt;/code&gt; を使用します。ロールは権限をグループ化し、複数のアカウントで再利用できるようにします。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ROLE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;GRANT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ON&lt;/span&gt; app.orders &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;GRANT&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;DEFAULT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ROLE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;アカウント管理はアプリケーションのマイグレーションテーブルの外部で行います。アプリケーションスキーマは、場当たり的な権限変更が行われても有効性を維持できるように設計してください。&lt;/p&gt;
+&lt;h2 id="数値型"&gt;
+ 数値型
+ &lt;a href="#%e6%95%b0%e5%80%a4%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;整数型は表示幅ではなく、値の範囲から選択します。&lt;code&gt;TINYINT&lt;/code&gt;、&lt;code&gt;SMALLINT&lt;/code&gt;、&lt;code&gt;MEDIUMINT&lt;/code&gt;、&lt;code&gt;INT&lt;/code&gt;、&lt;code&gt;BIGINT&lt;/code&gt; は、それぞれ 1、2、3、4、8 バイトを使用します。符号なし型は範囲を非負値に移しますが、データベース間の移植性に関する懸念が生じます。&lt;code&gt;BOOLEAN&lt;/code&gt; と &lt;code&gt;BOOL&lt;/code&gt; は &lt;code&gt;TINYINT(1)&lt;/code&gt; のエイリアスです。&lt;/p&gt;
+&lt;p&gt;通貨など、10進演算が必要な数量には &lt;code&gt;DECIMAL(p, s)&lt;/code&gt; を使用します。&lt;code&gt;p&lt;/code&gt; は10進数全体の桁数、&lt;code&gt;s&lt;/code&gt; は小数点以下の桁数です。&lt;code&gt;FLOAT&lt;/code&gt; と &lt;code&gt;DOUBLE&lt;/code&gt; は2進浮動小数点値を表すため、10進小数を丸めることがあります。等価性が重要な金額には使用しないでください。&lt;/p&gt;
+&lt;h2 id="時間型と構造化された値"&gt;
+ 時間型と構造化された値
+ &lt;a href="#%e6%99%82%e9%96%93%e5%9e%8b%e3%81%a8%e6%a7%8b%e9%80%a0%e5%8c%96%e3%81%95%e3%82%8c%e3%81%9f%e5%80%a4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DATE&lt;/code&gt; は暦日を格納し、&lt;code&gt;TIME&lt;/code&gt; は時刻または期間を格納します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DATETIME&lt;/code&gt; は、タイムゾーン変換を行わず、文字どおりの日付と時刻を格納します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;TIMESTAMP&lt;/code&gt; は瞬間として格納され、サポートされる値について、セッションのタイムゾーンと UTC の間で変換されます。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;JSON&lt;/code&gt; は JSON を検証し、JSON 関数を提供しますが、その値は結合やインデックスで使用するリレーショナル列の代替にはなりません。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;ローカルの予定を表す値には、&lt;code&gt;DATETIME&lt;/code&gt; と明示的な業務上のタイムゾーンを使用します。イベントの発生時点には UTC の &lt;code&gt;TIMESTAMP&lt;/code&gt; または UTC の &lt;code&gt;DATETIME&lt;/code&gt; を使用し、アプリケーションで変換する境界を明示します。&lt;/p&gt;</description></item></channel></rss>

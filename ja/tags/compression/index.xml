@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Compression on cesun.life</title><link>https://example.org/ja/tags/compression/</link><description>Recent content in Compression on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Fri, 04 Apr 2025 21:50:25 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/compression/index.xml" rel="self" type="application/rss+xml"/><item><title>Unix compress と LZW</title><link>https://example.org/ja/unix-compress/</link><pubDate>Fri, 04 Apr 2025 21:50:25 +0800</pubDate><guid>https://example.org/ja/unix-compress/</guid><description>&lt;p&gt;歴史的な Unix &lt;code&gt;compress&lt;/code&gt; ユーティリティは、慣例的に
+&lt;code&gt;.Z&lt;/code&gt; という名前のファイルを書き出します。これは DEFLATE ではなく、LZW 系の辞書符号化方式を使用します。&lt;code&gt;uncompress&lt;/code&gt; と
+&lt;code&gt;zcat&lt;/code&gt; は、この形式を提供するシステム上で互換性のあるコマンドラインインターフェースを公開しています。&lt;/p&gt;
+&lt;h2 id="lzw-の初期化と同期"&gt;
+ LZW の初期化と同期
+ &lt;a href="#lzw-%e3%81%ae%e5%88%9d%e6%9c%9f%e5%8c%96%e3%81%a8%e5%90%8c%e6%9c%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;LZW エンコーダーは、1 バイトのアルファベット用エントリから開始します。現在のフレーズ &lt;code&gt;w&lt;/code&gt; を保持し、次のバイト &lt;code&gt;k&lt;/code&gt; を読み取り、そのフレーズが &lt;code&gt;w + k&lt;/code&gt; 辞書に存在する間は処理を続けます。そのフレーズが存在しない場合は、&lt;code&gt;w&lt;/code&gt; のコードを出力し、&lt;code&gt;w + k&lt;/code&gt; を追加して、&lt;code&gt;k&lt;/code&gt; から開始します。デコーダーは各コードに対応する文字列を出力し、最初のコードの後は、直前に復号した文字列と現在の文字列の先頭バイトを連結したエントリを追加します。入力を使い果たした後、エンコーダーは最後のフレーズを出力します。したがって、エンコーダーとデコーダーは、1 コード遅れて同じエントリを追加します。&lt;/p&gt;
+&lt;p&gt;よく知られた &lt;code&gt;KwKwK&lt;/code&gt; のケースは、コードが次の辞書インデックスと等しい場合に発生します。このときデコーダーはそれを &lt;code&gt;previous + first(previous)&lt;/code&gt; として展開します。このケースを拒否すると有効なストリームを拒否することになり、次のインデックスを超えるコードを受け入れると辞書の同期が失われます。&lt;/p&gt;
+&lt;h2 id="z-ビットストリーム"&gt;
+ &lt;code&gt;.Z&lt;/code&gt; ビットストリーム
+ &lt;a href="#z-%e3%83%93%e3%83%83%e3%83%88%e3%82%b9%e3%83%88%e3%83%aa%e3%83%bc%e3%83%a0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;.Z&lt;/code&gt; ストリームは &lt;code&gt;1f 9d&lt;/code&gt; とフラグバイトで始まります。下位 5 ビットは最大コード幅を指定し、通常は 9 ～ 16 ビットです。ビット 7 はブロックモードを有効にします。残りの予約ビットは、実装の互換性規則に従って処理する必要があります。コードは 9 ビットから始まり、辞書が現在の幅の容量に達すると幅が広がります。ブロックモードでは、コード 256 は &lt;code&gt;CLEAR&lt;/code&gt; です。エンコーダーはこのコードを出力してエントリを破棄し、初期アルファベットで再開できます。デコーダーは同じ時点でリセットし、その後 9 ビットのコードを再開する必要があります。非ブロックモードのストリームには、そのリセットコードはありません。&lt;/p&gt;
+&lt;p&gt;コード幅の遷移規則は &lt;code&gt;.Z&lt;/code&gt; 方言の一部であるため、読み取り側は次のコードから推測するのではなく、形式で指定されたタイミングに従う必要があります。歴史的な実装はエッジケースで異なるため、対象の &lt;code&gt;compress&lt;/code&gt; 実装との相互運用性テストが適切です。&lt;/p&gt;</description></item><item><title>LZ77 スライディングウィンドウ圧縮</title><link>https://example.org/ja/lz77/</link><pubDate>Sat, 03 Aug 2024 21:49:43 +0800</pubDate><guid>https://example.org/ja/lz77/</guid><description>&lt;p&gt;LZ77 は、繰り返される入力を、限定された履歴ウィンドウ内への参照で置き換える非可逆圧縮方式のファミリーです。元の 1977 年の設計ではスライディング辞書を使用していました。実用的な形式では、独自のトークン構文、マッチ検索器、エントロピー符号を選択します。&lt;/p&gt;
+&lt;h2 id="リテラル履歴マッチ"&gt;
+ リテラル、履歴、マッチ
+ &lt;a href="#%e3%83%aa%e3%83%86%e3%83%a9%e3%83%ab%e5%b1%a5%e6%ad%b4%e3%83%9e%e3%83%83%e3%83%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;入力位置で、エンコーダーは以前に出力したバイト列から一致するプレフィックスを検索します。有用なマッチがない場合はリテラルを出力し、そうでなければ少なくとも距離と長さを含むバックリファレンスを出力します。形式によっては各マッチの後にリテラルを追加し、別の形式では独立したリテラルとマッチのストリームを出力します。デコーダーは、現在の出力位置から &lt;code&gt;distance&lt;/code&gt; バイト前の位置から &lt;code&gt;length&lt;/code&gt; バイトをコピーします。&lt;/p&gt;
+&lt;p&gt;コピー元とコピー先は重なることがあります。履歴が &lt;code&gt;a&lt;/code&gt; で終わっている場合、距離 1、長さ 5 のマッチは &lt;code&gt;aaaaa&lt;/code&gt; を生成します。コピーされた各バイトが次のバイトのコピー元になるためです。デコーダーは前方のバイト順でコピーするか、同等の連鎖セマンティクスを持つループを使用する必要があります。&lt;code&gt;memcpy&lt;/code&gt; もスナップショット方式の &lt;code&gt;memmove&lt;/code&gt; も、すべての有効な重複マッチを実装するものではありません。&lt;/p&gt;
+&lt;h2 id="マッチ検索と解析"&gt;
+ マッチ検索と解析
+ &lt;a href="#%e3%83%9e%e3%83%83%e3%83%81%e6%a4%9c%e7%b4%a2%e3%81%a8%e8%a7%a3%e6%9e%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;大きなウィンドウはより遠くの反復を見つけますが、より多くのメモリを消費し、距離を表すビット数も増やします。ハッシュチェーン、二分木、サフィックス構造、候補数を制限した検索は、圧縮率と CPU 時間をトレードオフします。&lt;/p&gt;
+&lt;p&gt;貪欲パーサーは、現在位置で最長のマッチを選択します。遅延パーサーはまず候補を記録し、次の位置により良いマッチがあるか確認して、合計コストが改善する場合は代わりにリテラルを出力します。動的計画法はより大きな解析空間を検索できますが、CPU とメモリのコストが増加します。トークンストリームは自己完結しているため、これらのエンコーダーの選択はいずれもデコーダーの正しさに影響しません。&lt;/p&gt;
+&lt;h2 id="境界と防御的デコード"&gt;
+ 境界と防御的デコード
+ &lt;a href="#%e5%a2%83%e7%95%8c%e3%81%a8%e9%98%b2%e5%be%a1%e7%9a%84%e3%83%87%e3%82%b3%e3%83%bc%e3%83%89" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;各形式は、最小マッチ長、最大長、ウィンドウサイズ、距離エンコーディングを独自に定義します。たとえば DEFLATE は最大 32 KiB の距離と最大 258 バイトの長さを許可します。デコーダーは、利用可能な履歴を超える距離、無効な長さまたは距離コード、出力位置の計算中の整数オーバーフロー、呼び出し元の制限を超える出力を拒否する必要があります。小さな入力が非常に大きな出力ストリームに展開する可能性があるため、リソース制限は総出力と処理量の両方を対象にすべきです。&lt;/p&gt;
+&lt;h2 id="deflate-と関連形式"&gt;
+ DEFLATE と関連形式
+ &lt;a href="#deflate-%e3%81%a8%e9%96%a2%e9%80%a3%e5%bd%a2%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;DEFLATE はリテラル/長さシンボルと距離シンボルをハフマン木でエントロピー符号化し、LZ77 ウィンドウを参照バイトに使用します。LZ4 は同じコピー操作を中心にしたコンパクトなトークン形式を使用し、Zstandard はウィンドウ付き LZ マッチ段階と異なるエントロピー符号を組み合わせます。一方、LZ78 と LZW は句の明示的な辞書を維持します。これらの辞書更新規則を LZ77 の履歴参照の代わりに使用してはなりません。&lt;/p&gt;
+&lt;h2 id="参照"&gt;
+ 参照
+ &lt;a href="#%e5%8f%82%e7%85%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;J. Ziv and A. Lempel, “&lt;a href="https://doi.org/10.1109/TIT.1977.1055714"&gt;A Universal Algorithm for Sequential Data Compression&lt;/a&gt;,” &lt;em&gt;IEEE Transactions on Information Theory&lt;/em&gt;, 1977.&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.rfc-editor.org/rfc/rfc1951"&gt;RFC 1951: DEFLATE&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.rfc-editor.org/rfc/rfc7932"&gt;RFC 7932: Brotli Compressed Data Format&lt;/a&gt;, for another windowed LZ design.&lt;/li&gt;
+&lt;/ul&gt;</description></item><item><title>ハフマン符号</title><link>https://example.org/ja/huffman-coding/</link><pubDate>Wed, 26 Jun 2024 21:31:33 +0800</pubDate><guid>https://example.org/ja/huffman-coding/</guid><description>&lt;p&gt;ハフマン符号は、シンボルを可変長のビット列に対応付けます。接頭語自由符号では、
+ある符号語が別の符号語の接頭語になることがないため、デコーダーは1つの二分木を
+たどり、葉に到達するとすぐにシンボルを出力できます。接頭語自由符号は一意復号
+可能ですが、一意復号可能な符号がすべて接頭語自由というわけではありません。&lt;/p&gt;
+&lt;h2 id="接頭語自由符号とクラフトの不等式"&gt;
+ 接頭語自由符号とクラフトの不等式
+ &lt;a href="#%e6%8e%a5%e9%a0%ad%e8%aa%9e%e8%87%aa%e7%94%b1%e7%ac%a6%e5%8f%b7%e3%81%a8%e3%82%af%e3%83%a9%e3%83%95%e3%83%88%e3%81%ae%e4%b8%8d%e7%ad%89%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;符号語長が &lt;code&gt;lᵢ&lt;/code&gt; である二元接頭語符号について、クラフトの不等式は次のように
+なります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Σ 2^(-lᵢ) ≤ 1&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;この不等式は、各葉が占める二分木の割合を数えたものです。逆に、この不等式を
+満たす正の整数からなる任意の長さの列は、二元接頭語符号として実現できます。
+等号は完全な木を表し、狭義の不等号の場合は未使用の枝が残ります。&lt;/p&gt;
+&lt;h2 id="頻度木の構築"&gt;
+ 頻度木の構築
+ &lt;a href="#%e9%a0%bb%e5%ba%a6%e6%9c%a8%e3%81%ae%e6%a7%8b%e7%af%89" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;シンボルの頻度が与えられると、ハフマンアルゴリズムは重みが最小の2つのノードを
+繰り返し取り出し、それらを重みの和を持つノードの下の兄弟にして、そのノードを
+再挿入します。シンボルの深さが符号長になります。出現頻度の低いシンボルを木の
+最も深い位置で併合することにより、最適性を直感的に示す交換論法が得られます。
+つまり、出現頻度の高いシンボルを、それより低いシンボルの上に移しても、重み付き
+経路長は増加しません。生成された木は、与えられた頻度に対する二元接頭語符号の
+中で期待符号長を最小化します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;while more than one node remains:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; a, b = remove the two lowest-weight nodes
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; insert node(weight(a) + weight(b), a, b)&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;重みが等しい場合、最適な木が複数存在し得ます。決定的な実装では、たとえば頻度の
+次に安定したシンボル序数を比較するなど、同順位の処理方法を定義する必要があります。
+期待ビット数は変わらないものの、再現可能な出力とテストには決定性が重要です。
+最大符号長を規定するフォーマットでは、長さ制限付きハフマンアルゴリズムが必要です。
+木を単純に切り詰めると、クラフトの不等式に違反したり、意図したシンボル順序が
+変わったりする可能性があります。&lt;/p&gt;
+&lt;p&gt;短い入力やエントロピーの高い入力では、符号表のオーバーヘッドが圧縮による削減量を
+上回る場合があります。ハフマン符号は表現方法の選択肢であり、すべての入力が小さく
+なることを保証するものではありません。&lt;/p&gt;
+&lt;h2 id="正準符号の再構築"&gt;
+ 正準符号の再構築
+ &lt;a href="#%e6%ad%a3%e6%ba%96%e7%ac%a6%e5%8f%b7%e3%81%ae%e5%86%8d%e6%a7%8b%e7%af%89" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;多くのフォーマットでは、左右の木のポインターではなく符号長を伝送します。正準符号の
+構築では、有効なシンボルを &lt;code&gt;(length, symbol order)&lt;/code&gt; でソートし、各符号長の範囲内で
+連続した整数符号を割り当て、符号長が増えるたびに次の符号を左シフトします。
+デコーダーは同じ計算を繰り返した後、各符号をルックアップテーブルまたは復号木に
+挿入します。したがって、木の形状を伝送しなくても、同一の符号長から同一の符号が
+生成されます。&lt;/p&gt;</description></item><item><title>zlib Streaming API</title><link>https://example.org/ja/zlib/</link><pubDate>Wed, 03 Apr 2024 14:47:29 +0800</pubDate><guid>https://example.org/ja/zlib/</guid><description>&lt;p&gt;zlib は DEFLATE とその一般的なラッパーを実装する C ライブラリです。ストリーミング API は &lt;code&gt;z_stream&lt;/code&gt; を使うため、
+アプリケーションは 1 回の呼び出しでメッセージ全体を消費・生成すると仮定せず、上限付きバッファーで入力と出力を処理できます。&lt;/p&gt;
+&lt;h2 id="ストリーム状態と初期化"&gt;
+ ストリーム状態と初期化
+ &lt;a href="#%e3%82%b9%e3%83%88%e3%83%aa%e3%83%bc%e3%83%a0%e7%8a%b6%e6%85%8b%e3%81%a8%e5%88%9d%e6%9c%9f%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;アプリケーションは &lt;code&gt;next_in&lt;/code&gt;/&lt;code&gt;avail_in&lt;/code&gt; と &lt;code&gt;next_out&lt;/code&gt;/&lt;code&gt;avail_out&lt;/code&gt; を指定します。
+呼び出し後、zlib はポインターを進めて利用可能数を減らし、&lt;code&gt;total_in&lt;/code&gt; と &lt;code&gt;total_out&lt;/code&gt; は累積カウンターを提供します。
+アプリケーションは生成されたバイトを消費し、次の呼び出し前にバッファーを補充する必要があります。
+その他の状態フィールドは zlib に任せます。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;deflateInit()&lt;/code&gt; は zlib ラッパー付きストリームを生成します。&lt;code&gt;deflateInit2()&lt;/code&gt; は負の &lt;code&gt;windowBits&lt;/code&gt; で raw DEFLATE を、
+&lt;code&gt;windowBits + 16&lt;/code&gt; で gzip を選択します。初期化前にアロケーターのフィールドを初期化し、正常に初期化されたすべてのストリームで、
+エラーパスを含め &lt;code&gt;deflateEnd()&lt;/code&gt; を呼び出します。圧縮器は &lt;code&gt;deflateSetDictionary()&lt;/code&gt; で共有履歴を事前ロードできます。
+zlib ラッパーは Adler-32 の辞書識別子を持ち、&lt;code&gt;inflate()&lt;/code&gt; は &lt;code&gt;Z_NEED_DICT&lt;/code&gt; を返せます。
+raw DEFLATE では外側のプロトコルが辞書を識別する必要があります。gzip ラッパーはプリセット辞書の通知を定義しません。&lt;/p&gt;
+&lt;h2 id="正しい-deflate-ループ"&gt;
+ 正しい deflate ループ
+ &lt;a href="#%e6%ad%a3%e3%81%97%e3%81%84-deflate-%e3%83%ab%e3%83%bc%e3%83%97" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;通常の入力には &lt;code&gt;Z_NO_FLUSH&lt;/code&gt; を使います。頻繁なフラッシュは圧縮率を下げます。入力が残っているか出力が保留中の間は
+&lt;code&gt;deflate()&lt;/code&gt; を呼び続けます。終了するには入力の供給を止め、&lt;code&gt;Z_STREAM_END&lt;/code&gt; が返るまで &lt;code&gt;deflate(..., Z_FINISH)&lt;/code&gt; を呼び、
+呼び出しの間に出力バッファーを拡張または排出します。次の上限付き入力の例では、&lt;code&gt;input_len&lt;/code&gt; が zlib の &lt;code&gt;uInt&lt;/code&gt; カウントに収まると仮定しています。&lt;/p&gt;</description></item><item><title>DEFLATE と gzip の形式</title><link>https://example.org/ja/deflate-and-gzip/</link><pubDate>Wed, 27 Sep 2023 03:10:18 +0800</pubDate><guid>https://example.org/ja/deflate-and-gzip/</guid><description>&lt;p&gt;DEFLATE は RFC 1951 で定義されたビットストリーム形式です。LZ77 の
+スライディングウィンドウとハフマン符号を組み合わせています。「zlib」と
+「gzip」は DEFLATE を含むファイルを指すことが多いですが、それぞれ raw
+ビットストリームに対する異なるラッパーです。&lt;/p&gt;
+&lt;h2 id="ブロック境界と-btype"&gt;
+ ブロック境界と BTYPE
+ &lt;a href="#%e3%83%96%e3%83%ad%e3%83%83%e3%82%af%e5%a2%83%e7%95%8c%e3%81%a8-btype" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;DEFLATE ストリームは一連のブロックで構成されます。各ブロックは現在の
+ビット位置から &lt;code&gt;BFINAL&lt;/code&gt;（1 ビット）と &lt;code&gt;BTYPE&lt;/code&gt;（2 ビット）で始まります。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;&lt;code&gt;BTYPE&lt;/code&gt;&lt;/th&gt;
+ &lt;th&gt;意味&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;00&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;ハフマン符号化を行わない格納バイト&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;01&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;固定ハフマン符号で圧縮&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;10&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;動的ハフマン符号で圧縮&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;11&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;予約済みで無効&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;最後のブロックだけ &lt;code&gt;BFINAL&lt;/code&gt; が 1 になります。圧縮ブロックは、その
+リテラル/長さストリームがブロック終端（EOB）であるシンボル 256 を出力
+すると終了します。次のブロックヘッダーは次のビットから直ちに続くため、
+圧縮ブロックはバイト境界までパディングされません。格納ブロックは例外
+です。ヘッダーの後、デコーダーは現在のバイトに残っているビットを破棄し、
+リトルエンディアンの &lt;code&gt;LEN&lt;/code&gt; と &lt;code&gt;NLEN&lt;/code&gt;（&lt;code&gt;LEN&lt;/code&gt; の 1 の補数）を読み取り、
+ちょうど &lt;code&gt;LEN&lt;/code&gt; バイトをコピーします。&lt;code&gt;LEN&lt;/code&gt; は 16 ビットなので、1 つの
+格納ブロックに格納できるのは最大 65,535 バイトです。&lt;/p&gt;
+&lt;h2 id="lz77-シンボルとハフマン符号"&gt;
+ LZ77 シンボルとハフマン符号
+ &lt;a href="#lz77-%e3%82%b7%e3%83%b3%e3%83%9c%e3%83%ab%e3%81%a8%e3%83%8f%e3%83%95%e3%83%9e%e3%83%b3%e7%ac%a6%e5%8f%b7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;圧縮データのアルファベットには、リテラルバイト 0–255、EOB 256、および
+長さシンボル 257–285 が含まれます。長さシンボルは基準長と追加ビット数を
+選択します。続く距離シンボルは基準距離と追加ビット数を選択します。その
+結果得られるペアは、生成済み出力から最大 32 KiB 後方、最大 258 バイトの
+長さでバイトをコピーします。重複は有効です。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Apache-Kafka on cesun.life</title><link>https://example.org/zh-tw/tags/apache-kafka/</link><description>Recent content in Apache-Kafka on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sun, 19 Jul 2026 19:31:59 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/apache-kafka/index.xml" rel="self" type="application/rss+xml"/><item><title>Apache Kafka</title><link>https://example.org/zh-tw/apache-kafka/</link><pubDate>Sun, 19 Jul 2026 19:31:59 +0800</pubDate><guid>https://example.org/zh-tw/apache-kafka/</guid><description>&lt;p&gt;Apache Kafka 是一種用於持久化事件串流的分散式追加日誌系統。
+生產者將記錄追加至主題分割區，代理程式複製並保留這些記錄，而消費者則依偏移量讀取記錄。
+因此，當多個獨立應用程式需要觀察相同的有序歷史，同時又不希望耦合其可用性或處理速率時，
+Kafka 非常適合。&lt;/p&gt;
+&lt;h2 id="叢集角色與中繼資料"&gt;
+ 叢集角色與中繼資料
+ &lt;a href="#%e5%8f%a2%e9%9b%86%e8%a7%92%e8%89%b2%e8%88%87%e4%b8%ad%e7%b9%bc%e8%b3%87%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Kafka 叢集包含兩種伺服器角色：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;代理程式&lt;/strong&gt;儲存分割區副本，並處理 produce 與 fetch 請求。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;KRaft 控制器&lt;/strong&gt;維護叢集中繼資料、代理程式成員關係、主題設定、副本放置與分割區領導權。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在開發叢集中，一個程序可以執行其中一個或兩個角色。生產環境叢集會分離控制器與代理程式
+角色，因為資料平面負載不應干擾中繼資料法定人數的決策。ZooKeeper 屬於 Kafka 的舊版
+中繼資料架構，在 Kafka 4.x 中已不存在。&lt;/p&gt;
+&lt;p&gt;客戶端接收的是啟動位址清單，而不是完整的路由表。中繼資料請求會識別目前負責各分割區的
+代理程式，之後 produce 與 fetch 請求會直接傳送至相關領導者。因此，每個公告的代理程式
+位址都必須能從客戶端網路解析並連線；向外部客戶端公布僅能在容器內使用的主機名稱，是常見的
+部署錯誤。&lt;/p&gt;
+&lt;p&gt;Kafka 在 TCP 之上使用具版本的二進位協定。&lt;code&gt;org.apache.kafka:kafka-clients&lt;/code&gt; 工件提供
+Java 生產者、消費者與管理 API。其他語言的客戶端實作相同協定。&lt;/p&gt;
+&lt;h2 id="主題分割區與記錄"&gt;
+ 主題、分割區與記錄
+ &lt;a href="#%e4%b8%bb%e9%a1%8c%e5%88%86%e5%89%b2%e5%8d%80%e8%88%87%e8%a8%98%e9%8c%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;主題會分割成有序的分割區。每筆記錄可以包含：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;一個鍵；&lt;/li&gt;
+&lt;li&gt;一個值；&lt;/li&gt;
+&lt;li&gt;一個時間戳記；以及&lt;/li&gt;
+&lt;li&gt;零個或多個標頭。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;在協定邊界，鍵和值都是位元組陣列。序列化器會將應用程式物件轉換為這些位元組，
+反序列化器則執行反向操作。&lt;/p&gt;
+&lt;p&gt;代理程式會為追加至單一分割區的記錄指派單調遞增的偏移量。偏移量識別該分割區內的位置，
+不是全域有序的事件 ID。Kafka 僅保證單一分割區內的順序，不保證整個主題的順序。&lt;/p&gt;
+&lt;p&gt;當生產者未指定分割區時，分割器會使用記錄鍵與目前的主題中繼資料。因此，只要分割區數量
+維持不變，相等的非 null 鍵就會被路由至同一個分割區。這項特性支援對帳戶 ID 或裝置 ID
+等鍵維持實體內排序。增加分割區數量可能改變鍵到分割區的對映，因此擴充分割區需要明確的
+排序與遷移分析。&lt;/p&gt;
+&lt;p&gt;每個分割區都以區段檔案的形式儲存在代理程式日誌目錄下。區段檔案包含二進位記錄批次以及
+偏移量和時間戳記索引；它們不是逐行排列的文字日誌。&lt;/p&gt;
+&lt;h2 id="保留與壓縮"&gt;
+ 保留與壓縮
+ &lt;a href="#%e4%bf%9d%e7%95%99%e8%88%87%e5%a3%93%e7%b8%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;消費不會刪除記錄。代理程式會根據主題的清理原則移除記錄：&lt;/p&gt;</description></item></channel></rss>

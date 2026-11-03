@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Memory-Management on cesun.life</title><link>https://example.org/ja/tags/memory-management/</link><description>Recent content in Memory-Management on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Wed, 28 Feb 2024 10:22:21 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/memory-management/index.xml" rel="self" type="application/rss+xml"/><item><title>C++スマートポインターと所有権</title><link>https://example.org/ja/cpp-smart-pointers/</link><pubDate>Wed, 28 Feb 2024 10:22:21 +0800</pubDate><guid>https://example.org/ja/cpp-smart-pointers/</guid><description>&lt;p&gt;スマートポインターは、インターフェース上で所有権を明示します。ただし、オブジェクトのライフタイムが別の場所で保証されており、単に借用する目的だけで使われる参照や生ポインターを置き換えるものではありません。ライフタイムの契約に基づいてポインター型を選択し、API境界では所有権の移転と観察を明示してください。&lt;/p&gt;
+&lt;h2 id="一意所有権"&gt;
+ 一意所有権
+ &lt;a href="#%e4%b8%80%e6%84%8f%e6%89%80%e6%9c%89%e6%a8%a9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::unique_ptr&amp;lt;T&amp;gt;&lt;/code&gt; は1つのオブジェクトを所有し、ムーブ専用です。通常の &lt;code&gt;new&lt;/code&gt; とデフォルトデリータが適切な場合は &lt;code&gt;std::make_unique&lt;/code&gt; で生成し、所有権を移転するには値渡しまたは値返しを使用します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;memory&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;unique_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Connection&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; open_connection(Address address);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;install_connection&lt;/span&gt;(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;unique_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Connection&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; connection);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;install_connection(open_connection(address));&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;カスタムデリータは &lt;code&gt;unique_ptr&lt;/code&gt; の型の一部であるため、サイズやAPIが受け付ける型に影響する可能性があります。デリータは所有権プロトコルに対応できなければならず、破棄処理から例外を送出してはなりません。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;unique_ptr&amp;lt;T&amp;gt;&lt;/code&gt; は、&lt;code&gt;T&lt;/code&gt; が不完全型であってもヘッダーに記述できます。ただしデフォルトデリータでは、オブジェクトを破棄する操作がインスタンス化される箇所で &lt;code&gt;T&lt;/code&gt; が完全型である必要があります。これは通常、所有クラスのクラス外デストラクタです。&lt;code&gt;unique_ptr&amp;lt;T[]&amp;gt;&lt;/code&gt; は配列の確保を表しますが、要素数を保持しません。所有するシーケンスには &lt;code&gt;std::vector&amp;lt;T&amp;gt;&lt;/code&gt; を優先してください。&lt;/p&gt;
+&lt;h2 id="共有所有権と観察"&gt;
+ 共有所有権と観察
+ &lt;a href="#%e5%85%b1%e6%9c%89%e6%89%80%e6%9c%89%e6%a8%a9%e3%81%a8%e8%a6%b3%e5%af%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::shared_ptr&amp;lt;T&amp;gt;&lt;/code&gt; は、所有権の状態と、通常はデリータおよびアロケーターを含む制御ブロックを共有します。&lt;code&gt;shared_ptr&lt;/code&gt; をコピーすると所有権が拡張され、最後の所有ポインターが管理対象オブジェクトを破棄します。&lt;code&gt;std::make_shared&lt;/code&gt; はオブジェクトと制御ブロックをまとめて確保できるため、確保回数を減らせます。ただし、weakオブザーバーは制御ブロックを保持するため、この一体化された確保によって、オブザーバーが消滅するまでオブジェクトのストレージが利用できない状態になることがあります。&lt;/p&gt;
+&lt;p&gt;エイリアシングコンストラクターは、別のポインターを保持しながら既存の制御ブロックを共有します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; owner &lt;span style="color:#f92672"&gt;=&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;make_shared&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Record&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;shared_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Member&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; member(owner, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;owner&lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt;member);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;member.get()&lt;/code&gt; はサブオブジェクトを指しますが、ライフタイムは &lt;code&gt;owner&lt;/code&gt; の &lt;code&gt;Record&lt;/code&gt; によって管理されます。同じ生ポインターから無関係な &lt;code&gt;shared_ptr&lt;/code&gt; インスタンスを構築しないでください。それぞれが、そのオブジェクトを独立して所有していると判断してしまいます。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;std::weak_ptr&amp;lt;T&amp;gt;&lt;/code&gt; は、オブジェクトのライフタイムを延長せずに制御ブロックを観察します。デリファレンスする前に &lt;code&gt;lock()&lt;/code&gt; を使用して、一時的な所有ポインターを取得してください。所有権サイクルによってオブジェクトグラフが無期限に存続してしまう場合は、バックエッジやキャする必要もない操作では &lt;code&gt;const std::shared_ptr&amp;lt;T&amp;gt;&amp;amp;&lt;/code&gt; を受け取る方法もあります。ただし、&lt;code&gt;T&amp;amp;&lt;/code&gt; または &lt;code&gt;T*&lt;/code&gt; を受け取るほうが借用を直接的に文書化できます。借用したポインターまたは参照は、呼び出し元が保証したライフタイムの期間に限って有効です。&lt;/p&gt;</description></item></channel></rss>

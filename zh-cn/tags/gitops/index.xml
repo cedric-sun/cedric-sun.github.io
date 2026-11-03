@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Gitops on cesun.life</title><link>https://example.org/zh-cn/tags/gitops/</link><description>Recent content in Gitops on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 05 Nov 2021 13:57:33 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/gitops/index.xml" rel="self" type="application/rss+xml"/><item><title>Helm 运维与 Argo CD 迁移</title><link>https://example.org/zh-cn/helm-operations-and-argocd-migrations/</link><pubDate>Fri, 05 Nov 2021 13:57:33 +0800</pubDate><guid>https://example.org/zh-cn/helm-operations-and-argocd-migrations/</guid><description>&lt;p&gt;将静态 Kubernetes 清单迁移到 Helm，再迁移到 Argo CD，不仅会改变模板化方式，也会改变所有权。应盘点线上资源，保留不可变名称和存储，并在启用自动修剪前使期望状态可复现。&lt;/p&gt;
+&lt;h2 id="了解-helm-的发布模型"&gt;
+ 了解 Helm 的发布模型
+ &lt;a href="#%e4%ba%86%e8%a7%a3-helm-%e7%9a%84%e5%8f%91%e5%b8%83%e6%a8%a1%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;对于直接的 Helm 发布，升级会比较之前的发布清单、新渲染的清单和线上对象。两个清单中都存在的资源会在其字段允许时更新；只存在于新清单中的资源会被创建；从 chart 中移除的资源通常会被删除。不可变字段可能需要明确的替换策略。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm upgrade --install web ./chart &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --namespace web --create-namespace &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --values environments/production.yaml &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --dry-run --debug&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在既有工具链提供 &lt;code&gt;helm diff&lt;/code&gt; 时使用它，并在升级后检查 &lt;code&gt;helm get manifest&lt;/code&gt; 和
+&lt;code&gt;helm history&lt;/code&gt;。&lt;code&gt;helm.sh/resource-policy: keep&lt;/code&gt; 注解可以在卸载期间保留资源，但这应是有意作出的生命周期决策，而不是通用的安全措施。&lt;/p&gt;
+&lt;h2 id="增量迁移静态清单"&gt;
+ 增量迁移静态清单
+ &lt;a href="#%e5%a2%9e%e9%87%8f%e8%bf%81%e7%a7%bb%e9%9d%99%e6%80%81%e6%b8%85%e5%8d%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;首先从源代码管理中获取实际的期望规格，并将其与线上对象比较。只将真正的环境差异（镜像版本、主机名、资源限制、存储类）参数化，而不要参数化每个字段。渲染 chart，并将其与现有资源比较。&lt;/p&gt;
+&lt;p&gt;首次迁移期间，保持稳定的 &lt;code&gt;metadata.name&lt;/code&gt;、命名空间、选择器和持久卷声明名称。更改选择器可能使 Pod 无法归属；更改 PVC 名称会创建新的声明，并不会移动数据。对于有状态工作负载，在发生任何所有权转换前，应在非生产集群中演练备份、恢复和回滚流程。&lt;/p&gt;
+&lt;h2 id="安全地移交给-argo-cd"&gt;
+ 安全地移交给 Argo CD
+ &lt;a href="#%e5%ae%89%e5%85%a8%e5%9c%b0%e7%a7%bb%e4%ba%a4%e7%bb%99-argo-cd" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;当 Argo CD 渲染 Helm chart 时，避免针对同一资源运行单独的 &lt;code&gt;helm upgrade&lt;/code&gt;。配置
+&lt;code&gt;Application&lt;/code&gt;，验证渲染后的清单和差异，先在不修剪的情况下同步，然后仅在应用健康且作用域中没有无关资源后启用修剪。&lt;/p&gt;</description></item></channel></rss>

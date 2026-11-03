@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Browser on cesun.life</title><link>https://example.org/zh-cn/tags/browser/</link><description>Recent content in Browser on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 11 Sep 2026 11:02:01 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/browser/index.xml" rel="self" type="application/rss+xml"/><item><title>agent-browser：面向 AI Agent 的浏览器自动化</title><link>https://example.org/zh-cn/agent-browser/</link><pubDate>Fri, 11 Sep 2026 11:02:01 +0800</pubDate><guid>https://example.org/zh-cn/agent-browser/</guid><description>&lt;p&gt;&lt;a href="https://github.com/vercel-labs/agent-browser"&gt;agent-browser&lt;/a&gt; 是一个面向 AI Agent 设计的 Apache-2.0 浏览器自动化 CLI。它不要求 Agent 生成完整的 Playwright 程序，而是将导航、交互、检查、状态、网络和可观测性操作公开为 Shell 命令。持久化原生守护进程会在这些命令之间保留浏览器实例。&lt;/p&gt;
+&lt;p&gt;该项目结合了以下三个理念：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;紧凑的可访问性快照为模型提供页面的结构化视图，而无需发送完整 DOM。&lt;/li&gt;
+&lt;li&gt;快照引用用于在后续命令中标识元素。&lt;/li&gt;
+&lt;li&gt;长生命周期守护进程将浏览器生命周期与每个 CLI 进程的生命周期分离。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;截至 2026 年 9 月 11 日，当前版本为 0.37.1。项目变化迅速，因此本文中依赖版本的行为均链接到 &lt;a href="https://github.com/vercel-labs/agent-browser/tree/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2"&gt;0.37.1 源代码修订版&lt;/a&gt;。&lt;/p&gt;
+&lt;h2 id="浏览器自动化为何需要面向-agent-的接口"&gt;
+ 浏览器自动化为何需要面向 Agent 的接口
+ &lt;a href="#%e6%b5%8f%e8%a7%88%e5%99%a8%e8%87%aa%e5%8a%a8%e5%8c%96%e4%b8%ba%e4%bd%95%e9%9c%80%e8%a6%81%e9%9d%a2%e5%90%91-agent-%e7%9a%84%e6%8e%a5%e5%8f%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Playwright 及类似库提供了精确的浏览器 API，但由 LLM 驱动的进程直接使用这些 API 时，会产生额外成本：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;生成的源代码会消耗上下文，并且需要运行时。&lt;/li&gt;
+&lt;li&gt;原始 DOM 包含脚本、样式、隐藏节点和框架生成的结构，而这些内容很少有助于下一步操作。&lt;/li&gt;
+&lt;li&gt;根据一次观察生成的 CSS 选择器可能会在重新渲染后失效。&lt;/li&gt;
+&lt;li&gt;独立脚本需要显式管理浏览器和上下文的生命周期。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;agent-browser 改变的是接口，而不是浏览器。Agent 观察紧凑的树，选择一项操作，执行一条命令，然后再次观察：&lt;/p&gt;
+&lt;div class="mermaid"&gt;
+ &lt;div class="mermaid-toolbar" aria-label="Diagram zoom controls" hidden&gt;
+ &lt;button class="mermaid-zoom-out" type="button" aria-label="Zoom out" title="Zoom out" disabled&gt;-&lt;/button&gt;
+ &lt;output class="mermaid-zoom-level" aria-live="polite"&gt;100%&lt;/output&gt;
+ &lt;button class="mermaid-zoom-in" type="button" aria-label="Zoom in" title="Zoom in" disabled&gt;+&lt;/button&gt;
+ &lt;/div&gt;
+ &lt;div class="mermaid-viewport" aria-label="Diagram"&gt;
+ &lt;pre class="mermaid-source"&gt;flowchart LR
+ Goal[User Goal] --&amp;gt; Model[Agent]
+ Model --&amp;gt;|open or snapshot| CLI[agent-browser CLI]
+ CLI --&amp;gt; Daemon[Native Daemon]
+ Daemon --&amp;gt;|CDP or WebDriver| Browser[Browser]
+ Browser --&amp;gt; Daemon
+ Daemon --&amp;gt;|Snapshot and Refs| Model
+ Model --&amp;gt;|click @e2| CLI&lt;/pre&gt;
+ &lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;模型仍然负责决定执行什么，而 CLI 提供稳定的操作词汇并管理浏览器状态。根据&lt;a href="https://github.com/vercel-labs/agent-browser/blob/8c15ff9f71ae60c7e99e66afe1e2d4b9bf414fe2/docs/src/app/page.mdx"&gt;项目概览&lt;/a&gt;，典型的文本快照约使用 200&amp;ndash;400 个 Token，而完整 DOM 则使用 3,000&amp;ndash;5,000 个 Token。这些数字是项目估算值，而不是独立基准测试结果，但其根本原因很明确：可访问性树省略了 Agent 不需要的大量实现细节。&lt;/p&gt;</description></item><item><title>测量浏览器和 DOM 尺寸</title><link>https://example.org/zh-cn/dom-dimensions/</link><pubDate>Thu, 08 Jan 2026 10:38:14 +0800</pubDate><guid>https://example.org/zh-cn/dom-dimensions/</guid><description>&lt;p&gt;浏览器 API 暴露多个坐标系，因为屏幕、浏览器窗口、视口、文档和元素回答不同的测量问题。
+因此，仅根据 API 名称选择接口可能造成滚动条、舍入或滚动错误。&lt;/p&gt;
+&lt;h2 id="窗口屏幕和视口测量"&gt;
+ 窗口、屏幕和视口测量
+ &lt;a href="#%e7%aa%97%e5%8f%a3%e5%b1%8f%e5%b9%95%e5%92%8c%e8%a7%86%e5%8f%a3%e6%b5%8b%e9%87%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;API&lt;/th&gt;
+ &lt;th&gt;测量内容&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;window.innerWidth&lt;/code&gt;、&lt;code&gt;innerHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;布局视口，包括已渲染的经典滚动条&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;window.outerWidth&lt;/code&gt;、&lt;code&gt;outerHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;浏览器窗口的外部尺寸&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;screen.width&lt;/code&gt;、&lt;code&gt;screen.height&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;CSS 像素中的屏幕尺寸&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;screen.availWidth&lt;/code&gt;、&lt;code&gt;screen.availHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;排除操作系统保留区域后的屏幕空间&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;document.documentElement.clientWidth&lt;/code&gt;、&lt;code&gt;clientHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;排除经典滚动条的布局视口&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;CSS 像素是逻辑单位。在高密度显示器上，一个 CSS 像素可能覆盖多个设备像素，
+因此 &lt;code&gt;screen.width&lt;/code&gt; 不一定等于面板的物理像素数。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;outerWidth&lt;/code&gt; 和 &lt;code&gt;outerHeight&lt;/code&gt; 包含浏览器界面。它们与内部尺寸的差值取决于窗口装饰、
+标签页、工具栏和显示缩放；因此不应驱动页面布局。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;js&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-js" data-lang="js"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;viewport&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;width&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; document.&lt;span style="color:#a6e22e"&gt;documentElement&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;clientWidth&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;height&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt; document.&lt;span style="color:#a6e22e"&gt;documentElement&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;clientHeight&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;计算必须排除经典滚动条时，使用根元素的客户端尺寸。
+覆盖式滚动条不占用布局宽度，因此 &lt;code&gt;innerWidth&lt;/code&gt; 与 &lt;code&gt;clientWidth&lt;/code&gt; 的差异取决于平台。&lt;/p&gt;
+&lt;h3 id="布局视口和视觉视口"&gt;
+ 布局视口和视觉视口
+ &lt;a href="#%e5%b8%83%e5%b1%80%e8%a7%86%e5%8f%a3%e5%92%8c%e8%a7%86%e8%a7%89%e8%a7%86%e5%8f%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;布局视口建立页面布局使用的包含块。视觉视口是在缩放或屏幕键盘改变未遮挡区域后当前可见的部分。
+在支持的浏览器中，&lt;code&gt;window.visualViewport&lt;/code&gt; 暴露 &lt;code&gt;width&lt;/code&gt;、&lt;code&gt;height&lt;/code&gt;、&lt;code&gt;scale&lt;/code&gt;、&lt;code&gt;offsetLeft&lt;/code&gt; 和 &lt;code&gt;offsetTop&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;js&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-js" data-lang="js"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;viewport&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; window.&lt;span style="color:#a6e22e"&gt;visualViewport&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;viewport&lt;/span&gt;&lt;span style="color:#f92672"&gt;?&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;addEventListener&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;resize&amp;#34;&lt;/span&gt;, &lt;span style="color:#a6e22e"&gt;positionOverlay&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;viewport&lt;/span&gt;&lt;span style="color:#f92672"&gt;?&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;addEventListener&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;scroll&amp;#34;&lt;/span&gt;, &lt;span style="color:#a6e22e"&gt;positionOverlay&lt;/span&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;需要跟随可见区域的覆盖层应使用这些事件。普通文档布局仍应使用 CSS 和布局视口；
+响应视觉视口事件移动整个页面可能会与浏览器滚动发生冲突。&lt;/p&gt;</description></item><item><title>浏览器 Content-Disposition 与下载</title><link>https://example.org/zh-cn/browser-content-disposition/</link><pubDate>Wed, 16 Aug 2023 17:13:20 +0800</pubDate><guid>https://example.org/zh-cn/browser-content-disposition/</guid><description>&lt;p&gt;浏览器会根据多个输入决定显示响应、下载响应，还是将其交给
+external application from several inputs. &lt;code&gt;Content-Disposition&lt;/code&gt; provides a
+strong preference, but content type, navigation context, sandboxing, browser
+capabilities, and user settings also affect the result.&lt;/p&gt;
+&lt;h2 id="inline-与-attachment-处置方式"&gt;
+ inline 与 attachment 处置方式
+ &lt;a href="#inline-%e4%b8%8e-attachment-%e5%a4%84%e7%bd%ae%e6%96%b9%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;attachment 响应请求下载：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;HTTP&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;1.1&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;200&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OK&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Type&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;application/pdf&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Disposition&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;attachment; filename=&amp;#34;guide.pdf&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Length&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;110352&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;X-Content-Type-Options&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;nosniff&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;inline 响应允许在浏览器内呈现：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Type: application/pdf
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Disposition: inline; filename=&amp;#34;guide.pdf&amp;#34;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;inline&lt;/code&gt; 不保证显示。 The browser needs a viewer for the media
+type, and the user can configure some types to download instead. Omitting the
+header leaves the choice primarily to the media type and navigation context.&lt;/p&gt;</description></item><item><title>Docker 中的浏览器平台、图形与 Playwright</title><link>https://example.org/zh-cn/playwright-in-docker/</link><pubDate>Sun, 21 Aug 2022 22:50:08 +0800</pubDate><guid>https://example.org/zh-cn/playwright-in-docker/</guid><description>&lt;p&gt;当测试建模文档加载、布局、网络和渲染，而不是把页面当作静态字符串处理时，浏览器自动化才能可靠运行。&lt;/p&gt;
+&lt;h2 id="测量浏览器和-dom"&gt;
+ 测量浏览器和 DOM
+ &lt;a href="#%e6%b5%8b%e9%87%8f%e6%b5%8f%e8%a7%88%e5%99%a8%e5%92%8c-dom" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;浏览器尺寸回答的是不同的问题：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;API&lt;/th&gt;
+ &lt;th&gt;测量对象&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;window.innerWidth&lt;/code&gt; 和 &lt;code&gt;innerHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;布局视口，包括已渲染的滚动条&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;window.outerWidth&lt;/code&gt; 和 &lt;code&gt;outerHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;浏览器窗口边界&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;screen.width&lt;/code&gt; 和 &lt;code&gt;screen.height&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;以 CSS 像素表示的屏幕尺寸&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;screen.availWidth&lt;/code&gt; 和 &lt;code&gt;availHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;排除操作系统保留区域后的屏幕空间&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;element.clientWidth&lt;/code&gt; 和 &lt;code&gt;clientHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;内容框加内边距，不包括边框和滚动条&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;element.scrollWidth&lt;/code&gt; 和 &lt;code&gt;scrollHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;可滚动内容范围&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;element.offsetWidth&lt;/code&gt; 和 &lt;code&gt;offsetHeight&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;边框盒尺寸，四舍五入为整数像素&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;element.getBoundingClientRect()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;视口坐标中的边框盒几何信息，保留小数&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;没有布局框的内联元素的 &lt;code&gt;clientWidth&lt;/code&gt; 为 0。对于根元素，它描述的是不包含经典滚动条的布局视口。不要在未加上滚动偏移量的情况下混用 &lt;code&gt;getBoundingClientRect()&lt;/code&gt; 的视口坐标和文档坐标。&lt;/p&gt;
+&lt;h2 id="使用有效的-html-结构和资源提示"&gt;
+ 使用有效的 HTML 结构和资源提示
+ &lt;a href="#%e4%bd%bf%e7%94%a8%e6%9c%89%e6%95%88%e7%9a%84-html-%e7%bb%93%e6%9e%84%e5%92%8c%e8%b5%84%e6%ba%90%e6%8f%90%e7%a4%ba" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;&amp;lt;link&amp;gt;&lt;/code&gt; 表示与外部资源的关系。它的 &lt;code&gt;rel&lt;/code&gt; 属性是由空格分隔的一组标准化链接类型：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;html&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-html" data-lang="html"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&amp;lt;&lt;span style="color:#f92672"&gt;link&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;rel&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;stylesheet&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;href&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;/site.css&amp;#34;&lt;/span&gt;&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&amp;lt;&lt;span style="color:#f92672"&gt;link&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;rel&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;preconnect&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;href&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;https://fonts.gstatic.com&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;crossorigin&lt;/span&gt;&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&amp;lt;&lt;span style="color:#f92672"&gt;link&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;rel&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;icon&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;href&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;/favicon.svg&amp;#34;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;type&lt;/span&gt;&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#34;image/svg+xml&amp;#34;&lt;/span&gt;&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;preconnect&lt;/code&gt; 会提前建立传输连接；只能对页面将要联系的源使用它。它不会下载样式表、字体或脚本。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;&amp;lt;meta&amp;gt;&lt;/code&gt; 提供字符集、视口、描述和 HTTP 等效指令等文档元数据。将 &lt;code&gt;&amp;lt;meta charset=&amp;quot;utf-8&amp;quot;&amp;gt;&lt;/code&gt; 放在 &lt;code&gt;head&lt;/code&gt; 的前部，使解析器能够正确解码后续字节。&lt;/p&gt;</description></item></channel></rss>

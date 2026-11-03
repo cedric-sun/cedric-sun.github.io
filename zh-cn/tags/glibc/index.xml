@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Glibc on cesun.life</title><link>https://example.org/zh-cn/tags/glibc/</link><description>Recent content in Glibc on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Thu, 07 May 2026 03:47:31 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/glibc/index.xml" rel="self" type="application/rss+xml"/><item><title>glibc 源码内部机制和系统调用包装器</title><link>https://example.org/zh-cn/glibc-syscall-wrappers/</link><pubDate>Thu, 07 May 2026 03:47:31 +0800</pubDate><guid>https://example.org/zh-cn/glibc-syscall-wrappers/</guid><description>&lt;p&gt;glibc 暴露 &lt;code&gt;read(2)&lt;/code&gt; 和 &lt;code&gt;write(2)&lt;/code&gt; 等 C 函数，而 Linux 暴露特定于架构的系统调用入口约定。包装器连接这两层：它接受公共 C ABI，遵循所选架构的系统调用 ABI，转换内核错误，并且可能实现 POSIX 线程取消行为。&lt;/p&gt;
+&lt;p&gt;下面的示例描述当前上游源码树。已发布的 glibc 可能选择不同文件或宏定义，因此源码检查必须从正在构建的版本和目标三元组开始。&lt;/p&gt;
+&lt;h2 id="sysdeps"&gt;
+ &lt;code&gt;sysdeps/&lt;/code&gt; 选择
+ &lt;a href="#sysdeps" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href="https://sourceware.org/git/?p=glibc.git;a=tree;f=sysdeps;hb=HEAD"&gt;&lt;code&gt;sysdeps/&lt;/code&gt; 树&lt;/a&gt; 保存按操作系统、CPU、ABI、字长和功能选择的实现。通用代码是回退实现；更具体的目录可以用相同相对名称的文件替换它。对于 Linux 构建，相关路径包括 &lt;code&gt;sysdeps/unix/sysv/linux/&lt;/code&gt;；架构还可以提供 Linux 特定的入口代码或 ABI 特定变体。&lt;/p&gt;
+&lt;p&gt;glibc 的配置和构建机制会构建适用系统依赖目录的有序列表。构建规则搜索该列表，因此选定的实现会覆盖通用回退。该布局不是每个文件恰好只有一个维度的分类体系：操作系统目录可能依赖架构头文件，架构目录也可能包含与操作系统无关的代码。应检查 &lt;code&gt;config.make&lt;/code&gt;、已配置的构建目录和选定的源代码路径，而不要从某个目录名推断行为。&lt;/p&gt;
+&lt;h2 id="syscalls-list-and-make-syscalls-sh"&gt;
+ 生成的精简包装器
+ &lt;a href="#syscalls-list-and-make-syscalls-sh" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一些精简汇编包装器根据 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/syscalls.list;hb=HEAD"&gt;&lt;code&gt;syscalls.list&lt;/code&gt;&lt;/a&gt; 生成。每条记录命名一个输出、一个 Linux 系统调用、一个参数签名、一个强符号以及可选的弱符号或版本化名称。构建会调用 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/make-syscalls.sh;hb=HEAD"&gt;&lt;code&gt;make-syscalls.sh&lt;/code&gt;&lt;/a&gt;，它会：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;移除被更高优先级 &lt;code&gt;sysdeps&lt;/code&gt; 目录覆盖的条目；&lt;/li&gt;
+&lt;li&gt;通过目标的 &lt;code&gt;sysdep.h&lt;/code&gt; 解析 &lt;code&gt;SYS_&lt;/code&gt; 编号；&lt;/li&gt;
+&lt;li&gt;从签名推导参数数量和特殊参数处理；&lt;/li&gt;
+&lt;li&gt;使用 &lt;code&gt;syscall-template.S&lt;/code&gt; 生成规则，并在列表要求时包含别名和兼容符号。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;syscalls.list&lt;/code&gt; 不定义每个公共函数。带验证、回退逻辑、取消处理、时间宽度转换或其他策略的包装器通常是手写的。当前 glibc 中的 &lt;code&gt;write&lt;/code&gt; 就是一个这样的手写 C 包装器，位于 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/write.c;hb=HEAD"&gt;&lt;code&gt;write.c&lt;/code&gt;&lt;/a&gt;；因此它可以作为生成路径的对照。&lt;/p&gt;
+&lt;h2 id="write"&gt;
+ &lt;code&gt;write&lt;/code&gt; 和取消感知调度
+ &lt;a href="#write" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;从概念上看，Linux 的 &lt;code&gt;write&lt;/code&gt; 包装器执行以下操作：&lt;/p&gt;</description></item><item><title>C 库与 glibc 的历史</title><link>https://example.org/zh-cn/libc-history/</link><pubDate>Wed, 22 Nov 2023 04:35:36 +0800</pubDate><guid>https://example.org/zh-cn/libc-history/</guid><description>&lt;p&gt;Linux 应用程序依赖两个不同的接口：内核系统调用 ABI 和 C 库。ABI 定义了在特定架构上进入内核的方式。C 库实现程序编译所依赖的 ISO C 和 POSIX 接口，并添加进程启动代码、动态加载器、名称服务查询、线程支持、区域设置处理，以及许多无法映射到单个系统调用的接口。因此，内核并不提供完整的 C 运行时。&lt;/p&gt;
+&lt;h2 id="glibc-history"&gt;
+ GNU libc 的起源与发行版本
+ &lt;a href="#glibc-history" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Richard Stallman &lt;a href="https://www.gnu.org/gnu/initial-announcement.html"&gt;于 1983 年 9 月 27 日宣布了 GNU 项目&lt;/a&gt;。GNU libc 的开发在 20 世纪 80 年代后期继续进行；Roland McGrath 是最早公开贡献者之一。&lt;a href="https://www.gnu.org/bulletins/bull4.html"&gt;1988 年的 GNU Bulletin&lt;/a&gt; 报道称，大多数库已经完成。&lt;/p&gt;
+&lt;p&gt;早期发行资料必须谨慎对待。GNU FTP 存档保留了&lt;a href="https://ftp.gnu.org/old-gnu/glibc/"&gt;历史 glibc 补丁&lt;/a&gt;和&lt;a href="https://ftp.gnu.org/gnu/glibc/"&gt;发行存档&lt;/a&gt;，但存档覆盖范围并不是完整的发行数据库。例如，glibc 1.x 时代的发行版本和补丁采用了不同的可用性与日期记录惯例。与回溯整理的版本列表或软件包元数据相比，存档是更有力的证据。&lt;/p&gt;
+&lt;p&gt;glibc 2.0 于 1997 年 1 月发布，2.x 系列随后成为 GNU libc 持续发展的 ABI 系列。当前源代码、发行资料和手册由项目在 &lt;a href="https://sourceware.org/glibc/"&gt;sourceware.org&lt;/a&gt; 以及 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=tree"&gt;glibc 源代码仓库&lt;/a&gt;中维护。“glibc 2.x”描述的是一个源代码和 ABI 家族；对受支持的旧接口的兼容性通过 ABI 规则管理，而不是在每次发行时更改主库文件名。&lt;/p&gt;
+&lt;h2 id="from-linux-libc-to-glibc"&gt;
+ 从 Linux libc 到 glibc
+ &lt;a href="#from-linux-libc-to-glibc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;早期 Linux 系统采用了 GNU libc 的代码，之后 Linux 开发者维护了一个特定于 Linux 的分支，而上游 glibc 则独立开发。这个分支通常称为 &lt;em&gt;Linux libc&lt;/em&gt;。其共享库世代包括 libc4 和 libc5：&lt;/p&gt;</description></item><item><title>glibc 用户数据库</title><link>https://example.org/zh-cn/glibc-user-databases/</link><pubDate>Mon, 08 Feb 2021 07:06:54 +0800</pubDate><guid>https://example.org/zh-cn/glibc-user-databases/</guid><description>&lt;p&gt;用户数据库将登录名和数字用户 ID 映射到账户记录。&lt;code&gt;/etc/passwd&lt;/code&gt; 是常见表示，
+但应用不能假设该文件是权威来源。glibc 通过名称服务切换（NSS）解析 &lt;code&gt;passwd&lt;/code&gt; 数据库；
+&lt;code&gt;/etc/nsswitch.conf&lt;/code&gt; 中的 &lt;code&gt;passwd:&lt;/code&gt; 条目可以查询本地文件、systemd、LDAP、NIS 或其他已安装提供程序。&lt;/p&gt;
+&lt;p&gt;PAM 不执行这些查询。PAM 处理身份验证和账户管理策略，而 NSS 回答身份数据库查询。&lt;/p&gt;
+&lt;h2 id="账户记录"&gt;
+ 账户记录
+ &lt;a href="#%e8%b4%a6%e6%88%b7%e8%ae%b0%e5%bd%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;&amp;lt;pwd.h&amp;gt;&lt;/code&gt; 定义公共记录：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; passwd {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pw_name; &lt;span style="color:#75715e"&gt;/* login name */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pw_passwd; &lt;span style="color:#75715e"&gt;/* password field, commonly &amp;#34;x&amp;#34; */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;uid_t&lt;/span&gt; pw_uid; &lt;span style="color:#75715e"&gt;/* user ID */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;gid_t&lt;/span&gt; pw_gid; &lt;span style="color:#75715e"&gt;/* primary group ID */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pw_gecos; &lt;span style="color:#75715e"&gt;/* user information */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pw_dir; &lt;span style="color:#75715e"&gt;/* home directory */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pw_shell; &lt;span style="color:#75715e"&gt;/* login shell */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在普通 Linux 安装中，历史上的密码字段不再暴露可复用的密码哈希。
+哈希保存在单独保护的 shadow 数据库中；公共 &lt;code&gt;passwd&lt;/code&gt; 记录通常包含 &lt;code&gt;x&lt;/code&gt; 或其他标记。&lt;/p&gt;</description></item></channel></rss>

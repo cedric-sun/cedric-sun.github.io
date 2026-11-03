@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Web-Server on cesun.life</title><link>https://example.org/ja/tags/web-server/</link><description>Recent content in Web-Server on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Mon, 19 Dec 2022 02:06:42 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/web-server/index.xml" rel="self" type="application/rss+xml"/><item><title>Nginx の管理と内部構造</title><link>https://example.org/ja/nginx/</link><pubDate>Mon, 19 Dec 2022 02:06:42 +0800</pubDate><guid>https://example.org/ja/nginx/</guid><description>&lt;p&gt;Nginx は、イベント駆動型の HTTP、ストリーム、メール向けプロキシ兼サーバーである。
+設定、プロセス権限、アップストリームのタイムアウトは本番コードとして扱う。
+リロード前に変更を検証し、正常動作が確認済みの設定を保持する。&lt;/p&gt;
+&lt;h2 id="イベント駆動-io"&gt;
+ イベント駆動 I/O
+ &lt;a href="#%e3%82%a4%e3%83%99%e3%83%b3%e3%83%88%e9%a7%86%e5%8b%95-io" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Nginx はノンブロッキングイベントループを中心に構築されている。マスタープロセスが
+設定を読み込んでワーカーを起動し、各ワーカーは epoll、kqueue、またはプラットフォーム
+上の同等の準備完了通知バックエンドで待機する。ワーカーは通信相手ごとの接続レコードを
+保持し、ソケットが処理可能になったときに限り各リクエストの処理を進める。&lt;/p&gt;
+&lt;p&gt;したがって、リクエストごとにスレッドを割り当てなくても、1 つのイベントループで多数の
+接続を処理できる。このモデルから、ログ記録とバッファリングの選択が重要な理由も分かる。
+アップストリーム、クライアント、ディスク書き込みが個別に進行する間も、ワーカーは応答性を
+維持する必要があるためである。&lt;/p&gt;
+&lt;h2 id="分離された設定"&gt;
+ 分離された設定
+ &lt;a href="#%e5%88%86%e9%9b%a2%e3%81%95%e3%82%8c%e3%81%9f%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;ローカルビルドをテストするときは、プレフィックスと設定を明示してインスタンスを実行する。
+ログや一時ファイルなどの相対パスは、プレフィックスを基準に解決される。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;nginx -p &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$PWD&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; -c nginx.conf
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;nginx -t -p &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$PWD&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; -c nginx.conf&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;非特権のローカルプロセスでは、非特権ポートのリスナーを使い、&lt;code&gt;pid&lt;/code&gt;、ログ、
+各リクエストボディまたはアップストリーム用の一時パスを、書き込み可能な場所に設定する。
+&lt;code&gt;daemon off;&lt;/code&gt; と &lt;code&gt;master_process off;&lt;/code&gt; はフォアグラウンドでのデバッグを簡単にするが、
+本番環境向けの設定ではない。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;include&lt;/code&gt; ディレクティブは、プレフィックスに対する相対パスまたは絶対パスで指定した設定を
+テキストとして取り込む。&lt;code&gt;nginx -t&lt;/code&gt; で include の依存グラフ全体を検証し、&lt;code&gt;nginx -T&lt;/code&gt; で
+展開後の設定を確認する。リロード時、マスターは新しい設定を解析して検証し、成功すれば
+新しいワーカーを起動して、古いワーカーには進行中の処理を完了してから終了するよう求める。
+解析またはリソース取得に失敗した場合、古い設定のままトラフィックの処理が続く。&lt;/p&gt;
+&lt;h2 id="仮想サーバーと-cors"&gt;
+ 仮想サーバーと CORS
+ &lt;a href="#%e4%bb%ae%e6%83%b3%e3%82%b5%e3%83%bc%e3%83%90%e3%83%bc%e3%81%a8-cors" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Nginx はリスナーと &lt;code&gt;Host&lt;/code&gt; ヘッダーから HTTP 仮想サーバーを選択する。同じリスナー内では、
+完全一致の &lt;code&gt;server_name&lt;/code&gt;、最長の先頭ワイルドカード、最長の末尾ワイルドカード、
+最初に一致する正規表現、という順で優先される。&lt;code&gt;server_name .example.com&lt;/code&gt; は
+apex ドメインと &lt;code&gt;*.example.com&lt;/code&gt; の省略表記である。&lt;code&gt;*.example.com&lt;/code&gt; だけでは
+apex ドメインに一致しない。&lt;/p&gt;</description></item></channel></rss>

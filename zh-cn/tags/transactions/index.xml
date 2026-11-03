@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Transactions on cesun.life</title><link>https://example.org/zh-cn/tags/transactions/</link><description>Recent content in Transactions on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Thu, 03 Sep 2026 15:56:43 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/transactions/index.xml" rel="self" type="application/rss+xml"/><item><title>MySQL 事务、隔离与并发</title><link>https://example.org/zh-cn/mysql-transactions/</link><pubDate>Thu, 03 Sep 2026 15:56:43 +0800</pubDate><guid>https://example.org/zh-cn/mysql-transactions/</guid><description>&lt;p&gt;InnoDB 事务通过原子地提交相关更改，并控制并发语句如何观察这些更改，来保护数据库不变量。隔离性不能替代约束：对于模式能够表达的不变量，应使用主键、唯一约束、外键约束和检查约束；然后针对多语句决策选择合适的事务与锁定模式。&lt;/p&gt;
+&lt;h2 id="事务边界与自动提交"&gt;
+ 事务边界与自动提交
+ &lt;a href="#%e4%ba%8b%e5%8a%a1%e8%be%b9%e7%95%8c%e4%b8%8e%e8%87%aa%e5%8a%a8%e6%8f%90%e4%ba%a4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL 默认启用自动提交，因此显式事务之外的每条语句都会作为一个事务提交或回滚。应显式启动多语句单元，并使其保持简短：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;START&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;-&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;84&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;COMMIT&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在为目标账户入账之前，先检查第一条更新语句影响的行数。任何不变量或语句失败时都使用 &lt;code&gt;ROLLBACK&lt;/code&gt;。连接池在归还连接之前必须恢复自动提交、隔离级别、访问模式和其他会话状态，因为这些属性会在事务之间保留。&lt;/p&gt;
+&lt;p&gt;许多数据定义语句和账户管理语句会隐式提交。原子 DDL 使受支持的模式语句具备崩溃安全性，但不会使该语句成为外围应用事务的一部分。&lt;/p&gt;
+&lt;h2 id="隔离级别配置"&gt;
+ 隔离级别配置
+ &lt;a href="#%e9%9a%94%e7%a6%bb%e7%ba%a7%e5%88%ab%e9%85%8d%e7%bd%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 在 MySQL 8.4 中的默认隔离级别是 &lt;code&gt;REPEATABLE READ&lt;/code&gt;。使用 &lt;code&gt;--transaction-isolation&lt;/code&gt; 或 &lt;code&gt;transaction_isolation&lt;/code&gt; 配置服务器默认值，并且仅在明确的作用域内覆盖它：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;COMMITTED&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;REPEATABLE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SERIALIZABLE&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.transaction_isolation;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;GLOBAL&lt;/code&gt; 为新会话建立默认值。&lt;code&gt;SESSION&lt;/code&gt; 应用于该连接上的后续事务。不带限定词的 &lt;code&gt;SET TRANSACTION&lt;/code&gt; 应用于下一个事务。也可以在同一条语句中选择 &lt;code&gt;READ ONLY&lt;/code&gt; 和 &lt;code&gt;READ WRITE&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="mvcc-与一致性读取"&gt;
+ MVCC 与一致性读取
+ &lt;a href="#mvcc-%e4%b8%8e%e4%b8%80%e8%87%b4%e6%80%a7%e8%af%bb%e5%8f%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;只要活动快照仍可能需要，InnoDB 就会在 undo 数据中保留较早的行版本。普通 &lt;code&gt;SELECT&lt;/code&gt; 通常执行非锁定一致性读取：&lt;/p&gt;</description></item><item><title>Spring 概览与事务</title><link>https://example.org/zh-cn/spring-overview-and-transactions/</link><pubDate>Sun, 25 May 2025 03:36:19 +0800</pubDate><guid>https://example.org/zh-cn/spring-overview-and-transactions/</guid><description>&lt;p&gt;Spring Framework 提供依赖注入容器，以及面向 AOP、数据访问、事务、消息传递和 Web 应用的专用模块。事务管理体现了该框架的集成模型：应用程序代码声明边界，拦截器则协调特定资源的 &lt;code&gt;PlatformTransactionManager&lt;/code&gt; 或响应式事务管理器。&lt;/p&gt;
+&lt;h2 id="基于代理的声明式事务"&gt;
+ 基于代理的声明式事务
+ &lt;a href="#%e5%9f%ba%e4%ba%8e%e4%bb%a3%e7%90%86%e7%9a%84%e5%a3%b0%e6%98%8e%e5%bc%8f%e4%ba%8b%e5%8a%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在默认的通知模式下，Spring 会使用 AOP 代理包装符合条件的 Bean。进入与 &lt;code&gt;@Transactional&lt;/code&gt; 匹配的方法的调用会经过 &lt;code&gt;TransactionInterceptor&lt;/code&gt;，后者读取事务元数据，启动事务或加入现有事务，调用目标对象，然后提交或回滚。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Service&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OrderService&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; OrderRepository orders;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; PaymentGateway payments;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Transactional&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; Order &lt;span style="color:#a6e22e"&gt;place&lt;/span&gt;(CreateOrder command) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Order order &lt;span style="color:#f92672"&gt;=&lt;/span&gt; orders.&lt;span style="color:#a6e22e"&gt;insert&lt;/span&gt;(command);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; payments.&lt;span style="color:#a6e22e"&gt;reserve&lt;/span&gt;(order);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; order;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;代理存在实际限制。调用必须经过代理进入，并且方法必须能够被所选代理机制拦截。基于接口的 JDK 代理会公开接口方法；基于类的代理会继承目标类，因此无法为 &lt;code&gt;final&lt;/code&gt; 方法提供通知。&lt;/p&gt;
+&lt;h2 id="自调用"&gt;
+ 自调用
+ &lt;a href="#%e8%87%aa%e8%b0%83%e7%94%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;this.reprice()&lt;/code&gt; 之类的调用会停留在目标对象内部，不会重新进入其代理。因此，如果只能通过自调用到达 &lt;code&gt;reprice()&lt;/code&gt;，该方法上的事务元数据会被忽略：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;importOrders&lt;/span&gt;(List&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Order&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; batch) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; batch.&lt;span style="color:#a6e22e"&gt;forEach&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;this&lt;/span&gt;::storeOne); &lt;span style="color:#75715e"&gt;// 绕过 storeOne 上的事务通知&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果事务操作代表一个真实边界，应将其移动到单独的注入式服务中。编程式事务管理或 AspectJ 编织也可以作为替代方案；注入 Bean 自身的代理会使领域代码耦合到容器机制，并增加测试难度。&lt;/p&gt;</description></item></channel></rss>

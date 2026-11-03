@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Clang on cesun.life</title><link>https://example.org/zh-cn/tags/clang/</link><description>Recent content in Clang on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Wed, 11 Mar 2026 03:34:10 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/clang/index.xml" rel="self" type="application/rss+xml"/><item><title>Clangd 与编译数据库</title><link>https://example.org/zh-cn/clangd/</link><pubDate>Wed, 11 Mar 2026 03:34:10 +0800</pubDate><guid>https://example.org/zh-cn/clangd/</guid><description>&lt;p&gt;&lt;code&gt;clangd&lt;/code&gt; 使用虚拟编译器命令解析每个打开的文件，从而提供 C 和 C++ 语言服务器功能。只有当该命令代表真实构建上下文时，补全、诊断、导航和重构才可靠；上下文包括工作目录、编译器驱动程序、目标、语言模式、包含路径、预处理器定义和生成的头文件。&lt;/p&gt;
+&lt;h2 id="提供编译命令"&gt;
+ 提供编译命令
+ &lt;a href="#%e6%8f%90%e4%be%9b%e7%bc%96%e8%af%91%e5%91%bd%e4%bb%a4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;编译数据库是首选事实来源。&lt;code&gt;compile_commands.json&lt;/code&gt; 为每个翻译单元包含一条命令和一个工作目录。CMake 可以为构建树生成它：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS&lt;span style="color:#f92672"&gt;=&lt;/span&gt;ON
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;clangd --compile-commands-dir&lt;span style="color:#f92672"&gt;=&lt;/span&gt;build&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;json&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-json" data-lang="json"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;[
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;directory&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;/work/project&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;file&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;src/main.cc&amp;#34;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;#34;command&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;clang++ -Iinclude -std=c++20 -c src/main.cc&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;]&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;没有 &lt;code&gt;--compile-commands-dir&lt;/code&gt; 时，clangd 会从打开文件所在目录向上级目录搜索 &lt;code&gt;compile_commands.json&lt;/code&gt; 或 &lt;code&gt;compile_flags.txt&lt;/code&gt;。&lt;code&gt;compile_flags.txt&lt;/code&gt; 是更简单的备用方案：它为每个文件提供每行一个标志，无法表示不同翻译单元具有不同标志的目标。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;-Iinclude
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;-std=c++20
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;-Wall&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;从权威构建生成数据库，然后让工作区能够发现它。从仓库根目录建立符号链接、使用编辑器设置或指定 &lt;code&gt;--compile-commands-dir&lt;/code&gt; 都有效；复制数据库可能导致命令过时。对于没有原生支持的构建系统，Bear 等工具可以观察一次干净构建，但生成的命令仍必须描述开发者打开的配置。&lt;/p&gt;
+&lt;h2 id="头文件新文件与标志调整"&gt;
+ 头文件、新文件与标志调整
+ &lt;a href="#%e5%a4%b4%e6%96%87%e4%bb%b6%e6%96%b0%e6%96%87%e4%bb%b6%e4%b8%8e%e6%a0%87%e5%bf%97%e8%b0%83%e6%95%b4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;构建系统不会直接编译头文件。对于头文件，clangd 首先复用某个已打开且包含该头文件的源文件命令；否则会选择文件名相似的数据库条目。在多平台代码树中，这种启发式方法可能选择错误目标。应先打开包含该头文件的源文件，使头文件命名与其主要源文件保持一致，或使用项目配置明确指定上下文。&lt;/p&gt;
+&lt;p&gt;数据库中不存在的文件会获得备用命令。备用命令允许解析，但不包含构建提供的目标专用包含路径、宏、生成头文件或语言模式。应将其诊断视为暂时结果，并在编辑新目标前将源文件加入构建或提供配置。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;.clangd&lt;/code&gt; can adjust commands without duplicating the database:&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;yaml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-yaml" data-lang="yaml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;CompileFlags&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;Add&lt;/span&gt;: [-&lt;span style="color:#ae81ff"&gt;Ithird_party/api, -DMY_EDITOR_BUILD=1]&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;Remove&lt;/span&gt;: [-&lt;span style="color:#ae81ff"&gt;Werror]&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;使用调整来处理仅限编辑器的修正或 clangd 无法使用的标志，不要借此手工重建构建命令。尽可能保留编译器可执行文件，因为其位置和名称会影响默认标准库查找和语言选择。&lt;/p&gt;</description></item><item><title>Clang-Format</title><link>https://example.org/zh-cn/clang-format/</link><pubDate>Fri, 23 Apr 2021 07:23:47 +0800</pubDate><guid>https://example.org/zh-cn/clang-format/</guid><description>&lt;p&gt;&lt;code&gt;clang-format&lt;/code&gt; 将源代码布局变为仓库策略，而不是每位作者的个人偏好。它根据语法令牌流格式化受支持的语言，因此缩进、换行以及许多空格决策都可以复现。它不会规定命名、API、所有权或行为正确性；因此，代码评审仍然必须检查这些语义问题。&lt;/p&gt;
+&lt;h2 id="建立仓库策略"&gt;
+ 建立仓库策略
+ &lt;a href="#%e5%bb%ba%e7%ab%8b%e4%bb%93%e5%ba%93%e7%ad%96%e7%95%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在仓库根目录提交 &lt;code&gt;.clang-format&lt;/code&gt; 文件。使用 &lt;code&gt;--style=file&lt;/code&gt; 时，clang-format 会从每个输入文件所在位置向其祖先目录搜索，并选择距离最近的 &lt;code&gt;.clang-format&lt;/code&gt; 或 &lt;code&gt;_clang-format&lt;/code&gt;。因此，嵌套目录可以有意覆盖根目录策略，但意外放置的嵌套文件也会改变该子树的格式化结果。&lt;/p&gt;
+&lt;p&gt;使用显式 YAML，即使预设样式提供了默认值，也要包含基础样式：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;yaml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-yaml" data-lang="yaml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;---
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;BasedOnStyle&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;LLVM&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;IndentWidth&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;4&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;ColumnLimit&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;SortIncludes&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;CaseSensitive&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;LLVM、Google、Chromium、Mozilla、WebKit、Microsoft 和 GNU 是内置的基础样式。预设名称并不是稳定的仓库策略，因为新版 clang-format 可能会添加选项或修改默认值。使用 &lt;code&gt;clang-format --style=LLVM --dump-config&lt;/code&gt; 生成特定版本的完整起始配置，审核后提交预期的选项。当要求输出按字节完全一致时，应在开发环境和 CI 环境中固定格式化工具的版本；显式配置可以减少版本之间的格式差异，但无法完全消除这些差异。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;Language:&lt;/code&gt; 部分会针对特定语言扩展默认部分：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;yaml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-yaml" data-lang="yaml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;---
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;BasedOnStyle&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;LLVM&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;IndentWidth&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;4&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;---
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;Language&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Cpp&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;PointerAlignment&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Left&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;对于标准输入或没有扩展名的文件，传入 &lt;code&gt;--assume-filename=example.cc&lt;/code&gt;，使语言检测和仓库发现过程与目标源文件保持一致。&lt;/p&gt;
+&lt;h2 id="调用格式化工具"&gt;
+ 调用格式化工具
+ &lt;a href="#%e8%b0%83%e7%94%a8%e6%a0%bc%e5%bc%8f%e5%8c%96%e5%b7%a5%e5%85%b7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每次调用都使用已提交的策略：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# 重写由构建系统或文件列表选中的完整文件。&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;clang-format --style&lt;span style="color:#f92672"&gt;=&lt;/span&gt;file -i src/widget.cc include/widget.h
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# 仅重写发生变更的行。此调用中的偏移量以字节为单位。&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;clang-format --style&lt;span style="color:#f92672"&gt;=&lt;/span&gt;file -i --offset&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;120&lt;/span&gt; --length&lt;span style="color:#f92672"&gt;=&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;400&lt;/span&gt; src/widget.cc
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# 在不修改文件的情况下检查 CI 文件集。&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;clang-format --style&lt;span style="color:#f92672"&gt;=&lt;/span&gt;file --dry-run --Werror src/widget.cc include/widget.h&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;编辑器应在保存时或执行显式格式化命令时，使用 &lt;code&gt;--style=file&lt;/code&gt; 调用 clang-format。CI 应运行相同版本的可执行文件，并且只检查与项目相关的已跟踪文件；Shell 通配符会遗漏嵌套目录中的文件，并且结果可能因 Shell 而异。可供审核的 CI 脚本可以从 Git 或构建系统获取文件列表，并在格式化会产生差异时失败。&lt;/p&gt;</description></item></channel></rss>

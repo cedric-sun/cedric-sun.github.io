@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Aop on cesun.life</title><link>https://example.org/ja/tags/aop/</link><description>Recent content in Aop on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sun, 25 May 2025 03:36:19 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/aop/index.xml" rel="self" type="application/rss+xml"/><item><title>Springの概要とトランザクション</title><link>https://example.org/ja/spring-overview-and-transactions/</link><pubDate>Sun, 25 May 2025 03:36:19 +0800</pubDate><guid>https://example.org/ja/spring-overview-and-transactions/</guid><description>&lt;p&gt;Spring Frameworkは、依存性注入コンテナに加えて、AOP、データアクセス、トランザクション、メッセージング、Webアプリケーションに特化したモジュールを提供します。トランザクション管理は、フレームワークの統合モデルを示す代表例です。アプリケーションコードが境界を宣言し、インターセプターがリソース固有の&lt;code&gt;PlatformTransactionManager&lt;/code&gt;またはリアクティブトランザクションマネージャーを調整します。&lt;/p&gt;
+&lt;h2 id="プロキシベースの宣言的トランザクション"&gt;
+ プロキシベースの宣言的トランザクション
+ &lt;a href="#%e3%83%97%e3%83%ad%e3%82%ad%e3%82%b7%e3%83%99%e3%83%bc%e3%82%b9%e3%81%ae%e5%ae%a3%e8%a8%80%e7%9a%84%e3%83%88%e3%83%a9%e3%83%b3%e3%82%b6%e3%82%af%e3%82%b7%e3%83%a7%e3%83%b3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;デフォルトのアドバイスモードでは、Springは対象となるBeanをAOPプロキシでラップします。&lt;code&gt;@Transactional&lt;/code&gt;に一致するメソッドへの呼び出しは&lt;code&gt;TransactionInterceptor&lt;/code&gt;を経由し、トランザクションメタデータを読み取り、トランザクションを開始または既存のトランザクションに参加し、対象メソッドを呼び出した後、コミットまたはロールバックします。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Service&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OrderService&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; OrderRepository orders;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; PaymentGateway payments;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Transactional&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; Order &lt;span style="color:#a6e22e"&gt;place&lt;/span&gt;(CreateOrder command) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Order order &lt;span style="color:#f92672"&gt;=&lt;/span&gt; orders.&lt;span style="color:#a6e22e"&gt;insert&lt;/span&gt;(command);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; payments.&lt;span style="color:#a6e22e"&gt;reserve&lt;/span&gt;(order);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; order;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;プロキシには実際上の制約があります。呼び出しはプロキシを経由して入る必要があり、メソッドは選択したプロキシ機構によってインターセプト可能でなければなりません。インターフェースベースのJDKプロキシはインターフェースのメソッドを公開します。クラスベースのプロキシは対象をサブクラス化するため、&lt;code&gt;final&lt;/code&gt;メソッドにはアドバイスを適用できません。&lt;/p&gt;
+&lt;h2 id="自己呼び出し"&gt;
+ 自己呼び出し
+ &lt;a href="#%e8%87%aa%e5%b7%b1%e5%91%bc%e3%81%b3%e5%87%ba%e3%81%97" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;this.reprice()&lt;/code&gt;のような呼び出しは対象オブジェクト内にとどまり、そのプロキシには再び入りません。そのため、&lt;code&gt;reprice()&lt;/code&gt;への到達が自己呼び出しだけによる場合、そのメソッドに付与されたトランザクションメタデータは無視されます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;importOrders&lt;/span&gt;(List&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Order&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; batch) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; batch.&lt;span style="color:#a6e22e"&gt;forEach&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;this&lt;/span&gt;::storeOne); &lt;span style="color:#75715e"&gt;// storeOneのトランザクションアドバイスを回避する&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;トランザクション処理が実際の境界を表す場合は、その処理を別の注入可能なサービスへ移します。プログラムによるトランザクション管理やAspectJのウィービングも代替手段です。Bean自身のプロキシを注入すると、ドメインコードがコンテナの仕組みに結合され、テストも難しくなります。&lt;/p&gt;
+&lt;h2 id="境界の粒度"&gt;
+ 境界の粒度
+ &lt;a href="#%e5%a2%83%e7%95%8c%e3%81%ae%e7%b2%92%e5%ba%a6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;トランザクションには、アプリケーションレベルで1つの整合性操作を含めるべきです。コントローラーレベルの境界は、シリアライズや無関係なネットワーク処理まで含みがちです。一方、リポジトリレベルの境界では、1つのビジネス操作が複数のコミットに分割される可能性があります。サービスメソッドは通常、ドメイン不変条件を中心に複数のリポジトリを調整するため、有用な単位になります。&lt;/p&gt;
+&lt;p&gt;ロック保持時間、リトライ、障害復旧を分析せずに、制御不能なリモート呼び出しをまたいでデータベーストランザクションを開いたままにしないでください。ローカルトランザクションによって外部サービスをアトミックにすることはできません。outbox、冪等性、またはSaga形式の調整が必要になる場合があります。&lt;/p&gt;
+&lt;h2 id="伝播分離ロールバック"&gt;
+ 伝播、分離、ロールバック
+ &lt;a href="#%e4%bc%9d%e6%92%ad%e5%88%86%e9%9b%a2%e3%83%ad%e3%83%bc%e3%83%ab%e3%83%90%e3%83%83%e3%82%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;伝播は、メソッドが既存のトランザクションとどのように関係するかを定義します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;REQUIRED&lt;/code&gt;はデフォルトで、既存のトランザクションに参加するか、新しいトランザクションを作成します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;REQUIRES_NEW&lt;/code&gt;は既存のトランザクションを中断して独立したトランザクションを開始します。別のプール接続が必要になる場合があります。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;SUPPORTS&lt;/code&gt;は既存のトランザクションがあれば参加し、なければトランザクションなしで実行します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;MANDATORY&lt;/code&gt;は既存のトランザクションを要求し、&lt;code&gt;NEVER&lt;/code&gt;はトランザクションを禁止します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;NOT_SUPPORTED&lt;/code&gt;は既存のトランザクションを中断します。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;NESTED&lt;/code&gt;は、トランザクションマネージャーとリソースがセーブポイントをサポートしている場合、1つの物理トランザクション内でセーブポイントを使用します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;分離レベルの要求は、リソースの機能に対応付けられます。&lt;code&gt;DEFAULT&lt;/code&gt;は設定済みのデフォルト値を使用し、それ以外の値は標準的なJDBC分離レベルに対応します。宣言したからといって、すべてのデータベースが同一のロック方式やスナップショットセマンティクスを実装しているとは限りません。そのため、選択したデータベースとドライバーで動作を検証してください。&lt;/p&gt;
+&lt;p&gt;デフォルトでは、Springは&lt;code&gt;RuntimeException&lt;/code&gt;と&lt;code&gt;Error&lt;/code&gt;でトランザクションをロールバック対象としてマークしますが、チェック例外ではそうしません。例外分類の意味が異なる場合は、&lt;code&gt;rollbackFor&lt;/code&gt;または&lt;code&gt;noRollbackFor&lt;/code&gt;を設定してください。内部の参加者が共有トランザクションをロールバック専用としてマークすると、外側ではコミットに見える処理が&lt;code&gt;UnexpectedRollbackException&lt;/code&gt;を発生させることがあります。&lt;/p&gt;
+&lt;h2 id="アドバイザーの順序"&gt;
+ アドバイザーの順序
+ &lt;a href="#%e3%82%a2%e3%83%89%e3%83%90%e3%82%a4%e3%82%b6%e3%83%bc%e3%81%ae%e9%a0%86%e5%ba%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;セキュリティ、リトライ、キャッシュ、メトリクス、ロック、トランザクションの関心事は、同じ呼び出しをすべてラップできます。入れ子の順序によって意味が変わります。1つのトランザクション内でリトライすることは、試行ごとに新しいトランザクションを開くことと同じではありません。また、認可の前にキャッシュするとデータが公開される可能性があります。サポートされている場合は&lt;code&gt;Ordered&lt;/code&gt;/&lt;code&gt;@Order&lt;/code&gt;を使用して順序を指定し、結果として得られる呼び出し順序をテストしてください。必要な順序が明示されていない場合は、アノテーションを積み重ねないでください。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Data Platforms on cesun.life</title><link>https://example.org/ja/tags/data-platforms/</link><description>Recent content in Data Platforms on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 30 Jul 2026 07:27:00 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/data-platforms/index.xml" rel="self" type="application/rss+xml"/><item><title>Apache Kyuubi 入門</title><link>https://example.org/ja/apache-kyuubi-introduction/</link><pubDate>Thu, 30 Jul 2026 07:27:00 +0800</pubDate><guid>https://example.org/ja/apache-kyuubi-introduction/</guid><description>&lt;p&gt;Apache Kyuubi は、分散データシステム向けのマルチテナント SQL ゲートウェイです。各ユーザーが Spark アプリケーションのライフサイクル、クラスタキュー、エンジン設定を管理しなくても、ユーザーや BI ツールに安定した JDBC または ODBC エンドポイントを提供します。&lt;/p&gt;
+&lt;p&gt;Kyuubi は、クエリを実行するプロセスから、長時間稼働するクライアントエンドポイントを分離します。
+この分離が、Kyuubi の主なアーキテクチャ上の貢献です。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Kyuubi サーバー&lt;/strong&gt;はクライアントを認証し、プロトコルセッションを維持し、エンジンを選択して、操作を転送します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Kyuubi エンジン&lt;/strong&gt;は SQL を実行し、コンピュートリソースを消費します。Spark SQL が最も一般的なエンジンですが、Kyuubi のリリースによっては他のクエリエンジンとも統合できます。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;外部サービス&lt;/strong&gt;は引き続き、リソース管理、メタデータ、ストレージ、認可ポリシー、サービスディスカバリを提供します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;したがって Kyuubi は、Spark、YARN、Kubernetes、Hive metastore、オブジェクトストレージを置き換えるものではありません。Kyuubi はそれらへのアクセスを調整します。&lt;/p&gt;
+&lt;h2 id="アーキテクチャ"&gt;
+ アーキテクチャ
+ &lt;a href="#%e3%82%a2%e3%83%bc%e3%82%ad%e3%83%86%e3%82%af%e3%83%81%e3%83%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一般的な Spark-on-YARN デプロイメントは次のようになります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Beeline、BI ツール、またはアプリケーション
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | HiveServer2 プロトコルを使用する JDBC/ODBC
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Kyuubi サーバープール
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | `----&amp;gt; ZooKeeper または設定済みの別のディスカバリサービス
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | 起動、検出、または再利用
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Spark SQL エンジンアプリケーション
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |----&amp;gt; ドライバーとエグゼキューターのリソース用 YARN
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |----&amp;gt; テーブルメタデータ用 Hive Metastore
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |----&amp;gt; テーブルデータ用 HDFS またはオブジェクトストレージ
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; `----&amp;gt; Ranger または別の認可システム&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;エンジンが解析、実行計画、スキャン、結合、シャッフル、書き込みを実行するため、Kyuubi サーバーは比較的軽量です。サーバーノードを増やすと、接続数と操作処理能力は増加しますが、それだけで Spark エグゼキューターが追加されるわけではありません。&lt;/p&gt;</description></item><item><title>Apache Hive / Kyuubi の概要</title><link>https://example.org/ja/apache-hive-overview/</link><pubDate>Mon, 27 Jul 2026 21:28:09 +0800</pubDate><guid>https://example.org/ja/apache-hive-overview/</guid><description>&lt;p&gt;Apache Hive は、分散ファイルシステムおよびオブジェクトストアに保存されたデータセットに対して SQL セマンティクスを提供します。Hive のデプロイメントは、1 つのデーモンでも、1 つのストレージ形式でもありません。SQL 言語、メタデータサービス、クエリコンパイル、実行エンジン、ウェアハウスストレージ、クライアントプロトコルを組み合わせたものです。&lt;/p&gt;
+&lt;p&gt;Hive に関連する複数の名称は、それぞれ異なるレイヤーを指します。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Hive&lt;/strong&gt; は、プロジェクト、HiveQL 言語、コンパイラー、オプティマイザー、ランタイム統合、および補助サービスです。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Hive Metastore (HMS)&lt;/strong&gt; は、テーブル、パーティション、スキーマ、ロケーション、統計情報、トランザクションのメタデータを保存・提供します。HMS が保存するのはテーブルデータではなくメタデータです。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;HiveServer2 (HS2)&lt;/strong&gt; は、リモート JDBC および ODBC セッションを受け付け、HiveQL をコンパイルし、実行を調整して、結果を返します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;hive&lt;/code&gt; CLI&lt;/strong&gt; は、歴史的なシッククライアント型コマンドラインクライアントです。Hive のランタイムコードをローカルに読み込むため、HiveServer2 と混同しないでください。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Beeline&lt;/strong&gt; は JDBC コマンドラインクライアントです。共有デプロイメントでは、認証、設定、監査、リソース制御をサーバー側に維持できるため、HiveServer2 に対して Beeline を使用します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Apache Kyuubi&lt;/strong&gt; は、HiveServer2 互換プロトコルを備えたマルチテナント SQL ゲートウェイです。Spark SQL などのエンジンを管理できますが、Kyuubi は HiveServer2 ではなく、Spark SQL を Hive の実行エンジンに変えるものでもありません。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Kerberos&lt;/strong&gt; は、Hadoop コンポーネント間でユーザーとサービスを認証します。Kerberos は、テーブルスキーマを定義したり、SQL を実行したり、SQL 権限を決定したりしません。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Apache Kite SDK&lt;/strong&gt; は、歴史的な Hadoop データセットツールエコシステムに属します。現在の Hive クエリパスの一部ではありません。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;これらの区別は重要です。JDBC 接続が成功しても HMS が利用できない場合があり、HMS の検索が成功しても HDFS 権限によってクエリが拒否される場合があり、Kyuubi エンドポイントが HiveServer2 プロトコルを話していても Hive のコンパイラーやランタイムを実行しているとは限らないためです。&lt;/p&gt;</description></item><item><title>Apache Polaris と Apache Iceberg</title><link>https://example.org/ja/apache-polaris-and-iceberg/</link><pubDate>Wed, 22 Jul 2026 11:58:00 +0800</pubDate><guid>https://example.org/ja/apache-polaris-and-iceberg/</guid><description>&lt;p&gt;Apache Polaris は Apache Iceberg テーブル向けのカタログサービスです。Apache Iceberg
+は、大規模な分析データセット向けのオープンテーブル形式です。どちらのプロジェクトも
+汎用計算エンジンではありません。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Polaris はテーブルを識別し、アクセスを管理し、現在の Iceberg メタデータへの変更を調整します。&lt;/li&gt;
+&lt;li&gt;Iceberg は、テーブルの状態、スナップショット、マニフェスト、データファイル、削除ファイルがどのように構成されるかを定義します。&lt;/li&gt;
+&lt;li&gt;Spark、Flink、Trino、その他のエンジンが計算を計画し、実行します。&lt;/li&gt;
+&lt;li&gt;HDFS またはオブジェクトストレージが Iceberg のメタデータとテーブルデータファイルを保持します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;これらの責務を分離することで、よくある分類上の誤りを防げます。
+Polaris は Spark の代替ではありません。Spark デプロイメントは Polaris を
+Iceberg カタログとして使用できます。&lt;/p&gt;
+&lt;h2 id="各コンポーネントをスタック内に配置する"&gt;
+ 各コンポーネントをスタック内に配置する
+ &lt;a href="#%e5%90%84%e3%82%b3%e3%83%b3%e3%83%9d%e3%83%bc%e3%83%8d%e3%83%b3%e3%83%88%e3%82%92%e3%82%b9%e3%82%bf%e3%83%83%e3%82%af%e5%86%85%e3%81%ab%e9%85%8d%e7%bd%ae%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一般的なデプロイメントには、4 つの明確に分離されたレイヤーがあります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;SQL client, notebook, scheduler, or application
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Compute engine: Spark, Flink, Trino, or another Iceberg client
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | Iceberg REST requests | file I/O
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; v v
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Apache Polaris Object storage or HDFS
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | |
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; | current metadata pointer | Iceberg metadata,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; `----------------------------&amp;gt; | manifests, and data files&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;コントロールパスとデータパスは分離されています。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Source-Code on cesun.life</title><link>https://example.org/zh-cn/tags/source-code/</link><description>Recent content in Source-Code on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Thu, 07 May 2026 03:47:31 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/source-code/index.xml" rel="self" type="application/rss+xml"/><item><title>glibc 源码内部机制和系统调用包装器</title><link>https://example.org/zh-cn/glibc-syscall-wrappers/</link><pubDate>Thu, 07 May 2026 03:47:31 +0800</pubDate><guid>https://example.org/zh-cn/glibc-syscall-wrappers/</guid><description>&lt;p&gt;glibc 暴露 &lt;code&gt;read(2)&lt;/code&gt; 和 &lt;code&gt;write(2)&lt;/code&gt; 等 C 函数，而 Linux 暴露特定于架构的系统调用入口约定。包装器连接这两层：它接受公共 C ABI，遵循所选架构的系统调用 ABI，转换内核错误，并且可能实现 POSIX 线程取消行为。&lt;/p&gt;
+&lt;p&gt;下面的示例描述当前上游源码树。已发布的 glibc 可能选择不同文件或宏定义，因此源码检查必须从正在构建的版本和目标三元组开始。&lt;/p&gt;
+&lt;h2 id="sysdeps"&gt;
+ &lt;code&gt;sysdeps/&lt;/code&gt; 选择
+ &lt;a href="#sysdeps" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href="https://sourceware.org/git/?p=glibc.git;a=tree;f=sysdeps;hb=HEAD"&gt;&lt;code&gt;sysdeps/&lt;/code&gt; 树&lt;/a&gt; 保存按操作系统、CPU、ABI、字长和功能选择的实现。通用代码是回退实现；更具体的目录可以用相同相对名称的文件替换它。对于 Linux 构建，相关路径包括 &lt;code&gt;sysdeps/unix/sysv/linux/&lt;/code&gt;；架构还可以提供 Linux 特定的入口代码或 ABI 特定变体。&lt;/p&gt;
+&lt;p&gt;glibc 的配置和构建机制会构建适用系统依赖目录的有序列表。构建规则搜索该列表，因此选定的实现会覆盖通用回退。该布局不是每个文件恰好只有一个维度的分类体系：操作系统目录可能依赖架构头文件，架构目录也可能包含与操作系统无关的代码。应检查 &lt;code&gt;config.make&lt;/code&gt;、已配置的构建目录和选定的源代码路径，而不要从某个目录名推断行为。&lt;/p&gt;
+&lt;h2 id="syscalls-list-and-make-syscalls-sh"&gt;
+ 生成的精简包装器
+ &lt;a href="#syscalls-list-and-make-syscalls-sh" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一些精简汇编包装器根据 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/syscalls.list;hb=HEAD"&gt;&lt;code&gt;syscalls.list&lt;/code&gt;&lt;/a&gt; 生成。每条记录命名一个输出、一个 Linux 系统调用、一个参数签名、一个强符号以及可选的弱符号或版本化名称。构建会调用 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/make-syscalls.sh;hb=HEAD"&gt;&lt;code&gt;make-syscalls.sh&lt;/code&gt;&lt;/a&gt;，它会：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;移除被更高优先级 &lt;code&gt;sysdeps&lt;/code&gt; 目录覆盖的条目；&lt;/li&gt;
+&lt;li&gt;通过目标的 &lt;code&gt;sysdep.h&lt;/code&gt; 解析 &lt;code&gt;SYS_&lt;/code&gt; 编号；&lt;/li&gt;
+&lt;li&gt;从签名推导参数数量和特殊参数处理；&lt;/li&gt;
+&lt;li&gt;使用 &lt;code&gt;syscall-template.S&lt;/code&gt; 生成规则，并在列表要求时包含别名和兼容符号。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;syscalls.list&lt;/code&gt; 不定义每个公共函数。带验证、回退逻辑、取消处理、时间宽度转换或其他策略的包装器通常是手写的。当前 glibc 中的 &lt;code&gt;write&lt;/code&gt; 就是一个这样的手写 C 包装器，位于 &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/write.c;hb=HEAD"&gt;&lt;code&gt;write.c&lt;/code&gt;&lt;/a&gt;；因此它可以作为生成路径的对照。&lt;/p&gt;
+&lt;h2 id="write"&gt;
+ &lt;code&gt;write&lt;/code&gt; 和取消感知调度
+ &lt;a href="#write" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;从概念上看，Linux 的 &lt;code&gt;write&lt;/code&gt; 包装器执行以下操作：&lt;/p&gt;</description></item><item><title>Linux 内核源代码树</title><link>https://example.org/zh-cn/linux-kernel-source-tree/</link><pubDate>Wed, 28 Jan 2026 12:55:15 +0800</pubDate><guid>https://example.org/zh-cn/linux-kernel-source-tree/</guid><description>&lt;p&gt;Linux 源码 tree separates architecture-independent subsystems from
+architecture ports, public 用户空间 interfaces, 生成的 构建 state, tools, and
+tests. Directory names 是 a navigation aid rather than an execution model: Kconfig
+selects configuration, Kbuild selects objects, 和 the selected objects determine
+what reaches a particular 内核 image.&lt;/p&gt;
+&lt;h2 id="top-level-directories"&gt;
+ 顶层子系统边界
+ &lt;a href="#top-level-directories" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;principal 源码 directories are:&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;Path&lt;/th&gt;
+ &lt;th&gt;Responsibility&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;arch/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;Architecture ports, boot code, MMU 和 interrupt entry, 和 low-level ABI support.&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;block/&lt;/code&gt;, &lt;code&gt;fs/&lt;/code&gt;, &lt;code&gt;mm/&lt;/code&gt;, &lt;code&gt;net/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;block layer; VFS 和 filesystem implementations; virtual 和 physical 内存 management; 和 networking stacks.&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;kernel/&lt;/code&gt;, &lt;code&gt;init/&lt;/code&gt;, &lt;code&gt;ipc/&lt;/code&gt;, &lt;code&gt;security/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;Core scheduling, locking, signals, tracing, 和 other 内核 facilities; early initialization; IPC; 和 Linux Security Module infrastructure.&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;drivers/&lt;/code&gt;, &lt;code&gt;sound/&lt;/code&gt;, &lt;code&gt;virt/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;Device drivers, the sound subsystem, 和 virtualization support such 作为 KVM. 一个 driver need 不 expose a &lt;code&gt;struct file_operations&lt;/code&gt;; subsystem-specific buses 和 callbacks 是 also common.&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;crypto/&lt;/code&gt;, &lt;code&gt;lib/&lt;/code&gt;, &lt;code&gt;io_uring/&lt;/code&gt;, &lt;code&gt;rust/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;Shared cryptographic 和 library support, asynchronous I/O, 和 Rust 内核 support.&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;include/&lt;/code&gt;, &lt;code&gt;Documentation/&lt;/code&gt;, &lt;code&gt;scripts/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;Headers, maintained documentation, 和 Kbuild/Kconfig plus generation 和 maintenance utilities.&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;tools/&lt;/code&gt;, &lt;code&gt;samples/&lt;/code&gt;, &lt;code&gt;usr/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;Userspace tools such 作为 &lt;code&gt;perf&lt;/code&gt;, example programs, 和 built-in initramfs generation.&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Other top-level material such 作为 &lt;code&gt;certs/&lt;/code&gt; 和 &lt;code&gt;LICENSES/&lt;/code&gt; 支持 signing,
+licensing, 或 构建 policy. 一个 源码 checkout changes over time, so inspect its
+top-level &lt;code&gt;README&lt;/code&gt;, &lt;code&gt;MAINTAINERS&lt;/code&gt;, 和 &lt;code&gt;Documentation/&lt;/code&gt; instead 的 assuming every
+release 包含 the same directories.&lt;/p&gt;</description></item><item><title>Sudo 源代码指南</title><link>https://example.org/zh-cn/sudo-source-code-guide/</link><pubDate>Thu, 25 Jul 2024 00:00:00 +0000</pubDate><guid>https://example.org/zh-cn/sudo-source-code-guide/</guid><description>&lt;p&gt;sudo 源代码树将前端程序、插件实现、可复用库、生成的语言解析器和可移植性支持分开。应从可执行文件的入口开始，然后跟随插件接口；仅按目录名阅读代码树会掩盖策略边界。&lt;/p&gt;</description></item></channel></rss>

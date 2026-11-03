@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Locking on cesun.life</title><link>https://example.org/zh-tw/tags/locking/</link><description>Recent content in Locking on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Tue, 26 Nov 2024 05:37:18 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/locking/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 核心鎖定</title><link>https://example.org/zh-tw/linux-kernel-locking/</link><pubDate>Tue, 26 Nov 2024 05:37:18 +0800</pubDate><guid>https://example.org/zh-tw/linux-kernel-locking/</guid><description>&lt;p&gt;核心鎖定始於執行上下文。在程序上下文呼叫端之間正確的鎖，當相同資料從 softirq、硬體中斷或不可遮罩中斷（NMI）抵達時可能死結。原語及其後綴必須符合所有存取受保護狀態的上下文。&lt;/p&gt;
+&lt;h2 id="自旋鎖語意"&gt;
+ 自旋鎖語意
+ &lt;a href="#%e8%87%aa%e6%97%8b%e9%8e%96%e8%aa%9e%e6%84%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用下列方式宣告與初始化一般自旋鎖：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;DEFINE_SPINLOCK&lt;/span&gt;(queue_lock);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; queue {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;spinlock_t&lt;/span&gt; lock;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;spin_lock_init&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;queue&lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt;lock);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在非 PREEMPT_RT 的 SMP 核心上，&lt;code&gt;spin_lock()&lt;/code&gt; 會停用本機 CPU 的搶佔，並自旋直到取得獨佔擁有權。它不會停用本機中斷或 softirq。持有者不得睡眠、明確排程、執行阻塞配置，或呼叫可能取得睡眠鎖的程式碼。&lt;/p&gt;
+&lt;p&gt;在單處理器的非 RT 建置中，因為沒有其他 CPU 可以競爭，部分實作可以編譯為搶佔與編譯器控制。正確性不能依賴該最佳化；相同來源仍必須對 SMP 有效。&lt;/p&gt;
+&lt;p&gt;PREEMPT_RT 會變更 &lt;code&gt;spinlock_t&lt;/code&gt; 與 &lt;code&gt;rwlock_t&lt;/code&gt; 語意，使它們使用以 RT mutex 為基礎的實作並保持可搶佔。需要在 RT 與非 RT 核心上真正自旋且不可搶佔的鎖時，使用 &lt;code&gt;raw_spinlock_t&lt;/code&gt;，但原始臨界區必須保持短小，且不能呼叫在 RT 上會變成睡眠的程式碼。替換是在鎖定標頭檔與核心程式碼中實作；應用程式程式碼不應使用設定條件重現它。&lt;/p&gt;
+&lt;h2 id="對應程序softirq-與-hardirq-上下文"&gt;
+ 對應程序、Softirq 與 Hardirq 上下文
+ &lt;a href="#%e5%b0%8d%e6%87%89%e7%a8%8b%e5%ba%8fsoftirq-%e8%88%87-hardirq-%e4%b8%8a%e4%b8%8b%e6%96%87" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;請選擇能防止同一 CPU 重新進入的最窄變體：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;存取資料的來源&lt;/th&gt;
+ &lt;th&gt;程序上下文取得&lt;/th&gt;
+ &lt;th&gt;中斷側取得&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;僅程序上下文&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;不適用&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;程序上下文與 softirq/tasklet&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_bh()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;softirq 中的 &lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;程序上下文與 hardirq&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_irqsave()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;處理常式中的 &lt;code&gt;spin_lock()&lt;/code&gt;&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;具有已知 IRQ 狀態的 hardirq 上下文&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;spin_lock_irq()&lt;/code&gt; 或 &lt;code&gt;spin_lock_irqsave()&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;依呼叫端狀態&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;spin_lock_bh()&lt;/code&gt; 會在取得鎖前停用本機下半部。&lt;code&gt;spin_lock_irq()&lt;/code&gt; 會停用本機可遮罩中斷。&lt;code&gt;spin_lock_irqsave(lock, flags)&lt;/code&gt; 另外儲存先前的中斷狀態，而 &lt;code&gt;spin_unlock_irqrestore(lock, flags)&lt;/code&gt; 還原完全相同的狀態：&lt;/p&gt;</description></item></channel></rss>

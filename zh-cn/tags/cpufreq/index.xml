@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Cpufreq on cesun.life</title><link>https://example.org/zh-cn/tags/cpufreq/</link><description>Recent content in Cpufreq on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sun, 30 Oct 2022 03:35:16 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/cpufreq/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux CPU 频率缩放</title><link>https://example.org/zh-cn/linux-cpu-frequency-scaling/</link><pubDate>Sun, 30 Oct 2022 03:35:16 +0800</pubDate><guid>https://example.org/zh-cn/linux-cpu-frequency-scaling/</guid><description>&lt;p&gt;现代处理器公开了在执行能力、功耗和发热之间进行权衡的性能状态。Linux 通过 CPUFreq 提供这些控制。“频率”一词因兼容性仍保留在接口中，尽管硬件管理的 Intel HWP 和 AMD CPPC 操作的是性能请求，而不是离散的时钟表。&lt;/p&gt;
+&lt;h2 id="cpufreq-的三个层次"&gt;
+ CPUFreq 的三个层次
+ &lt;a href="#cpufreq-%e7%9a%84%e4%b8%89%e4%b8%aa%e5%b1%82%e6%ac%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;CPUFreq 包括：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;核心&lt;/strong&gt;，拥有策略对象和通用 sysfs 接口。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;调节器&lt;/strong&gt;，将工作负载需求转换为性能请求。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;缩放驱动程序&lt;/strong&gt;，将请求转换为特定于平台的寄存器、固件或硬件操作。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;一次只能注册一个 &lt;code&gt;struct cpufreq_driver&lt;/code&gt;。因此，驱动程序必须处理所有 CPUFreq 可用的 CPU；异构系统仍然使用策略对象表示不同的控制域。&lt;/p&gt;
+&lt;p&gt;调度器驱动的 &lt;code&gt;schedutil&lt;/code&gt; 调节器会在任务入队、出队和调度器时钟等事件上接收利用率更新。它推导容量请求，并直接调用驱动程序，或根据驱动程序是否支持快速转换而通过延迟工作调用。其他通用调节器包括 &lt;code&gt;performance&lt;/code&gt;、&lt;code&gt;powersave&lt;/code&gt;、&lt;code&gt;ondemand&lt;/code&gt;、&lt;code&gt;conservative&lt;/code&gt; 和 &lt;code&gt;userspace&lt;/code&gt;，但具体集合取决于内核配置和已加载模块。&lt;/p&gt;
+&lt;h2 id="策略表示硬件控制域"&gt;
+ 策略表示硬件控制域
+ &lt;a href="#%e7%ad%96%e7%95%a5%e8%a1%a8%e7%a4%ba%e7%a1%ac%e4%bb%b6%e6%8e%a7%e5%88%b6%e5%9f%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;struct cpufreq_policy&lt;/code&gt; 表示共享性能控制接口的逻辑 CPU。一个策略可以涵盖一个逻辑 CPU，也可以涵盖多个无法独立控制的 CPU。核心为每个 CPU 保留策略指针；一个硬件域中 CPU 的指针指向同一对象。&lt;/p&gt;
+&lt;p&gt;驱动程序初始化新策略时，其 &lt;code&gt;-&amp;gt;init()&lt;/code&gt; 回调提供：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;相关 CPU 掩码；&lt;/li&gt;
+&lt;li&gt;硬件最小和最大频率；&lt;/li&gt;
+&lt;li&gt;硬件使用离散表时的工作频率表；&lt;/li&gt;
+&lt;li&gt;转换属性和驱动程序能力。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;核心随后附加一个调节器，并调用其 &lt;code&gt;-&amp;gt;init()&lt;/code&gt; 和 &lt;code&gt;-&amp;gt;start()&lt;/code&gt; 操作。启动支持调度器的调节器会安装每 CPU 利用率回调。拥有自身选择算法的驱动程序可以改为实现 &lt;code&gt;-&amp;gt;setpolicy()&lt;/code&gt;，绕过通用调节器。当最后一个 CPU 下线时，CPU 热插拔可以停用策略；之后可重新激活，而不改变底层控制域模型。&lt;/p&gt;
+&lt;h2 id="检查和控制策略"&gt;
+ 检查和控制策略
+ &lt;a href="#%e6%a3%80%e6%9f%a5%e5%92%8c%e6%8e%a7%e5%88%b6%e7%ad%96%e7%95%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每个策略显示在 &lt;code&gt;/sys/devices/system/cpu/cpufreq/policyX/&lt;/code&gt; 下。&lt;code&gt;related_cpus&lt;/code&gt; 列出域中的所有逻辑 CPU，包括离线 CPU；&lt;code&gt;affected_cpus&lt;/code&gt; 列出在线成员。&lt;/p&gt;</description></item></channel></rss>

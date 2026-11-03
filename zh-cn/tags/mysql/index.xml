@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Mysql on cesun.life</title><link>https://example.org/zh-cn/tags/mysql/</link><description>Recent content in Mysql on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Thu, 03 Sep 2026 15:56:43 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/mysql/index.xml" rel="self" type="application/rss+xml"/><item><title>MySQL 事务、隔离与并发</title><link>https://example.org/zh-cn/mysql-transactions/</link><pubDate>Thu, 03 Sep 2026 15:56:43 +0800</pubDate><guid>https://example.org/zh-cn/mysql-transactions/</guid><description>&lt;p&gt;InnoDB 事务通过原子地提交相关更改，并控制并发语句如何观察这些更改，来保护数据库不变量。隔离性不能替代约束：对于模式能够表达的不变量，应使用主键、唯一约束、外键约束和检查约束；然后针对多语句决策选择合适的事务与锁定模式。&lt;/p&gt;
+&lt;h2 id="事务边界与自动提交"&gt;
+ 事务边界与自动提交
+ &lt;a href="#%e4%ba%8b%e5%8a%a1%e8%be%b9%e7%95%8c%e4%b8%8e%e8%87%aa%e5%8a%a8%e6%8f%90%e4%ba%a4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL 默认启用自动提交，因此显式事务之外的每条语句都会作为一个事务提交或回滚。应显式启动多语句单元，并使其保持简短：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;START&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;-&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;UPDATE&lt;/span&gt; account
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;=&lt;/span&gt; balance &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;84&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;COMMIT&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在为目标账户入账之前，先检查第一条更新语句影响的行数。任何不变量或语句失败时都使用 &lt;code&gt;ROLLBACK&lt;/code&gt;。连接池在归还连接之前必须恢复自动提交、隔离级别、访问模式和其他会话状态，因为这些属性会在事务之间保留。&lt;/p&gt;
+&lt;p&gt;许多数据定义语句和账户管理语句会隐式提交。原子 DDL 使受支持的模式语句具备崩溃安全性，但不会使该语句成为外围应用事务的一部分。&lt;/p&gt;
+&lt;h2 id="隔离级别配置"&gt;
+ 隔离级别配置
+ &lt;a href="#%e9%9a%94%e7%a6%bb%e7%ba%a7%e5%88%ab%e9%85%8d%e7%bd%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 在 MySQL 8.4 中的默认隔离级别是 &lt;code&gt;REPEATABLE READ&lt;/code&gt;。使用 &lt;code&gt;--transaction-isolation&lt;/code&gt; 或 &lt;code&gt;transaction_isolation&lt;/code&gt; 配置服务器默认值，并且仅在明确的作用域内覆盖它：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;COMMITTED&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;REPEATABLE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;READ&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TRANSACTION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ISOLATION&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;LEVEL&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SERIALIZABLE&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.transaction_isolation;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;GLOBAL&lt;/code&gt; 为新会话建立默认值。&lt;code&gt;SESSION&lt;/code&gt; 应用于该连接上的后续事务。不带限定词的 &lt;code&gt;SET TRANSACTION&lt;/code&gt; 应用于下一个事务。也可以在同一条语句中选择 &lt;code&gt;READ ONLY&lt;/code&gt; 和 &lt;code&gt;READ WRITE&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="mvcc-与一致性读取"&gt;
+ MVCC 与一致性读取
+ &lt;a href="#mvcc-%e4%b8%8e%e4%b8%80%e8%87%b4%e6%80%a7%e8%af%bb%e5%8f%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;只要活动快照仍可能需要，InnoDB 就会在 undo 数据中保留较早的行版本。普通 &lt;code&gt;SELECT&lt;/code&gt; 通常执行非锁定一致性读取：&lt;/p&gt;</description></item><item><title>关系数据建模</title><link>https://example.org/zh-cn/mysql-data-modeling/</link><pubDate>Sat, 04 Jan 2025 20:27:25 +0800</pubDate><guid>https://example.org/zh-cn/mysql-data-modeling/</guid><description>&lt;p&gt;实体关系模型在选择表之前识别实体类型、实体属性及其关系。随后，关系模式以定义的粒度对每个事实只表示一次。例如，&lt;code&gt;order_line&lt;/code&gt; 表示某个订单中的一个产品，而 &lt;code&gt;order&lt;/code&gt; 表示订单头。&lt;/p&gt;
+&lt;h2 id="实体键和关系"&gt;
+ 实体、键和关系
+ &lt;a href="#%e5%ae%9e%e4%bd%93%e9%94%ae%e5%92%8c%e5%85%b3%e7%b3%bb" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每个表都需要一个能够唯一标识其行的候选键。选择主键时，应确保其稳定、非空并适合连接。使用代理键并不意味着不需要针对自然业务标识建立唯一约束，例如账户的外部标识符。&lt;/p&gt;
+&lt;p&gt;按以下方式映射关系基数：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;对于一对一关系，在可选的一侧放置 &lt;code&gt;UNIQUE&lt;/code&gt; 外键；如果两个表的生命周期和访问控制一致，也可以合并这些表。&lt;/li&gt;
+&lt;li&gt;对于一对多关系，将外键放在多的一侧的表中。&lt;/li&gt;
+&lt;li&gt;对于多对多关系，创建一个关联表，其中包含指向两个实体的外键，以及属于该关系的属性。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div
+ class="goat svg-container"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 448 73"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 0,0 L 88,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,0 L 432,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,16 L 320,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,48 L 88,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,48 L 432,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 0,0 L 0,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,0 L 88,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 88,16 L 88,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 328,0 L 328,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 432,0 L 432,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='328.000000,16.000000 316.000000,10.400000 316.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 320.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;text text-anchor='middle' x='16' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='36' fill='currentColor' style='font-size:1em'&gt;(&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='36' fill='currentColor' style='font-size:1em'&gt;P&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='56' y='36' fill='currentColor' style='font-size:1em'&gt;K&lt;/text&gt;
+&lt;text text-anchor='middle' x='64' y='36' fill='currentColor' style='font-size:1em'&gt;)&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='4' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='4' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='4' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='4' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='4' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='4' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='4' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='36' fill='currentColor' style='font-size:1em'&gt;q&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='36' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='36' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='36' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='20' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='376' y='36' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='20' fill='currentColor' style='font-size:1em'&gt;_&lt;/text&gt;
+&lt;text text-anchor='middle' x='384' y='36' fill='currentColor' style='font-size:1em'&gt;_&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='20' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='392' y='36' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='400' y='36' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='408' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='416' y='36' fill='currentColor' style='font-size:1em'&gt;F&lt;/text&gt;
+&lt;text text-anchor='middle' x='424' y='36' fill='currentColor' style='font-size:1em'&gt;K&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;p&gt;&lt;code&gt;NOT NULL&lt;/code&gt; 表示必须参与该关系。可为空的外键表示对于该行而言，该关系是可选的。外键约束可以防止孤立引用，而 &lt;code&gt;ON DELETE&lt;/code&gt; 的行为必须反映业务规则：限制删除、级联删除、设置为 NULL，或在显式工作流中处理删除。&lt;/p&gt;</description></item><item><title>MySQL 字符串类型和字符集</title><link>https://example.org/zh-cn/mysql-string-types/</link><pubDate>Sat, 07 Sep 2024 23:40:56 +0800</pubDate><guid>https://example.org/zh-cn/mysql-string-types/</guid><description>&lt;p&gt;MySQL 字符串列同时具有逻辑字符限制和物理字节表示。将这两个概念分开，可以避免多语言文本和索引中的许多意外。&lt;/p&gt;
+&lt;h2 id="char-和-varchar"&gt;
+ &lt;code&gt;CHAR&lt;/code&gt; 和 &lt;code&gt;VARCHAR&lt;/code&gt;
+ &lt;a href="#char-%e5%92%8c-varchar" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;CHAR(n)&lt;/code&gt; 是定长字符串。MySQL 会按照声明的长度填充值以满足存储语义，因此它最适合国家/地区代码等真正定宽的值。&lt;code&gt;VARCHAR(n)&lt;/code&gt; 是变长字符串，通常更适合作为名称、标签和其他长度变化文本的默认类型。&lt;/p&gt;
+&lt;p&gt;在这两种类型中，&lt;code&gt;n&lt;/code&gt; 都是最大&lt;strong&gt;字符&lt;/strong&gt;数，而不是字节数。因此，当字符集支持时，
+&lt;code&gt;VARCHAR(10)&lt;/code&gt; 列可以容纳十个 emoji 或十个中文字符，即使这些字符在磁盘上使用的字节数超过十个。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; profile (
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; country_code CHAR(&lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; display_name VARCHAR(&lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;) &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;) CHARACTER &lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; utf8mb4;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="text-类型"&gt;
+ &lt;code&gt;TEXT&lt;/code&gt; 类型
+ &lt;a href="#text-%e7%b1%bb%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;对于较大的变长文本，使用 &lt;code&gt;TINYTEXT&lt;/code&gt;、&lt;code&gt;TEXT&lt;/code&gt;、&lt;code&gt;MEDIUMTEXT&lt;/code&gt; 或 &lt;code&gt;LONGTEXT&lt;/code&gt;。它们的限制以字节为单位，因此实际字符容量取决于列字符集。&lt;code&gt;TEXT&lt;/code&gt; 列可以建立索引，但较大或较旧的 MySQL 配置可能需要索引前缀；围绕长文本设计索引前，应检查存储引擎和 MySQL 版本。&lt;/p&gt;
+&lt;h2 id="字符集和排序规则"&gt;
+ 字符集和排序规则
+ &lt;a href="#%e5%ad%97%e7%ac%a6%e9%9b%86%e5%92%8c%e6%8e%92%e5%ba%8f%e8%a7%84%e5%88%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;字符集定义字符如何编码为字节。对于新的 MySQL 应用，&lt;code&gt;utf8mb4&lt;/code&gt; 通常是安全选择，因为它支持完整的 Unicode 范围。MySQL 历史上的 &lt;code&gt;utf8&lt;/code&gt; 名称可能指代三字节实现，不能表示每个 Unicode 字符。&lt;/p&gt;
+&lt;p&gt;排序规则定义字符集的比较和排序规则。它决定比较是否区分大小写或重音，以及字符串如何排序。可以在服务器、数据库、表或列级别设置字符集和排序规则；明确的表级或列级设置可以使应用的预期更清晰。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; article (
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; title VARCHAR(&lt;span style="color:#ae81ff"&gt;255&lt;/span&gt;) CHARACTER &lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; utf8mb4
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;COLLATE&lt;/span&gt; utf8mb4_0900_ai_ci &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NULL&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;根据应用所需的比较方式选择排序规则。对于标识符，二进制或区分大小写的比较可能合适；对于面向用户的搜索，不区分重音和大小写的排序规则可能更合适。&lt;/p&gt;</description></item><item><title>MySQL InnoDB 内部机制</title><link>https://example.org/zh-cn/mysql-internals/</link><pubDate>Sun, 14 Aug 2022 15:11:43 +0800</pubDate><guid>https://example.org/zh-cn/mysql-internals/</guid><description>&lt;p&gt;InnoDB 将表数据和索引存储在按表空间组织的页面中。一个
+tablespace has a fixed page size, selected when the data directory is
+initialized. The default page size is 16 KiB. Page-oriented I/O explains why
+index locality, buffer-pool capacity, and row width affect query cost.&lt;/p&gt;
+&lt;h2 id="数据字典与元数据"&gt;
+ 数据字典与元数据
+ &lt;a href="#%e6%95%b0%e6%8d%ae%e5%ad%97%e5%85%b8%e4%b8%8e%e5%85%83%e6%95%b0%e6%8d%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL 8 将事务性数据字典存储在 InnoDB 中。 Server metadata,
+including schemas, tables, columns, indexes, stored programs, and privileges,
+is therefore crash-safe and participates in atomic data-definition operations.
+应用必须使用 &lt;code&gt;INFORMATION_SCHEMA&lt;/code&gt;、Performance Schema 或 &lt;code&gt;SHOW&lt;/code&gt; 语句检查元数据；内部字典表不是应用接口。&lt;/p&gt;</description></item><item><title>MySQL 索引</title><link>https://example.org/zh-cn/mysql-indexes/</link><pubDate>Thu, 16 Jun 2022 20:46:43 +0800</pubDate><guid>https://example.org/zh-cn/mysql-indexes/</guid><description>&lt;p&gt;InnoDB 使用 B+ 树实现主索引和二级索引。当索引顺序符合选择性谓词、连接、范围扫描或排序要求时，它可以减少 I/O；但每个被索引的行都会增加写入工作和存储开销。&lt;/p&gt;
+&lt;h2 id="聚簇索引和二级索引"&gt;
+ 聚簇索引和二级索引
+ &lt;a href="#%e8%81%9a%e7%b0%87%e7%b4%a2%e5%bc%95%e5%92%8c%e4%ba%8c%e7%ba%a7%e7%b4%a2%e5%bc%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 表将行数据存储在其聚簇索引中。InnoDB 会选择声明的主键；否则会选择第一个合适的非空唯一键，或者创建内部隐藏键。应声明简短且稳定的主键，因为每个二级索引条目都会存储主键值。&lt;/p&gt;
+&lt;p&gt;二级索引存储其索引列和主键值。需要二级索引中不存在的列的查询，会为每个匹配条目执行一次聚簇索引查找。只有在经过测量的成本确实可以消除时，才添加覆盖索引；更宽的索引会降低页面扇出并增加写入开销。&lt;/p&gt;
+&lt;h2 id="复合索引"&gt;
+ 复合索引
+ &lt;a href="#%e5%a4%8d%e5%90%88%e7%b4%a2%e5%bc%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;对于 &lt;code&gt;(tenant_id, created_at, id)&lt;/code&gt;，B+ 树可以高效定位：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;仅从 &lt;code&gt;created_at&lt;/code&gt; 开始无法高效查找，因为树的顺序从 &lt;code&gt;tenant_id&lt;/code&gt; 开始。在常见设计中，等值谓词位于范围谓词之前，随后是满足排序或覆盖所需的列。使用 &lt;code&gt;EXPLAIN ANALYZE&lt;/code&gt; 验证选择；索引顺序取决于实际谓词、数据分布和结果大小。&lt;/p&gt;
+&lt;h2 id="索引类型和诊断"&gt;
+ 索引类型和诊断
+ &lt;a href="#%e7%b4%a2%e5%bc%95%e7%b1%bb%e5%9e%8b%e5%92%8c%e8%af%8a%e6%96%ad" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;UNIQUE&lt;/code&gt; 在创建访问路径的同时强制执行不变量。大多数 InnoDB 索引都是 B 树。
+&lt;code&gt;FULLTEXT&lt;/code&gt; 索引支持基于词元的文本搜索，&lt;code&gt;SPATIAL&lt;/code&gt; 索引对几何值使用 R 树。
+MySQL 还介绍了 &lt;code&gt;MEMORY&lt;/code&gt; 引擎的哈希索引；InnoDB 不会公开通用哈希索引，尽管其自适应哈希索引可以将频繁访问的 B 树页面缓存为内部优化。前缀索引可以减少长文本键的字节数，但前提是所选前缀仍具有选择性。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXPLAIN&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ANALYZE&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id, created_at
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; event
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;7&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;2026-01-01&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;LIMIT&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;应检查实际行数、循环次数和耗时，而不是假设索引会被使用。统计信息、基数估计和较小的结果集都可能使全表扫描比索引遍历更便宜。&lt;/p&gt;</description></item><item><title>MySQL 表与视图</title><link>https://example.org/zh-cn/mysql-tables-and-views/</link><pubDate>Thu, 09 Sep 2021 08:09:41 +0800</pubDate><guid>https://example.org/zh-cn/mysql-tables-and-views/</guid><description>&lt;p&gt;基表持久化存储行。视图持久化存储查询定义，并将其结果呈现为类似表的对象。&lt;code&gt;SHOW FULL TABLES&lt;/code&gt;
+可区分二者，而 &lt;code&gt;INFORMATION_SCHEMA.TABLES.TABLE_TYPE&lt;/code&gt; 会报告 &lt;code&gt;BASE TABLE&lt;/code&gt; 或 &lt;code&gt;VIEW&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="innodb-行格式"&gt;
+ InnoDB 行格式
+ &lt;a href="#innodb-%e8%a1%8c%e6%a0%bc%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 支持 &lt;code&gt;REDUNDANT&lt;/code&gt;、&lt;code&gt;COMPACT&lt;/code&gt;、&lt;code&gt;DYNAMIC&lt;/code&gt; 和 &lt;code&gt;COMPRESSED&lt;/code&gt; 行格式。
+&lt;code&gt;DYNAMIC&lt;/code&gt; 是当前的默认格式。对于可变长度列，InnoDB 可以将较长的值存储在溢出页中，
+并在聚簇记录中保留一个引用。具体的行内和溢出存储行为取决于行格式、页大小、列类型和值长度；
+设计模式时不应假定 &lt;code&gt;TEXT&lt;/code&gt; 或 &lt;code&gt;BLOB&lt;/code&gt; 值在行内占用固定大小。&lt;/p&gt;
+&lt;p&gt;检查表的实际配置：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SHOW&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; STATUS &lt;span style="color:#66d9ef"&gt;LIKE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;orders&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SHOW&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TABLE&lt;/span&gt; orders;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="视图"&gt;
+ 视图
+ &lt;a href="#%e8%a7%86%e5%9b%be" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用稳定且明确的列列表创建视图：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;VIEW&lt;/span&gt; active_customer_orders &lt;span style="color:#66d9ef"&gt;AS&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; o.id, o.customer_id, o.created_at, o.total
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; orders &lt;span style="color:#66d9ef"&gt;AS&lt;/span&gt; o
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; o.status &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;active&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;默认情况下，视图不会存储单独的表。优化器可以将可合并视图并入外层查询；当定义要求时，
+例如涉及聚合、&lt;code&gt;DISTINCT&lt;/code&gt; 或某些派生表操作时，也可以将其物化为临时表。
+&lt;code&gt;ALGORITHM = MERGE&lt;/code&gt; 和 &lt;code&gt;ALGORITHM = TEMPTABLE&lt;/code&gt; 表达一种偏好，但视图定义仍须满足所选算法的限制。&lt;/p&gt;
+&lt;p&gt;当每个受影响的行都能明确映射到一个基表时，部分视图可以更新。包含聚合、&lt;code&gt;GROUP BY&lt;/code&gt;、
+&lt;code&gt;DISTINCT&lt;/code&gt;、窗口函数、集合操作或不可更新连接的视图不可更新。当视图的更新行为不属于所需接口时，
+应使用基表执行写入。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;DEFINER&lt;/code&gt; 账户和 &lt;code&gt;SQL SECURITY&lt;/code&gt; 设置决定执行视图时应用谁的权限。
+当视图向应用程序账户公开受限的投影时，应检查这两项设置。&lt;/p&gt;</description></item><item><title>MySQL 变量和预处理语句</title><link>https://example.org/zh-cn/mysql-variables/</link><pubDate>Thu, 24 Jun 2021 18:18:18 +0800</pubDate><guid>https://example.org/zh-cn/mysql-variables/</guid><description>&lt;p&gt;MySQL 区分服务器系统变量、局部例程变量和会话用户变量。它们的作用域和求值规则不同，因此不应互换使用。&lt;/p&gt;
+&lt;h2 id="系统变量和用户变量"&gt;
+ 系统变量和用户变量
+ &lt;a href="#%e7%b3%bb%e7%bb%9f%e5%8f%98%e9%87%8f%e5%92%8c%e7%94%a8%e6%88%b7%e5%8f%98%e9%87%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;系统变量使用 &lt;code&gt;@@&lt;/code&gt;，并且可能具有全局作用域、会话作用域或同时具有二者：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;GLOBAL&lt;/span&gt;.transaction_isolation, &lt;span style="color:#f92672"&gt;@@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt;.sql_mode;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SESSION&lt;/span&gt; sql_safe_updates &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;更改全局变量会在该变量也具有会话作用域时影响新会话；它不能用来更改现有连接的事务策略。动态变量可以在运行时更改，而只读变量需要启动配置。&lt;code&gt;SET PERSIST&lt;/code&gt; 会更改运行时全局值并写入 &lt;code&gt;mysqld-auto.cnf&lt;/code&gt;；&lt;code&gt;SET PERSIST_ONLY&lt;/code&gt; 会写入持久化值，但不更改运行时状态。使用任一形式前，应确认变量支持持久化，并让服务器拥有该文件，而不要编辑生成的文件。&lt;/p&gt;
+&lt;p&gt;用户变量使用 &lt;code&gt;@name&lt;/code&gt;，以连接为作用域，并且没有声明类型：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;minimum_total &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id &lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; orders &lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; total &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;minimum_total;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;不要在同一个表达式或查询中赋值并读取同一个用户变量，以模拟过程式求值。MySQL 不保证能使此类查询可靠的求值顺序。应改用窗口函数、公共表表达式、存储程序局部变量或应用代码。值的类型在赋值时确定；预处理语句引用会保留语句首次准备时建立的变量类型。当所需 SQL 类型属于契约的一部分时，应显式使用 &lt;code&gt;CAST&lt;/code&gt; 转换值。&lt;/p&gt;
+&lt;h2 id="预处理语句"&gt;
+ 预处理语句
+ &lt;a href="#%e9%a2%84%e5%a4%84%e7%90%86%e8%af%ad%e5%8f%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;客户端库的预处理语句会将数据与 SQL 语法分开绑定，并且应作为应用查询的默认方式。它们可以防止值被解释为注入的 SQL，并允许服务器分别解析语句结构。&lt;/p&gt;
+&lt;p&gt;服务器端 SQL 预处理语句遵循连接作用域的生命周期：&lt;code&gt;PREPARE&lt;/code&gt; 解析一条语句，
+&lt;code&gt;EXECUTE&lt;/code&gt; 重复执行它，&lt;code&gt;DEALLOCATE PREPARE&lt;/code&gt; 释放它。使用同名的第二个 &lt;code&gt;PREPARE&lt;/code&gt;
+会先释放旧语句。会话结束时，预处理语句也会被丢弃。当必须组装标识符时，预处理语句适用于管理用动态 SQL。参数标记绑定的是数据值，而不是标识符、关键字或 SQL 片段：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;sql&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;SELECT id FROM orders WHERE customer_id = ?&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;PREPARE&lt;/span&gt; stmt &lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;sql&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;customer_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXECUTE&lt;/span&gt; stmt &lt;span style="color:#66d9ef"&gt;USING&lt;/span&gt; &lt;span style="color:#f92672"&gt;@&lt;/span&gt;customer_id;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;DEALLOCATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;PREPARE&lt;/span&gt; stmt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在将任何动态标识符连接到 SQL 之前，应验证它或使用允许列表。参数标记不能在每个语法位置代表任意表达式，并且预处理语句受 &lt;code&gt;max_prepared_stmt_count&lt;/code&gt; 限制。应释放短期管理语句，并让应用驱动程序管理自己的预处理语句句柄。&lt;/p&gt;</description></item><item><title>MySQL 服务器与数据类型</title><link>https://example.org/zh-cn/mysql-overview/</link><pubDate>Wed, 06 Jan 2021 12:27:16 +0800</pubDate><guid>https://example.org/zh-cn/mysql-overview/</guid><description>&lt;p&gt;MySQL 将服务器初始化、模式定义和连接配置分离。生产环境安装应只初始化一次空数据目录，将配置存储在该目录之外，并通过平台服务管理器管理服务器。&lt;code&gt;mysqld --initialize&lt;/code&gt; 会创建数据字典和初始管理账户，但不会配置应用程序模式或权限。&lt;/p&gt;
+&lt;h2 id="账户授权与角色"&gt;
+ 账户、授权与角色
+ &lt;a href="#%e8%b4%a6%e6%88%b7%e6%8e%88%e6%9d%83%e4%b8%8e%e8%a7%92%e8%89%b2" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;MySQL 同时根据用户和主机识别账户，因此 &lt;code&gt;'app'@'localhost'&lt;/code&gt; 与 &lt;code&gt;'app'@'10.%'&lt;/code&gt; 是不同的身份。创建账户时应显式指定认证策略：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;USER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;IF&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;NOT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;EXISTS&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; IDENTIFIED &lt;span style="color:#66d9ef"&gt;WITH&lt;/span&gt; caching_sha2_password &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;generated-secret&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在 MySQL 8 中，&lt;code&gt;CREATE USER&lt;/code&gt; 创建身份，&lt;code&gt;GRANT&lt;/code&gt; 分配权限；&lt;code&gt;GRANT&lt;/code&gt; 不会创建账户。主机匹配发生在认证之前，随后由角色和直接授权决定授权结果。使用 &lt;code&gt;SHOW GRANTS&lt;/code&gt; 检查有效权限。角色将权限分组，以便在多个账户之间复用：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;CREATE&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ROLE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;GRANT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ON&lt;/span&gt; app.orders &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;GRANT&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SET&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;DEFAULT&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ROLE&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;order_reader&amp;#39;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;TO&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;app&amp;#39;&lt;/span&gt;&lt;span style="color:#f92672"&gt;@&lt;/span&gt;&lt;span style="color:#e6db74"&gt;&amp;#39;localhost&amp;#39;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;将账户管理置于应用程序迁移表之外。应用程序模式不应依赖临时的权限变更来维持有效性。&lt;/p&gt;
+&lt;h2 id="数值类型"&gt;
+ 数值类型
+ &lt;a href="#%e6%95%b0%e5%80%bc%e7%b1%bb%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;应根据取值范围而不是显示宽度选择整数类型。&lt;code&gt;TINYINT&lt;/code&gt;、&lt;code&gt;SMALLINT&lt;/code&gt;、&lt;code&gt;MEDIUMINT&lt;/code&gt;、&lt;code&gt;INT&lt;/code&gt; 和 &lt;code&gt;BIGINT&lt;/code&gt; 分别使用 1、2、3、4 和 8 字节。无符号类型会将范围调整为非负值，但会带来跨数据库可移植性问题。&lt;code&gt;BOOLEAN&lt;/code&gt; 和 &lt;code&gt;BOOL&lt;/code&gt; 是 &lt;code&gt;TINYINT(1)&lt;/code&gt; 的别名。&lt;/p&gt;
+&lt;p&gt;对于货币等需要十进制运算的数量，应使用 &lt;code&gt;DECIMAL(p, s)&lt;/code&gt;。&lt;code&gt;p&lt;/code&gt; 是十进制总位数，&lt;code&gt;s&lt;/code&gt; 是小数点后的位数。&lt;code&gt;FLOAT&lt;/code&gt; 和 &lt;code&gt;DOUBLE&lt;/code&gt; 表示二进制浮点值，可能会对十进制小数进行舍入；不要将其用于对相等性敏感的货币值。&lt;/p&gt;
+&lt;h2 id="时间类型与结构化值"&gt;
+ 时间类型与结构化值
+ &lt;a href="#%e6%97%b6%e9%97%b4%e7%b1%bb%e5%9e%8b%e4%b8%8e%e7%bb%93%e6%9e%84%e5%8c%96%e5%80%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DATE&lt;/code&gt; 存储日历日期；&lt;code&gt;TIME&lt;/code&gt; 存储时间或持续时间。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DATETIME&lt;/code&gt; 存储字面日期和时间，不进行时区转换。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;TIMESTAMP&lt;/code&gt; 以时间瞬间存储，并针对受支持的值在会话时区与 UTC 之间转换。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;JSON&lt;/code&gt; 会验证 JSON 并提供 JSON 函数，但其中的值不能替代用于连接和索引的关系型列。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;当值表示本地预约时，应使用 &lt;code&gt;DATETIME&lt;/code&gt; 加上显式的业务时区。对于事件发生瞬间，应使用 UTC &lt;code&gt;TIMESTAMP&lt;/code&gt; 或 UTC &lt;code&gt;DATETIME&lt;/code&gt;，并明确应用程序执行转换的边界。&lt;/p&gt;</description></item></channel></rss>

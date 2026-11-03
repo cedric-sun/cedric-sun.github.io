@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Security on cesun.life</title><link>https://example.org/zh-tw/tags/security/</link><description>Recent content in Security on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Fri, 31 Jul 2026 20:08:54 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/security/index.xml" rel="self" type="application/rss+xml"/><item><title>Kerberos</title><link>https://example.org/zh-tw/kerberos/</link><pubDate>Fri, 31 Jul 2026 20:08:54 +0800</pubDate><guid>https://example.org/zh-tw/kerberos/</guid><description>&lt;p&gt;Kerberos 是一種適用於協同管理系統的網路身分驗證協定。使用者先向受信任的金鑰發行中心（Key Distribution Center，KDC）驗證身分，再取得各項服務的限時票證。服務無須接收使用者密碼即可驗證其身分，而用戶端也能要求服務證明其持有預期的祕密金鑰。&lt;/p&gt;
+&lt;p&gt;Kerberos 主要使用對稱式密碼學。對稱式密碼學使 KDC 成為中央信任錨點：KDC 或其資料庫一旦遭入侵，KDC 所掌管長期金鑰的每個主體都可能受影響。因此，Kerberos 以分散式信任換取集中式身分管理、高效率票證簽發，以及領域內的單一登入。&lt;/p&gt;
+&lt;h2 id="信任模型與核心物件"&gt;
+ 信任模型與核心物件
+ &lt;a href="#%e4%bf%a1%e4%bb%bb%e6%a8%a1%e5%9e%8b%e8%88%87%e6%a0%b8%e5%bf%83%e7%89%a9%e4%bb%b6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;**領域（realm）**是管理上的身分驗證網域，依慣例以大寫表示，例如 &lt;code&gt;EXAMPLE.COM&lt;/code&gt;。領域名稱通常類似 DNS 網域，但兩者屬於不同命名空間。組態或 DNS 探索會將主機和網域名稱對應至 Kerberos 領域。&lt;/p&gt;
+&lt;p&gt;**主體（principal）**用來命名身分：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;alice@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;HTTP/web.example.com@EXAMPLE.COM
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;主體名稱包含一個或多個組成部分，後接領域。&lt;code&gt;alice&lt;/code&gt; 是使用者主體。&lt;code&gt;HTTP/web.example.com&lt;/code&gt; 是服務主體，第一個組成部分表示服務，第二個則表示主機。主體字串區分大小寫，儘管領域、使用者及主機組成部分在實務上有不同慣例。&lt;/p&gt;
+&lt;p&gt;每個主體都有一把或多把向 KDC 註冊的長期金鑰。不同類型的主體以不同方式取得金鑰：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;人員主體通常透過加密類型（enctype）專屬的字串轉金鑰函式及鹽值，從密碼衍生金鑰。&lt;/li&gt;
+&lt;li&gt;服務主體通常取得管理員產生的隨機金鑰。&lt;/li&gt;
+&lt;li&gt;領域的 &lt;code&gt;krbtgt/REALM&lt;/code&gt; 主體擁有用於加密票證授予票證（ticket-granting ticket，TGT）的金鑰。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;keytab&lt;/strong&gt; 儲存主體名稱、金鑰版本號（KVNO）、加密類型和長期金鑰。常駐程式使用 keytab，因為無人值守的服務無法輸入密碼。keytab 是憑證而非公開憑證；任何能讀取可用服務金鑰的人，都能冒充該服務並解密簽發給其主體的票證。&lt;/p&gt;
+&lt;p&gt;KDC 提供兩項邏輯服務：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;**身分驗證服務（Authentication Service，AS）**在初始身分驗證後簽發 TGT。&lt;/li&gt;
+&lt;li&gt;**票證授予服務（Ticket-Granting Service，TGS）**將有效 TGT 交換為特定服務的票證。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;兩項服務通常在同一個 KDC 程序中執行，並使用相同的領域資料庫。正式環境會部署備援 KDC，因為票證取得否則將依賴單一主機，而資料庫管理與複寫也需要額外控制措施。&lt;/p&gt;
+&lt;h2 id="協定流程"&gt;
+ 協定流程
+ &lt;a href="#%e5%8d%94%e5%ae%9a%e6%b5%81%e7%a8%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;假設 &lt;code&gt;alice@EXAMPLE.COM&lt;/code&gt; 要存取 &lt;code&gt;HTTP/web.example.com@EXAMPLE.COM&lt;/code&gt;。取得所需憑證需要三次交換。以下名稱描述 Kerberos 協定訊息，而非應用程式專屬封包。&lt;/p&gt;
+&lt;h3 id="初始身分驗證as-req-與-as-rep"&gt;
+ 初始身分驗證：AS-REQ 與 AS-REP
+ &lt;a href="#%e5%88%9d%e5%a7%8b%e8%ba%ab%e5%88%86%e9%a9%97%e8%ad%89as-req-%e8%88%87-as-rep" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;用戶端傳送 &lt;strong&gt;AS-REQ&lt;/strong&gt;，要求取得 &lt;code&gt;krbtgt/EXAMPLE.COM@EXAMPLE.COM&lt;/code&gt; 的 TGT。要求包含用戶端主體、所要求的有效期限與旗標、nonce、支援的加密類型，以及必要時的預先身分驗證資料。&lt;/p&gt;</description></item><item><title>Git 認證資料管理</title><link>https://example.org/zh-tw/git-credential-management/</link><pubDate>Tue, 07 Oct 2025 11:26:05 +0800</pubDate><guid>https://example.org/zh-tw/git-credential-management/</guid><description>&lt;p&gt;Git 將 HTTP(S) 驗證委派給認證資料輔助程式。SSH 遠端則改用 SSH 金鑰與 agent，因此 &lt;code&gt;credential.helper&lt;/code&gt; 不會管理它們的私密金鑰。&lt;/p&gt;
+&lt;h2 id="選取認證資料輔助程式"&gt;
+ 選取認證資料輔助程式
+ &lt;a href="#%e9%81%b8%e5%8f%96%e8%aa%8d%e8%ad%89%e8%b3%87%e6%96%99%e8%bc%94%e5%8a%a9%e7%a8%8b%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;列出已設定的輔助程式，以及設定它們的設定檔：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git config --show-origin --get-all credential.helper
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git help -a | grep credential-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Git 會依設定順序要求輔助程式填入缺少的認證資料欄位。輔助程式可以拒絕或傳回部分資料，之後 Git 可能查詢另一個輔助程式，或提示使用者。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;輔助程式&lt;/th&gt;
+ &lt;th&gt;儲存方式&lt;/th&gt;
+ &lt;th&gt;適用用途&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;cache&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;本機 daemon 中的記憶體&lt;/td&gt;
+ &lt;td&gt;短期開發工作階段&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;store&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;純文字 &lt;code&gt;~/.git-credentials&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;僅在可接受純文字儲存風險時&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;osxkeychain&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;macOS Keychain&lt;/td&gt;
+ &lt;td&gt;macOS 開發&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;Git Credential Manager&lt;/td&gt;
+ &lt;td&gt;平台安全儲存與瀏覽器登入&lt;/td&gt;
+ &lt;td&gt;支援的桌面平台&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;例如，使用有期限的記憶體快取：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git config --global credential.helper &lt;span style="color:#e6db74"&gt;&amp;#39;cache --timeout=3600&amp;#39;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;相較於 &lt;code&gt;store&lt;/code&gt;，優先使用平台金鑰鏈或 Git Credential Manager。本機儲存庫可以省略 &lt;code&gt;--global&lt;/code&gt; 來覆寫全域輔助程式。&lt;/p&gt;
+&lt;h2 id="限定權杖範圍與使用者名稱"&gt;
+ 限定權杖範圍與使用者名稱
+ &lt;a href="#%e9%99%90%e5%ae%9a%e6%ac%8a%e6%9d%96%e7%af%84%e5%9c%8d%e8%88%87%e4%bd%bf%e7%94%a8%e8%80%85%e5%90%8d%e7%a8%b1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;除非啟用路徑比對，否則 Git 會依通訊協定與主機比對認證資料。當不同儲存庫使用不同帳戶或權杖時，請包含 HTTP 路徑：&lt;/p&gt;</description></item><item><title>Linux 隨機性 API</title><link>https://example.org/zh-tw/linux-randomness-apis/</link><pubDate>Tue, 22 Oct 2024 20:12:02 +0800</pubDate><guid>https://example.org/zh-tw/linux-randomness-apis/</guid><description>&lt;p&gt;隨機性 API 服務兩種不同契約。確定性的偽隨機數產生器適合可重複的測試與模擬。安全敏感的金鑰、nonce、權杖、鹽值與種子則需要來自核心密碼學安全亂數產生器（CSPRNG）的位元組。&lt;/p&gt;
+&lt;h2 id="c-函式庫產生器"&gt;
+ C 函式庫產生器
+ &lt;a href="#c-%e5%87%bd%e5%bc%8f%e5%ba%ab%e7%94%a2%e7%94%9f%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;rand()&lt;/code&gt; 推進隱藏的程序狀態，並回傳 0 到 &lt;code&gt;RAND_MAX&lt;/code&gt; 的整數。&lt;code&gt;srand(seed)&lt;/code&gt; 為特定 C 函式庫實作選取可重複序列；省略它時，行為如同種子為 1。ISO C 未指定演算法，也不要求不同實作使用相同序列，因此需要跨平台可重現性的測試應選擇並記錄明確演算法。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;random()&lt;/code&gt; 與 &lt;code&gt;srandom()&lt;/code&gt; 提供另一個確定性系列。glibc 以加法回饋狀態實作 &lt;code&gt;random()&lt;/code&gt;，並允許呼叫端使用 &lt;code&gt;initstate()&lt;/code&gt; 與 &lt;code&gt;setstate()&lt;/code&gt; 切換狀態陣列；&lt;code&gt;random_r()&lt;/code&gt; 使該狀態明確。&lt;code&gt;rand_r()&lt;/code&gt; 只儲存一個 &lt;code&gt;unsigned int&lt;/code&gt; 狀態，且在 POSIX 中已過時，因此不適合獨立的高品質串流設計。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;drand48()&lt;/code&gt; 系列指定 48 位元線性同餘遞迴：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;X(n + 1) = (0x5DEECE66D * X(n) + 0xB) mod 2^48&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;drand48()&lt;/code&gt; 回傳 &lt;code&gt;[0.0, 1.0)&lt;/code&gt; 中的 &lt;code&gt;double&lt;/code&gt;，&lt;code&gt;lrand48()&lt;/code&gt; 回傳 &lt;code&gt;[0, 2^31)&lt;/code&gt; 中的 &lt;code&gt;long&lt;/code&gt;，而 &lt;code&gt;mrand48()&lt;/code&gt; 回傳 &lt;code&gt;[-2^31, 2^31)&lt;/code&gt; 中的有號結果。&lt;code&gt;erand48()&lt;/code&gt;、&lt;code&gt;nrand48()&lt;/code&gt; 與 &lt;code&gt;jrand48()&lt;/code&gt; 使用呼叫端提供的三元素狀態；&lt;code&gt;_r&lt;/code&gt; 介面使用明確的可重入狀態結構。&lt;/p&gt;</description></item><item><title>GnuPG 速查表</title><link>https://example.org/zh-tw/gnupg/</link><pubDate>Thu, 31 Aug 2023 20:10:33 +0800</pubDate><guid>https://example.org/zh-tw/gnupg/</guid><description>&lt;p&gt;&lt;code&gt;gpg&lt;/code&gt; 命令負責幾項不同工作：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;管理 OpenPGP 金鑰，並對資料加密給收件者；&lt;/li&gt;
+&lt;li&gt;為金鑰持有者解密資料；以及&lt;/li&gt;
+&lt;li&gt;建立或驗證簽章。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;GPG 最常見的用途包括使用開發者的公開金鑰，驗證軟體發行版附帶的 &lt;code&gt;.asc&lt;/code&gt; 檔案，或&lt;a href="https://example.org/git-misc/#gpg-signing"&gt;使用祕密金鑰簽署 Git 提交與標籤&lt;/a&gt;。&lt;/p&gt;
+&lt;h2 id="安裝"&gt;
+ 安裝
+ &lt;a href="#%e5%ae%89%e8%a3%9d" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# archlinux&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# gnupg and pinentry should already be installed on your system as it is a dependency of pacman.&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# debian/ubuntu&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo apt install gnupg pinentry-curses pinentry-gtk-2
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# redhat/fedora/centos&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo dnf install gnupg2 pinentry &lt;span style="color:#75715e"&gt;# fedora/rhel 8+&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo yum install gnupg2 pinentry &lt;span style="color:#75715e"&gt;# rhel 7&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;# mac&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;brew install gnupg pinentry-mac&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;GPG 使用名為 &lt;code&gt;pinentry&lt;/code&gt; 的程式，在解鎖私密金鑰時提示密碼片語。設計原則是分離：&lt;code&gt;pinentry&lt;/code&gt; 以獨立程序執行，因此要求解密的應用程式永遠看不到你的密碼片語，只有 GPG agent 能看見。這在你與加密作業之間提供受信任的路徑。存在多種變體：&lt;code&gt;pinentry-curses&lt;/code&gt;（CLI）、&lt;code&gt;pinentry-gtk&lt;/code&gt;（GTK）、&lt;code&gt;pinentry-qt&lt;/code&gt;（Qt）、&lt;code&gt;pinentry-mac&lt;/code&gt;（macOS 原生）及其他變體。你可以在 &lt;code&gt;~/.gnupg/gpg-agent.conf&lt;/code&gt; 中使用 &lt;code&gt;pinentry-program&lt;/code&gt; 指示詞設定要使用的變體。&lt;/p&gt;</description></item><item><title>瀏覽器 Content-Disposition 與下載</title><link>https://example.org/zh-tw/browser-content-disposition/</link><pubDate>Wed, 16 Aug 2023 17:13:20 +0800</pubDate><guid>https://example.org/zh-tw/browser-content-disposition/</guid><description>&lt;p&gt;瀏覽器會根據多項輸入，決定顯示回應、下載回應，或將回應交給外部應用程式。&lt;code&gt;Content-Disposition&lt;/code&gt; 提供強烈偏好，但內容類型、導覽情境、沙箱、瀏覽器能力與使用者設定也會影響結果。&lt;/p&gt;
+&lt;h2 id="inline-與-attachment-配置"&gt;
+ Inline 與 Attachment 配置
+ &lt;a href="#inline-%e8%88%87-attachment-%e9%85%8d%e7%bd%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Attachment 回應會要求下載：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;HTTP&lt;/span&gt;&lt;span style="color:#f92672"&gt;/&lt;/span&gt;&lt;span style="color:#ae81ff"&gt;1.1&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;200&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OK&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Type&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;application/pdf&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Disposition&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;attachment; filename=&amp;#34;guide.pdf&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Content-Length&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;110352&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;X-Content-Type-Options&lt;span style="color:#f92672"&gt;:&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;nosniff&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Inline 回應允許在瀏覽器內呈現：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Type: application/pdf
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Disposition: inline; filename=&amp;#34;guide.pdf&amp;#34;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;inline&lt;/code&gt; 不保證會顯示。瀏覽器需要支援該媒體類型的檢視器，使用者也可以將某些類型設定為下載。省略標頭時，選擇主要交由媒體類型與導覽情境決定。&lt;/p&gt;
+&lt;h2 id="提供安全的檔名"&gt;
+ 提供安全的檔名
+ &lt;a href="#%e6%8f%90%e4%be%9b%e5%ae%89%e5%85%a8%e7%9a%84%e6%aa%94%e5%90%8d" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;filename&lt;/code&gt; 提供相容 ASCII 的後備值。&lt;code&gt;filename*&lt;/code&gt; 使用 RFC 8187 定義的擴充參數編碼；它取代 RFC 5987，並能表示 Unicode：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;http&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-http" data-lang="http"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;Content-Disposition: attachment;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt; filename=&amp;#34;report.pdf&amp;#34;;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt; filename*=UTF-8&amp;#39;&amp;#39;r%C3%A9sum%C3%A9.pdf&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;請同時傳送兩個參數，因為較舊的用戶端可能忽略 &lt;code&gt;filename*&lt;/code&gt;；當兩者都有效時，相容的接收者會優先使用 &lt;code&gt;filename*&lt;/code&gt;。將伺服器提供的檔名視為不受信任輸入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;移除目錄分隔符號與控制字元。&lt;/li&gt;
+&lt;li&gt;拒絕將 &lt;code&gt;.&lt;/code&gt; 與 &lt;code&gt;..&lt;/code&gt; 作為最終名稱。&lt;/li&gt;
+&lt;li&gt;讓預期副檔名與媒體類型一致。&lt;/li&gt;
+&lt;li&gt;設定合理的長度限制。&lt;/li&gt;
+&lt;li&gt;絕不要直接根據該值建立伺服器檔案系統路徑。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;瀏覽器會各自清理檔名，因此不同實作的確切重新命名行為會有所差異。&lt;/p&gt;
+&lt;h2 id="內容類型與嗅探"&gt;
+ 內容類型與嗅探
+ &lt;a href="#%e5%85%a7%e5%ae%b9%e9%a1%9e%e5%9e%8b%e8%88%87%e5%97%85%e6%8e%a2" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;Content-Type&lt;/code&gt; 描述表示內容。PDF 應為 &lt;code&gt;application/pdf&lt;/code&gt;，SVG 應為 &lt;code&gt;image/svg+xml&lt;/code&gt;，任意二進位資料應為 &lt;code&gt;application/octet-stream&lt;/code&gt;。&lt;/p&gt;</description></item><item><title>Linux Seccomp</title><link>https://example.org/zh-tw/linux-seccomp/</link><pubDate>Fri, 07 Apr 2023 12:28:12 +0800</pubDate><guid>https://example.org/zh-tw/linux-seccomp/</guid><description>&lt;p&gt;Seccomp（secure computing）限制程序可執行的系統呼叫。在 strict
+模式中，程序僅能使用少量呼叫；對現有檔案描述元而言，這些呼叫在歷史上包括 &lt;code&gt;read&lt;/code&gt;、
+&lt;code&gt;write&lt;/code&gt;、&lt;code&gt;_exit&lt;/code&gt; 和 &lt;code&gt;sigreturn&lt;/code&gt;。對大多數現代應用程式而言，這項限制刻意設得過於狹窄。&lt;/p&gt;
+&lt;p&gt;filter 模式會附加一個 classic BPF 程式，用來檢查系統呼叫編號與選定的引數。篩選器可以
+允許呼叫、以 errno 拒絕呼叫、終止程序、記錄日誌、進行追蹤，或將決策委派給 userspace
+notifier。篩選器具有單調性：一旦安裝，就無法放寬。未具特權的程序通常必須先設定
+&lt;code&gt;no_new_privs&lt;/code&gt;，才能安裝篩選器，藉此防止程序日後透過取得更高權限來繞過篩選器。
+容器執行階段會將 seccomp 作為一層防禦，與 namespaces、capabilities 以及
+mandatory-access-control 原則搭配使用。&lt;/p&gt;</description></item><item><title>Docker 映像檔的 CVE 修復與預防</title><link>https://example.org/zh-tw/docker-cve-fix/</link><pubDate>Fri, 03 Mar 2023 14:00:22 +0800</pubDate><guid>https://example.org/zh-tw/docker-cve-fix/</guid><description>&lt;p&gt;經驗法則：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;確保映像檔已設定適當的安全性軟體升級來源，避免 &lt;code&gt;apt-get upgrade&lt;/code&gt;（或等效命令）未執行任何動作。&lt;/li&gt;
+&lt;li&gt;在 Dockerfile 中加入 &lt;code&gt;RUN apt-get update &amp;amp;&amp;amp; apt-get upgrade -y&lt;/code&gt;（或等效命令）。&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://example.org/zh-tw/fixing-gosu/"&gt;在涉及靜態連結 Go 程式的少數情況下&lt;/a&gt;，請刪除該程式，或在 &lt;code&gt;docker build&lt;/code&gt; 過程中從原始碼重新建置。&lt;/li&gt;
+&lt;li&gt;排定每週或每月自行重新建置。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="背景"&gt;
+ 背景
+ &lt;a href="#%e8%83%8c%e6%99%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;Docker 官方映像檔（Docker official images，DOI）的唯一真實來源，是 &lt;a href="https://github.com/docker-library/official-images"&gt;https://github.com/docker-library/official-images&lt;/a&gt; 的 master 分支。該專案使用名為「Library definition files」的格式，定義哪些儲存庫中的哪些標籤應主動重新建置，以及其 Dockerfile 的位置（Git 儲存庫 URL 與 commit ID）。這些 &lt;code&gt;repo:tag&lt;/code&gt; 稱為&lt;em&gt;目前仍維護&lt;/em&gt;的映像檔。
+&lt;ul&gt;
+&lt;li&gt;這些被參照的 Dockerfile Git 儲存庫中，&lt;em&gt;大多數但非全部&lt;/em&gt;由 &lt;a href="https://github.com/docker-library"&gt;Docker Inc. 本身&lt;/a&gt;維護。&lt;a href="https://github.com/apple/swift-docker.git"&gt;此處&lt;/a&gt;提供一個例子。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://doi-janky.infosiftr.net/"&gt;https://doi-janky.infosiftr.net/&lt;/a&gt; 上的 Jenkins 工作會分析所有 DOI 的 Dockerfile、產生最新的 DOI 相依關係，並將其保存至 &lt;a href="https://github.com/docker-library/meta"&gt;https://github.com/docker-library/meta&lt;/a&gt;。&lt;/li&gt;
+&lt;li&gt;透過這些中繼資料，每個合併至 DOI Dockerfile 的 PR 都會在 &lt;a href="https://doi-janky.infosiftr.net/"&gt;https://doi-janky.infosiftr.net/&lt;/a&gt; 觸發其所有下游 DOI（即 &lt;code&gt;FROM&lt;/code&gt; 該映像檔者）重新建置並推送至 Docker Hub。
+&lt;ul&gt;
+&lt;li&gt;系統不保證會進行排程的無條件重新建置。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="觀察"&gt;
+ 觀察
+ &lt;a href="#%e8%a7%80%e5%af%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;Docker Inc. 的 DOI 不會在 Dockerfile 中執行 &lt;code&gt;RUN apt upgrade&lt;/code&gt;（或等效命令），其他 DOI 供應商也無須如此做。&lt;/li&gt;
+&lt;li&gt;即使 DOI 供應商在 Dockerfile 中加入作業系統升級步驟，若沒有排程的無條件重新建置，安全性修補程式（若有）仍不會安裝。&lt;/li&gt;
+&lt;li&gt;部分 DOI 使用的發行版預設停用上游安全性更新。範例請參閱 &lt;code&gt;docker run --rm mysql:9.6.0 tail /etc/yum.repos.d/oracle-linux-ol9.repo&lt;/code&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;因此，目前仍維護的 DOI 無法保證在建置時不含 CVE。所以，無操作的重新建置（未執行 &lt;code&gt;RUN apt upgrade&lt;/code&gt; 或等效命令）不會修復任何問題。&lt;/p&gt;</description></item><item><title>x86 保護模式與特權</title><link>https://example.org/zh-tw/x86-protected-mode/</link><pubDate>Sat, 24 Dec 2022 15:42:13 +0800</pubDate><guid>https://example.org/zh-tw/x86-protected-mode/</guid><description>&lt;p&gt;x86 保護模式結合了以描述元為基礎的分段、受控控制轉移、分頁與特權指令。長模式降低了一般分段的作用，但仍保留描述元表、特權層級、中斷閘門與工作狀態區段（TSS）。作業系統使用這些機制進入核心並隔離使用者執行，而在目前的 x86-64 系統中，頁表提供主要的記憶體保護邊界。&lt;/p&gt;
+&lt;h2 id="table-registers"&gt;
+ 表格暫存器
+ &lt;a href="#table-registers" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;全域描述元表（GDT）包含由邏輯處理器共用的程式碼、資料與系統描述元。&lt;code&gt;GDTR&lt;/code&gt; 儲存 GDT 的線性基底與位元組限制。依照慣例，GDT 項目 0 是空描述元，因此索引為 0 的選擇子不能用於一般程式碼或資料存取。&lt;/p&gt;
+&lt;p&gt;區域描述元表（LDT）是透過 &lt;code&gt;LDTR&lt;/code&gt; 選取的選用表格。&lt;code&gt;LDTR&lt;/code&gt; 包含 GDT 中 LDT 系統描述元的選擇子，並快取解析後的基底、限制與屬性。在傳統架構中，工作可以擁有自己的 LDT，但目前的 64 位元作業系統很少使用 LDT。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;IDTR&lt;/code&gt; 儲存中斷描述元表（IDT）的線性基底與位元組限制。IDT 以例外或中斷向量為索引，而不是以一般區段選擇子為索引。其項目是閘門，用於識別處理常式程式碼並控制進入語意。&lt;/p&gt;
+&lt;p&gt;工作暫存器（&lt;code&gt;TR&lt;/code&gt;）包含 GDT 中 TSS 描述元的選擇子，並快取該描述元。&lt;code&gt;LGDT&lt;/code&gt;、&lt;code&gt;LIDT&lt;/code&gt;、&lt;code&gt;LLDT&lt;/code&gt; 與 &lt;code&gt;LTR&lt;/code&gt; 會在架構定義的特權與型別檢查下載入表格狀態。&lt;/p&gt;
+&lt;h2 id="selectors-and-hidden-caches"&gt;
+ 選擇子與隱藏快取
+ &lt;a href="#selectors-and-hidden-caches" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;16 位元區段選擇子包含索引、表格指示器（&lt;code&gt;TI&lt;/code&gt;）以及要求的特權層級（&lt;code&gt;RPL&lt;/code&gt;）：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;15 3 2 1 0
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;+--------------------------------+---+---+
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;| index | TI|RPL|
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;+--------------------------------+---+---+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;TI=0&lt;/code&gt; 選取 GDT，而 &lt;code&gt;TI=1&lt;/code&gt; 選取目前的 LDT。處理器將索引乘以描述元大小，檢查表格限制，擷取描述元，並驗證其型別、存在狀態以及該操作所需的特權。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;CS&lt;/code&gt;、&lt;code&gt;SS&lt;/code&gt;、&lt;code&gt;DS&lt;/code&gt;、&lt;code&gt;ES&lt;/code&gt;、&lt;code&gt;FS&lt;/code&gt; 與 &lt;code&gt;GS&lt;/code&gt; 會公開選擇子，但也包含基底、限制、型別與存取權限的隱藏快取。記憶體參照會使用快取，而不會再次讀取描述元表。因此，重寫 GDT 或 LDT 項目不會變更已載入的區段；軟體必須重新載入選擇子，或執行架構要求的轉移。&lt;/p&gt;</description></item><item><title>瀏覽器驗證</title><link>https://example.org/zh-tw/browser-authentication/</link><pubDate>Tue, 12 Jul 2022 14:43:24 +0800</pubDate><guid>https://example.org/zh-tw/browser-authentication/</guid><description>&lt;p&gt;瀏覽器驗證會將應用程式請求指派給使用者或工作負載身分。應用程式必須定義認證資料的
+存放位置、哪些請求會攜帶認證資料、瀏覽器如何限制這些資料，以及伺服器如何使其失效。&lt;/p&gt;
+&lt;h2 id="工作階段與-cookie"&gt;
+ 工作階段與 Cookie
+ &lt;a href="#%e5%b7%a5%e4%bd%9c%e9%9a%8e%e6%ae%b5%e8%88%87-cookie" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;對於具有同網站後端的瀏覽器應用程式，Cookie 中的不透明工作階段識別碼可讓認證資料不被
+JavaScript 存取。將工作階段狀態儲存在伺服器端，在驗證後及權限變更後輪換識別碼，並在
+登出或閒置時使其過期。&lt;/p&gt;
+&lt;p&gt;設定 &lt;code&gt;Secure&lt;/code&gt;、&lt;code&gt;HttpOnly&lt;/code&gt; 以及適當的 &lt;code&gt;SameSite&lt;/code&gt; 值。&lt;code&gt;Secure&lt;/code&gt; 要求使用 HTTPS，&lt;code&gt;HttpOnly&lt;/code&gt;
+可防止 JavaScript 存取，而 &lt;code&gt;SameSite&lt;/code&gt; 可降低跨網站請求偽造的暴露風險。&lt;code&gt;SameSite&lt;/code&gt; 不能
+取代 CSRF 防禦：會變更狀態的 Cookie 驗證端點應驗證 CSRF 權杖，或要求使用應用程式明確
+信任的來源。&lt;/p&gt;
+&lt;h2 id="oauth-20-與-openid-connect"&gt;
+ OAuth 2.0 與 OpenID Connect
+ &lt;a href="#oauth-20-%e8%88%87-openid-connect" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;OAuth 2.0 將授權委派給授權伺服器；其本身不會標準化使用者驗證。OpenID Connect 增加
+身分層與 ID 權杖。瀏覽器型公開用戶端應使用含 PKCE 的 Authorization Code，並驗證
+&lt;code&gt;state&lt;/code&gt;、使用 OpenID Connect 時的 &lt;code&gt;nonce&lt;/code&gt;、精確的重新導向 URI、issuer、audience、expiry
+及 signature。&lt;/p&gt;
+&lt;p&gt;不要將存取權杖放入可能出現在記錄、參照來源及瀏覽器歷程記錄中的 URL 查詢字串或片段。
+Backend-for-Frontend 可以將權杖保留在伺服器端，並向瀏覽器公開應用程式工作階段 Cookie。&lt;/p&gt;
+&lt;h2 id="saml"&gt;
+ SAML
+ &lt;a href="#saml" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;SAML 會在身分識別提供者與服務提供者之間交換已簽署的 XML 判斷。根據已設定的中繼資料
+驗證判斷的簽章，並驗證 issuer、audience、recipient、時間條件及請求關聯。XML 簽章驗證
+必須使用受維護的函式庫和強化的剖析器；手寫 XML 或簽章處理並不安全。&lt;/p&gt;</description></item><item><title>Kubernetes 存取控制</title><link>https://example.org/zh-tw/kubernetes-access-control/</link><pubDate>Mon, 27 Jun 2022 04:47:20 +0800</pubDate><guid>https://example.org/zh-tw/kubernetes-access-control/</guid><description>&lt;p&gt;Kubernetes 會依序透過驗證、授權與准入控制處理 API 請求。驗證建立身分；授權決定該身分是否能執行某項動作；准入控制則可以驗證或變更已接受的物件。這些是分開的控制項，應分別設定與稽核。&lt;/p&gt;
+&lt;h2 id="使用-oidc-進行驗證"&gt;
+ 使用 OIDC 進行驗證
+ &lt;a href="#%e4%bd%bf%e7%94%a8-oidc-%e9%80%b2%e8%a1%8c%e9%a9%97%e8%ad%89" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;OpenID Connect（OIDC）讓 API server 驗證由外部身分提供者簽發的 bearer token。API server 會設定簽發者 URL、用戶端 ID，以及選用的使用者名稱與群組宣告對映。API server 必須能連線到簽發者，且其 TLS 憑證必須通過驗證。&lt;/p&gt;
+&lt;p&gt;身分提供者負責使用者生命週期與多因素驗證；Kubernetes 從有效 token 接收使用者名稱與群組。不要為人員使用共用的靜態 token。在 &lt;code&gt;kubectl&lt;/code&gt; 中，使用核准的 OIDC 登入外掛程式或 exec 憑證提供者，讓短期 token 能在不將長期憑證儲存在 kubeconfig 檔案中的情況下更新。&lt;/p&gt;
+&lt;h2 id="使用-rbac-進行授權"&gt;
+ 使用 RBAC 進行授權
+ &lt;a href="#%e4%bd%bf%e7%94%a8-rbac-%e9%80%b2%e8%a1%8c%e6%8e%88%e6%ac%8a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;RBAC 透過 &lt;code&gt;Role&lt;/code&gt; 與 &lt;code&gt;ClusterRole&lt;/code&gt; 物件授予資源型別上的動詞，再透過繫結附加這些權限。&lt;code&gt;Role&lt;/code&gt; 的範圍是命名空間；&lt;code&gt;ClusterRole&lt;/code&gt; 可以授予叢集範圍的存取權，或在命名空間內繫結。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;yaml&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-yaml" data-lang="yaml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io/v1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Role&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;metadata&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;deployment-reader&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;namespace&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;rules&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; - &lt;span style="color:#f92672"&gt;apiGroups&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;apps&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;resources&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;deployments&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;verbs&lt;/span&gt;: [&lt;span style="color:#e6db74"&gt;&amp;#34;get&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;list&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;watch&amp;#34;&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;---
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io/v1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;RoleBinding&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;metadata&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;developers-can-read-deployments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;namespace&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;subjects&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; - &lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Group&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;payments-developers&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;apiGroup&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;roleRef&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;kind&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Role&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;deployment-reader&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;apiGroup&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;rbac.authorization.k8s.io&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;只授予所需的最小動詞、資源、命名空間與非資源 URL。除非是受到嚴格控管的平台管理，否則避免使用 &lt;code&gt;cluster-admin&lt;/code&gt;、萬用字元動詞與萬用字元資源。使用 &lt;code&gt;kubectl auth can-i&lt;/code&gt; 檢查預計授予的權限。&lt;/p&gt;</description></item></channel></rss>

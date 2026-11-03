@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Language on cesun.life</title><link>https://example.org/ja/tags/language/</link><description>Recent content in Language on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Mon, 01 Dec 2025 21:05:41 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/language/index.xml" rel="self" type="application/rss+xml"/><item><title>C++ Language and Library Notes</title><link>https://example.org/ja/cpp-language-notes/</link><pubDate>Mon, 01 Dec 2025 21:05:41 +0800</pubDate><guid>https://example.org/ja/cpp-language-notes/</guid><description>&lt;p&gt;この小規模なアンソロジーは、独立した記事を必要としない言語およびツールチェーン向けの規則をまとめます。
+見た目が似た C++ の記法でも所有権、検索、ライフタイムへの影響が異なるため、各セクションでは機能を支配する境界を示します。&lt;/p&gt;
+&lt;h2 id="リソース所有権と任意状態"&gt;
+ リソース所有権と任意状態
+ &lt;a href="#%e3%83%aa%e3%82%bd%e3%83%bc%e3%82%b9%e6%89%80%e6%9c%89%e6%a8%a9%e3%81%a8%e4%bb%bb%e6%84%8f%e7%8a%b6%e6%85%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;所有権とは、適切な時点でリソースを解放する責任です。RAII でモデル化し、構築時に取得し、破棄時に解放し、
+例外的な制御フローをまたいでもオブジェクトの不変条件を維持します。&lt;code&gt;std::unique_ptr&lt;/code&gt; や &lt;code&gt;std::vector&lt;/code&gt; などのメンバーがすでにリソースポリシーを実装している場合は Rule of Zero を優先します。
+raw リソースを直接管理する型は、一貫したデストラクター、コピー方針、ムーブ方針、失敗方針を定義する必要があります。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;std::make_unique&amp;lt;T&amp;gt;(args...)&lt;/code&gt; expresses sole ownership without exposing a standalone &lt;code&gt;new&lt;/code&gt;; it has been available since C++14. &lt;code&gt;std::make_shared&amp;lt;T&amp;gt;(args...)&lt;/code&gt; may combine the control block and object allocation. Combined allocation is not always appropriate: a &lt;code&gt;weak_ptr&lt;/code&gt; can keep that allocation alive after the object is destroyed, and custom deletion or an existing raw pointer can require direct construction. When direct construction is necessary, establish the smart-pointer owner in the same full expression. Before C++17 tightened function-argument evaluation sequencing, separating allocation from ownership inside a larger call could also leak if another argument threw.&lt;/p&gt;</description></item><item><title>C++の宣言、定義、リンケージ</title><link>https://example.org/ja/cpp-declarations/</link><pubDate>Fri, 27 Jun 2025 06:42:46 +0800</pubDate><guid>https://example.org/ja/cpp-declarations/</guid><description>&lt;p&gt;宣言は名前を導入し、その型を記述します。定義は、プログラムが使用する実体を提供します。リンケージは、異なるスコープまたは翻訳単位にある宣言が同じ実体を指すかどうかを決定し、記憶域期間はオブジェクトが存在する期間を決定します。この4つの問いを分離すると、複雑なCおよびC++の宣言を容易に推論できます。&lt;/p&gt;
+&lt;h2 id="名前から宣言子を読む"&gt;
+ 名前から宣言子を読む
+ &lt;a href="#%e5%90%8d%e5%89%8d%e3%81%8b%e3%82%89%e5%ae%a3%e8%a8%80%e5%ad%90%e3%82%92%e8%aa%ad%e3%82%80" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;宣言は、宣言指定子の後に1つ以上の宣言子が続く構成です。宣言子内の演算子は、文法に従って結合します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;後置の &lt;code&gt;()&lt;/code&gt; と &lt;code&gt;[]&lt;/code&gt; は、前置の &lt;code&gt;*&lt;/code&gt;、&lt;code&gt;&amp;amp;&lt;/code&gt;、&lt;code&gt;&amp;amp;&amp;amp;&lt;/code&gt; より先に結合します。&lt;/li&gt;
+&lt;li&gt;括弧はその結合順序を上書きします。&lt;/li&gt;
+&lt;li&gt;各コンマは独立した宣言子を開始するため、&lt;code&gt;*&lt;/code&gt; は基本型には属しません。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;宣言された識別子から始め、隣接する演算子を適用してから、外側へ向かって読み進めます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pointer;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;pointer_to_const &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; const_pointer &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; (&lt;span style="color:#f92672"&gt;*&lt;/span&gt;pointer_to_array)[&lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;] &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt;array_of_pointers[&lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;] &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; (&lt;span style="color:#f92672"&gt;*&lt;/span&gt;binary_operation)(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;) &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;各宣言の意味は次のとおりです。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;名前&lt;/th&gt;
+ &lt;th&gt;型&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;pointer_to_const&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;const int&lt;/code&gt; へのポインター&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;const_pointer&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;int&lt;/code&gt; へのconstポインター&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;pointer_to_array&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;42個の &lt;code&gt;int&lt;/code&gt; オブジェクトからなる配列へのポインター&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;array_of_pointers&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;int&lt;/code&gt; へのポインターを42個格納する配列&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;binary_operation&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;2つの &lt;code&gt;int&lt;/code&gt; 値を受け取り、&lt;code&gt;int&lt;/code&gt; を返す関数へのポインター&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;基本型の前後に記述した &lt;code&gt;const&lt;/code&gt; は同じ意味です。&lt;code&gt;const int&lt;/code&gt; と &lt;code&gt;int const&lt;/code&gt; は等価です。一方、&lt;code&gt;*&lt;/code&gt; の後にあるcv修飾子はポインターを修飾します。生の宣言子では重要な違いが隠れる場合、エイリアスによって公開インターフェースを明確にできます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;using&lt;/span&gt; Row &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;[&lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;];
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;using&lt;/span&gt; BinaryOperation &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Row &lt;span style="color:#f92672"&gt;*&lt;/span&gt;row &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;BinaryOperation &lt;span style="color:#f92672"&gt;*&lt;/span&gt;operation &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;コンパイル時に列数が決まる動的な2次元C配列では、行の型を保持します。&lt;/p&gt;</description></item><item><title>C++のコピー省略と戻り値</title><link>https://example.org/ja/cpp-copy-elision/</link><pubDate>Sun, 03 Nov 2024 19:25:13 +0800</pubDate><guid>https://example.org/ja/cpp-copy-elision/</guid><description>&lt;p&gt;コピー省略を使用すると、コピーコンストラクターまたはムーブコンストラクターに観測可能な副作用がある場合でも、実装はそのコピー構築またはムーブ構築を省略できます。C++17より前は、コピー省略の各ケースが許可されていましたが、必須ではありませんでした。C++17ではprvalueの意味論が変更され、それまで一時オブジェクトの省略として扱われていた複数のケースが、代わりに直接構築となりました。&lt;/p&gt;
+&lt;h2 id="返されるprvalueと名前付きローカル変数"&gt;
+ 返されるprvalueと名前付きローカル変数
+ &lt;a href="#%e8%bf%94%e3%81%95%e3%82%8c%e3%82%8bprvalue%e3%81%a8%e5%90%8d%e5%89%8d%e4%bb%98%e3%81%8d%e3%83%ad%e3%83%bc%e3%82%ab%e3%83%ab%e5%a4%89%e6%95%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;C++17以降、関数の戻り値型のprvalueを関数から返すと、結果オブジェクトが直接構築されます。したがって、コピーコンストラクターとムーブコンストラクターが削除されていても、この形式は妨げられません。ただし、return文の時点で、返される型のデストラクターにはアクセス可能であり、削除されていない必要があります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Token&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Token();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Token(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Token&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;) &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;delete&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Token(Token&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt;) &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;delete&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Token &lt;span style="color:#a6e22e"&gt;make_token&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; Token{}; &lt;span style="color:#75715e"&gt;// C++17以降は保証された直接構築
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;名前付き戻り値最適化（NRVO）は、C++17以降でも引き続き省略可能です。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Widget&lt;/span&gt; {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Widget &lt;span style="color:#a6e22e"&gt;make_named_widget&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Widget widget;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; widget; &lt;span style="color:#75715e"&gt;// NRVOが適用される可能性がある。使用可能なコピーまたはムーブが必要
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;NRVOが適用されない場合、return文内の適格なローカル変数は、オーバーロード解決ではrvalueとして扱われます。この動作を要求するためだけに &lt;code&gt;return std::move(token);&lt;/code&gt; と記述してはいけません。これはNRVOを妨げる可能性があり、NRVOの対象となる名前から式をxvalueへ変更します。名前付きローカル変数をそのまま返してください。&lt;/p&gt;
+&lt;h2 id="インターフェースとライフタイムの設計"&gt;
+ インターフェースとライフタイムの設計
+ &lt;a href="#%e3%82%a4%e3%83%b3%e3%82%bf%e3%83%bc%e3%83%95%e3%82%a7%e3%83%bc%e3%82%b9%e3%81%a8%e3%83%a9%e3%82%a4%e3%83%95%e3%82%bf%e3%82%a4%e3%83%a0%e3%81%ae%e8%a8%ad%e8%a8%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;呼び出し側が独立した結果を受け取る場合は、完成した値を返してください。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string make_label(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; id) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;item-&amp;#34;&lt;/span&gt; &lt;span style="color:#f92672"&gt;+&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;to_string(id);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;戻り値はローカルオブジェクトへの参照ではありません。参照戻り値が正しいのは、参照先オブジェクトが呼び出しより長く存続し、借用またはエイリアス化が意図した契約である場合だけです。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; Config&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; active_config(); &lt;span style="color:#75715e"&gt;// より長いライフタイムを持つストレージを参照する
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;自動変数であるローカル変数へのlvalue参照またはrvalue参照を返してはいけません。rvalue参照は、return後までローカルオブジェクトのライフタイムを延長せず、参照カテゴリーを伝えるだけです。逆に、一時オブジェクトをローカルの &lt;code&gt;const T&amp;amp;&lt;/code&gt; または &lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt; に束縛すると、その一時オブジェクトのライフタイムはそのローカル参照のライフタイムまで延長されますが、関数から返される参照のライフタイムまで延長されるわけではありません。&lt;/p&gt;</description></item><item><title>C++クラスと特殊メンバー関数</title><link>https://example.org/ja/cpp-classes/</link><pubDate>Wed, 28 Aug 2024 06:08:01 +0800</pubDate><guid>https://example.org/ja/cpp-classes/</guid><description>&lt;p&gt;C++のクラスは、表現、不変条件、およびそれらを確立・維持する操作を定義します。コンストラクターはオブジェクトの不変条件を確立し、メンバー関数はそれを維持し、デストラクターはそのオブジェクトが所有するリソースを解放します。所有権ポリシーを最初に設計してください。これは、コンパイラーが生成する特殊メンバーが正しいかどうかを決定するためです。&lt;/p&gt;
+&lt;h2 id="構築と破棄"&gt;
+ 構築と破棄
+ &lt;a href="#%e6%a7%8b%e7%af%89%e3%81%a8%e7%a0%b4%e6%a3%84" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;コンストラクターはクラス名を持ち、戻り値の型を持ちません。デフォルトコンストラクターは、パラメーターを持たないか、すべてのパラメーターにデフォルト値が指定されています。コピーコンストラクターとムーブコンストラクターは、同じクラスの左辺値または右辺値から新しいオブジェクトを初期化します。コピー代入とムーブ代入は既存のオブジェクトを更新します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;utility&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Connection&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;explicit&lt;/span&gt; Connection(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string endpoint) &lt;span style="color:#f92672"&gt;:&lt;/span&gt; endpoint_(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(endpoint)) {}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;private&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string endpoint_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;メンバーは、コンストラクターの初期化子リストに記述された順序では初期化&lt;strong&gt;されません&lt;/strong&gt;。構築は次の順序で行われます。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;最も派生したオブジェクトを構築する場合の仮想基底。&lt;/li&gt;
+&lt;li&gt;基底指定子の順序に従った直接基底。&lt;/li&gt;
+&lt;li&gt;宣言順に従った非静的データメンバー。&lt;/li&gt;
+&lt;li&gt;コンストラクター本体。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;したがって、初期化子は宣言順に記述し、後から宣言されたメンバーから別のメンバーを初期化しないでください。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Valid&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; first;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; second;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Valid(&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; value) &lt;span style="color:#f92672"&gt;:&lt;/span&gt; first(value), second(first &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;) {}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;破棄は、完了した構築順序を逆にたどります。通常の破棄は自動記憶域とRAII所有者に任せてください。明示的なデストラクター呼び出しは、ライフタイムと、その後の記憶域の再利用の両方が確立されている、制御された記憶域管理で使用します。&lt;/p&gt;
+&lt;h2 id="特殊メンバー関数とrule-of-zero"&gt;
+ 特殊メンバー関数とRule of Zero
+ &lt;a href="#%e7%89%b9%e6%ae%8a%e3%83%a1%e3%83%b3%e3%83%90%e3%83%bc%e9%96%a2%e6%95%b0%e3%81%a8rule-of-zero" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;特殊メンバー関数は、デフォルトコンストラクター、コピーコンストラクター、ムーブコンストラクター、コピー代入演算子、ムーブ代入演算子、およびデストラクターです。実装は、クラスがユーザー宣言していない操作を暗黙的に宣言し、その操作が必要になった時点で定義します。宣言は、暗黙的に宣言することも、明示的にデフォルト化することも、明示的に削除することもできます。ユーザーが記述した定義を持つ関数は、ユーザー提供関数です。&lt;/p&gt;
+&lt;p&gt;次の抑制規則には、意図的な確認が必要です。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;操作&lt;/th&gt;
+ &lt;th&gt;重要な規則&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;デフォルトコンストラクター&lt;/td&gt;
+ &lt;td&gt;ユーザー宣言されたコンストラクターまたはコンストラクターテンプレートがあると抑制されます。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;ムーブコンストラクターとムーブ代入&lt;/td&gt;
+ &lt;td&gt;ユーザー宣言されたコピーコンストラクター、コピー代入、ムーブ操作、またはデストラクターがあると、暗黙のムーブ操作は両方とも抑制されます。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;コピーコンストラクターとコピー代入&lt;/td&gt;
+ &lt;td&gt;ユーザー宣言されていない場合は暗黙的に宣言されますが、基底またはメンバーが必要な操作を実行できないため、削除済みとして定義されることがあります。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;参照メンバーと不適切な&lt;code&gt;const&lt;/code&gt;メンバーは、暗黙の代入を削除することがよくあります。いずれか一方のムーブ操作を宣言すると、暗黙的に宣言されたコピー操作は両方とも削除済みとして定義されます。基底またはメンバーにあるアクセス不能、削除済み、または使用できない操作は、他の暗黙の特殊メンバーを削除することがあります。基底とメンバーが標準の構造要件を満たす場合、コンパイラー生成関数はtrivialになることもあります。trivial性は型の性質であり、所有権ポリシーではありません。&lt;/p&gt;
+&lt;p&gt;Rule of Zeroを優先してください。正しい所有権動作を持つ型を組み合わせ、ドメイン型では特殊メンバーを宣言しないようにします。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;utility&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;vector&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Document&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;explicit&lt;/span&gt; Document(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string title) &lt;span style="color:#f92672"&gt;:&lt;/span&gt; title_(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(title)) {}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;private&lt;/span&gt;&lt;span style="color:#f92672"&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string title_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;vector&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;string&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; paragraphs_;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;カスタムリソース所有者には、明示的で一貫したポリシーが必要です。ムーブ専用の所有者はコピーを削除し、正確に一度だけ解放し、転送が失敗しない場合はムーブを&lt;code&gt;noexcept&lt;/code&gt;にする必要があります。従来の「Rule of Three」の操作のいずれか、またはムーブ操作のいずれかを定義した場合は、5つの関数を自動的に実装するのではなく、すべてのコピー、ムーブ、破棄の動作を確認してください。&lt;/p&gt;</description></item><item><title>C++ の例外と例外安全性</title><link>https://example.org/ja/cpp-exceptions/</link><pubDate>Tue, 28 May 2024 17:55:25 +0800</pubDate><guid>https://example.org/ja/cpp-exceptions/</guid><description>&lt;p&gt;例外は、失敗した操作の報告と、それに対応できる境界への伝播を分離します。例外は一致するハンドラーへ制御を移します。制御が外側へ移動する間、C++ は終了するスコープ内で完全に構築された自動オブジェクトを、構築と逆の順序で破棄します。したがって、Resource Acquisition Is Initialization (RAII) によって通常のクリーンアップ経路と例外時のクリーンアップ経路を同じにできます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;load_configuration&lt;/span&gt;(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;filesystem&lt;span style="color:#f92672"&gt;::&lt;/span&gt;path path) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;ifstream input{path}; &lt;span style="color:#75715e"&gt;// Closed during unwinding.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (&lt;span style="color:#f92672"&gt;!&lt;/span&gt;input) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;throw&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;runtime_error{&lt;span style="color:#e6db74"&gt;&amp;#34;cannot open configuration&amp;#34;&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#75715e"&gt;// Parsing may throw; input still closes.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;try&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; load_configuration(&lt;span style="color:#e6db74"&gt;&amp;#34;app.conf&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;} &lt;span style="color:#66d9ef"&gt;catch&lt;/span&gt; (&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;exception&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; error) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; report(error.what());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;例外オブジェクトは値で throw し、多相的な例外型は &lt;code&gt;const&lt;/code&gt; 参照で catch します。基底例外を値で catch すると、派生オブジェクトがスライスされます。&lt;code&gt;catch (...)&lt;/code&gt; は、不変条件を復元したり、エラーを変換したり、意図的に終了したりできる境界にのみ置きます。破損した状態で黙って処理を続けてはなりません。&lt;/p&gt;
+&lt;h2 id="巻き戻しと-raii"&gt;
+ 巻き戻しと RAII
+ &lt;a href="#%e5%b7%bb%e3%81%8d%e6%88%bb%e3%81%97%e3%81%a8-raii" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;コンストラクターが throw すると、完成したオブジェクトは生成されませんが、完全に構築された基底クラスとメンバーのサブオブジェクトについてはデストラクターが実行されます。別の例外がアクティブな間にデストラクターから例外を外へ出してはいけません。そうすると &lt;code&gt;std::terminate&lt;/code&gt; が呼び出されるためです。したがって、デストラクター、スマートポインターのデリーター、ロールバックガードは throw しないようにすべきです。クリーンアップが失敗する可能性がある場合は、破棄前に失敗を報告する明示的な操作を公開します。&lt;/p&gt;</description></item><item><title>C++ の言語規則と名前付き要件</title><link>https://example.org/ja/cpp-language-rules/</link><pubDate>Sat, 23 Sep 2023 12:23:05 +0800</pubDate><guid>https://example.org/ja/cpp-language-rules/</guid><description>&lt;p&gt;C++ の言語規則は、プログラムが適格であるか、およびその実行が何を意味するかを決定します。ライブラリの名前付き要件とコンセプトは、ジェネリックコードに契約を追加します。似た用語によって重要な違いが隠れる場合があります。コンパイラーは式と型を検査できますが、型が約束するすべてのセマンティクス、計算量、有効性、または等価性を証明することはできません。&lt;/p&gt;
+&lt;h2 id="定義と-one-definition-rule"&gt;
+ 定義と One Definition Rule
+ &lt;a href="#%e5%ae%9a%e7%be%a9%e3%81%a8-one-definition-rule" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;odr-use されるすべての非 inline 関数または変数には、プログラム内に 1 つの定義が必要です。互換性がある場合は宣言を繰り返せるため、前方宣言が可能です。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Node&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Node&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Node&lt;span style="color:#f92672"&gt;*&lt;/span&gt; next &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;nullptr&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;型、テンプレート、inline 関数、および inline 変数は、それぞれの整合性要件を満たす場合に限り、複数の翻訳単位に定義を持てます。ヘッダーガードは 1 つの翻訳単位内での重複インクルードを防ぎますが、翻訳単位間で異なる定義を修復するものではありません。ODR 違反があってもプログラムのコンパイルとリンクに成功する場合がありますが、その動作は信頼できません。&lt;/p&gt;
+&lt;h2 id="名前付き要件とコンセプト"&gt;
+ 名前付き要件とコンセプト
+ &lt;a href="#%e5%90%8d%e5%89%8d%e4%bb%98%e3%81%8d%e8%a6%81%e4%bb%b6%e3%81%a8%e3%82%b3%e3%83%b3%e3%82%bb%e3%83%97%e3%83%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;C++20 より前は、標準ライブラリのジェネリック契約が &lt;code&gt;LegacyInputIterator&lt;/code&gt; などの名前付き要件として表現されていました。C++20 のコンセプトは、その構文的要素の多くを制約として表現します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;concepts&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;iterator&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;input_iterator Iterator&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; consume(Iterator first, Iterator last);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;制約付き宣言は、必要な式と関連する型関係を満たさない型を拒否します。制約の充足は、意味的な振る舞いを確立しません。型は &lt;code&gt;++i&lt;/code&gt;、&lt;code&gt;*i&lt;/code&gt;、&lt;code&gt;i == j&lt;/code&gt; を適格にしながら、複数回走査、等価性の保持、または明記された計算量の上限に違反する可能性があります。同じ境界は一様乱数ビット生成器にも当てはまります。型チェックでは、その出力が一様に分布することを実証できません。&lt;/p&gt;
+&lt;h2 id="ジェネリック契約の記述"&gt;
+ ジェネリック契約の記述
+ &lt;a href="#%e3%82%b8%e3%82%a7%e3%83%8d%e3%83%aa%e3%83%83%e3%82%af%e5%a5%91%e7%b4%84%e3%81%ae%e8%a8%98%e8%bf%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;ジェネリック API は階層に分けて指定します。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;必要な式と関連型を、標準コンセプトまたはプロジェクトのコンセプトを用いて記載する。&lt;/li&gt;
+&lt;li&gt;操作の意味、等価性を保持する式、および呼び出し後も値が有効かどうかという意味的不変条件を記載する。&lt;/li&gt;
+&lt;li&gt;計算量、イテレーターの無効化、所有権、および並行性の保証を記載する。&lt;/li&gt;
+&lt;li&gt;実行時の呼び出し側が守るか確認する必要がある事前条件と事後条件を記載する。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;たとえば、キー述語として使用する等価関係は、アルゴリズムが受け入れる値に対して同値関係でなければなりません。その述語とともに使用するハッシュは、等しいキーに対して同じ結果を生成する必要があります。どちらの性質も &lt;code&gt;requires&lt;/code&gt; 式では証明できません。&lt;/p&gt;
+&lt;p&gt;有効性も実行時の性質です。イテレーター型が構文的に &lt;code&gt;std::input_iterator&lt;/code&gt; を満たしていても、特定のイテレーターがコンテナ操作によって無効化されている場合があります。型の要件と、既存のイテレーター、ポインター、または参照を無効化する操作の両方を文書化してください。&lt;/p&gt;</description></item><item><title>C++の初期化</title><link>https://example.org/ja/cpp-initialization/</link><pubDate>Thu, 23 Jun 2022 04:19:15 +0800</pubDate><guid>https://example.org/ja/cpp-initialization/</guid><description>&lt;p&gt;初期化は、エンティティに最初の値を与えるか、参照の束縛を確立します。代入は、すでに存在するオブジェクトを変更します。コンストラクターは初期化にのみ関与し、代入演算子はライフタイムが開始した後にのみ関与するため、この違いはオーバーロード解決、不変条件、パフォーマンスに影響します。&lt;/p&gt;</description></item><item><title>C++ の値カテゴリーとムーブセマンティクス</title><link>https://example.org/ja/cpp-move-semantics/</link><pubDate>Mon, 25 Jan 2021 02:14:28 +0800</pubDate><guid>https://example.org/ja/cpp-move-semantics/</guid><description>&lt;p&gt;ムーブセマンティクスはオーバーロード選択と型で定義された状態移転であり、所有権の
+自動移転ではありません。まず式の値カテゴリーを確認し、次に所有権とライフタイムを
+表すパラメーター型を選びます。&lt;/p&gt;
+&lt;h2 id="式のカテゴリー"&gt;
+ 式のカテゴリー
+ &lt;a href="#%e5%bc%8f%e3%81%ae%e3%82%ab%e3%83%86%e3%82%b4%e3%83%aa%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;すべての &lt;code&gt;void&lt;/code&gt; ではない式は、次のカテゴリーのいずれか 1 つに該当します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;lvalue&lt;/strong&gt; はオブジェクト、関数、ビットフィールドを識別します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;xvalue&lt;/strong&gt; はリソースを再利用できるオブジェクトを識別します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;prvalue&lt;/strong&gt; は値を計算するか、オブジェクトを初期化します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;lvalue と xvalue は &lt;strong&gt;glvalue&lt;/strong&gt; であり、prvalue と xvalue は &lt;strong&gt;rvalue&lt;/strong&gt; です。名前付き
+変数は型が &lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt; であっても lvalue 式です。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; counter();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; cache_slot();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;counter() &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;42&lt;/span&gt;; &lt;span style="color:#75715e"&gt;// The call is an lvalue.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; slot &lt;span style="color:#f92672"&gt;=&lt;/span&gt; cache_slot();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;consume(slot); &lt;span style="color:#75715e"&gt;// `slot` is an lvalue expression.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;consume(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;move(slot)); &lt;span style="color:#75715e"&gt;// Casts it to an xvalue.
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;T&lt;/code&gt; を返す呼び出しは prvalue、&lt;code&gt;T&amp;amp;&lt;/code&gt; を返す呼び出しは lvalue、&lt;code&gt;T&amp;amp;&amp;amp;&lt;/code&gt; を返す呼び出し
+は xvalue です。&lt;code&gt;std::move&lt;/code&gt; は xvalue キャストを行うだけで、データを移動したり
+ソースオブジェクトのライフタイムを終了させたりしません。&lt;/p&gt;</description></item></channel></rss>

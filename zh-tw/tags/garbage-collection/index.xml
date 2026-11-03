@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Garbage-Collection on cesun.life</title><link>https://example.org/zh-tw/tags/garbage-collection/</link><description>Recent content in Garbage-Collection on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Mon, 27 Jan 2025 11:37:11 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/garbage-collection/index.xml" rel="self" type="application/rss+xml"/><item><title>JVM 垃圾回收</title><link>https://example.org/zh-tw/jvm-garbage-collection/</link><pubDate>Mon, 27 Jan 2025 11:37:11 +0800</pubDate><guid>https://example.org/zh-tw/jvm-garbage-collection/</guid><description>&lt;p&gt;JVM 規範要求自動儲存體管理，但不規定回收器或堆積配置。因此，回收器的行為取決於
+已部署的 JVM、版本、旗標、堆積大小與工作負載。&lt;/p&gt;
+&lt;h2 id="可達性與記憶體池"&gt;
+ 可達性與記憶體池
+ &lt;a href="#%e5%8f%af%e9%81%94%e6%80%a7%e8%88%87%e8%a8%98%e6%86%b6%e9%ab%94%e6%b1%a0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;追蹤從 GC 根開始，包括活動執行緒的堆疊與暫存器、靜態欄位、JNI 控點，以及 VM 執行
+階段結構。從根強可達的物件會保持存活。軟參照可能在記憶體壓力下被清除，弱參照不會
+保留其參照物件，而幻象參照則透過 &lt;code&gt;ReferenceQueue&lt;/code&gt; 支援事後協調。這些機制都不能
+取代確定性的資源清理；請使用 try-with-resources，並僅將 &lt;code&gt;Cleaner&lt;/code&gt; 作為安全網。終結
+機制已遭棄用，並計畫移除。&lt;/p&gt;
+&lt;p&gt;Java 堆積儲存物件與陣列。在 HotSpot 中，元空間、程式碼快取、執行緒堆疊、直接緩衝區、
+GC 記帳資料及原生程式庫會消耗堆積外的記憶體。&lt;code&gt;-Xmx&lt;/code&gt; 只限制 Java 堆積，因此容器
+限制必須為原生記憶體保留餘裕。記憶體池名稱與記帳方式取決於回收器及實作。&lt;/p&gt;
+&lt;h2 id="分代與配置"&gt;
+ 分代與配置
+ &lt;a href="#%e5%88%86%e4%bb%a3%e8%88%87%e9%85%8d%e7%bd%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;分代回收器利用許多配置物件會快速失效這項事實。新物件會配置到年輕代區域；存活物件
+可能在倖存者區之間移動，並晉升至老年代區域。為避免每次年輕代回收都掃描所有老年代
+物件，寫入屏障會將老年代指向年輕代的指標記錄在卡表或記憶集內。配置速率、存活集
+大小、晉升速率以及可用的疏散空間，比單獨觀察堆積使用率更能預測壓力。&lt;/p&gt;
+&lt;h2 id="hotspot-回收器的取捨"&gt;
+ HotSpot 回收器的取捨
+ &lt;a href="#hotspot-%e5%9b%9e%e6%94%b6%e5%99%a8%e7%9a%84%e5%8f%96%e6%8d%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;HotSpot 提供目標不同的回收器：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Serial&lt;/strong&gt; 針對小型堆積，將實作負荷降至最低。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Parallel&lt;/strong&gt; 透過平行的 stop-the-world 工作優先確保吞吐量。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;G1&lt;/strong&gt; 將堆積分割為多個區域，在平衡並行工作與疏散工作的同時，朝暫停時間目標運作。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ZGC&lt;/strong&gt; 將大部分標記與重新定位工作並行執行，以達到較短暫停，但代價是屏障與並行
+資源使用。&lt;/li&gt;
+&lt;li&gt;若所選發行版提供 &lt;strong&gt;Shenandoah&lt;/strong&gt;，它也會執行並行疏散，以縮短暫停時間。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;回收器的可用性與預設值會隨 JDK 供應商及版本變更。不要將歷史預設值編碼到作業
+指引中，而應使用 &lt;code&gt;java -XX:+PrintCommandLineFlags -version&lt;/code&gt; 及其版本文件檢查已部署
+的執行環境。&lt;/p&gt;
+&lt;p&gt;所有追蹤式回收器都需要協調點。根處理、重新標記及部分疏散工作可能會停止應用程式
+執行緒（STW）。並行階段可減少暫停時間，但會消耗 CPU 與記憶體頻寬，需要屏障，並且
+需要為重新定位保留可用空間。因此，較低的暫停目標可能降低吞吐量，或在配置壓力下失敗。&lt;/p&gt;</description></item></channel></rss>

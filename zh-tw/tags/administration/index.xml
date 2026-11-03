@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Administration on cesun.life</title><link>https://example.org/zh-tw/tags/administration/</link><description>Recent content in Administration on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sat, 07 Oct 2023 01:45:35 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/administration/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 管理筆記</title><link>https://example.org/zh-tw/linux-administration-miscellaneous/</link><pubDate>Sat, 07 Oct 2023 01:45:35 +0800</pubDate><guid>https://example.org/zh-tw/linux-administration-miscellaneous/</guid><description>&lt;p&gt;本文整理了幾項彼此獨立的管理工作：可移除式儲存裝置、能力、檔案系統位置、影像合成，以及 ELF 符號版本。每個章節都說明自動化時需要注意的操作邊界。&lt;/p&gt;
+&lt;h2 id="安全操作可移除式裝置"&gt;
+ 安全操作可移除式裝置
+ &lt;a href="#%e5%ae%89%e5%85%a8%e6%93%8d%e4%bd%9c%e5%8f%af%e7%a7%bb%e9%99%a4%e5%bc%8f%e8%a3%9d%e7%bd%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在關閉可移除式媒體的電源之前，先卸載所有已掛載的檔案系統。&lt;code&gt;udisksctl&lt;/code&gt; 使用 UDisks 服務，因此會套用桌面工作階段授權並協調操作，而不是直接發出未經中介的裝置命令。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;lsblk -o NAME,PATH,TYPE,FSTYPE,MOUNTPOINTS
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;udisksctl unmount -b /dev/sdb1
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;udisksctl power-off -b /dev/sdb&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;將 &lt;code&gt;/dev/sdb1&lt;/code&gt; 這類分割區傳給 &lt;code&gt;unmount&lt;/code&gt;，但將 &lt;code&gt;/dev/sdb&lt;/code&gt; 這類完整磁碟傳給 &lt;code&gt;power-off&lt;/code&gt;。後者會清除緩衝區、讓裝置停止供核心使用，並在硬體支援時關閉磁碟電源。裝置名稱可能在每次連接事件後改變，因此請在執行命令前立即確認名稱。卸載成功本身並不保證 USB 外接盒已關閉電源。&lt;/p&gt;
+&lt;h2 id="使用能力委派權限"&gt;
+ 使用能力委派權限
+ &lt;a href="#%e4%bd%bf%e7%94%a8%e8%83%bd%e5%8a%9b%e5%a7%94%e6%b4%be%e6%ac%8a%e9%99%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Linux 能力會將傳統上擁有全部權限的 root 權限，分割為彼此獨立且分別檢查的單位。程序具有 permitted、effective、inheritable、bounding 和 ambient 能力集合；檔案也可以攜帶 permitted 與 inheritable 能力遮罩，以及 effective 位元。每項能力涵蓋特定的核心檢查，因此請參閱 &lt;code&gt;capabilities(7)&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;例如，需要設定系統時鐘的專用二進位檔可以獲得 &lt;code&gt;CAP_SYS_TIME&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo setcap cap_sys_time&lt;span style="color:#f92672"&gt;=&lt;/span&gt;ep /opt/example/bin/clock-setter
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;getcap /opt/example/bin/clock-setter&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;=ep&lt;/code&gt; 會將該能力加入檔案的 permitted 集合，並要求它進入執行後程序的 effective 集合。對於範圍狹窄且不可寫入的可執行檔，只授予最小能力集合。複製、封裝或不支援必要擴充屬性的檔案系統可能會移除檔案能力，因此部署檢查應執行 &lt;code&gt;getcap&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;能力不是完整的沙盒。尤其是 &lt;code&gt;CAP_SYS_ADMIN&lt;/code&gt; 授權許多互不相關的操作，而特權二進位檔仍可能因記憶體安全問題或命令注入錯誤而導致系統遭到入侵。如果委派內容可以表示為一個經過稽核的命令，受限制的 &lt;code&gt;sudoers&lt;/code&gt; 規則可能更容易檢查。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Templates on cesun.life</title><link>https://example.org/zh-tw/tags/templates/</link><description>Recent content in Templates on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Wed, 21 Jan 2026 08:29:00 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/templates/index.xml" rel="self" type="application/rss+xml"/><item><title>SFINAE 與樣板多載解析</title><link>https://example.org/zh-tw/cpp-sfinae/</link><pubDate>Wed, 21 Jan 2026 08:29:00 +0800</pubDate><guid>https://example.org/zh-tw/cpp-sfinae/</guid><description>&lt;p&gt;C++ 在形成函式樣板候選項目時會替換樣板引數。&lt;strong&gt;替換失敗不是錯誤&lt;/strong&gt;（SFINAE）表示相依型別或運算式在替換的&lt;em&gt;立即內容&lt;/em&gt;中無效時，會移除該候選項目；它不會讓任意無效的樣板程式碼變得安全。&lt;/p&gt;
+&lt;h2 id="候選項目形成與立即內容"&gt;
+ 候選項目形成與立即內容
+ &lt;a href="#%e5%80%99%e9%81%b8%e9%a0%85%e7%9b%ae%e5%bd%a2%e6%88%90%e8%88%87%e7%ab%8b%e5%8d%b3%e5%85%a7%e5%ae%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;多載解析會先形成候選項目。對函式樣板而言，推導或明確提供的引數可能需要替換至其函式型別與樣板參數宣告中。如果該立即宣告內容無效，特化會被捨棄，並可能選取另一個可行的多載。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;cstddef&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;concepts&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;type_traits&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; element_count(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; T&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; value) &lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;decltype&lt;/span&gt;(value.size()) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value.size();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;, std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;size_t N&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;size_t element_count(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; T (&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;)[N]) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; N;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;對陣列而言，第一個候選項目會失敗，因為陣列沒有 &lt;code&gt;size()&lt;/code&gt; 成員。該失敗發生在尾端回傳型別中，因此陣列多載仍可使用。當非樣板多載是更佳匹配時，也可能勝出。&lt;/p&gt;
+&lt;p&gt;SFINAE 不會在候選項目已被選取後，僅因其函式本體無法編譯就適用：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; broken(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; T&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value.missing_member(); &lt;span style="color:#75715e"&gt;// hard error if this specialization is instantiated
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;請將偵測放在會進行替換的宣告內容中，而不是實作本體中。&lt;/p&gt;
+&lt;h2 id="既有的偵測技術"&gt;
+ 既有的偵測技術
+ &lt;a href="#%e6%97%a2%e6%9c%89%e7%9a%84%e5%81%b5%e6%b8%ac%e6%8a%80%e8%a1%93" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::enable_if_t&lt;/code&gt; 有條件地提供型別，因此適合用於樣板參數、參數型別或回傳型別。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;enable_if_t&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;is_integral_v&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;T twice(T value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value &lt;span style="color:#f92672"&gt;*&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;decltype&lt;/code&gt; 會測試運算式是否格式正確。&lt;code&gt;std::void_t&lt;/code&gt; 支援偵測慣用法，因為提供的每個型別都有效時，它會變成 &lt;code&gt;void&lt;/code&gt;。&lt;/p&gt;</description></item><item><title>C++20 概念與限制</title><link>https://example.org/zh-tw/cpp-concepts/</link><pubDate>Tue, 23 Dec 2025 21:51:39 +0800</pubDate><guid>https://example.org/zh-tw/cpp-concepts/</guid><description>&lt;p&gt;C++20 概念讓樣板宣告能在其介面中陳述可由編譯器檢查的要求。只有在其相關限制滿足時，受限制的候選項才會參與多載解析。因此，限制可用暴露預期作業集合的宣告，取代許多 &lt;code&gt;std::enable_if&lt;/code&gt; SFINAE 用法；但限制無法證明 API 文件所述的語意要求。&lt;/p&gt;
+&lt;h2 id="宣告限制"&gt;
+ 宣告限制
+ &lt;a href="#%e5%ae%a3%e5%91%8a%e9%99%90%e5%88%b6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;概念是命名空間範圍、類似變數的樣板，其定義是 &lt;code&gt;bool&lt;/code&gt; 常數運算式：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;concepts&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;concept&lt;/span&gt; Addable &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;requires&lt;/span&gt;(T value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; { value &lt;span style="color:#f92672"&gt;+&lt;/span&gt; value } &lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;convertible_to&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;使用 requires 子句、受限制的樣板參數或縮寫函式樣板套用概念：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;requires&lt;/span&gt; Addable&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;T sum(T left, T right) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; left &lt;span style="color:#f92672"&gt;+&lt;/span&gt; right;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;integral &lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; increment(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;integral &lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value &lt;span style="color:#f92672"&gt;+&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每個 &lt;code&gt;std::integral auto&lt;/code&gt; 都會引入獨立的樣板參數。兩個引數必須具有相同推導型別時，請使用明確參數。尾端 requires 子句在限制接續宣告子之後時很有用，包括類別樣板的成員：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Buffer&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;compact&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;requires&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;movable&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;requires 子句不能套用至非樣板的自由函式。多個宣告位置的限制會以 &lt;code&gt;&amp;amp;&amp;amp;&lt;/code&gt; 組合；替換依賴某項先決條件的要求時，請將先決條件放在前面。&lt;/p&gt;</description></item><item><title>C++ 樣板特化</title><link>https://example.org/zh-tw/cpp-template-specialization/</link><pubDate>Sat, 08 Feb 2025 22:23:52 +0800</pubDate><guid>https://example.org/zh-tw/cpp-template-specialization/</guid><description>&lt;p&gt;特化會為特定的樣板引數清單提供定義；對類別與變數樣板而言，也可為更具體的引數模式提供定義。只有在以型別為基礎的分派適合作為介面時才選用特化；函式特定的分派請使用一般多載，行為資格則使用概念。&lt;/p&gt;
+&lt;h2 id="完全特化"&gt;
+ 完全特化
+ &lt;a href="#%e5%ae%8c%e5%85%a8%e7%89%b9%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;完全特化會列出每個引數，並以 &lt;code&gt;template &amp;lt;&amp;gt;&lt;/code&gt; 開始。函式、類別與變數樣板都可以完全特化。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;formatter&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt;&lt;span style="color:#f92672"&gt;*&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;name&lt;/span&gt;() { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;other&amp;#34;&lt;/span&gt;; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;formatter&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt;&lt;span style="color:#f92672"&gt;*&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;name&lt;/span&gt;() { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;int&amp;#34;&lt;/span&gt;; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;完全特化是獨立的實體。它不會繼承主要樣板的成員、定義或預設樣板引數；請定義它所需的一切。在每個使用該特化的轉譯單元中，第一次使用可能隱式實例化該特化之前，先宣告完全特化。&lt;/p&gt;
+&lt;h2 id="部分特化"&gt;
+ 部分特化
+ &lt;a href="#%e9%83%a8%e5%88%86%e7%89%b9%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;類別與變數樣板可以有部分特化。部分特化會符合某種模式，編譯器透過部分排序選擇符合的最特化模式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;type_traits&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;is_pointer_like&lt;/span&gt; &lt;span style="color:#f92672"&gt;:&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;false_type {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;is_pointer_like&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;*&amp;gt;&lt;/span&gt; &lt;span style="color:#f92672"&gt;:&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;true_type {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;inline&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; is_pointer_like_v &lt;span style="color:#f92672"&gt;=&lt;/span&gt; is_pointer_like&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;::&lt;/span&gt;value;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;部分特化需要主要樣板宣告。其引數清單必須比主要樣板更具特化性，且依語言規則仍須可推導。若符合的部分特化彼此無法比較，使用時會產生歧義並導致編譯失敗。&lt;/p&gt;
+&lt;p&gt;函式樣板不能部分特化。請加入多載函式樣板、限制它們，或透過特化的類別／變數特徵進行分派。&lt;/p&gt;
+&lt;h2 id="排序與函式庫邊界"&gt;
+ 排序與函式庫邊界
+ &lt;a href="#%e6%8e%92%e5%ba%8f%e8%88%87%e5%87%bd%e5%bc%8f%e5%ba%ab%e9%82%8a%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;當呼叫端可能隱式實例化主要樣板與適用的特化時，請將它們放在標頭檔中宣告。只有當宣告在每個可能的隱式實例化點之前可見，且連結方式相應安排時，才在單一轉譯單元中定義特化。&lt;/p&gt;
+&lt;p&gt;特化特徵可以建立清楚的分派邊界：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;LocalPacket&lt;/span&gt; {};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;inline&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; uses_fast_path_v &lt;span style="color:#f92672"&gt;=&lt;/span&gt; false;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;inline&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; uses_fast_path_v&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;LocalPacket&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; true;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;程式擁有 &lt;code&gt;LocalPacket&lt;/code&gt; 與該特徵，因此契約是明確的。不要使用特化繞過存取控制或改變無關的語意。&lt;/p&gt;</description></item><item><title>C 與 C++ 中的可變參數程式設計</title><link>https://example.org/zh-tw/cpp-variadic-programming/</link><pubDate>Mon, 05 Sep 2022 18:24:42 +0800</pubDate><guid>https://example.org/zh-tw/cpp-variadic-programming/</guid><description>&lt;p&gt;C++ 可變參數樣板會保留每個引數的型別與數量。C 的省略號函式會抹除這些資訊，因而將型別解讀與引數數量的規範責任轉移給呼叫端。對於新的具型別介面，優先使用 C++ 參數包。&lt;/p&gt;
+&lt;h2 id="參數包展開與摺疊"&gt;
+ 參數包、展開與摺疊
+ &lt;a href="#%e5%8f%83%e6%95%b8%e5%8c%85%e5%b1%95%e9%96%8b%e8%88%87%e6%91%ba%e7%96%8a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;樣板參數包與函式參數包可以包含零個或多個元素。參數包展開會針對每個元素套用一次模式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;utility&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Function&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;... &lt;/span&gt;&lt;span style="color:#a6e22e"&gt;Ts&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;decltype&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt;) invoke(Function&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; function, Ts&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt;... values) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;forward&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Function&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;(function)(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;forward&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Ts&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;(values)...);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;... &lt;/span&gt;&lt;span style="color:#a6e22e"&gt;Ts&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; sum(Ts... values) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; (&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt; &lt;span style="color:#f92672"&gt;+&lt;/span&gt; ... &lt;span style="color:#f92672"&gt;+&lt;/span&gt; values); &lt;span style="color:#75715e"&gt;// binary left fold; 0 is the empty-pack identity
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;std::forward&lt;/code&gt; 會保留為每個轉送參考推導出的值類別。它不會延長引數的生命週期，因此被呼叫函式仍必須遵守一般的參考與所有權契約。&lt;/p&gt;
+&lt;p&gt;展開會出現在樣板引數列表、函式引數、基底指定器列表、初始化式、lambda 擷取，以及其他由文法定義的情境中。巢狀或同時進行的展開需要長度相容的參數包。&lt;/p&gt;
+&lt;p&gt;一元摺疊，例如 &lt;code&gt;(values + ...)&lt;/code&gt;，除非運算子具有語言定義的空集合單位元，否則需要非空參數包。當空輸入具有意義時，使用二元摺疊提供明確的單位元；當空輸入沒有意義時，使用約束拒絕空輸入。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;... &lt;/span&gt;&lt;span style="color:#a6e22e"&gt;Ts&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;requires&lt;/span&gt; (&lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;...(Ts) &lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; product(Ts... values) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; (... &lt;span style="color:#f92672"&gt;*&lt;/span&gt; values);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="c-可變參數函式"&gt;
+ C 可變參數函式
+ &lt;a href="#c-%e5%8f%af%e8%ae%8a%e5%8f%83%e6%95%b8%e5%87%bd%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;以 &lt;code&gt;...&lt;/code&gt; 宣告的 C 函式會透過 &lt;code&gt;va_list&lt;/code&gt;、&lt;code&gt;va_start&lt;/code&gt;、&lt;code&gt;va_arg&lt;/code&gt;、&lt;code&gt;va_copy&lt;/code&gt; 與 &lt;code&gt;va_end&lt;/code&gt; 讀取未命名引數。宣告不會提供數量或型別中繼資料。因此，數量參數、格式字串或文件化的哨兵值都是 API 契約的一部分。&lt;/p&gt;</description></item><item><title>Go 語言與範本</title><link>https://example.org/zh-tw/go-language-and-templates/</link><pubDate>Tue, 03 May 2022 10:12:40 +0800</pubDate><guid>https://example.org/zh-tw/go-language-and-templates/</guid><description>&lt;p&gt;Go 將原始碼組織為套件與模組，將可復原的失敗以值回報，並在標準函式庫中提供以反射為基礎的文字範本與 HTML 範本。這些領域由同一項設計原則連結：在 API 邊界明確表達相依性與控制流程。&lt;/p&gt;
+&lt;h2 id="模組套件與建置"&gt;
+ 模組、套件與建置
+ &lt;a href="#%e6%a8%a1%e7%b5%84%e5%a5%97%e4%bb%b6%e8%88%87%e5%bb%ba%e7%bd%ae" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;套件是由同一目錄中具有相同套件宣告的非測試 &lt;code&gt;.go&lt;/code&gt; 檔案所形成的編譯與命名空間邊界。模組是以 &lt;code&gt;go.mod&lt;/code&gt; 為根的版本化套件集合。模組路徑提供匯入路徑前綴：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;mkdir example
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cd example
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;go mod init example.com/team/example
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;go get golang.org/x/sync@v0.17.0
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;go mod tidy
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;go test ./...
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;go build ./cmd/server&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;go get&lt;/code&gt; 會變更模組需求；&lt;code&gt;go install package@version&lt;/code&gt; 會安裝命令，但不會變更目前的模組。在目前的 Go 發行版本中，模組模式是標準的相依性模型，模組可以位於 &lt;code&gt;GOPATH&lt;/code&gt; 外部。巢狀模組是獨立的相依性邊界，並且會從父模組的套件模式中排除。&lt;/p&gt;
+&lt;p&gt;建置快取會將已編譯的套件與測試結果儲存在 &lt;code&gt;GOCACHE&lt;/code&gt; 下。下載的模組原始碼會儲存在 &lt;code&gt;GOMODCACHE&lt;/code&gt; 下，通常位於 &lt;code&gt;$GOPATH/pkg/mod&lt;/code&gt;。使用以下指令檢查實際位置：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;go env GOCACHE GOMODCACHE GOPATH&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;不要將 &lt;code&gt;GOCACHE&lt;/code&gt; 與 &lt;code&gt;GOMODCACHE&lt;/code&gt; 指向同一個目錄，因為兩者具有不同的配置與生命週期規則。CI 可以依 Go 版本、目標平台與相依性檔案為兩者設定快取鍵，同時仍將 &lt;code&gt;go.sum&lt;/code&gt; 視為經過驗證的模組內容紀錄。&lt;/p&gt;
+&lt;p&gt;包含 &lt;code&gt;func main()&lt;/code&gt; 的 &lt;code&gt;package main&lt;/code&gt; 會建置可執行檔，而不是可匯入的函式庫邊界。將可重用行為放在另一個套件中；將旗標剖析與程序結束決策保留在 &lt;code&gt;main&lt;/code&gt; 中。&lt;/p&gt;</description></item><item><title>C++ 樣板元程式設計與型別特徵</title><link>https://example.org/zh-tw/cpp-template-metaprogramming/</link><pubDate>Mon, 24 May 2021 02:08:49 +0800</pubDate><guid>https://example.org/zh-tw/cpp-template-metaprogramming/</guid><description>&lt;p&gt;樣板元程式設計會在轉譯期間選擇型別與值。標準型別特徵函式庫提供常用的建構元件；相較於遞迴的類別樣板特化，&lt;code&gt;constexpr&lt;/code&gt;、&lt;code&gt;if constexpr&lt;/code&gt; 與概念能更直接地表達許多決策。&lt;/p&gt;
+&lt;h2 id="特徵轉換與述詞"&gt;
+ 特徵、轉換與述詞
+ &lt;a href="#%e7%89%b9%e5%be%b5%e8%bd%89%e6%8f%9b%e8%88%87%e8%bf%b0%e8%a9%9e" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;依照慣例，特徵會公開巢狀的 &lt;code&gt;type&lt;/code&gt; 或 &lt;code&gt;value&lt;/code&gt;。以 &lt;code&gt;_t&lt;/code&gt; 結尾的標準別名會擷取型別，而以 &lt;code&gt;_v&lt;/code&gt; 結尾的變數樣板則會擷取布林值或其他值。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;concepts&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;type_traits&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;using&lt;/span&gt; storage_type &lt;span style="color:#f92672"&gt;=&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;remove_cvref_t&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;inline&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; is_plain_object_v &lt;span style="color:#f92672"&gt;=&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;same_as&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T, std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;remove_cvref_t&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&amp;gt;&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;應有意識地使用轉換來正規化介面：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;std::remove_cv_t&lt;/code&gt;、&lt;code&gt;std::remove_reference_t&lt;/code&gt; 與 &lt;code&gt;std::remove_cvref_t&lt;/code&gt; 會移除限定條件，以便比較型別。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::decay_t&lt;/code&gt; 還會執行陣列至指標及函式至指標的調整，與以值傳遞引數的行為一致。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::conditional_t&lt;/code&gt; 可在兩個型別之間選擇，而不必定義個別的特化。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::common_type_t&lt;/code&gt; 會依其指定的轉換規則計算共同型別；它不能取代領域專屬的單位或精度政策。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;std::is_integral_v&lt;/code&gt;、&lt;code&gt;std::is_same_v&lt;/code&gt; 與 &lt;code&gt;std::is_invocable_v&lt;/code&gt; 等述詞會回答結構性問題，但不會確立語意行為。&lt;/p&gt;
+&lt;h2 id="編譯期分支"&gt;
+ 編譯期分支
+ &lt;a href="#%e7%b7%a8%e8%ad%af%e6%9c%9f%e5%88%86%e6%94%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;當分支取決於樣板引數時，請使用 &lt;code&gt;if constexpr&lt;/code&gt;。遭捨棄的相依分支不會被具現化，因此其中可以包含所選型別不支援的操作。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; measure(&lt;span style="color:#66d9ef"&gt;const&lt;/span&gt; T&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; value) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;constexpr&lt;/span&gt; (std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;is_integral_v&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; } &lt;span style="color:#66d9ef"&gt;else&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value.size();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;只有被選取的回傳陳述式會被具現化，因此整數不需要 &lt;code&gt;size()&lt;/code&gt; 成員。條件本身與非相依程式碼仍必須具備良好形式。對於歸納式型別計算，或必須支援較舊語言標準的程式碼，遞迴特化仍然適用，但不應讓它掩蓋直接的 &lt;code&gt;constexpr&lt;/code&gt; 運算式。&lt;/p&gt;</description></item><item><title>C++ 範本基礎</title><link>https://example.org/zh-tw/cpp-template-fundamentals/</link><pubDate>Mon, 03 May 2021 19:04:55 +0800</pubDate><guid>https://example.org/zh-tw/cpp-template-fundamentals/</guid><description>&lt;p&gt;範本是由型別、常數值、範本與參數包參數化的宣告族。特化會在 C++ 名稱查找、型別檢查、多載解析與約束規則下形成；範本不是文字替換。&lt;/p&gt;
+&lt;h2 id="範本參數"&gt;
+ 範本參數
+ &lt;a href="#%e7%af%84%e6%9c%ac%e5%8f%83%e6%95%b8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;型別參數接受型別，常數範本參數接受結構化常數值，而範本範本參數接受相容的範本。預設值可提供省略的引數。參數包代表零個或多個參數或引數。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;, std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;size_t N &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;16&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Buffer&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; Value&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Constant&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;...&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Container&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;using&lt;/span&gt; one_element_container &lt;span style="color:#f92672"&gt;=&lt;/span&gt; Container&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt;&lt;span style="color:#960050;background-color:#1e0010"&gt;... &lt;/span&gt;&lt;span style="color:#a6e22e"&gt;Ts&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;TypeList&lt;/span&gt; {};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;類別範本或別名範本可以具有型別、常數、範本與參數包參數。函式範本額外支援推導：出現在可推導參數位置的引數會從呼叫引數推斷，而不可推導參數則必須提供，或從其他地方取得。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;T maximum(T left, T right);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; a &lt;span style="color:#f92672"&gt;=&lt;/span&gt; maximum(&lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;); &lt;span style="color:#75715e"&gt;// T is int
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; b &lt;span style="color:#f92672"&gt;=&lt;/span&gt; maximum&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;double&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;(&lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;2.5&lt;/span&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;明確的範本引數位於一般呼叫引數之前。推導不會使用函式回傳型別，因為呼叫結果可能被捨棄，而且多載解析需要在得知結果前先取得候選型別。&lt;/p&gt;
+&lt;h2 id="範本類別與-ctad"&gt;
+ 範本類別與 CTAD
+ &lt;a href="#%e7%af%84%e6%9c%ac%e9%a1%9e%e5%88%a5%e8%88%87-ctad" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;函式、類別、變數、別名與成員範本具有不同的具現化規則。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;type_traits&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; T identity(T value) { &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; value; } &lt;span style="color:#75715e"&gt;// function
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Box&lt;/span&gt; { T value; }; &lt;span style="color:#75715e"&gt;// class
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;inline&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;bool&lt;/span&gt; is_box &lt;span style="color:#f92672"&gt;=&lt;/span&gt; false; &lt;span style="color:#75715e"&gt;// variable
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;using&lt;/span&gt; remove_cvref_t &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#75715e"&gt;// alias
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;remove_cvref_t&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;T&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;Store&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;template&lt;/span&gt; &lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;T&lt;/span&gt;&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; put(T&lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; value); &lt;span style="color:#75715e"&gt;// member
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;類別範本引數推導（CTAD）會根據建構函式、聚合推導候選項或使用者定義的推導指南來選擇類別範本引數。當使用類別範本名稱而未指定明確引數時會套用；不適用於函式範本。&lt;/p&gt;</description></item></channel></rss>

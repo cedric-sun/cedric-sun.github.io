@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Multicluster on cesun.life</title><link>https://example.org/ja/tags/multicluster/</link><description>Recent content in Multicluster on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sat, 28 Aug 2021 08:15:01 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/multicluster/index.xml" rel="self" type="application/rss+xml"/><item><title>Kubernetes Federation</title><link>https://example.org/ja/kubernetes-federation/</link><pubDate>Sat, 28 Aug 2021 08:15:01 +0800</pubDate><guid>https://example.org/ja/kubernetes-federation/</guid><description>&lt;p&gt;Kubernetes Federation は、フェデレーションコントロールプレーンから複数クラスター
+にまたがるワークロードを管理する初期の試みでした。Federation v1 は非推奨となり、
+CRD ベースの後継である KubeFed または Federation v2 と呼ばれるものも、現在は
+Kubernetes のアクティブなプロジェクトではありません。新しいプラットフォームの
+基盤ではなく、歴史的な技術として扱う必要があります。&lt;/p&gt;
+&lt;h2 id="federation-が解決しようとした問題"&gt;
+ Federation が解決しようとした問題
+ &lt;a href="#federation-%e3%81%8c%e8%a7%a3%e6%b1%ba%e3%81%97%e3%82%88%e3%81%86%e3%81%a8%e3%81%97%e3%81%9f%e5%95%8f%e9%a1%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;このモデルではメンバークラスターを登録し、選択したリソースをメンバークラスターへ
+伝播しました。独立したクラスターを維持しながら、配置、レプリカ分散、サービス
+ディスカバリー、設定を一元化することを目指していました。難しい点は、競合処理、
+クラスター障害、ネットワーク、ID、バージョンのずれ、そして単一のグローバル API
+が別の可用性依存要因になり得ることでした。&lt;/p&gt;
+&lt;p&gt;初期実装では、独立したフェデレーション API サーバーを使用していました。その後の
+取り組みでは、フェデレーションの動作をカスタムリソースとコントローラーへ移し、
+拡張しやすくなりましたが、クラスター間の状態を運用する複雑さは解消されませんでした。&lt;/p&gt;
+&lt;h2 id="現行の代替手段を使用する"&gt;
+ 現行の代替手段を使用する
+ &lt;a href="#%e7%8f%be%e8%a1%8c%e3%81%ae%e4%bb%a3%e6%9b%bf%e6%89%8b%e6%ae%b5%e3%82%92%e4%bd%bf%e7%94%a8%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;問題に応じて代替手段を選択します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;GitOps フリート:&lt;/strong&gt; Argo CD ApplicationSet と Flux は、登録された多数のクラスター
+にアプリケーションをレンダリングして調整できます。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ワークロードスケジューリング:&lt;/strong&gt; Karmada はマルチクラスターのスケジューリングと
+伝播 API を提供します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;フリート管理:&lt;/strong&gt; Open Cluster Management は、管理対象クラスターの登録、ポリシー、
+配置のプリミティブを提供します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;クラスター間ネットワーク:&lt;/strong&gt; Cilium Cluster Mesh、Submariner、サービスメッシュの
+マルチクラスター機能は接続性を扱いますが、デプロイオーケストレーションを置き
+換えるものではありません。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;これらのツールは異なるコントロールプレーンと障害モードを持ちます。マルチクラスター
+デプロイメントマネージャーを選択すれば、グローバルなサービスディスカバリー、
+ネットワーク到達性、共有 ID も提供されると想定しないでください。&lt;/p&gt;
+&lt;h2 id="独立したクラスター向けに設計する"&gt;
+ 独立したクラスター向けに設計する
+ &lt;a href="#%e7%8b%ac%e7%ab%8b%e3%81%97%e3%81%9f%e3%82%af%e3%83%a9%e3%82%b9%e3%82%bf%e3%83%bc%e5%90%91%e3%81%91%e3%81%ab%e8%a8%ad%e8%a8%88%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;各クラスターを、独立して運用可能な障害ドメインとして扱います。認証情報をどのように
+ローテーションするか、コントロールプレーン切断中にアプリケーションがどのように
+動作するか、ワークロードを 1 つのクラスターでアクティブにするか複数でアクティブに
+するかを定義します。データストア自体に検証済みのレプリケーションとフェイルオーバー
+設計がある場合を除き、クラスターごとの永続データを優先します。中央管理プレーンは、
+ローカル復旧を不可能にすることなく、一貫性と可視性を向上させる必要があります。&lt;/p&gt;</description></item></channel></rss>

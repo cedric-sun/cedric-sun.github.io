@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Load-Balancing on cesun.life</title><link>https://example.org/zh-cn/tags/load-balancing/</link><description>Recent content in Load-Balancing on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Thu, 21 Jul 2022 00:23:46 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/load-balancing/index.xml" rel="self" type="application/rss+xml"/><item><title>负载均衡</title><link>https://example.org/zh-cn/load-balancing/</link><pubDate>Thu, 21 Jul 2022 00:23:46 +0800</pubDate><guid>https://example.org/zh-cn/load-balancing/</guid><description>&lt;p&gt;负载均衡在保留传输和应用语义的同时，将需求映射到健康的容量。放置、健康检查、重试和过载策略构成一个整体：如果健康检查错误地判断容量，或者重试消耗了容量，算法无法恢复这些容量。&lt;/p&gt;
+&lt;h2 id="放置层"&gt;
+ 放置层
+ &lt;a href="#%e6%94%be%e7%bd%ae%e5%b1%82" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;DNS 放置&lt;/strong&gt;返回区域或服务地址。解析器和客户端缓存使变更粒度较粗，因此 DNS 无法排空单个连接，也无法响应每个请求的负载。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Anycast 放置&lt;/strong&gt;从多个站点公布同一地址，并让路由选择路径。路由变更可能移动流，而最近的网络路径不一定是拥有剩余应用容量的站点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;传输层负载均衡&lt;/strong&gt;根据 TCP、UDP 或 QUIC 流元数据选择后端，而不解释应用请求。直接服务器返回和连接跟踪会影响拓扑和故障行为。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;反向代理&lt;/strong&gt;终止应用协议，并可以按 authority、路径、标头、方法或 Cookie 路由 HTTP。终止协议支持重试和可观测性，但会消耗代理容量并创建另一个故障域。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;应用放置&lt;/strong&gt;使用租户、分片所有权、队列分区或加速器可用性等领域状态分配工作。应用随后必须处理所有权变更和过时的路由元数据。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;大型系统会组合这些层：DNS 或 Anycast 选择站点，L4 负载均衡器选择代理，代理选择工作负载。&lt;/p&gt;
+&lt;h2 id="选择算法"&gt;
+ 选择算法
+ &lt;a href="#%e9%80%89%e6%8b%a9%e7%ae%97%e6%b3%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;轮询适合容量和请求成本相近的端点。加权轮询反映已知的容量差异。最少连接使用活动连接数作为负载信号，但长时间空闲的连接以及多路复用的 HTTP/2 或 HTTP/3 流会使一个连接成为不准确的单位。最少请求或延迟感知变体需要稳定的测量和阻尼，以避免将每个请求都发往暂时较快的端点。&lt;/p&gt;
+&lt;p&gt;按稳定键进行哈希可以提供亲和性。一致性哈希或 rendezvous 哈希会减少成员变更时的重新映射，但可能集中一个热点键，也不能消除故障转移。感知局部性的算法优先选择同一可用区或区域，以降低延迟和传输成本，同时为本地短缺保留溢出容量。&lt;/p&gt;
+&lt;h2 id="健康异常值和排空"&gt;
+ 健康、异常值和排空
+ &lt;a href="#%e5%81%a5%e5%ba%b7%e5%bc%82%e5%b8%b8%e5%80%bc%e5%92%8c%e6%8e%92%e7%a9%ba" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;主动健康检查发送合成探测。被动检查观察真实的连接错误、重置、超时或状态码。就绪状态应验证服务流量所需的依赖边界，但不能将每次下游瞬时失败都变成全局移除。&lt;/p&gt;
+&lt;p&gt;使用连续成功和连续失败阈值来避免抖动。异常值检测会临时移除观测行为与对等端不同的端点；应限制被移除端点的百分比，以免一个共享依赖故障移除整个服务。&lt;/p&gt;
+&lt;p&gt;排空会从新选择中移除端点，同时允许已建立的请求或连接在截止时间内完成。应协调负载均衡器排空时间、应用关闭钩子、编排就绪状态和协议的 keep-alive 行为。&lt;/p&gt;
+&lt;h2 id="亲和性重试和故障转移"&gt;
+ 亲和性、重试和故障转移
+ &lt;a href="#%e4%ba%b2%e5%92%8c%e6%80%a7%e9%87%8d%e8%af%95%e5%92%8c%e6%95%85%e9%9a%9c%e8%bd%ac%e7%a7%bb" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Cookie、源地址或哈希亲和性可以改善缓存局部性或保留旧式会话状态。亲和性会降低均衡自由度，因此必须定义所选后端消失时的行为。当请求需要透明故障转移时，优先使用外部或复制的会话状态。&lt;/p&gt;
+&lt;p&gt;超时意味着调用方没有收到结果；它不证明后端没有执行工作。仅在调用方截止时间和有界重试预算内重试。安全且幂等的操作是候选对象；非幂等操作需要应用幂等键和持久化去重。使用退避和抖动分散重试，并避免将过载响应重试到已经饱和的对等端集合。&lt;/p&gt;
+&lt;p&gt;跨可用区或跨区域故障转移需要预留容量、兼容数据和明确的一致性模型。单独的路由切换不能让远程站点准备好接受写入。&lt;/p&gt;
+&lt;h2 id="容量和过载"&gt;
+ 容量和过载
+ &lt;a href="#%e5%ae%b9%e9%87%8f%e5%92%8c%e8%bf%87%e8%bd%bd" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;端点数量不是容量。跟踪并发请求、队列深度、受限资源利用率、延迟百分位数、错误和准入拒绝。自动扩缩容会在测量和配置延迟之后才做出反应，因此应为突发和故障保留余量。&lt;/p&gt;
+&lt;p&gt;当需求超过容量时，应限制队列、丢弃低优先级工作、执行每租户限制，并在协议支持时返回清晰的重试信号。应在内存或连接池耗尽前让背压到达调用方。负载均衡器指标必须区分没有健康端点、本地代理饱和、后端过载和策略拒绝，因为每种情况需要不同响应。&lt;/p&gt;
+&lt;h2 id="参考资料"&gt;
+ 参考资料
+ &lt;a href="#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.rfc-editor.org/rfc/rfc9110"&gt;RFC 9110：HTTP 语义&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/overview"&gt;Envoy 负载均衡&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/#terminating"&gt;Kubernetes 端点终止&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</description></item></channel></rss>

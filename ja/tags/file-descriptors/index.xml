@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>File-Descriptors on cesun.life</title><link>https://example.org/ja/tags/file-descriptors/</link><description>Recent content in File-Descriptors on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Wed, 06 Oct 2021 12:25:39 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/file-descriptors/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux ファイルディスクリプター</title><link>https://example.org/ja/linux-file-descriptors/</link><pubDate>Wed, 06 Oct 2021 12:25:39 +0800</pubDate><guid>https://example.org/ja/linux-file-descriptors/</guid><description>&lt;p&gt;Linux は、プロセスの整数ハンドルと、開いたインスタンスの状態を保持するカーネル
+オブジェクトを分離します。この区別により、オフセットの共有、複製、継承、多くの
+ディスクリプターリークを説明できます。&lt;/p&gt;
+&lt;h2 id="ディスクリプターテーブルとオープンファイル記述"&gt;
+ ディスクリプターテーブルとオープンファイル記述
+ &lt;a href="#%e3%83%87%e3%82%a3%e3%82%b9%e3%82%af%e3%83%aa%e3%83%97%e3%82%bf%e3%83%bc%e3%83%86%e3%83%bc%e3%83%96%e3%83%ab%e3%81%a8%e3%82%aa%e3%83%bc%e3%83%97%e3%83%b3%e3%83%95%e3%82%a1%e3%82%a4%e3%83%ab%e8%a8%98%e8%bf%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;ファイルディスクリプターは、呼び出し元プロセスのディスクリプターテーブルを索引付け
+する非負整数です。テーブルエントリは、Linux 内部で &lt;code&gt;struct file&lt;/code&gt; によって表される
+&lt;strong&gt;オープンファイル記述&lt;/strong&gt; を参照します。オープンファイル記述は次のような状態を記録します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;現在のファイルオフセット。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;O_APPEND&lt;/code&gt; や &lt;code&gt;O_NONBLOCK&lt;/code&gt; などのファイル状態フラグ。&lt;/li&gt;
+&lt;li&gt;開いたパス、アクセスモード、認証情報、ファイル操作。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;成功した &lt;code&gt;open()&lt;/code&gt; は通常、新しいオープンファイル記述を作成し、プロセステーブルに
+参照を追加します。そのため同じパスを 2 回開くと独立したオフセットが作成されます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; a &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;open&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;events.log&amp;#34;&lt;/span&gt;, O_RDONLY);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; b &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;open&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;events.log&amp;#34;&lt;/span&gt;, O_RDONLY); &lt;span style="color:#75715e"&gt;/* independent description and offset */&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;inode はファイルシステムオブジェクトを識別し、オープンファイル記述はその 1 回の
+オープンを識別します。パス名の unlink や rename は既存のディスクリプターを無効に
+しません。&lt;/p&gt;
+&lt;p&gt;ディスクリプターフラグは共有オープンファイル記述ではなくテーブルエントリに属します。
+主なディスクリプターフラグは &lt;code&gt;FD_CLOEXEC&lt;/code&gt; で、&lt;code&gt;fcntl(fd, F_GETFD/F_SETFD)&lt;/code&gt; で
+読み取りまたは変更します。&lt;code&gt;O_CLOEXEC&lt;/code&gt;、&lt;code&gt;pipe2(O_CLOEXEC)&lt;/code&gt;、&lt;code&gt;dup3(..., O_CLOEXEC)&lt;/code&gt;
+などのアトミックな作成フラグを優先します。後続の &lt;code&gt;fcntl()&lt;/code&gt; でフラグを設定すると、
+別スレッドの &lt;code&gt;fork()&lt;/code&gt; と &lt;code&gt;execve()&lt;/code&gt; との競合が起こるためです。&lt;/p&gt;
+&lt;h2 id="複製forkexecve"&gt;
+ 複製、&lt;code&gt;fork()&lt;/code&gt;、&lt;code&gt;execve()&lt;/code&gt;
+ &lt;a href="#%e8%a4%87%e8%a3%bdforkexecve" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;dup()&lt;/code&gt;、&lt;code&gt;dup2()&lt;/code&gt;、&lt;code&gt;dup3()&lt;/code&gt; は同じオープンファイル記述を参照する別のディスクリプター
+を作成します。そのため複製されたディスクリプターはオフセットとファイル状態フラグを
+共有します。&lt;/p&gt;</description></item></channel></rss>

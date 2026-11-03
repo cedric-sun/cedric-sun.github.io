@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Arch-Linux on cesun.life</title><link>https://example.org/zh-tw/tags/arch-linux/</link><description>Recent content in Arch-Linux on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sun, 16 Mar 2025 08:23:44 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/arch-linux/index.xml" rel="self" type="application/rss+xml"/><item><title>AUR 套件相依性</title><link>https://example.org/zh-tw/aur-dependencies/</link><pubDate>Sun, 16 Mar 2025 08:23:44 +0800</pubDate><guid>https://example.org/zh-tw/aur-dependencies/</guid><description>&lt;p&gt;AUR 儲存庫提供 &lt;code&gt;PKGBUILD&lt;/code&gt;：它是可執行的封裝中繼資料，不是二進位套件或相依性解析器。因此，安全建置套件需要區分使建置得以進行的相依性，以及安裝到最終系統上的相依性。&lt;/p&gt;
+&lt;h2 id="pkgbuild-中的相依性類別"&gt;
+ &lt;code&gt;PKGBUILD&lt;/code&gt; 中的相依性類別
+ &lt;a href="#pkgbuild-%e4%b8%ad%e7%9a%84%e7%9b%b8%e4%be%9d%e6%80%a7%e9%a1%9e%e5%88%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;PKGBUILD(5)&lt;/code&gt; 定義具有不同生命週期的相依性陣列：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;depends&lt;/code&gt; 宣告執行已安裝套件所需的套件。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;makedepends&lt;/code&gt; 宣告只有建置期間需要的工具與函式庫。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;checkdepends&lt;/code&gt; 宣告 &lt;code&gt;check()&lt;/code&gt; 所需的套件。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;版本限制使用 pacman 的相依性語法，例如 &lt;code&gt;depends=('libfoo&amp;gt;=2')&lt;/code&gt;。分割套件可以有套件專屬的相依性陣列，例如 &lt;code&gt;package_client() { depends=('libclient') }&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;不要僅因為套件沒有它也能建置，就將執行階段函式庫移入 &lt;code&gt;makedepends&lt;/code&gt;。相反地，當沒有已安裝檔案需要編譯器時，也不要將編譯器保留在 &lt;code&gt;depends&lt;/code&gt; 中。準確的陣列能讓 pacman 正確規劃升級與移除。&lt;/p&gt;
+&lt;h2 id="makepkg-建置pacman-安裝"&gt;
+ &lt;code&gt;makepkg&lt;/code&gt; 建置；&lt;code&gt;pacman&lt;/code&gt; 安裝
+ &lt;a href="#makepkg-%e5%bb%ba%e7%bd%aepacman-%e5%ae%89%e8%a3%9d" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;請以非特權使用者執行 &lt;code&gt;makepkg&lt;/code&gt;。它會下載並驗證原始碼、檢查相依性、執行 &lt;code&gt;prepare()&lt;/code&gt;、&lt;code&gt;build()&lt;/code&gt;、&lt;code&gt;check()&lt;/code&gt; 與 &lt;code&gt;package()&lt;/code&gt;，並建立供 pacman 使用的封存檔。&lt;code&gt;makepkg -i&lt;/code&gt; 只有在建置成功後才會安裝該封存檔；安裝工作由 pacman 執行。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git clone https://aur.archlinux.org/example.git
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cd example
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;makepkg --cleanbuild --syncdeps
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo pacman -U ./*.pkg.tar.zst&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;--syncdeps&lt;/code&gt; 要求 pacman 安裝缺少的相依性。因此它只會解析已在設定的二進位儲存庫中可用的套件。它無法取得 AUR 相依性，因為 AUR 發佈的是建置配方，而不是儲存庫套件。&lt;/p&gt;
+&lt;p&gt;避免使用 &lt;code&gt;--nodeps&lt;/code&gt;，也絕不要以 &lt;code&gt;sudo&lt;/code&gt; 執行 &lt;code&gt;makepkg&lt;/code&gt;；繞過相依性檢查可能產生連結錯誤的套件，而 root 會以不必要的權限執行未檢閱的 &lt;code&gt;PKGBUILD&lt;/code&gt; shell 程式碼。&lt;/p&gt;</description></item><item><title>維護 AUR 套件</title><link>https://example.org/zh-tw/maintaining-aur-packages/</link><pubDate>Wed, 05 Oct 2022 15:39:56 +0800</pubDate><guid>https://example.org/zh-tw/maintaining-aur-packages/</guid><description>&lt;p&gt;Arch User Repository 儲存包含套件配方的 Git 儲存庫，而不是已建置的套件。因此，維護 AUR 套件代表發布可供檢閱的 &lt;code&gt;PKGBUILD&lt;/code&gt; 與相符的 &lt;code&gt;.SRCINFO&lt;/code&gt;，接著在隔離的建置環境中驗證該配方。&lt;/p&gt;
+&lt;h2 id="正確建模套件"&gt;
+ 正確建模套件
+ &lt;a href="#%e6%ad%a3%e7%a2%ba%e5%bb%ba%e6%a8%a1%e5%a5%97%e4%bb%b6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;PKGBUILD&lt;/code&gt; 定義 &lt;code&gt;pkgname&lt;/code&gt;、&lt;code&gt;pkgver&lt;/code&gt;、&lt;code&gt;pkgrel&lt;/code&gt;、&lt;code&gt;arch&lt;/code&gt;、授權條款、來源、檢查總和與相依性陣列等中繼資料。其函數會區分階段：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;prepare()&lt;/code&gt; 套用修補程式或準備來源。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;build()&lt;/code&gt; 編譯或產生軟體。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;check()&lt;/code&gt; 執行測試，並需要 &lt;code&gt;checkdepends&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;package()&lt;/code&gt; 只安裝至 &lt;code&gt;$pkgdir&lt;/code&gt; 以下。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;使用 &lt;code&gt;$srcdir&lt;/code&gt; 儲存來源與建置狀態；不要在套件函數中寫入主機檔案系統。將執行期相依項放在 &lt;code&gt;depends&lt;/code&gt;，僅供建置的工具放在 &lt;code&gt;makedepends&lt;/code&gt;，僅供測試的套件放在 &lt;code&gt;checkdepends&lt;/code&gt;。遺漏宣告可能在開發者工作站上被隱藏，卻使使用者失敗。&lt;/p&gt;
+&lt;p&gt;請檢閱每個來源 URL、修補程式與 shell 運算式，因為 &lt;code&gt;makepkg&lt;/code&gt; 會以呼叫使用者的權限執行配方。將發布套件固定至不可變的上游成品，並使用檢查總和。當上游發布已簽署的版本時，透過 &lt;code&gt;validpgpkeys&lt;/code&gt; 驗證簽章；檢查總和可以偵測變更的位元組，但無法建立來源信任。&lt;/p&gt;
+&lt;h2 id="在乾淨-chroot-中建置與檢查"&gt;
+ 在乾淨 chroot 中建置與檢查
+ &lt;a href="#%e5%9c%a8%e4%b9%be%e6%b7%a8-chroot-%e4%b8%ad%e5%bb%ba%e7%bd%ae%e8%88%87%e6%aa%a2%e6%9f%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;不要以 root 執行 &lt;code&gt;makepkg&lt;/code&gt;。在乾淨 chroot 中建置，使主機相依項、設定與過期建置成品無法讓不完整的配方通過。在已設定 &lt;code&gt;devtools&lt;/code&gt; 的情況下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;extra-x86_64-build&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;若要在 chroot 外進行本機反覆作業，請從乾淨的來源樹開始，並讓 makepkg 解決儲存庫相依項：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;makepkg --cleanbuild --syncdeps&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;--syncdeps&lt;/code&gt; 會呼叫 pacman，因此無法擷取 AUR 相依項。請先檢閱並建置這些相依項，然後透過本機儲存庫或 chroot 工作流程提供已驗證的套件。&lt;/p&gt;</description></item><item><title>pacman</title><link>https://example.org/zh-tw/pacman/</link><pubDate>Tue, 02 Feb 2021 07:14:22 +0800</pubDate><guid>https://example.org/zh-tw/pacman/</guid><description>&lt;p&gt;&lt;code&gt;pacman&lt;/code&gt; 管理已安裝的套件記錄和已設定的 Arch 軟體庫。
+本機資料庫記錄已安裝的版本、安裝原因、檔案及擁有權；
+同步資料庫則描述軟體庫中的套件。為保持這些檢視一致，應在同一個交易中完成重新整理和升級。&lt;/p&gt;
+&lt;h2 id="檢查本機資料庫"&gt;
+ 檢查本機資料庫
+ &lt;a href="#%e6%aa%a2%e6%9f%a5%e6%9c%ac%e6%a9%9f%e8%b3%87%e6%96%99%e5%ba%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用 &lt;code&gt;-Q&lt;/code&gt; 查詢已安裝的套件：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;pacman -Qs &lt;span style="color:#e6db74"&gt;&amp;#39;^bash$&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;pacman -Qi bash
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;pacman -Ql bash
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;pacman -Qo /usr/bin/pacman
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;pacman -Qk&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;-Ql&lt;/code&gt; 列出已安裝套件提供的檔案，&lt;code&gt;-Qo&lt;/code&gt; 尋找現有路徑的擁有者，&lt;code&gt;-Qk&lt;/code&gt; 檢查受追蹤的檔案。&lt;code&gt;pacman -F&lt;/code&gt; 則搜尋軟體庫檔案資料庫；先使用 &lt;code&gt;sudo pacman -Fy&lt;/code&gt; 填入該資料庫。&lt;/p&gt;
+&lt;p&gt;套件的安裝原因會影響孤立套件的偵測。應有意檢查或變更單一套件的安裝原因：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;pacman -Qi package-name
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo pacman -D --asexplicit package-name
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo pacman -D --asdeps package-name&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id="安全地同步和升級"&gt;
+ 安全地同步和升級
+ &lt;a href="#%e5%ae%89%e5%85%a8%e5%9c%b0%e5%90%8c%e6%ad%a5%e5%92%8c%e5%8d%87%e7%b4%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用 &lt;code&gt;-Ss&lt;/code&gt; 和 &lt;code&gt;-Si&lt;/code&gt; 搜尋並檢查已設定的軟體庫。一般系統更新如下：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo pacman -Syu&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;-y&lt;/code&gt; 會重新整理同步資料庫，&lt;code&gt;-u&lt;/code&gt; 會根據同一個軟體庫狀態升級已安裝的系統。不要執行 &lt;code&gt;pacman -Sy package-name&lt;/code&gt; 這類部分升級：重新整理後的中繼資料可能要求比目前已安裝系統更新的相依套件。在確認大型交易前，請閱讀 Arch 新聞，並處理設定檔相關指示。&lt;/p&gt;</description></item></channel></rss>

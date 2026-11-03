@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Dns on cesun.life</title><link>https://example.org/ja/tags/dns/</link><description>Recent content in Dns on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 15 Jan 2026 18:06:05 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/dns/index.xml" rel="self" type="application/rss+xml"/><item><title>BIND 9 権威 DNS と再帰 DNS</title><link>https://example.org/ja/bind-9-dns/</link><pubDate>Thu, 15 Jan 2026 18:06:05 +0800</pubDate><guid>https://example.org/ja/bind-9-dns/</guid><description>&lt;p&gt;BIND 9 は &lt;code&gt;named&lt;/code&gt; ネームサーバーを実行します。その設定によって、権威応答、再帰の提供、ゾーン転送、動的更新の受け入れが決まります。インターネットに公開する権威サーバーがオープンな再帰リゾルバーにならないよう、これらの役割は分離して扱ってください。&lt;/p&gt;
+&lt;h2 id="サーバー設定"&gt;
+ サーバー設定
+ &lt;a href="#%e3%82%b5%e3%83%bc%e3%83%90%e3%83%bc%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;named.conf&lt;/code&gt; はグローバルオプション、アクセス制御リスト、ゾーン、ログを定義します。最小限の権威設定では、再帰とゾーン転送を制限します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;named&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-named" data-lang="named"&gt;acl trusted-recursors { 192.0.2.0/24; 2001:db8:1::/48; };
+
+options {
+ directory &amp;#34;/var/named&amp;#34;;
+ listen-on { any; };
+ listen-on-v6 { any; };
+ recursion no;
+ allow-transfer { none; };
+ minimal-responses yes;
+};
+
+zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/example.net&amp;#34;;
+ allow-transfer { 192.0.2.53; };
+};&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;再帰リゾルバーには &lt;code&gt;recursion yes&lt;/code&gt; と、クライアントに限定した &lt;code&gt;allow-recursion&lt;/code&gt; または &lt;code&gt;allow-query-cache&lt;/code&gt; ACL が必要です。デプロイで乱用制御を備えた公開リゾルバーを明示的に提供する場合を除き、信頼できないネットワークに再帰を公開しないでください。&lt;/p&gt;
+&lt;p&gt;ACL は &lt;code&gt;allow-query&lt;/code&gt;、&lt;code&gt;allow-recursion&lt;/code&gt;、&lt;code&gt;allow-query-cache&lt;/code&gt;、&lt;code&gt;allow-transfer&lt;/code&gt;、&lt;code&gt;match-clients&lt;/code&gt; で再利用できます。BIND の &lt;code&gt;view&lt;/code&gt; ステートメントは、送信元アドレス、宛先アドレス、または TSIG アイデンティティに従って、異なるゾーンおよび再帰ポリシーを提示します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;named&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-named" data-lang="named"&gt;view &amp;#34;internal&amp;#34; {
+ match-clients { trusted-recursors; };
+ recursion yes;
+ allow-recursion { trusted-recursors; };
+
+ zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/internal/example.net&amp;#34;;
+ };
+};
+
+view &amp;#34;external&amp;#34; {
+ match-clients { any; };
+ recursion no;
+
+ zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/external/example.net&amp;#34;;
+ };
+};&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;ビューを有効にした場合は、クライアントから見える各ゾーンを該当するビューで定義します。最も具体的な &lt;code&gt;match-clients&lt;/code&gt; 規則を先に置いてください。BIND は最初に一致するビューを選択するためです。&lt;/p&gt;</description></item><item><title>コンテンツ配信ネットワーク</title><link>https://example.org/ja/content-delivery-networks/</link><pubDate>Thu, 10 Jul 2025 20:16:44 +0800</pubDate><guid>https://example.org/ja/content-delivery-networks/</guid><description>&lt;p&gt;コンテンツ配信ネットワーク（CDN）は、ユーザーに近いエッジロケーションからコンテンツを
+配信します。静的アセットをキャッシュでき、プロバイダーによっては動的トラフィックを
+プロキシし、TLS を終端し、攻撃をフィルタリングし、接続を最適化できます。オリジンは
+権威あるアプリケーションであり続け、CDN は明示的なキャッシュおよびルーティング
+ポリシーを持つ仲介者です。&lt;/p&gt;
+&lt;h2 id="ドメインを-cdn-に接続する"&gt;
+ ドメインを CDN に接続する
+ &lt;a href="#%e3%83%89%e3%83%a1%e3%82%a4%e3%83%b3%e3%82%92-cdn-%e3%81%ab%e6%8e%a5%e7%b6%9a%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;運用者は &lt;code&gt;https://origin.example.net&lt;/code&gt; などのオリジンを設定し、&lt;code&gt;www.example.com&lt;/code&gt; 用の
+CDN ディストリビューションを作成します。プロバイダーは &lt;code&gt;example.cdnprovider.net&lt;/code&gt;
+などのホスト名を提供します。運用者はその後、通常は CNAME として &lt;code&gt;www.example.com&lt;/code&gt;
+をそこへ向ける DNS レコードを作成します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;www.example.com. CNAME example.cdnprovider.net.&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;エッジでは、CDN が要求されたホスト名を使ってディストリビューションを識別し、適切な
+&lt;code&gt;Host&lt;/code&gt; ヘッダーをオリジンへ転送します。TLS SNI と HTTP の &lt;code&gt;Host&lt;/code&gt; ヘッダーが意図した
+仮想ホストを識別するため、多数のサイトでエッジ IP アドレスを共有できます。&lt;/p&gt;
+&lt;p&gt;DNS apex には SOA レコードと NS レコードも保持する必要があるため、通常 CNAME を
+含められません。プロバイダーは A/AAAA エイリアス機能、対応している場合の
+ANAME/ALIAS レコード、または委任 DNS でこれに対応します。正確な動作は DNS
+プロバイダーによって異なります。&lt;/p&gt;
+&lt;h2 id="キャッシュ動作を意図的に選択する"&gt;
+ キャッシュ動作を意図的に選択する
+ &lt;a href="#%e3%82%ad%e3%83%a3%e3%83%83%e3%82%b7%e3%83%a5%e5%8b%95%e4%bd%9c%e3%82%92%e6%84%8f%e5%9b%b3%e7%9a%84%e3%81%ab%e9%81%b8%e6%8a%9e%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;キャッシュキーには通常、ホスト名、パス、選択したクエリパラメーター、選択した
+リクエストヘッダーまたは Cookie が含まれます。すべての Cookie を含めると
+キャッシュ効率が失われ、レスポンスを変える値を省略すると、あるユーザーのコンテンツが
+別のユーザーに開示される可能性があります。&lt;/p&gt;</description></item><item><title>DNS ワイヤーフォーマット</title><link>https://example.org/ja/dns-wire-format/</link><pubDate>Thu, 29 May 2025 15:04:54 +0800</pubDate><guid>https://example.org/ja/dns-wire-format/</guid><description>&lt;p&gt;DNS のクエリと応答は、12 バイトのヘッダーに続いて Question、Answer、
+Authority、Additional の各セクションで構成されます。複数オクテットの整数
+フィールドはすべてネットワークバイトオーダーを使用します。RFC 1035 は基本
+フォーマットを定義しており、EDNS、DNSSEC、および後続の拡張は、基本ヘッダーを
+変更せずにレコードとヘッダーのセマンティクスを追加します。&lt;/p&gt;
+&lt;h2 id="ヘッダー"&gt;
+ ヘッダー
+ &lt;a href="#%e3%83%98%e3%83%83%e3%83%80%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;フィールド&lt;/th&gt;
+ &lt;th style="text-align: right"&gt;ビット数&lt;/th&gt;
+ &lt;th&gt;目的&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;ID&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;クライアントが選択し、応答でエコーバックされる識別子&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;QR&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;クエリ（&lt;code&gt;0&lt;/code&gt;）または応答（&lt;code&gt;1&lt;/code&gt;）&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;Opcode&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;4&lt;/td&gt;
+ &lt;td&gt;操作。&lt;code&gt;QUERY&lt;/code&gt; はゼロ&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;AA&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;応答における権威ある回答の指示&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;TC&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;メッセージが切り詰められたことを示す&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;RD&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;クライアントが再帰処理を要求&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;RA&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;サーバーが再帰処理を提供&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;Z&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;3&lt;/td&gt;
+ &lt;td&gt;予約済みの基本ビット。拡張では AD と CD を使用&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;RCODE&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;4&lt;/td&gt;
+ &lt;td&gt;基本応答コード&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;QDCOUNT&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;Question の数&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;ANCOUNT&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;Answer レコード数&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;NSCOUNT&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;Authority レコード数&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;ARCOUNT&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;Additional レコード数&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;RD&lt;/code&gt; は、受信サーバーに再帰処理を実行するよう要求します。&lt;code&gt;RA&lt;/code&gt; は、
+サーバーが再帰処理を実行できることを通知します。&lt;code&gt;AA&lt;/code&gt; は、応答サーバーが
+回答に対して権威を持つことを示しますが、メッセージ内のすべてのレコードが
+権威あるものだという意味ではありません。&lt;code&gt;TC&lt;/code&gt; は、切り詰められた応答では
+不十分な場合に、クライアントが TCP または別のサポートされているトランスポート
+で再試行する必要があることを通知します。&lt;/p&gt;</description></item><item><title>DNS 名前解決モデル</title><link>https://example.org/ja/dns-resolution-model/</link><pubDate>Fri, 02 Jul 2021 04:23:55 +0800</pubDate><guid>https://example.org/ja/dns-resolution-model/</guid><description>&lt;p&gt;DNS 名はルート付きの木構造を形成します。ドメインは、ある名前をルートとする部分木です。ゾーンは、その木構造のうち、権威データとして提供される管理単位です。したがって、ドメインとゾーンは同義ではありません。ゾーンは子部分木に委任を行い、その子部分木の権威レコードを保持しなくなることがあります。&lt;/p&gt;
+&lt;h2 id="委任と権威"&gt;
+ 委任と権威
+ &lt;a href="#%e5%a7%94%e4%bb%bb%e3%81%a8%e6%a8%a9%e5%a8%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;親ゾーンは、その名前に NS レコードを公開することで &lt;code&gt;child.example.&lt;/code&gt; を委任します。子ゾーンは自身の頂点 SOA レコードと NS レコードを公開します。リゾルバーが親ゾーンに対して、その委任境界より下のデータを要求すると、Authority セクションに子ゾーンの NS RRset を含む紹介応答を受け取ります。&lt;/p&gt;
+&lt;p&gt;NS ターゲットが委任された子ゾーン内にある場合、親ゾーンは Additional セクションにグルーレコードとして A レコードまたは AAAA レコードも提供します。グルーは、子のネームサーバーに接続する前にその名前を解決する必要があるという循環依存を解消します。リゾルバーは、グルーをターゲットのアドレスに関する権威データではなく、ブートストラップ用のアドレスデータとして扱わなければなりません。&lt;/p&gt;
+&lt;p&gt;権威サーバーは自身のゾーンデータから応答します。再帰リゾルバーは、キャッシュからクライアントに応答するか、反復クエリを実行します。スタブリゾルバーは委任をたどらず、設定された再帰リゾルバーに処理を依頼します。&lt;/p&gt;
+&lt;h2 id="応答の意味"&gt;
+ 応答の意味
+ &lt;a href="#%e5%bf%9c%e7%ad%94%e3%81%ae%e6%84%8f%e5%91%b3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;クエリに対して、サーバーは回答、紹介、またはエラー応答を返すことができます。&lt;code&gt;NXDOMAIN&lt;/code&gt; は、クエリされた名前が存在しないことを示します。空の回答を伴う &lt;code&gt;NOERROR&lt;/code&gt; は、代わりに、その名前は存在するものの、クエリされたタイプのレコードを持たないことを意味する場合があります。これは一般に NODATA と呼ばれます。&lt;/p&gt;
+&lt;p&gt;CNAME は、その所有者名が別名であることを示します。別名は独立した権威データも同時に所有してはならないため、その所有者名には他のデータを共存させることができません。要求されたタイプ、別の別名、またはエラーを取得するまで CNAME ターゲットをたどります。DNAME は異なり、部分木全体に別名を付け、その所有者名より下の名前に対して合成 CNAME 処理を発生させます。&lt;/p&gt;
+&lt;h2 id="キャッシュと-dnssec"&gt;
+ キャッシュと DNSSEC
+ &lt;a href="#%e3%82%ad%e3%83%a3%e3%83%83%e3%82%b7%e3%83%a5%e3%81%a8-dnssec" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;リゾルバーは TTL に従って RRset をキャッシュします。否定応答は SOA 情報に従ってキャッシュされます。DNSSEC により、検証を行うリゾルバーは、設定されたトラストアンカーから DS から DNSKEY へと連なる信頼の連鎖を通じて、肯定応答と否定応答を認証できます。&lt;code&gt;NSEC&lt;/code&gt; または &lt;code&gt;NSEC3&lt;/code&gt; の証明は否定を認証します。NXDOMAIN のみの応答では認証できません。&lt;/p&gt;
+&lt;p&gt;設定されたオリジンとの曖昧さが問題となるゾーンファイルおよびプロトコル文書の例では、末尾のドットを付けた完全修飾名を使用してください。&lt;/p&gt;
+&lt;p&gt;パケットエンコーディングについては、&lt;a href="https://example.org/ja/dns-wire-format/"&gt;DNS ワイヤーフォーマット&lt;/a&gt; を参照してください。サーバーの運用設定については、&lt;a href="https://example.org/ja/bind-9-dns/"&gt;BIND 9 権威 DNS および再帰 DNS&lt;/a&gt; を参照してください。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Source-Code on cesun.life</title><link>https://example.org/ja/tags/source-code/</link><description>Recent content in Source-Code on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 07 May 2026 03:47:31 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/source-code/index.xml" rel="self" type="application/rss+xml"/><item><title>glibc Source Internals and System-Call Wrappers</title><link>https://example.org/ja/glibc-syscall-wrappers/</link><pubDate>Thu, 07 May 2026 03:47:31 +0800</pubDate><guid>https://example.org/ja/glibc-syscall-wrappers/</guid><description>&lt;p&gt;glibc は &lt;code&gt;read(2)&lt;/code&gt; や &lt;code&gt;write(2)&lt;/code&gt; などの C 関数を公開し、Linux はアーキテクチャ固有のシステムコール入口規約を公開します。
+ラッパーはこれらの層を橋渡しします。公開 C ABI を受け入れ、選択したアーキテクチャのシステムコール ABI に従い、
+カーネルエラーを変換し、POSIX スレッドキャンセルの動作を実装する場合があります。&lt;/p&gt;
+&lt;p&gt;以下の例は現在の上流ソースツリーを説明します。リリース版 glibc は異なるファイルやマクロ定義を選択できるため、
+ソースを調べるときは、対象のリリースとビルドするターゲットトリプルを最初に確認します。&lt;/p&gt;
+&lt;h2 id="sysdeps"&gt;
+ &lt;code&gt;sysdeps/&lt;/code&gt; の選択
+ &lt;a href="#sysdeps" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href="https://sourceware.org/git/?p=glibc.git;a=tree;f=sysdeps;hb=HEAD"&gt;&lt;code&gt;sysdeps/&lt;/code&gt; ツリー&lt;/a&gt; には、オペレーティングシステム、
+CPU、ABI、ワードサイズ、機能に基づいて選択される実装があります。汎用コードはフォールバックであり、
+より具体的なディレクトリが同じ相対名のファイルを置き換えられます。Linux ビルドでは &lt;code&gt;sysdeps/unix/sysv/linux/&lt;/code&gt; などが関係し、
+アーキテクチャが Linux 固有の入口コードや ABI 固有の変種をさらに提供する場合があります。&lt;/p&gt;
+&lt;p&gt;glibc の configure とビルド機構は、適用可能なシステム依存ディレクトリの順序付きリストを構築します。
+ビルドルールはそのリストを検索し、選択された実装が汎用フォールバックより優先されるようにします。
+したがって、この構造は各ファイルが正確に 1 つの軸だけを持つ分類体系ではありません。
+OS ディレクトリがアーキテクチャヘッダーに依存することも、アーキテクチャディレクトリが OS 非依存コードを含むこともあります。
+1 つのディレクトリ名から動作を推測せず、&lt;code&gt;config.make&lt;/code&gt;、設定済みビルドディレクトリ、選択されたソースパスを調べます。&lt;/p&gt;
+&lt;h2 id="syscalls-list-and-make-syscalls-sh"&gt;
+ 生成される薄いラッパー
+ &lt;a href="#syscalls-list-and-make-syscalls-sh" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;一部の薄いアセンブリラッパーは
+&lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/syscalls.list;hb=HEAD"&gt;&lt;code&gt;syscalls.list&lt;/code&gt;&lt;/a&gt;.
+各レコードは出力、Linux システムコール、引数シグネチャ、強シンボル、任意の弱シンボルまたはバージョン付き名前を指定します。
+ビルドは
+&lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/make-syscalls.sh;hb=HEAD"&gt;&lt;code&gt;make-syscalls.sh&lt;/code&gt;&lt;/a&gt;,
+を呼び出します。このスクリプトは次を行います。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;優先度の高い &lt;code&gt;sysdeps&lt;/code&gt; ディレクトリで上書きされたエントリを削除する。&lt;/li&gt;
+&lt;li&gt;ターゲットの &lt;code&gt;sysdep.h&lt;/code&gt; を通じて &lt;code&gt;SYS_&lt;/code&gt; 番号を解決する。&lt;/li&gt;
+&lt;li&gt;シグネチャから引数個数と特殊な引数処理を導出する。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;syscall-template.S&lt;/code&gt; を使う規則を出力し、リストが要求する場合はエイリアスと互換性
+シンボルも含める。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;syscalls.list&lt;/code&gt; がすべての公開関数を定義するわけではありません。検証、フォールバックロジック、
+キャンセル処理、時間幅変換、その他のポリシーを持つラッパーは、手書きであることがよくあります。
+現在の glibc では &lt;code&gt;write&lt;/code&gt; がそのような手書き C ラッパーの 1 つです。
+&lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/unix/sysv/linux/write.c;hb=HEAD"&gt;&lt;code&gt;write.c&lt;/code&gt;&lt;/a&gt;;
+そのため、生成経路との比較に適しています。&lt;/p&gt;</description></item><item><title>Linux カーネルのソースツリー</title><link>https://example.org/ja/linux-kernel-source-tree/</link><pubDate>Wed, 28 Jan 2026 12:55:15 +0800</pubDate><guid>https://example.org/ja/linux-kernel-source-tree/</guid><description>&lt;p&gt;Linux のソースツリーは、アーキテクチャ非依存のサブシステム、アーキテクチャポート、公開ユーザー空間インターフェイス、生成されたビルド状態、ツール、テストを分離します。ディレクトリ名はナビゲーションの手がかりであり、実行モデルではありません。Kconfig が設定を選択し、Kbuild がオブジェクトを選択し、選択されたオブジェクトが特定のカーネルイメージに到達するものを決定します。&lt;/p&gt;
+&lt;h2 id="top-level-directories"&gt;
+ トップレベルのサブシステム境界
+ &lt;a href="#top-level-directories" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;主なソースディレクトリは次のとおりです。&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;パス&lt;/th&gt;
+ &lt;th&gt;役割&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;arch/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;アーキテクチャポート、ブートコード、MMU と割り込みのエントリ、低レベル ABI サポート。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;block/&lt;/code&gt;, &lt;code&gt;fs/&lt;/code&gt;, &lt;code&gt;mm/&lt;/code&gt;, &lt;code&gt;net/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;ブロック層、VFS とファイルシステム実装、仮想および物理メモリ管理、ネットワークスタック。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;kernel/&lt;/code&gt;, &lt;code&gt;init/&lt;/code&gt;, &lt;code&gt;ipc/&lt;/code&gt;, &lt;code&gt;security/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;コアスケジューリング、ロック、シグナル、トレース、その他のカーネル機能、初期化、IPC、Linux Security Module インフラストラクチャ。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;drivers/&lt;/code&gt;, &lt;code&gt;sound/&lt;/code&gt;, &lt;code&gt;virt/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;デバイスドライバー、サウンドサブシステム、KVM などの仮想化サポート。ドライバーは &lt;code&gt;struct file_operations&lt;/code&gt; を公開する必要はなく、サブシステム固有のバスとコールバックも一般的です。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;crypto/&lt;/code&gt;, &lt;code&gt;lib/&lt;/code&gt;, &lt;code&gt;io_uring/&lt;/code&gt;, &lt;code&gt;rust/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;共有暗号およびライブラリサポート、非同期 I/O、Rust カーネルサポート。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;include/&lt;/code&gt;, &lt;code&gt;Documentation/&lt;/code&gt;, &lt;code&gt;scripts/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;ヘッダー、保守されるドキュメント、Kbuild/Kconfig、および生成・保守ユーティリティ。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;tools/&lt;/code&gt;, &lt;code&gt;samples/&lt;/code&gt;, &lt;code&gt;usr/&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;perf&lt;/code&gt; などのユーザー空間ツール、サンプルプログラム、組み込み initramfs の生成。&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;certs/&lt;/code&gt; や &lt;code&gt;LICENSES/&lt;/code&gt; などの他のトップレベル要素は、署名、ライセンス、またはビルドポリシーをサポートします。ソースチェックアウトは時間とともに変化するため、すべてのリリースに同じディレクトリが含まれると仮定せず、トップレベルの &lt;code&gt;README&lt;/code&gt;、&lt;code&gt;MAINTAINERS&lt;/code&gt;、&lt;code&gt;Documentation/&lt;/code&gt; を確認してください。&lt;/p&gt;
+&lt;h2 id="built-in-a"&gt;
+ Kbuild の集約と最終リンク
+ &lt;a href="#built-in-a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Kbuild は &lt;code&gt;Makefile&lt;/code&gt; または &lt;code&gt;Kbuild&lt;/code&gt; ファイルを読み取り、&lt;code&gt;obj-$(CONFIG_FOO)&lt;/code&gt; エントリを評価します。&lt;code&gt;y&lt;/code&gt; は組み込みオブジェクトを、&lt;code&gt;m&lt;/code&gt; はロード可能なモジュールを選択し、未設定のシンボルはどちらも選択しません。ビルドが選択されたディレクトリを下っていくと、&lt;code&gt;obj-y&lt;/code&gt; オブジェクトを薄い &lt;code&gt;built-in.a&lt;/code&gt; アーカイブにまとめます。その後、アーカイブと選択された他のオブジェクトが &lt;code&gt;vmlinux&lt;/code&gt; にリンクされ、モジュールは別のリンクパスに従います。&lt;/p&gt;</description></item><item><title>Sudo ソースコードガイド</title><link>https://example.org/ja/sudo-source-code-guide/</link><pubDate>Thu, 25 Jul 2024 00:00:00 +0000</pubDate><guid>https://example.org/ja/sudo-source-code-guide/</guid><description>&lt;p&gt;sudo のソースツリーでは、フロントエンドプログラム、プラグイン実装、再利用可能なライブラリ、生成された言語パーサー、移植性サポートが分離されています。実行可能ファイルのエントリポイントから始め、次にプラグインインターフェースをたどってください。ディレクトリ名だけを手掛かりにツリーを読むと、ポリシーの境界が見えにくくなります。&lt;/p&gt;</description></item></channel></rss>

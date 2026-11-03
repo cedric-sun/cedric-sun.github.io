@@ -1,0 +1,545 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Spring on cesun.life</title><link>https://example.org/zh-cn/tags/spring/</link><description>Recent content in Spring on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Wed, 08 Apr 2026 03:18:35 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/spring/index.xml" rel="self" type="application/rss+xml"/><item><title>Spring 环境与配置文件</title><link>https://example.org/zh-cn/spring-environment-and-profiles/</link><pubDate>Wed, 08 Apr 2026 03:18:35 +0800</pubDate><guid>https://example.org/zh-cn/spring-environment-and-profiles/</guid><description>&lt;p&gt;Spring 的 &lt;code&gt;Environment&lt;/code&gt; 结合了两个关注点：解析配置属性，以及确定哪些 Bean 定义配置文件处于激活状态。核心框架定义了抽象以及标准 JVM／Servlet 来源；Spring Boot 则增加了自己的外部配置来源和优先级规则。&lt;/p&gt;
+&lt;h2 id="属性源与优先级"&gt;
+ 属性源与优先级
+ &lt;a href="#%e5%b1%9e%e6%80%a7%e6%ba%90%e4%b8%8e%e4%bc%98%e5%85%88%e7%ba%a7" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;可配置环境在 &lt;code&gt;MutablePropertySources&lt;/code&gt; 中维护按顺序排列的 &lt;code&gt;PropertySource&amp;lt;?&amp;gt;&lt;/code&gt; 对象。解析会从优先级最高的源开始，依次向优先级较低的源搜索，并返回包含所请求键的第一个源中的值。显式命名和排序属性源，可以避免配置随注册顺序变化：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ConfigurableEnvironment environment &lt;span style="color:#f92672"&gt;=&lt;/span&gt; context.&lt;span style="color:#a6e22e"&gt;getEnvironment&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;environment.&lt;span style="color:#a6e22e"&gt;getPropertySources&lt;/span&gt;().&lt;span style="color:#a6e22e"&gt;addFirst&lt;/span&gt;(
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; MapPropertySource(&lt;span style="color:#e6db74"&gt;&amp;#34;deployment&amp;#34;&lt;/span&gt;, Map.&lt;span style="color:#a6e22e"&gt;of&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;orders.timeout&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;2s&amp;#34;&lt;/span&gt;)));&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;StandardEnvironment&lt;/code&gt; 包含 JVM 系统属性和操作系统环境变量。&lt;code&gt;StandardServletEnvironment&lt;/code&gt; 增加 Servlet 配置、Servlet 上下文参数，并可选地增加 JNDI 源。在处理配置类时，&lt;code&gt;@PropertySource&lt;/code&gt; 可以添加属性资源。&lt;/p&gt;
+&lt;p&gt;源的顺序是一项策略，而不是一条要求每个文件、JVM 属性或环境变量都必须获胜的内在规则。Spring Boot 定义了一个更大的、已文档化的顺序，其中包括配置数据和命令行参数。测试应添加显式的测试源，而不应依赖开发者机器的环境。&lt;/p&gt;
+&lt;h2 id="解析默认值与类型"&gt;
+ 解析、默认值与类型
+ &lt;a href="#%e8%a7%a3%e6%9e%90%e9%bb%98%e8%ae%a4%e5%80%bc%e4%b8%8e%e7%b1%bb%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;PropertyResolver&lt;/code&gt; API 支持直接查找和类型化查找：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Duration timeout &lt;span style="color:#f92672"&gt;=&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; environment.&lt;span style="color:#a6e22e"&gt;getProperty&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;orders.timeout&amp;#34;&lt;/span&gt;, Duration.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;, Duration.&lt;span style="color:#a6e22e"&gt;ofSeconds&lt;/span&gt;(1));&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;类型化访问会委托给已配置的转换服务。占位符语法支持 &lt;code&gt;${orders.timeout}&lt;/code&gt;，以及 &lt;code&gt;${orders.timeout:1s}&lt;/code&gt; 这样的回退值。上下文具有适当的嵌入值解析器时，&lt;code&gt;@Value&lt;/code&gt; 会使用占位符解析；在显式的非 Boot 配置中，&lt;code&gt;PropertySourcesPlaceholderConfigurer&lt;/code&gt; 提供该功能。&lt;/p&gt;
+&lt;p&gt;只有当默认值在运行层面有效时，回退值才适用。可以在 Bean 使用必需配置之前声明并校验它：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;environment.&lt;span style="color:#a6e22e"&gt;setRequiredProperties&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;database.url&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;database.user&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;environment.&lt;span style="color:#a6e22e"&gt;validateRequiredProperties&lt;/span&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;未解析的必需占位符应使启动失败，而不是静默选择不适合生产环境的值。密钥应通过受控的属性源输入，并且在诊断解析问题时不得打印。&lt;/p&gt;</description></item><item><title>Spring Bean 生命周期与原型作用域</title><link>https://example.org/zh-cn/spring-bean-lifecycle/</link><pubDate>Mon, 17 Nov 2025 23:19:46 +0800</pubDate><guid>https://example.org/zh-cn/spring-bean-lifecycle/</guid><description>&lt;p&gt;Spring 将 Bean 元数据与 Bean 实例分离。&lt;code&gt;BeanDefinition&lt;/code&gt; 描述如何创建对象，
+而 &lt;code&gt;BeanFactory&lt;/code&gt; 会在请求对象时应用该定义。&lt;code&gt;ApplicationContext&lt;/code&gt; 还提供协调启动、
+后处理、事件、资源加载和关闭功能。&lt;/p&gt;
+&lt;h2 id="上下文刷新期间发生的事情"&gt;
+ 上下文刷新期间发生的事情
+ &lt;a href="#%e4%b8%8a%e4%b8%8b%e6%96%87%e5%88%b7%e6%96%b0%e6%9c%9f%e9%97%b4%e5%8f%91%e7%94%9f%e7%9a%84%e4%ba%8b%e6%83%85" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;AbstractApplicationContext.refresh()&lt;/code&gt; 会在应用程序单例可以使用之前准备环境和
+Bean 工厂。主要阶段如下：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;准备或获取 &lt;code&gt;BeanFactory&lt;/code&gt; 并加载 Bean 定义。&lt;/li&gt;
+&lt;li&gt;在定义仍可修改时调用 &lt;code&gt;BeanFactoryPostProcessor&lt;/code&gt;s，包括配置类处理。&lt;/li&gt;
+&lt;li&gt;发现并注册 &lt;code&gt;BeanPostProcessor&lt;/code&gt;s。&lt;/li&gt;
+&lt;li&gt;初始化上下文基础设施，例如消息解析、事件和上下文特定的资源。&lt;/li&gt;
+&lt;li&gt;实例化其余的非延迟初始化单例 Bean。&lt;/li&gt;
+&lt;li&gt;发布已刷新的状态和 &lt;code&gt;ContextRefreshedEvent&lt;/code&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;BeanFactoryPostProcessor&lt;/code&gt; 修改元数据。相比之下，&lt;code&gt;BeanPostProcessor&lt;/code&gt; 会处理实例，
+可以注入字段、调用生命周期注解，或将 Bean 替换为代理。由于普通应用程序 Bean
+可能会在所有后处理器注册之前被实例化，因此从工厂后处理器中创建普通应用程序 Bean
+是不安全的。&lt;/p&gt;
+&lt;h2 id="依赖顺序与-depends-on"&gt;
+ 依赖顺序与 &lt;code&gt;depends-on&lt;/code&gt;
+ &lt;a href="#%e4%be%9d%e8%b5%96%e9%a1%ba%e5%ba%8f%e4%b8%8e-depends-on" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;容器会先创建 Bean 的构造器依赖和属性依赖，再创建依赖它的 Bean。因此，构造器注入
+同时表达了必需的关系和创建顺序：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Component&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;ReportService&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; ReportRepository repository;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; ReportService(ReportRepository repository) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;this&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;repository&lt;/span&gt; &lt;span style="color:#f92672"&gt;=&lt;/span&gt; repository;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;当不存在注入关系时，例如初始化共享外部资源，&lt;code&gt;@DependsOn(&amp;quot;schemaInitializer&amp;quot;)&lt;/code&gt;
+或 XML 中的 &lt;code&gt;depends-on&lt;/code&gt; 可以添加顺序约束。对于单例 Bean，它还会反转销毁顺序：
+依赖其他 Bean 的 Bean 会先于其依赖的 Bean 被销毁。&lt;code&gt;depends-on&lt;/code&gt; 会隐藏类所使用的
+依赖，因此不应替代实际的类型化依赖关系。&lt;/p&gt;</description></item><item><title>Spring 注解处理</title><link>https://example.org/zh-cn/spring-annotation-processing/</link><pubDate>Thu, 25 Sep 2025 03:47:26 +0800</pubDate><guid>https://example.org/zh-cn/spring-annotation-processing/</guid><description>&lt;p&gt;Spring 将注解用作声明式元数据，用于组件发现、配置、依赖注入、事务、Web 请求映射以及其他框架服务。Java 反射公开原始注解；Spring 则增加了用于组合注解、别名、搜索策略以及无需加载类即可读取元数据的一致模型。&lt;/p&gt;
+&lt;h2 id="java-注解语义"&gt;
+ Java 注解语义
+ &lt;a href="#java-%e6%b3%a8%e8%a7%a3%e8%af%ad%e4%b9%89" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;注解声明本身是一个接口，其隐式超接口是
+&lt;code&gt;java.lang.annotation.Annotation&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Retention&lt;/span&gt;(RetentionPolicy.&lt;span style="color:#a6e22e"&gt;RUNTIME&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Target&lt;/span&gt;(ElementType.&lt;span style="color:#a6e22e"&gt;TYPE&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Audited {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;当类上直接存在&lt;code&gt;@Audited&lt;/code&gt;时，运行时反射可以检查它。&lt;code&gt;@Retention&lt;/code&gt;、&lt;code&gt;@Target&lt;/code&gt;和&lt;code&gt;@Documented&lt;/code&gt;等元注解用于描述注解声明，但不会导致任意的传递式查找。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;SOURCE&lt;/code&gt;、&lt;code&gt;CLASS&lt;/code&gt;和&lt;code&gt;RUNTIME&lt;/code&gt;保留策略决定元数据仅保留在源代码中、保留在类文件中，还是可通过反射获得。&lt;code&gt;@Target&lt;/code&gt;限制声明位置或类型使用位置。可重复注解通过&lt;code&gt;@Repeatable&lt;/code&gt;指定容器；反射和Spring可以公开逻辑上的重复注解，也可以公开其物理容器。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;@Inherited&lt;/code&gt;是一个范围有限的例外。当注解声明带有&lt;code&gt;@Inherited&lt;/code&gt;时，某些&lt;code&gt;Class&lt;/code&gt;查找方法可以在超类上找到继承的注解。该规则不适用于接口，也不涵盖方法或字段，并且不同于Spring的组合注解模型。&lt;/p&gt;
+&lt;h2 id="组合注解"&gt;
+ 组合注解
+ &lt;a href="#%e7%bb%84%e5%90%88%e6%b3%a8%e8%a7%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Spring会解释放置在其他注解声明上的注解。例如，&lt;code&gt;@Service&lt;/code&gt;使用&lt;code&gt;@Component&lt;/code&gt;作为元注解：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Component&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; Service {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@AliasFor&lt;/span&gt;(annotation &lt;span style="color:#f92672"&gt;=&lt;/span&gt; Component.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; String &lt;span style="color:#a6e22e"&gt;value&lt;/span&gt;() &lt;span style="color:#66d9ef"&gt;default&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;&amp;#34;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此，使用&lt;code&gt;@Service&lt;/code&gt;注解的类会成为组件候选者，尽管普通反射不会报告该类直接存在&lt;code&gt;@Component&lt;/code&gt;。应用程序可以使用相同机制创建领域专用注解：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Target&lt;/span&gt;(ElementType.&lt;span style="color:#a6e22e"&gt;TYPE&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Retention&lt;/span&gt;(RetentionPolicy.&lt;span style="color:#a6e22e"&gt;RUNTIME&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Service&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Transactional&lt;/span&gt;(readOnly &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;true&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;@interface&lt;/span&gt; ReadOnlyService {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这是一种编程模型，而不是Java语言规则。Spring代码必须执行遍历、循环检测、过滤和属性合成。&lt;/p&gt;
+&lt;h2 id="合并注解"&gt;
+ 合并注解
+ &lt;a href="#%e5%90%88%e5%b9%b6%e6%b3%a8%e8%a7%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;MergedAnnotations&lt;/code&gt;是Spring用于直接存在、继承存在和元存在注解的核心查询模型。它的&lt;code&gt;SearchStrategy&lt;/code&gt;控制要遍历哪些类型关系：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DIRECT&lt;/code&gt;仅检查元素上直接声明的注解。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;INHERITED_ANNOTATIONS&lt;/code&gt;遵循Java的&lt;code&gt;@Inherited&lt;/code&gt;规则。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;SUPERCLASS&lt;/code&gt;搜索超类层次结构。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;TYPE_HIERARCHY&lt;/code&gt;搜索超类和已实现的接口。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;应使用与框架功能匹配的最窄策略。宽泛的层次结构搜索可能产生仅凭Java反射无法公开的元数据。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;MergedAnnotation&amp;lt;T&amp;gt;&lt;/code&gt;表示一个已发现的注解，以及它的距离、聚合位置、来源和合成属性。合成过程会解析通过&lt;code&gt;@AliasFor&lt;/code&gt;声明的Spring别名关系。因此，它可以在组合注解及其元注解之间呈现一致的属性视图。&lt;/p&gt;
+&lt;p&gt;别名声明必须保持一致。在同一个注解内，互为别名的属性必须具有兼容的返回类型和默认值。跨注解别名必须标识元注解层次结构中可达的属性。&lt;/p&gt;
+&lt;h2 id="元数据抽象"&gt;
+ 元数据抽象
+ &lt;a href="#%e5%85%83%e6%95%b0%e6%8d%ae%e6%8a%bd%e8%b1%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Spring将通用的带注解元素元数据与类级和方法级专用元数据分离：&lt;/p&gt;
+&lt;div
+ class="goat svg-container"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 384 137"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 112,0 L 304,0' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 112,32 L 208,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 208,32 L 304,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,80 L 184,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 200,80 L 208,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 224,80 L 232,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,80 L 352,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,112 L 232,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,112 L 368,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 80,80 L 80,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 112,0 L 112,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 232,96 L 232,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,96 L 248,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 304,0 L 304,32' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 368,96 L 368,112' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 192,80 L 208,48' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 224,48 L 240,80' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 232,88 L 232,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 248,88 L 248,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='204.000000,80.000000 192.000000,74.400002 192.000000,85.599998' fill='currentColor' transform='rotate(120.000000, 192.000000, 80.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='252.000000,80.000000 240.000000,74.400002 240.000000,85.599998' fill='currentColor' transform='rotate(60.000000, 240.000000, 80.000000)'&gt;&lt;/polygon&gt;
+&lt;path d='M 352,80 A 16,16 0 0,1 368,96' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;text text-anchor='middle' x='88' y='100' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='20' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='100' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='100' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='20' fill='currentColor' style='font-size:1em'&gt;T&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='20' fill='currentColor' style='font-size:1em'&gt;y&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='20' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='20' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='20' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='100' fill='currentColor' style='font-size:1em'&gt;h&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='288' y='100' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='100' fill='currentColor' style='font-size:1em'&gt;M&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='100' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='100' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='100' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='100' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;AnnotatedTypeMetadata&lt;/code&gt;公开类型和方法共有的注解查询。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;AnnotationMetadata&lt;/code&gt;增加类信息以及对带注解方法的访问。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;MethodMetadata&lt;/code&gt;增加声明类、返回类型和方法属性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;基于反射的实现会检查已加载的类。类读取实现使用字节码元数据，使组件扫描和配置解析等基础设施能够在不初始化类的情况下检查类。避免加载类可以防止静态初始化副作用，并允许在所有可选依赖都可解析之前发现元数据。&lt;/p&gt;</description></item><item><title>Spring 概览与事务</title><link>https://example.org/zh-cn/spring-overview-and-transactions/</link><pubDate>Sun, 25 May 2025 03:36:19 +0800</pubDate><guid>https://example.org/zh-cn/spring-overview-and-transactions/</guid><description>&lt;p&gt;Spring Framework 提供依赖注入容器，以及面向 AOP、数据访问、事务、消息传递和 Web 应用的专用模块。事务管理体现了该框架的集成模型：应用程序代码声明边界，拦截器则协调特定资源的 &lt;code&gt;PlatformTransactionManager&lt;/code&gt; 或响应式事务管理器。&lt;/p&gt;
+&lt;h2 id="基于代理的声明式事务"&gt;
+ 基于代理的声明式事务
+ &lt;a href="#%e5%9f%ba%e4%ba%8e%e4%bb%a3%e7%90%86%e7%9a%84%e5%a3%b0%e6%98%8e%e5%bc%8f%e4%ba%8b%e5%8a%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在默认的通知模式下，Spring 会使用 AOP 代理包装符合条件的 Bean。进入与 &lt;code&gt;@Transactional&lt;/code&gt; 匹配的方法的调用会经过 &lt;code&gt;TransactionInterceptor&lt;/code&gt;，后者读取事务元数据，启动事务或加入现有事务，调用目标对象，然后提交或回滚。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Service&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OrderService&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; OrderRepository orders;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; PaymentGateway payments;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Transactional&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; Order &lt;span style="color:#a6e22e"&gt;place&lt;/span&gt;(CreateOrder command) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Order order &lt;span style="color:#f92672"&gt;=&lt;/span&gt; orders.&lt;span style="color:#a6e22e"&gt;insert&lt;/span&gt;(command);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; payments.&lt;span style="color:#a6e22e"&gt;reserve&lt;/span&gt;(order);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; order;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;代理存在实际限制。调用必须经过代理进入，并且方法必须能够被所选代理机制拦截。基于接口的 JDK 代理会公开接口方法；基于类的代理会继承目标类，因此无法为 &lt;code&gt;final&lt;/code&gt; 方法提供通知。&lt;/p&gt;
+&lt;h2 id="自调用"&gt;
+ 自调用
+ &lt;a href="#%e8%87%aa%e8%b0%83%e7%94%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;this.reprice()&lt;/code&gt; 之类的调用会停留在目标对象内部，不会重新进入其代理。因此，如果只能通过自调用到达 &lt;code&gt;reprice()&lt;/code&gt;，该方法上的事务元数据会被忽略：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;importOrders&lt;/span&gt;(List&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Order&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; batch) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; batch.&lt;span style="color:#a6e22e"&gt;forEach&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;this&lt;/span&gt;::storeOne); &lt;span style="color:#75715e"&gt;// 绕过 storeOne 上的事务通知&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果事务操作代表一个真实边界，应将其移动到单独的注入式服务中。编程式事务管理或 AspectJ 编织也可以作为替代方案；注入 Bean 自身的代理会使领域代码耦合到容器机制，并增加测试难度。&lt;/p&gt;</description></item><item><title>Spring 资源</title><link>https://example.org/zh-cn/spring-resources/</link><pubDate>Tue, 30 Jan 2024 20:15:57 +0800</pubDate><guid>https://example.org/zh-cn/spring-resources/</guid><description>&lt;p&gt;&lt;code&gt;org.springframework.core.io.Resource&lt;/code&gt; 为 Spring API 提供统一句柄，所表示的内容可以位于文件、
+类路径条目、URL、servlet 上下文、字节数组或已打开的流中。
+该抽象描述访问能力；它不会让每个资源都可寻址、可重复读取、可写或由文件支持。&lt;/p&gt;
+&lt;h2 id="resource-契约"&gt;
+ &lt;code&gt;Resource&lt;/code&gt; 契约
+ &lt;a href="#resource-%e5%a5%91%e7%ba%a6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;Resource&lt;/code&gt; 扩展了 &lt;code&gt;InputStreamSource&lt;/code&gt;。&lt;code&gt;getInputStream()&lt;/code&gt; 是基本操作，而
+&lt;code&gt;exists()&lt;/code&gt;、&lt;code&gt;isReadable()&lt;/code&gt;、&lt;code&gt;isOpen()&lt;/code&gt;、&lt;code&gt;isFile()&lt;/code&gt;、&lt;code&gt;contentLength()&lt;/code&gt;、
+&lt;code&gt;lastModified()&lt;/code&gt; 和 &lt;code&gt;getDescription()&lt;/code&gt; 等方法暴露能力或元数据。&lt;/p&gt;
+&lt;p&gt;重要实现包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;ClassPathResource&lt;/code&gt;：用于类加载器或类相对条目；&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;FileSystemResource&lt;/code&gt; 和 &lt;code&gt;PathResource&lt;/code&gt;：用于文件系统内容；&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;UrlResource&lt;/code&gt;：用于 JVM 支持的 URL；&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ServletContextResource&lt;/code&gt;：用于 Web 应用路径；&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ByteArrayResource&lt;/code&gt;：用于可重复读取的内存字节；以及&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;InputStreamResource&lt;/code&gt;：用于已打开的、通常只能使用一次的流。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;调用方拥有 &lt;code&gt;getInputStream()&lt;/code&gt; 返回的每个流，并必须关闭它。
+&lt;code&gt;isOpen()&lt;/code&gt; 尤其重要：&lt;code&gt;InputStreamResource&lt;/code&gt; 包装已打开的句柄，不能安全地重复读取；
+文件和字节数组资源则可以在每次调用时打开新流。&lt;/p&gt;
+&lt;h2 id="加载和相对解析"&gt;
+ 加载和相对解析
+ &lt;a href="#%e5%8a%a0%e8%bd%bd%e5%92%8c%e7%9b%b8%e5%af%b9%e8%a7%a3%e6%9e%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;ResourceLoader.getResource(String)&lt;/code&gt; 将位置转换为一个资源。
+每个 &lt;code&gt;ApplicationContext&lt;/code&gt; 都是资源加载器。前缀选择明确语义：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;classpath:com/example/report.html&lt;/code&gt; 选择类路径资源。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;file:/srv/app/report.html&lt;/code&gt; 选择文件系统 URL。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;https://example.net/schema.json&lt;/code&gt; 选择 URL 资源。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;无前缀位置相对于上下文。&lt;code&gt;ClassPathXmlApplicationContext&lt;/code&gt; 将其解释为类路径位置，
+&lt;code&gt;FileSystemXmlApplicationContext&lt;/code&gt; 将其解释为文件系统位置，Web 应用上下文则将其解释为 servlet 上下文位置。
+库代码应请求 &lt;code&gt;Resource&lt;/code&gt; 或 &lt;code&gt;ResourceLoader&lt;/code&gt;，而不是假设一种默认位置。&lt;/p&gt;</description></item><item><title>Spring 容器类型</title><link>https://example.org/zh-cn/spring-container-types/</link><pubDate>Thu, 14 Dec 2023 04:20:44 +0800</pubDate><guid>https://example.org/zh-cn/spring-container-types/</guid><description>&lt;p&gt;Spring 的容器 API 有三个不同层次：Bean 元数据、根据元数据创建对象的工厂，以及将工厂与应用程序服务协调起来的应用程序上下文。保持这些层次分离，可以更容易地理解 Spring 源代码和扩展点。&lt;/p&gt;
+&lt;h2 id="bean-定义和注册表"&gt;
+ Bean 定义和注册表
+ &lt;a href="#bean-%e5%ae%9a%e4%b9%89%e5%92%8c%e6%b3%a8%e5%86%8c%e8%a1%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;BeanDefinition&lt;/code&gt; 是一个 Bean 的可变元数据。它记录 Bean 类或类名、作用域、构造函数参数、属性值、限定符、工厂方法、生命周期方法、角色、源位置和显式依赖。父子元数据关系独立于 Java 继承。&lt;/p&gt;
+&lt;p&gt;常见实现服务于不同的注册路径：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;RootBeanDefinition&lt;/code&gt; 表示 Bean 工厂使用的合并定义。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ChildBeanDefinition&lt;/code&gt; 从命名的父定义继承元数据。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;GenericBeanDefinition&lt;/code&gt; 可以在合并前表达独立或派生自父定义的元数据。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;AnnotatedGenericBeanDefinition&lt;/code&gt; 公开已注册类的注解元数据。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ScannedGenericBeanDefinition&lt;/code&gt; 公开类路径扫描期间读取的元数据，而无需先加载组件类。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;BeanDefinitionRegistry&lt;/code&gt; 按 Bean 名称存储定义。其核心操作是注册、移除和查询定义；&lt;code&gt;DefaultListableBeanFactory&lt;/code&gt; 和 &lt;code&gt;GenericApplicationContext&lt;/code&gt; 是重要实现。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;AnnotatedBeanDefinitionReader&lt;/code&gt; 注册显式提供的组件类：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; GenericApplicationContext();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; reader &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; AnnotatedBeanDefinitionReader(context);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;reader.&lt;span style="color:#a6e22e"&gt;register&lt;/span&gt;(OrderService.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;context.&lt;span style="color:#a6e22e"&gt;refresh&lt;/span&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;ClassPathBeanDefinitionScanner&lt;/code&gt; 搜索候选组件的包并注册其定义。两种机制都会应用注解作用域、命名、限定符、条件和 &lt;code&gt;BeanDefinitionCustomizer&lt;/code&gt; 回调。定制器可以在注册期间进行有针对性的元数据更改，而无需实现注册表后处理器。&lt;/p&gt;
+&lt;h2 id="beanfactoryfactorybean-和-objectfactory"&gt;
+ &lt;code&gt;BeanFactory&lt;/code&gt;、&lt;code&gt;FactoryBean&lt;/code&gt; 和 &lt;code&gt;ObjectFactory&lt;/code&gt;
+ &lt;a href="#beanfactoryfactorybean-%e5%92%8c-objectfactory" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;BeanFactory&lt;/code&gt; 是运行时注册表和依赖解析 API。它定位定义、创建 Bean、解析协作者、管理单例身份并应用生命周期处理器。&lt;code&gt;ListableBeanFactory&lt;/code&gt; 增加枚举功能，&lt;code&gt;HierarchicalBeanFactory&lt;/code&gt; 增加父级查找，&lt;code&gt;ConfigurableListableBeanFactory&lt;/code&gt; 向框架基础设施公开容器配置。应用程序代码应依赖领域协作者，而不是将 &lt;code&gt;getBean()&lt;/code&gt; 作为服务定位器调用。&lt;/p&gt;
+&lt;p&gt;三个名称相似的类型具有不同职责：&lt;/p&gt;</description></item><item><title>Spring 转换与验证</title><link>https://example.org/zh-cn/spring-conversion-and-validation/</link><pubDate>Tue, 28 Nov 2023 10:33:04 +0800</pubDate><guid>https://example.org/zh-cn/spring-conversion-and-validation/</guid><description>&lt;p&gt;Spring 将转换、表示格式化、对象绑定和验证视为相互独立的操作。因此，请求参数可以转换为类型化属性，同时仍能生成结构化错误，而无需将领域对象与 Web 控制器耦合。&lt;/p&gt;
+&lt;h2 id="转换与格式化"&gt;
+ 转换与格式化
+ &lt;a href="#%e8%bd%ac%e6%8d%a2%e4%b8%8e%e6%a0%bc%e5%bc%8f%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;ConversionService&lt;/code&gt; 是类型转换的门面。它可以先判断是否存在可用的转换，然后按原始类或按 &lt;code&gt;TypeDescriptor&lt;/code&gt; 执行转换；后者会保留注解和嵌套泛型信息。&lt;/p&gt;
+&lt;p&gt;扩展接口分别覆盖不同的需求：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;Converter&amp;lt;S, T&amp;gt;&lt;/code&gt; 实现一次强类型转换。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ConverterFactory&amp;lt;S, R&amp;gt;&lt;/code&gt; 为一组目标子类型创建转换器，例如将 &lt;code&gt;String&lt;/code&gt; 转换为任意枚举类型。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;GenericConverter&lt;/code&gt; 声明可转换的源/目标类型对集合，并接收 &lt;code&gt;TypeDescriptor&lt;/code&gt; 值，以执行依赖上下文的转换。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ConditionalGenericConverter&lt;/code&gt; 还可以判断自身是否匹配特定的源类型和目标类型。&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;StringToOrderId&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;implements&lt;/span&gt; Converter&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;String, OrderId&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Override&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; OrderId &lt;span style="color:#a6e22e"&gt;convert&lt;/span&gt;(String source) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; OrderId(UUID.&lt;span style="color:#a6e22e"&gt;fromString&lt;/span&gt;(source.&lt;span style="color:#a6e22e"&gt;strip&lt;/span&gt;()));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;Formatter&amp;lt;T&amp;gt;&lt;/code&gt; 属于表示层。其 &lt;code&gt;Printer&lt;/code&gt; 和 &lt;code&gt;Parser&lt;/code&gt; 操作使用 &lt;code&gt;Locale&lt;/code&gt;，因此适用于数字、日期和面向用户的文本。对于与上下文无关的类型变更，应使用转换器；当文本表示取决于区域设置或 UI 策略时，应使用格式化器。通过 &lt;code&gt;FormatterRegistry&lt;/code&gt; 注册二者；&lt;code&gt;DefaultFormattingConversionService&lt;/code&gt; 同时实现注册表和转换服务契约。&lt;/p&gt;
+&lt;h2 id="遗留-javabeans-属性编辑器"&gt;
+ 遗留 JavaBeans 属性编辑器
+ &lt;a href="#%e9%81%97%e7%95%99-javabeans-%e5%b1%9e%e6%80%a7%e7%bc%96%e8%be%91%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Spring 仍出于兼容性目的支持 &lt;code&gt;java.beans.PropertyEditor&lt;/code&gt;。&lt;code&gt;PropertyEditor&lt;/code&gt; 有状态，主要通过文本和内部值工作，并且不是线程安全的。因此，容器不会共享实例，而是为每次绑定操作创建编辑器。&lt;/p&gt;
+&lt;p&gt;JavaBeans 约定会查找与 &lt;code&gt;Type&lt;/code&gt; 位于同一位置、名为 &lt;code&gt;TypeEditor&lt;/code&gt; 的编辑器；&lt;code&gt;PropertyEditorManager&lt;/code&gt; 还支持显式注册和搜索路径。Spring 增加了用于按类型或属性路径注册的 &lt;code&gt;PropertyEditorRegistry&lt;/code&gt;，以及用于封装可复用注册逻辑的 &lt;code&gt;PropertyEditorRegistrar&lt;/code&gt;。&lt;code&gt;BeanWrapper&lt;/code&gt; 和 &lt;code&gt;DataBinder&lt;/code&gt; 会公开这些注册表。&lt;/p&gt;</description></item><item><title>Spring MVC</title><link>https://example.org/zh-cn/spring-mvc/</link><pubDate>Fri, 03 Nov 2023 17:36:24 +0800</pubDate><guid>https://example.org/zh-cn/spring-mvc/</guid><description>&lt;p&gt;Spring MVC 是 Spring Framework 中基于 Servlet 的 Web 框架。其前端控制器 &lt;code&gt;DispatcherServlet&lt;/code&gt; 协调请求映射、参数解析、控制器调用、返回值处理和异常转换。Spring WebFlux 使用不同的响应式运行时和线程模型；不能将两个框架视为可互换。&lt;/p&gt;
+&lt;h2 id="引导和分派"&gt;
+ 引导和分派
+ &lt;a href="#%e5%bc%95%e5%af%bc%e5%92%8c%e5%88%86%e6%b4%be" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;非 Boot Servlet 应用程序可以通过 &lt;code&gt;WebApplicationInitializer&lt;/code&gt; 注册 Web 应用程序上下文和分派器：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;WebInitializer&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;implements&lt;/span&gt; WebApplicationInitializer {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Override&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;onStartup&lt;/span&gt;(ServletContext servletContext) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; AnnotationConfigWebApplicationContext();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; context.&lt;span style="color:#a6e22e"&gt;register&lt;/span&gt;(WebConfiguration.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; servlet &lt;span style="color:#f92672"&gt;=&lt;/span&gt; servletContext.&lt;span style="color:#a6e22e"&gt;addServlet&lt;/span&gt;(
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;mvc&amp;#34;&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; DispatcherServlet(context));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; servlet.&lt;span style="color:#a6e22e"&gt;setLoadOnStartup&lt;/span&gt;(1);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; servlet.&lt;span style="color:#a6e22e"&gt;addMapping&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;/&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Spring Boot 会为 MVC 应用程序执行等效注册。将分派器映射到 &lt;code&gt;/&lt;/code&gt;，可以让 Servlet 容器保留对静态资源和 JSP 的特殊处理；&lt;code&gt;/*&lt;/code&gt; 还会捕获这些分派。&lt;/p&gt;
+&lt;p&gt;对于每个请求，分派器会：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;向有序的 &lt;code&gt;HandlerMapping&lt;/code&gt; 实现请求处理器和拦截器；&lt;/li&gt;
+&lt;li&gt;选择能够调用该处理器的 &lt;code&gt;HandlerAdapter&lt;/code&gt;；&lt;/li&gt;
+&lt;li&gt;调用前置处理拦截器和处理器；&lt;/li&gt;
+&lt;li&gt;将返回值作为响应体、视图、异步结果或其他受支持形式进行处理；然后&lt;/li&gt;
+&lt;li&gt;运行异常解析器和完成拦截器。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;MVC 策略对象是分派器上下文中的 Bean。&lt;code&gt;@EnableWebMvc&lt;/code&gt; 为普通 Spring 应用程序导入标准配置。在 Spring Boot 中，应实现 &lt;code&gt;WebMvcConfigurer&lt;/code&gt; 来扩展 Boot 配置，而不是添加 &lt;code&gt;@EnableWebMvc&lt;/code&gt;，后者会完全接管自动配置。&lt;/p&gt;</description></item><item><title>Spring 线程池</title><link>https://example.org/zh-cn/spring-thread-pools/</link><pubDate>Mon, 02 Jan 2023 16:27:18 +0800</pubDate><guid>https://example.org/zh-cn/spring-thread-pools/</guid><description>&lt;p&gt;Spring 的 &lt;code&gt;TaskExecutor&lt;/code&gt; 抽象任务提交。常见的 &lt;code&gt;ThreadPoolTaskExecutor&lt;/code&gt; 是围绕
+&lt;code&gt;ThreadPoolExecutor&lt;/code&gt; 的受管 JavaBean 包装器；其线程池、队列、拒绝和生命周期选择仍决定系统容量。&lt;/p&gt;
+&lt;h2 id="定义和命名执行器"&gt;
+ 定义和命名执行器
+ &lt;a href="#%e5%ae%9a%e4%b9%89%e5%92%8c%e5%91%bd%e5%90%8d%e6%89%a7%e8%a1%8c%e5%99%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;按照工作负载命名执行器，使调用方选择预期资源：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Bean&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;reportExecutor&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ThreadPoolTaskExecutor &lt;span style="color:#a6e22e"&gt;reportExecutor&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; executor &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ThreadPoolTaskExecutor();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setCorePoolSize&lt;/span&gt;(8);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setMaxPoolSize&lt;/span&gt;(24);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setQueueCapacity&lt;/span&gt;(100);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setKeepAliveSeconds&lt;/span&gt;(30);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setThreadNamePrefix&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;report-&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setRejectedExecutionHandler&lt;/span&gt;(
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ThreadPoolExecutor.&lt;span style="color:#a6e22e"&gt;CallerRunsPolicy&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; executor;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Spring 会将 &lt;code&gt;ThreadPoolTaskExecutor&lt;/code&gt; 作为受管 bean 初始化和关闭。
+返回其具体类型可以保留生命周期配置和监控方法。
+应使用不同执行器隔离具有不同延迟、阻塞、优先级或下游容量要求的工作负载。&lt;/p&gt;
+&lt;h2 id="线程池队列和饱和行为"&gt;
+ 线程池、队列和饱和行为
+ &lt;a href="#%e7%ba%bf%e7%a8%8b%e6%b1%a0%e9%98%9f%e5%88%97%e5%92%8c%e9%a5%b1%e5%92%8c%e8%a1%8c%e4%b8%ba" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;底层执行器遵循明确的接纳顺序：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;创建工作线程，直到达到 &lt;code&gt;corePoolSize&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;工作队列接受任务时，将新任务排队。&lt;/li&gt;
+&lt;li&gt;只有队列拒绝任务后，才创建线程，直到达到 &lt;code&gt;maxPoolSize&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;线程池和队列都饱和时，应用拒绝策略。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;因此，无界队列会阻止线程数超过核心大小，并将过载转化为不断增长的延迟和内存使用。
+有界队列能使过载可观察。&lt;code&gt;AbortPolicy&lt;/code&gt; 以异常拒绝，&lt;code&gt;CallerRunsPolicy&lt;/code&gt; 通过让提交线程运行任务施加背压，
+而丢弃策略会丢失工作，需要明确的产品决策。&lt;/p&gt;
+&lt;p&gt;核心/最大大小、队列容量和保活时间必须依据测得的任务服务时间、阻塞比例、到达突发和下游限制。
+更大的线程池无法增加数据库的连接容量。&lt;/p&gt;
+&lt;h2 id="async-选择和失败"&gt;
+ &lt;code&gt;@Async&lt;/code&gt; 选择和失败
+ &lt;a href="#async-%e9%80%89%e6%8b%a9%e5%92%8c%e5%a4%b1%e8%b4%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用 &lt;code&gt;@EnableAsync&lt;/code&gt; 启用方法拦截。当应用有多个执行器时，选择一个命名执行器：&lt;/p&gt;</description></item><item><title>Spring Data JPA Specification API</title><link>https://example.org/zh-cn/spring-data-jpa-specifications/</link><pubDate>Wed, 09 Nov 2022 01:13:09 +0800</pubDate><guid>https://example.org/zh-cn/spring-data-jpa-specifications/</guid><description>&lt;p&gt;当 Spring Data JPA 仓库需要一个可选、可组合并在运行时决定的 &lt;code&gt;WHERE&lt;/code&gt; 子句时，通常使用的 API 是 &lt;code&gt;org.springframework.data.jpa.repository.JpaSpecificationExecutor&amp;lt;T&amp;gt;&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;它连接了以下组件：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Spring Data 仓库方法，例如 &lt;code&gt;findAll(...)&lt;/code&gt;、&lt;code&gt;count(...)&lt;/code&gt; 和 &lt;code&gt;exists(...)&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Spring 的 &lt;code&gt;org.springframework.data.jpa.domain.Specification&amp;lt;T&amp;gt;&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;以 &lt;code&gt;jakarta.persistence.criteria.CriteriaBuilder&lt;/code&gt; 为核心的 Jakarta Persistence Criteria API&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="jpaspecificationexecutort"&gt;
+ &lt;code&gt;JpaSpecificationExecutor&amp;lt;T&amp;gt;&lt;/code&gt;
+ &lt;a href="#jpaspecificationexecutort" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;假设存在一个实体：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Entity&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Table&lt;/span&gt;(name &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;orders&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;PurchaseOrder&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Id&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; Long id;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Column&lt;/span&gt;(nullable &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;false&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; String status;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Column&lt;/span&gt;(nullable &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;false&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; String customerEmail;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Column&lt;/span&gt;(nullable &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;false&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; Instant createdAt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@ManyToOne&lt;/span&gt;(fetch &lt;span style="color:#f92672"&gt;=&lt;/span&gt; FetchType.&lt;span style="color:#a6e22e"&gt;LAZY&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; Customer customer;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;以及一个仓库：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;interface&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;PurchaseOrderRepository&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;extends&lt;/span&gt; JpaRepository&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;PurchaseOrder, Long&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; JpaSpecificationExecutor&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;PurchaseOrder&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;JpaRepository&lt;/code&gt; 提供 CRUD 和分页 API。&lt;code&gt;JpaSpecificationExecutor&lt;/code&gt; 添加了一组方法，其过滤逻辑由 &lt;code&gt;Specification&amp;lt;PurchaseOrder&amp;gt;&lt;/code&gt; 描述。&lt;/p&gt;</description></item></channel></rss>

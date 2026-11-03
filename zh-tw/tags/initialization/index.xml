@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Initialization on cesun.life</title><link>https://example.org/zh-tw/tags/initialization/</link><description>Recent content in Initialization on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Tue, 26 Dec 2023 14:30:46 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/initialization/index.xml" rel="self" type="application/rss+xml"/><item><title>C++ 靜態初始化順序</title><link>https://example.org/zh-tw/cpp-static-initialization/</link><pubDate>Tue, 26 Dec 2023 14:30:46 +0800</pubDate><guid>https://example.org/zh-tw/cpp-static-initialization/</guid><description>&lt;p&gt;C++ 會獨立於作用域指定儲存期。靜態儲存期與執行緒儲存期的初始化及銷毀規則，決定物件是在 &lt;code&gt;main&lt;/code&gt; 之前可用、第一次使用時可用，或每個執行緒各自初始化一次。&lt;/p&gt;
+&lt;h2 id="儲存期與初始化階段"&gt;
+ 儲存期與初始化階段
+ &lt;a href="#%e5%84%b2%e5%ad%98%e6%9c%9f%e8%88%87%e5%88%9d%e5%a7%8b%e5%8c%96%e9%9a%8e%e6%ae%b5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;命名空間作用域物件、靜態資料成員，以及區塊作用域的 &lt;code&gt;static&lt;/code&gt; 物件具有靜態儲存期。&lt;code&gt;thread_local&lt;/code&gt; 物件具有執行緒儲存期：每個執行緒都有獨立的實例，並依據宣告與實作規則，在該執行緒啟動時或第一次使用時初始化。&lt;/p&gt;
+&lt;p&gt;當靜態儲存期或執行緒儲存期變數符合條件時，會進行常數初始化；否則，該變數會進行零初始化。常數初始化與零初始化合稱靜態初始化，並在動態初始化之前完成。因此，&lt;code&gt;constinit&lt;/code&gt; 變數必須進行常數初始化，而 &lt;code&gt;constexpr&lt;/code&gt; 物件是明確表達初始化要求的有效方式。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;constinit &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; process_limit &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;256&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;constexpr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; cache_line_bytes &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;64&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;constinit&lt;/code&gt; 不會使物件變成不可變；它只會拒絕需要動態初始化的初始化式。&lt;/p&gt;
+&lt;h2 id="順序邊界"&gt;
+ 順序邊界
+ &lt;a href="#%e9%a0%86%e5%ba%8f%e9%82%8a%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;同一翻譯單元中，一般的非內聯命名空間作用域變數會依定義順序進行動態初始化。跨翻譯單元的動態初始化沒有可靠的原始碼順序：它可能以不確定順序排序，或受到延遲初始化規則的影響。因此，讀取另一個非區域物件的非區域初始化式，可能只會看到零初始化狀態，而不是該物件預期的動態狀態。&lt;/p&gt;
+&lt;p&gt;函式區域靜態物件會將建構延遲到控制流程第一次經過其宣告時：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Logger&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt; logger() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;static&lt;/span&gt; Logger instance;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; instance;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;從 C++11 開始，對區塊作用域靜態物件的並行初始化嘗試只會成功初始化一次；其他執行緒會等待初始化成功。如果初始化式擲出例外，則會在後續進入時重試初始化。第一次使用時建構可移除 &lt;code&gt;instance&lt;/code&gt; 的跨翻譯單元建構相依性，但呼叫端仍必須建立更廣泛的關閉策略。&lt;/p&gt;
+&lt;h2 id="銷毀是獨立的設計問題"&gt;
+ 銷毀是獨立的設計問題
+ &lt;a href="#%e9%8a%b7%e6%af%80%e6%98%af%e7%8d%a8%e7%ab%8b%e7%9a%84%e8%a8%ad%e8%a8%88%e5%95%8f%e9%a1%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;靜態物件與執行緒物件分別在程式終止或執行緒結束時銷毀。不能將跨翻譯單元的非區域物件銷毀順序作為安全的相依機制，因為解構函式可能存取已經銷毀的物件。函式區域靜態物件會依建構完成順序的反向順序銷毀；當其解構函式呼叫其他存取器時，也可能產生類似的風險。&lt;/p&gt;
+&lt;p&gt;對於在結束處理期間互相作用的資源，應優先採用明確的所有權與關閉順序。對於存續於整個程序生命週期的服務，如果選擇由作業系統回收資源的契約，可以刻意不銷毀這些服務；應記錄此選擇，而不要依賴偶然的銷毀順序。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Garbage-Collection on cesun.life</title><link>https://example.org/ja/tags/garbage-collection/</link><description>Recent content in Garbage-Collection on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Mon, 27 Jan 2025 11:37:11 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/garbage-collection/index.xml" rel="self" type="application/rss+xml"/><item><title>JVMガベージコレクション</title><link>https://example.org/ja/jvm-garbage-collection/</link><pubDate>Mon, 27 Jan 2025 11:37:11 +0800</pubDate><guid>https://example.org/ja/jvm-garbage-collection/</guid><description>&lt;p&gt;JVM仕様は自動ストレージ管理を要求しますが、コレクタやヒープレイアウトを
+規定していません。したがって、コレクタの動作は、実行されるJVM、リリース、
+フラグ、ヒープサイズ、ワークロードの特性です。&lt;/p&gt;
+&lt;h2 id="到達可能性とメモリプール"&gt;
+ 到達可能性とメモリプール
+ &lt;a href="#%e5%88%b0%e9%81%94%e5%8f%af%e8%83%bd%e6%80%a7%e3%81%a8%e3%83%a1%e3%83%a2%e3%83%aa%e3%83%97%e3%83%bc%e3%83%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;トレーシングはGCルートから開始されます。GCルートには、実行中スレッドの
+スタックとレジスタ、staticフィールド、JNIハンドル、VMランタイム構造体などが
+含まれます。ルートから強く到達可能なオブジェクトは生存し続けます。
+ソフト参照はメモリ逼迫時にクリアされる可能性があり、弱参照は参照先を保持せず、
+ファントム参照は&lt;code&gt;ReferenceQueue&lt;/code&gt;を通じた事後処理の調整を支援します。これらは
+いずれも決定的なリソース解放の代替ではありません。try-with-resourcesを使用し、
+&lt;code&gt;Cleaner&lt;/code&gt;は安全網としてのみ使用してください。ファイナライゼーションは削除予定
+として非推奨です。&lt;/p&gt;
+&lt;p&gt;Javaヒープにはオブジェクトと配列が格納されます。HotSpotでは、メタスペース、
+コードキャッシュ、スレッドスタック、ダイレクトバッファ、GCの管理情報、
+ネイティブライブラリがヒープ外のメモリを消費します。&lt;code&gt;-Xmx&lt;/code&gt;が上限を設定するのは
+Javaヒープだけなので、コンテナの制限ではネイティブメモリ用の余裕を確保する必要が
+あります。プール名とメモリ使用量の集計方法は、コレクタおよび実装に依存します。&lt;/p&gt;
+&lt;h2 id="世代別管理と割り当て"&gt;
+ 世代別管理と割り当て
+ &lt;a href="#%e4%b8%96%e4%bb%a3%e5%88%a5%e7%ae%a1%e7%90%86%e3%81%a8%e5%89%b2%e3%82%8a%e5%bd%93%e3%81%a6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;世代別コレクタは、多くの割り当てが短時間で不要になるという事実を利用します。
+新しいオブジェクトは若い領域に割り当てられ、生存したオブジェクトはサバイバー
+領域を移動し、古い領域へ昇格することがあります。若い世代の各コレクションで
+すべての古いオブジェクトを走査することを避けるため、ライトバリアは古い世代から
+若い世代へのポインタをカードテーブルまたはリメンバードセットに記録します。
+割り当て率、生存集合のサイズ、昇格率、利用可能な退避領域は、ヒープ使用率だけよりも
+メモリ逼迫を適切に予測します。&lt;/p&gt;
+&lt;h2 id="hotspotコレクタのトレードオフ"&gt;
+ HotSpotコレクタのトレードオフ
+ &lt;a href="#hotspot%e3%82%b3%e3%83%ac%e3%82%af%e3%82%bf%e3%81%ae%e3%83%88%e3%83%ac%e3%83%bc%e3%83%89%e3%82%aa%e3%83%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;HotSpotは異なる目的を持つコレクタを提供します。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Serial&lt;/strong&gt;は、小さなヒープで実装オーバーヘッドを最小化します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Parallel&lt;/strong&gt;は、並列のstop-the-world処理によりスループットを優先します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;G1&lt;/strong&gt;はヒープをリージョンに分割し、並行処理と退避処理のバランスを取りながら、
+ポーズ時間の目標に向けて動作します。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ZGC&lt;/strong&gt;は、バリアと並行処理によるリソース使用を伴う代わりに、マーキングと
+再配置の大部分を並行して実行し、短いポーズを目指します。&lt;/li&gt;
+&lt;li&gt;選択したディストリビューションが提供する場合、&lt;strong&gt;Shenandoah&lt;/strong&gt;も並行退避を実行し、
+ポーズ時間を短縮します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;コレクタの可用性とデフォルトは、JDKベンダーおよびリリースによって変わります。
+過去のデフォルトを運用ガイダンスに埋め込むのではなく、
+&lt;code&gt;java -XX:+PrintCommandLineFlags -version&lt;/code&gt;と、使用しているリリースのドキュメントで
+実行中のランタイムを確認してください。&lt;/p&gt;
+&lt;p&gt;すべてのトレーシングコレクタには、調整のためのポイントが必要です。ルート処理、
+リマーク、一部の退避処理では、アプリケーションスレッドを停止することがあります
+（STW）。並行フェーズはポーズ時間を短縮しますが、CPUとメモリ帯域幅を消費し、
+バリアを必要とし、再配置用の空き領域を必要とします。したがって、ポーズ目標を
+短くすると、スループットが低下したり、割り当て圧力下で失敗したりする可能性があります。&lt;/p&gt;
+&lt;h2 id="証拠に基づくチューニング"&gt;
+ 証拠に基づくチューニング
+ &lt;a href="#%e8%a8%bc%e6%8b%a0%e3%81%ab%e5%9f%ba%e3%81%a5%e3%81%8f%e3%83%81%e3%83%a5%e3%83%bc%e3%83%8b%e3%83%b3%e3%82%b0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;統合ログを有効にし、アプリケーションのレイテンシおよびリソースメトリクスと
+相関させます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;java -Xlog:gc*,safepoint:file&lt;span style="color:#f92672"&gt;=&lt;/span&gt;gc.log:time,uptime,level,tags ...
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;java -XX:StartFlightRecording&lt;span style="color:#f92672"&gt;=&lt;/span&gt;filename&lt;span style="color:#f92672"&gt;=&lt;/span&gt;recording.jfr ...&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;JFRの割り当てイベント、&lt;code&gt;jcmd&lt;/code&gt;、保持が疑われる場合のヒープダンプ、CPUおよび
+コンテナのメトリクスを使用して、過剰な割り当て、増加する生存集合、断片化、
+ネイティブメモリの枯渇を区別します。次の順序でチューニングします。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;意図しない保持と割り当てホットスポットを排除する。&lt;/li&gt;
+&lt;li&gt;測定した生存集合と割り当てバーストに合わせてヒープサイズを設定する。&lt;/li&gt;
+&lt;li&gt;測定したレイテンシおよびスループットの目標に適したコレクタを選択する。&lt;/li&gt;
+&lt;li&gt;文書化された目標を少数だけ変更する。その後、&lt;/li&gt;
+&lt;li&gt;代表的な負荷測定を繰り返す。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;System.gc()&lt;/code&gt;は要求であり、正しさを保証する仕組みではありません。また、性能に
+大きな影響を与える処理を引き起こす可能性があります。アプリケーションの動作は
+コレクションのタイミングに依存してはなりません。&lt;/p&gt;</description></item></channel></rss>

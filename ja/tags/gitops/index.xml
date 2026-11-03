@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Gitops on cesun.life</title><link>https://example.org/ja/tags/gitops/</link><description>Recent content in Gitops on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Fri, 05 Nov 2021 13:57:33 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/gitops/index.xml" rel="self" type="application/rss+xml"/><item><title>Helm の運用と Argo CD の移行</title><link>https://example.org/ja/helm-operations-and-argocd-migrations/</link><pubDate>Fri, 05 Nov 2021 13:57:33 +0800</pubDate><guid>https://example.org/ja/helm-operations-and-argocd-migrations/</guid><description>&lt;p&gt;静的な Kubernetes マニフェストを Helm に移し、さらに Argo CD に移すことは、テンプレートだけでなく所有権も変更します。稼働中のリソースを棚卸しし、不変の名前とストレージを保持し、自動プルーニングを有効にする前に望ましい状態を再現可能にします。&lt;/p&gt;
+&lt;h2 id="helm-のリリースモデルを理解する"&gt;
+ Helm のリリースモデルを理解する
+ &lt;a href="#helm-%e3%81%ae%e3%83%aa%e3%83%aa%e3%83%bc%e3%82%b9%e3%83%a2%e3%83%87%e3%83%ab%e3%82%92%e7%90%86%e8%a7%a3%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;直接の Helm リリースでは、アップグレードによって以前のリリースマニフェスト、新しくレンダリングされたマニフェスト、稼働中のオブジェクトが比較されます。両方のマニフェストに存在するリソースは、フィールドが許す場合に更新され、新しいマニフェストだけに存在するリソースは作成され、チャートから削除されたリソースは通常削除されます。不変フィールドには明示的な置換戦略が必要になることがあります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;helm upgrade --install web ./chart &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --namespace web --create-namespace &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --values environments/production.yaml &lt;span style="color:#ae81ff"&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --dry-run --debug&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;既存のツールチェーンで利用できる場合は &lt;code&gt;helm diff&lt;/code&gt; を使用し、アップグレード後に &lt;code&gt;helm get manifest&lt;/code&gt; と &lt;code&gt;helm history&lt;/code&gt; を確認します。&lt;code&gt;helm.sh/resource-policy: keep&lt;/code&gt; アノテーションはアンインストール時にリソースを保持できますが、一般的な安全策ではなく、意図的なライフサイクル上の判断にしてください。&lt;/p&gt;
+&lt;h2 id="静的マニフェストを段階的に移行する"&gt;
+ 静的マニフェストを段階的に移行する
+ &lt;a href="#%e9%9d%99%e7%9a%84%e3%83%9e%e3%83%8b%e3%83%95%e3%82%a7%e3%82%b9%e3%83%88%e3%82%92%e6%ae%b5%e9%9a%8e%e7%9a%84%e3%81%ab%e7%a7%bb%e8%a1%8c%e3%81%99%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;まず、ソース管理から実際に望ましい仕様を取得し、稼働中のオブジェクトと比較します。イメージバージョン、ホスト名、リソース制限、ストレージクラスなど、本当の環境差だけをパラメーター化し、すべてのフィールドをパラメーター化しないでください。チャートをレンダリングし、既存のリソースと比較します。&lt;/p&gt;
+&lt;p&gt;最初の移行では、安定した &lt;code&gt;metadata.name&lt;/code&gt;、名前空間、セレクター、永続ボリューム要求名を維持します。セレクターを変更すると Pod が取り残される可能性があり、PVC 名を変更すると新しい要求が作成され、データは移動しません。ステートフルワークロードでは、所有権を移行する前に、本番環境ではないクラスターでバックアップ、リストア、ロールバック手順をリハーサルします。&lt;/p&gt;
+&lt;h2 id="argo-cd-に安全に引き渡す"&gt;
+ Argo CD に安全に引き渡す
+ &lt;a href="#argo-cd-%e3%81%ab%e5%ae%89%e5%85%a8%e3%81%ab%e5%bc%95%e3%81%8d%e6%b8%a1%e3%81%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Argo CD が Helm チャートをレンダリングするときは、同じリソースに対して別の &lt;code&gt;helm upgrade&lt;/code&gt; を実行しないでください。&lt;code&gt;Application&lt;/code&gt; を設定し、レンダリングされたマニフェストと差分を確認し、最初はプルーニングなしで同期してから、アプリケーションが正常で、範囲内に無関係なリソースがないことを確認した後にのみプルーニングを有効にします。&lt;/p&gt;
+&lt;p&gt;リソース名の変更や削除ガードを伴う依存関係グラフには、段階的な移行を使用します。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;古いリソースを保持したまま新しいリソースを追加する。&lt;/li&gt;
+&lt;li&gt;利用者を更新し、ヘルスチェックを待つ。&lt;/li&gt;
+&lt;li&gt;古い依存リソースを削除する。&lt;/li&gt;
+&lt;li&gt;後の同期で古い親リソースを削除する。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Argo CD の同期ウェーブは通常の適用とプルーンの順序を設定できますが、データ移行、アドミッション Webhook、外部クライアントが関係する場合は、段階的な変更の方が明確です。&lt;/p&gt;</description></item></channel></rss>

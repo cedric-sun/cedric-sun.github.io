@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Cgroups on cesun.life</title><link>https://example.org/zh-tw/tags/cgroups/</link><description>Recent content in Cgroups on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sat, 15 Oct 2022 15:47:14 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/cgroups/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 控制群組第二版</title><link>https://example.org/zh-tw/linux-cgroup-v2/</link><pubDate>Sat, 15 Oct 2022 15:47:14 +0800</pubDate><guid>https://example.org/zh-tw/linux-cgroup-v2/</guid><description>&lt;p&gt;控制群組（cgroup）會記帳並控制 Linux 工作的集合。cgroup 不是程序樹節點：工作在 fork 時繼承父項的 cgroup，但管理器之後可以遷移它。因此，cgroup 提供服務管理器與容器背後的資源邊界，而命名空間提供全域資源的檢視。&lt;/p&gt;
+&lt;p&gt;本文描述 cgroup 第二版（cgroup v2）。其文件化介面是 &lt;code&gt;cgroup2&lt;/code&gt; 檔案系統；檔案與支援的控制器取決於執行中的核心設定與可用硬體。&lt;/p&gt;
+&lt;h2 id="統一階層與成員資格"&gt;
+ 統一階層與成員資格
+ &lt;a href="#%e7%b5%b1%e4%b8%80%e9%9a%8e%e5%b1%a4%e8%88%87%e6%88%90%e5%93%a1%e8%b3%87%e6%a0%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Cgroup v2 具有一個統一階層。每個工作都恰好屬於該階層中的一個 cgroup，包括未命名的根 cgroup。子 cgroup 會繼承祖先允許的限制與控制器設定，因此子項不能取得其父項未委派的 CPU、記憶體或裝置。&lt;/p&gt;
+&lt;p&gt;階層由 &lt;code&gt;cgroup2&lt;/code&gt; 掛載表示，慣例位置為 &lt;code&gt;/sys/fs/cgroup&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;findmnt -t cgroup2
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cat /proc/self/cgroup
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ps -o pid,cgroup,comm -p $$&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每個目錄都是 cgroup。建立目錄會建立子 cgroup，將 PID 寫入其 &lt;code&gt;cgroup.procs&lt;/code&gt; 會遷移程序的執行緒群組：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo mkdir /sys/fs/cgroup/build
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;printf &lt;span style="color:#e6db74"&gt;&amp;#39;%s\n&amp;#39;&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$$&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; | sudo tee /sys/fs/cgroup/build/cgroup.procs&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;請使用服務管理器，而不要手動移動其自身程序。例如，systemd 為 slice、scope 與服務建立並管理 cgroup；手動遷移可能違反管理器的記帳與生命週期假設。&lt;/p&gt;
+&lt;h3 id="網域與執行緒-cgroup"&gt;
+ 網域與執行緒 cgroup
+ &lt;a href="#%e7%b6%b2%e5%9f%9f%e8%88%87%e5%9f%b7%e8%a1%8c%e7%b7%92-cgroup" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;p&gt;一般階層由&lt;em&gt;網域&lt;/em&gt; cgroup 組成，其控制器將程序視為單位套用。內部無程序規則防止非根網域 cgroup 同時包含程序，並將網域控制器分發給子項。將工作移至葉節點，使用空的中間節點在子 cgroup 之間配置控制器：&lt;/p&gt;</description></item></channel></rss>

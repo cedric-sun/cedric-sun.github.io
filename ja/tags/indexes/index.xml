@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Indexes on cesun.life</title><link>https://example.org/ja/tags/indexes/</link><description>Recent content in Indexes on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 16 Jun 2022 20:46:43 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/indexes/index.xml" rel="self" type="application/rss+xml"/><item><title>MySQL のインデックス</title><link>https://example.org/ja/mysql-indexes/</link><pubDate>Thu, 16 Jun 2022 20:46:43 +0800</pubDate><guid>https://example.org/ja/mysql-indexes/</guid><description>&lt;p&gt;InnoDB は主インデックスとセカンダリインデックスを B+ 木で実装します。インデックスの順序が選択性の高い述語、結合、範囲スキャン、または順序付け要件と一致すると I/O を削減できますが、インデックス付きのすべての行に対する書き込み処理とストレージが増加します。&lt;/p&gt;
+&lt;h2 id="クラスター化インデックスとセカンダリインデックス"&gt;
+ クラスター化インデックスとセカンダリインデックス
+ &lt;a href="#%e3%82%af%e3%83%a9%e3%82%b9%e3%82%bf%e3%83%bc%e5%8c%96%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9%e3%81%a8%e3%82%bb%e3%82%ab%e3%83%b3%e3%83%80%e3%83%aa%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB テーブルは行データをクラスター化インデックスに格納します。InnoDB は宣言された主キーを選択し、そうでなければ最初の適切な非 NULL 一意キーを選択し、どちらもなければ内部の隠しキーを作成します。各セカンダリインデックスエントリには主キー値が格納されるため、短く安定した主キーを宣言してください。&lt;/p&gt;
+&lt;p&gt;セカンダリインデックスには、インデックス対象の列と主キー値が格納されます。クエリがセカンダリインデックスにない列を必要とする場合、一致する各エントリについてクラスター化インデックスのルックアップが実行されます。測定されたコストを削減できる場合にのみカバリングインデックスを追加してください。幅の広いインデックスはページのファンアウトを減らし、書き込みオーバーヘッドを増加させます。&lt;/p&gt;
+&lt;h2 id="複合インデックス"&gt;
+ 複合インデックス
+ &lt;a href="#%e8%a4%87%e5%90%88%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;(tenant_id, created_at, id)&lt;/code&gt; では、B+ 木は次を効率的に検索できます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;ツリーの順序は &lt;code&gt;tenant_id&lt;/code&gt; から始まるため、&lt;code&gt;created_at&lt;/code&gt; だけから効率的にシークすることはできません。一般的な設計では、等値述語を範囲述語より前に置き、その後に順序付けまたはカバレッジを満たすために必要な列を置きます。実際の述語、データ分布、結果サイズによってインデックス順序は変わるため、&lt;code&gt;EXPLAIN ANALYZE&lt;/code&gt; で選択を検証してください。&lt;/p&gt;
+&lt;h2 id="インデックスの種類と診断"&gt;
+ インデックスの種類と診断
+ &lt;a href="#%e3%82%a4%e3%83%b3%e3%83%87%e3%83%83%e3%82%af%e3%82%b9%e3%81%ae%e7%a8%ae%e9%a1%9e%e3%81%a8%e8%a8%ba%e6%96%ad" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;UNIQUE&lt;/code&gt; は不変条件を適用すると同時にアクセスパスを作成します。InnoDB のインデックスの大半は B ツリーです。&lt;code&gt;FULLTEXT&lt;/code&gt; インデックスはトークンベースのテキスト検索をサポートし、ジオメトリ値に対する &lt;code&gt;SPATIAL&lt;/code&gt; インデックスは R ツリーを使用します。MySQL は &lt;code&gt;MEMORY&lt;/code&gt; エンジン向けのハッシュインデックスも説明しています。InnoDB は一般的なハッシュインデックスを公開しませんが、アダプティブハッシュインデックスは内部最適化として頻繁にアクセスされる B ツリーページをキャッシュできます。プレフィックスインデックスは長いテキストキーのバイトサイズを削減できますが、選択したプレフィックスが選択性を維持する場合に限ります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXPLAIN&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ANALYZE&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id, created_at
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; event
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;7&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;2026-01-01&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;LIMIT&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;インデックスが使用されると仮定せず、実際の行数、ループ回数、時間を確認します。統計情報、カーディナリティの推定、少ない結果セットによって、インデックス走査よりテーブルスキャンが安価になることがあります。&lt;/p&gt;</description></item></channel></rss>

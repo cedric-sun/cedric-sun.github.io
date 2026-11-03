@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Memory-Management on cesun.life</title><link>https://example.org/zh-cn/tags/memory-management/</link><description>Recent content in Memory-Management on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Wed, 28 Feb 2024 10:22:21 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/memory-management/index.xml" rel="self" type="application/rss+xml"/><item><title>C++ 智能指针与所有权</title><link>https://example.org/zh-cn/cpp-smart-pointers/</link><pubDate>Wed, 28 Feb 2024 10:22:21 +0800</pubDate><guid>https://example.org/zh-cn/cpp-smart-pointers/</guid><description>&lt;p&gt;智能指针使接口中的所有权变得清晰可见。但它们不会取代仅用于借用对象的引用和原始指针；对于这类对象，其生命周期由其他位置保证。应根据生命周期契约选择指针类型，并在 API 边界明确表达所有权转移和对象观察。&lt;/p&gt;
+&lt;h2 id="唯一所有权"&gt;
+ 唯一所有权
+ &lt;a href="#%e5%94%af%e4%b8%80%e6%89%80%e6%9c%89%e6%9d%83" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::unique_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 拥有一个对象，并且只能移动。普通 &lt;code&gt;new&lt;/code&gt; 和默认删除器适用时，应使用 &lt;code&gt;std::make_unique&lt;/code&gt; 创建；要转移所有权，应按值传递或按值返回。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;memory&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;unique_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Connection&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; open_connection(Address address);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;install_connection&lt;/span&gt;(std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;unique_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Connection&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; connection);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;install_connection(open_connection(address));&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;自定义删除器是 &lt;code&gt;unique_ptr&lt;/code&gt; 类型的一部分，因此可能影响其大小以及 API 接受的类型。删除器必须满足所有权协议，并且不得在析构过程中抛出异常。&lt;/p&gt;
+&lt;p&gt;即使 &lt;code&gt;T&lt;/code&gt; 是不完整类型，&lt;code&gt;unique_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 也可以出现在头文件中。但是，默认删除器要求在实例化销毁对象的操作处，&lt;code&gt;T&lt;/code&gt; 已经是完整类型；这通常是拥有该对象的类的类外析构函数。&lt;code&gt;unique_ptr&amp;lt;T[]&amp;gt;&lt;/code&gt; 表示数组分配，但不会保存数组长度；对于拥有的序列，应优先使用 &lt;code&gt;std::vector&amp;lt;T&amp;gt;&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="共享所有权与观察"&gt;
+ 共享所有权与观察
+ &lt;a href="#%e5%85%b1%e4%ba%ab%e6%89%80%e6%9c%89%e6%9d%83%e4%b8%8e%e8%a7%82%e5%af%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::shared_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 共享一个控制块，其中包含所有权状态，通常还包含删除器和分配器。复制 &lt;code&gt;shared_ptr&lt;/code&gt; 会延长所有权；最后一个拥有对象的指针会销毁被管理对象。&lt;code&gt;std::make_shared&lt;/code&gt; 可以同时分配对象和控制块，从而减少分配次数。由于弱观察者会保留控制块，这种合并分配可能导致对象的存储空间一直无法释放，直到所有观察者消失。&lt;/p&gt;
+&lt;p&gt;别名构造函数在保存不同指针的同时共享已有的控制块：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;cpp&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-cpp" data-lang="cpp"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;auto&lt;/span&gt; owner &lt;span style="color:#f92672"&gt;=&lt;/span&gt; std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;make_shared&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Record&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;std&lt;span style="color:#f92672"&gt;::&lt;/span&gt;shared_ptr&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Member&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; member(owner, &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;owner&lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt;member);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;member.get()&lt;/code&gt; 指向子对象，而其生命周期由 &lt;code&gt;owner&lt;/code&gt; 所拥有的 &lt;code&gt;Record&lt;/code&gt; 控制。不要从同一个原始指针构造彼此无关的 &lt;code&gt;shared_ptr&lt;/code&gt; 实例；每个实例都会认为自己独立拥有该对象。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;std::weak_ptr&amp;lt;T&amp;gt;&lt;/code&gt; 观察控制块，但不会延长对象的生命周期。解引用前，应使用 &lt;code&gt;lock()&lt;/code&gt; 获取临时的拥有指针。当所有权环会使对象图无限期存活时，应使用 &lt;code&gt;weak_ptr&lt;/code&gt; 对反向边和缓存进行建模。&lt;/p&gt;
+&lt;h2 id="api-契约"&gt;
+ API 契约
+ &lt;a href="#api-%e5%a5%91%e7%ba%a6" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;使用能够说明预期关系的签名：&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Load-Balancing on cesun.life</title><link>https://example.org/zh-tw/tags/load-balancing/</link><description>Recent content in Load-Balancing on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 21 Jul 2022 00:23:46 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/load-balancing/index.xml" rel="self" type="application/rss+xml"/><item><title>負載平衡</title><link>https://example.org/zh-tw/load-balancing/</link><pubDate>Thu, 21 Jul 2022 00:23:46 +0800</pubDate><guid>https://example.org/zh-tw/load-balancing/</guid><description>&lt;p&gt;負載平衡會在保留傳輸與應用程式語意的同時，將需求對應到健康的容量。放置、健康狀態、重試與過載政策構成一個整體：演算法無法挽回被健康檢查誤判的容量，也無法挽回被重試消耗的容量。&lt;/p&gt;
+&lt;h2 id="放置層"&gt;
+ 放置層
+ &lt;a href="#%e6%94%be%e7%bd%ae%e5%b1%a4" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;DNS 放置&lt;/strong&gt;會回傳區域或服務位址。解析器與用戶端快取使變更較粗略，因此 DNS 無法排空個別連線，也無法回應每個請求的負載。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Anycast 放置&lt;/strong&gt;從多個站點宣告相同位址，讓路由選取路徑。路由變更可能移動流量，而最近的網路路徑不一定是具有剩餘應用程式容量的站點。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;傳輸層負載平衡&lt;/strong&gt;會從 TCP、UDP 或 QUIC 流量中繼資料選取後端，但不解析應用程式請求。直接伺服器回傳與連線追蹤會影響拓撲與故障行為。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;反向代理&lt;/strong&gt;會終止應用程式協定，並可依 authority、路徑、標頭、方法或 cookie 路由 HTTP。終止連線能啟用重試與可觀測性，但會消耗代理容量並建立另一個故障網域。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;應用程式放置&lt;/strong&gt;會使用租戶、分區擁有權、佇列分割或加速器可用性等領域狀態分派工作。應用程式接著必須處理擁有權變更與過時的路由中繼資料。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;大型系統會組合多個層：DNS 或 anycast 選取站點，L4 負載平衡器選取代理，而代理選取工作負載。&lt;/p&gt;
+&lt;h2 id="選取演算法"&gt;
+ 選取演算法
+ &lt;a href="#%e9%81%b8%e5%8f%96%e6%bc%94%e7%ae%97%e6%b3%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;對容量與請求成本相近的端點而言，輪詢很適合。加權輪詢反映已知的容量差異。最少連線會使用作用中連線數量作為負載訊號，但長時間閒置連線與多工的 HTTP/2 或 HTTP/3 串流可能使單一連線成為不準確的單位。最少請求或延遲感知的變體需要穩定的測量與阻尼，避免將每個請求都送往暫時較快的端點。&lt;/p&gt;
+&lt;p&gt;依穩定鍵進行雜湊可以提供親和性。一致雜湊或 rendezvous 雜湊能在成員變更時減少重新對映，但可能集中熱門鍵，也不能消除故障轉移。具區域性的演算法偏好相同區域或地區，以降低延遲與傳輸成本，同時保留溢出容量來處理本地短缺。&lt;/p&gt;
+&lt;h2 id="健康狀態離群值與排空"&gt;
+ 健康狀態、離群值與排空
+ &lt;a href="#%e5%81%a5%e5%ba%b7%e7%8b%80%e6%85%8b%e9%9b%a2%e7%be%a4%e5%80%bc%e8%88%87%e6%8e%92%e7%a9%ba" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;主動健康檢查會傳送合成探針。被動檢查會觀察實際連線錯誤、重設、逾時或狀態碼。就緒狀態應驗證提供流量所需的相依性邊界，避免每次暫時的下游失敗都導致整個叢集被移除。&lt;/p&gt;
+&lt;p&gt;使用連續成功與連續失敗門檻避免狀態抖動。離群值偵測會暫時排除觀察行為與同儕不同的端點；限制排除百分比，避免單一共用相依性失敗移除整個服務。&lt;/p&gt;
+&lt;p&gt;排空會將端點從新的選取中移除，同時允許已建立的請求或連線在期限內完成。協調負載平衡器排空時間、應用程式關閉 hooks、編排就緒狀態與協定的 keep-alive 行為。&lt;/p&gt;
+&lt;h2 id="親和性重試與故障轉移"&gt;
+ 親和性、重試與故障轉移
+ &lt;a href="#%e8%a6%aa%e5%92%8c%e6%80%a7%e9%87%8d%e8%a9%a6%e8%88%87%e6%95%85%e9%9a%9c%e8%bd%89%e7%a7%bb" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Cookie、來源位址或雜湊親和性可以改善快取區域性，或保留傳統工作階段狀態。親和性會減少平衡自由度，且必須定義選定後端消失時的行為。當請求需要透明故障轉移時，優先使用外部或複製的工作階段狀態。&lt;/p&gt;
+&lt;p&gt;逾時表示呼叫端沒有收到結果；它不能證明後端沒有執行工作。只在呼叫端期限與有界重試預算內重試。安全且具冪等性的操作是候選者；非冪等操作需要應用程式冪等鍵與持久去重。以退避與抖動分散重試，並避免將過載回應重試到已飽和的同儕集合。&lt;/p&gt;
+&lt;p&gt;跨區域或跨地區故障轉移需要保留容量、相容資料與明確一致性模型。單獨的路由切換無法讓遠端站點準備好接受寫入。&lt;/p&gt;
+&lt;h2 id="容量與過載"&gt;
+ 容量與過載
+ &lt;a href="#%e5%ae%b9%e9%87%8f%e8%88%87%e9%81%8e%e8%bc%89" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;端點數量不是容量。追蹤並行請求、佇列深度、受限資源的使用率、延遲百分位數、錯誤與准入拒絕。自動擴展會在測量與佈建延遲之後反應，因此要為突發與故障保留餘裕。&lt;/p&gt;
+&lt;p&gt;當需求超過容量時，限制佇列、捨棄較低優先級工作、強制執行每個租戶的限制，並在協定支援時回傳清楚的重試訊號。反壓應在記憶體或連線池耗盡前傳達給呼叫端。負載平衡器指標必須區分沒有健康端點、本地代理飽和、後端過載與政策拒絕，因為每一種都需要不同回應。&lt;/p&gt;
+&lt;h2 id="參考資料"&gt;
+ 參考資料
+ &lt;a href="#%e5%8f%83%e8%80%83%e8%b3%87%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.rfc-editor.org/rfc/rfc9110"&gt;RFC 9110：HTTP 語意&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/overview"&gt;Envoy 負載平衡&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/#terminating"&gt;Kubernetes 端點終止&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</description></item></channel></rss>

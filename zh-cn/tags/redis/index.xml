@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Redis on cesun.life</title><link>https://example.org/zh-cn/tags/redis/</link><description>Recent content in Redis on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Thu, 03 Sep 2026 15:56:43 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/redis/index.xml" rel="self" type="application/rss+xml"/><item><title>Redis 缓存和协调模式</title><link>https://example.org/zh-cn/redis-overview/</link><pubDate>Thu, 03 Sep 2026 15:56:43 +0800</pubDate><guid>https://example.org/zh-cn/redis-overview/</guid><description>&lt;p&gt;Redis 是内存数据结构服务器，可以加速读取并协调有界操作。生产设计必须定义事实来源、一致性窗口、容量策略、故障行为以及每个键的所有权。持久化和复制改善恢复选项，但不会赋予缓存源数据库所具有的事务不变量。&lt;/p&gt;
+&lt;h2 id="cache-aside-和一致性窗口"&gt;
+ Cache-Aside 和一致性窗口
+ &lt;a href="#cache-aside-%e5%92%8c%e4%b8%80%e8%87%b4%e6%80%a7%e7%aa%97%e5%8f%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Cache-Aside 将读写策略留给应用程序：&lt;/p&gt;
+&lt;div
+ class="goat svg-container goat--sized" style="--goat-width: 65%;"&gt;
+ &lt;svg
+ xmlns="http://www.w3.org/2000/svg"
+ font-family="Menlo,Lucida Console,monospace"
+ viewBox="0 0 384 105"&gt;
+ &lt;g transform='translate(8,16)'&gt;
+&lt;path d='M 64,16 L 144,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 256,16 L 296,16' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 32,64 L 200,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 200,64 L 296,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 32,32 L 32,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;path d='M 200,32 L 200,64' fill='none' stroke='currentColor'&gt;&lt;/path&gt;
+&lt;polygon points='40.000000,32.000000 28.000000,26.400000 28.000000,37.599998' fill='currentColor' transform='rotate(270.000000, 32.000000, 32.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='152.000000,16.000000 140.000000,10.400000 140.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 144.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='304.000000,16.000000 292.000000,10.400000 292.000000,21.600000' fill='currentColor' transform='rotate(0.000000, 296.000000, 16.000000)'&gt;&lt;/polygon&gt;
+&lt;polygon points='304.000000,64.000000 292.000000,58.400002 292.000000,69.599998' fill='currentColor' transform='rotate(0.000000, 296.000000, 64.000000)'&gt;&lt;/polygon&gt;
+&lt;text text-anchor='middle' x='8' y='20' fill='currentColor' style='font-size:1em'&gt;C&lt;/text&gt;
+&lt;text text-anchor='middle' x='16' y='20' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='24' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='32' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='40' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='48' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='88' y='4' fill='currentColor' style='font-size:1em'&gt;m&lt;/text&gt;
+&lt;text text-anchor='middle' x='96' y='4' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='104' y='4' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='4' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='112' y='84' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='120' y='84' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='128' y='84' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='136' y='84' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='144' y='84' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='152' y='84' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='20' fill='currentColor' style='font-size:1em'&gt;A&lt;/text&gt;
+&lt;text text-anchor='middle' x='160' y='84' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='20' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='168' y='84' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='176' y='20' fill='currentColor' style='font-size:1em'&gt;p&lt;/text&gt;
+&lt;text text-anchor='middle' x='184' y='20' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='192' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='200' y='20' fill='currentColor' style='font-size:1em'&gt;c&lt;/text&gt;
+&lt;text text-anchor='middle' x='208' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='216' y='52' fill='currentColor' style='font-size:1em'&gt;S&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='20' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='224' y='52' fill='currentColor' style='font-size:1em'&gt;E&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='20' fill='currentColor' style='font-size:1em'&gt;o&lt;/text&gt;
+&lt;text text-anchor='middle' x='232' y='52' fill='currentColor' style='font-size:1em'&gt;T&lt;/text&gt;
+&lt;text text-anchor='middle' x='240' y='20' fill='currentColor' style='font-size:1em'&gt;n&lt;/text&gt;
+&lt;text text-anchor='middle' x='248' y='52' fill='currentColor' style='font-size:1em'&gt;v&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='4' fill='currentColor' style='font-size:1em'&gt;r&lt;/text&gt;
+&lt;text text-anchor='middle' x='256' y='52' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='4' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='264' y='52' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='4' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='272' y='52' fill='currentColor' style='font-size:1em'&gt;u&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='4' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='280' y='52' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='296' y='52' fill='currentColor' style='font-size:1em'&gt;E&lt;/text&gt;
+&lt;text text-anchor='middle' x='304' y='52' fill='currentColor' style='font-size:1em'&gt;X&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='20' fill='currentColor' style='font-size:1em'&gt;D&lt;/text&gt;
+&lt;text text-anchor='middle' x='312' y='68' fill='currentColor' style='font-size:1em'&gt;R&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='320' y='68' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='20' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='52' fill='currentColor' style='font-size:1em'&gt;t&lt;/text&gt;
+&lt;text text-anchor='middle' x='328' y='68' fill='currentColor' style='font-size:1em'&gt;d&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='52' fill='currentColor' style='font-size:1em'&gt;l&lt;/text&gt;
+&lt;text text-anchor='middle' x='336' y='68' fill='currentColor' style='font-size:1em'&gt;i&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='20' fill='currentColor' style='font-size:1em'&gt;b&lt;/text&gt;
+&lt;text text-anchor='middle' x='344' y='68' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='352' y='20' fill='currentColor' style='font-size:1em'&gt;a&lt;/text&gt;
+&lt;text text-anchor='middle' x='360' y='20' fill='currentColor' style='font-size:1em'&gt;s&lt;/text&gt;
+&lt;text text-anchor='middle' x='368' y='20' fill='currentColor' style='font-size:1em'&gt;e&lt;/text&gt;
+&lt;/g&gt;
+
+ &lt;/svg&gt;
+ &lt;/div&gt;&lt;p&gt;应用程序读取 Redis，从数据库加载未命中结果，使用 TTL 存储结果，然后返回结果。源数据写入必须使受影响的键失效或刷新。由于数据库提交和缓存变更不是一个原子操作，读取者可能在这两个事件之间观察到过时数据。应定义可接受窗口；当缓存失效必须经受进程故障时，使用事务性 outbox 或变更数据流。&lt;/p&gt;</description></item><item><title>Redis 数据类型与命令</title><link>https://example.org/zh-cn/redis-commands/</link><pubDate>Tue, 02 Jan 2024 17:43:06 +0800</pubDate><guid>https://example.org/zh-cn/redis-commands/</guid><description>&lt;p&gt;Redis 将每个键与一种数据类型关联。对类型错误的键执行命令会失败，
+因此键命名和值的归属关系应明确表达数据模型。&lt;/p&gt;
+&lt;p&gt;Redis 在服务器线程上以原子方式执行每条命令。因此，&lt;code&gt;INCR&lt;/code&gt;、&lt;code&gt;HSET&lt;/code&gt;、
+&lt;code&gt;SADD&lt;/code&gt; 和 &lt;code&gt;ZADD&lt;/code&gt; 等单条命令可安全地用于单键状态变更；但如果多步骤的
+读取—修改—写入序列必须作为一个整体执行，则需要使用 &lt;code&gt;MULTI&lt;/code&gt;/&lt;code&gt;EXEC&lt;/code&gt;、
+&lt;code&gt;WATCH&lt;/code&gt; 或 Lua。&lt;/p&gt;
+&lt;h2 id="键的生命周期"&gt;
+ 键的生命周期
+ &lt;a href="#%e9%94%ae%e7%9a%84%e7%94%9f%e5%91%bd%e5%91%a8%e6%9c%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;DEL&lt;/code&gt; 会同步回收值，在处理大型聚合数据时可能造成阻塞。&lt;code&gt;UNLINK&lt;/code&gt; 会
+解除键的关联，并让 Redis 异步回收内存。使用 &lt;code&gt;EXPIRE&lt;/code&gt;、&lt;code&gt;PEXPIRE&lt;/code&gt;、
+&lt;code&gt;TTL&lt;/code&gt; 和 &lt;code&gt;PTTL&lt;/code&gt; 设置及检查过期时间；对于没有过期时间的键，&lt;code&gt;TTL&lt;/code&gt;
+返回 &lt;code&gt;-1&lt;/code&gt;，对于不存在的键则返回 &lt;code&gt;-2&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;不要对生产规模的键空间使用 &lt;code&gt;KEYS *&lt;/code&gt;，因为它会在一条命令中扫描整个
+键空间。应改用 &lt;code&gt;SCAN&lt;/code&gt; 进行迭代：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;redis&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-redis" data-lang="redis"&gt;SCAN 0 MATCH user:* COUNT 1000&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;持续迭代，直到返回的游标为 &lt;code&gt;0&lt;/code&gt;。扫描可能返回重复项，也可能遗漏迭代期间
+创建或删除的键；需要唯一结果的调用方必须自行去重。&lt;/p&gt;
+&lt;h2 id="核心类型"&gt;
+ 核心类型
+ &lt;a href="#%e6%a0%b8%e5%bf%83%e7%b1%bb%e5%9e%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;字符串&lt;/strong&gt;支持 &lt;code&gt;GET&lt;/code&gt;、&lt;code&gt;SET&lt;/code&gt;、原子操作 &lt;code&gt;INCRBY&lt;/code&gt; 和二进制安全的值。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;列表&lt;/strong&gt;是有序、可从左右两端索引的集合，用于队列和工作流。
+&lt;code&gt;LPUSH&lt;/code&gt; 和 &lt;code&gt;RPUSH&lt;/code&gt; 分别向头部或尾部添加元素；&lt;code&gt;LPOP&lt;/code&gt; 和
+&lt;code&gt;RPOP&lt;/code&gt; 在空列表上返回 &lt;code&gt;nil&lt;/code&gt;，并在最后一个元素消失时删除该键。
+&lt;code&gt;BLPOP&lt;/code&gt; 和 &lt;code&gt;BRPOP&lt;/code&gt; 会阻塞，直到列出的某个键变为非空。
+&lt;code&gt;LRANGE&lt;/code&gt; 的两端均为闭区间，并接受从尾部开始计算的负索引；
+不受限的范围可能返回很大的载荷。&lt;code&gt;RPOPLPUSH&lt;/code&gt; 和 &lt;code&gt;BRPOPLPUSH&lt;/code&gt;
+以原子方式将一个尾部元素移动到另一个列表。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;集合&lt;/strong&gt;包含唯一成员，并通过哈希表测试成员资格。使用
+&lt;code&gt;SADD&lt;/code&gt;、&lt;code&gt;SREM&lt;/code&gt;、&lt;code&gt;SCARD&lt;/code&gt;、&lt;code&gt;SISMEMBER&lt;/code&gt;、&lt;code&gt;SMEMBERS&lt;/code&gt;、&lt;code&gt;SPOP&lt;/code&gt;
+和 &lt;code&gt;SRANDMEMBER&lt;/code&gt;。&lt;code&gt;SINTER&lt;/code&gt;、&lt;code&gt;SUNION&lt;/code&gt; 和 &lt;code&gt;SDIFF&lt;/code&gt; 等集合运算命令
+读取输入但不修改输入；相应的 &lt;code&gt;*STORE&lt;/code&gt; 变体会以原子方式替换目标集合。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;有序集合&lt;/strong&gt;将每个唯一成员与一个浮点分值关联。&lt;code&gt;ZADD&lt;/code&gt; 以原子方式
+添加或更新成员，因此重复成员会替换先前的分值，而不会创建重复项。
+使用 &lt;code&gt;ZRANGE&lt;/code&gt;、&lt;code&gt;ZREVRANGE&lt;/code&gt;、&lt;code&gt;ZRANK&lt;/code&gt;、&lt;code&gt;ZREVRANK&lt;/code&gt; 和按分值范围
+查询的命令进行有序查找，并使用 &lt;code&gt;ZREM&lt;/code&gt; 或
+&lt;code&gt;ZREMRANGEBYRANK&lt;/code&gt;/&lt;code&gt;ZREMRANGEBYSCORE&lt;/code&gt; 删除元素。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;哈希&lt;/strong&gt;将字段/值对归组到一个键下。&lt;code&gt;HSET&lt;/code&gt; 以原子方式创建或更新字段；
+&lt;code&gt;HGET&lt;/code&gt;、&lt;code&gt;HMGET&lt;/code&gt;、&lt;code&gt;HDEL&lt;/code&gt;、&lt;code&gt;HINCRBY&lt;/code&gt; 和 &lt;code&gt;HGETALL&lt;/code&gt; 操作的是具名字段，
+而非嵌套对象。&lt;code&gt;HGETALL&lt;/code&gt; 的结果可能很大，因此只需要少数字段时应优先
+进行定向读取。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;流&lt;/strong&gt;在有序 ID 下追加字段/值条目。&lt;code&gt;XADD&lt;/code&gt; 写入条目，&lt;code&gt;XRANGE&lt;/code&gt; 读取
+ID 范围，&lt;code&gt;XREAD&lt;/code&gt; 等待游标之后的条目。消费者组使用 &lt;code&gt;XREADGROUP&lt;/code&gt;
+分发条目；消费者必须使用 &lt;code&gt;XACK&lt;/code&gt; 确认已完成的工作，并明确回收被遗弃的
+待处理条目。流是持久化数据结构，而非临时的发布/订阅投递机制。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;HGETALL&lt;/code&gt;、&lt;code&gt;SMEMBERS&lt;/code&gt; 和不受限的 &lt;code&gt;LRANGE&lt;/code&gt; 会返回所有元素，并可能
+产生很大的响应。在请求路径中，应使用基于游标的哈希/集合扫描或有界范围。&lt;/p&gt;</description></item></channel></rss>

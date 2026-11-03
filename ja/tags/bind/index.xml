@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Bind on cesun.life</title><link>https://example.org/ja/tags/bind/</link><description>Recent content in Bind on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Thu, 15 Jan 2026 18:06:05 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/bind/index.xml" rel="self" type="application/rss+xml"/><item><title>BIND 9 権威 DNS と再帰 DNS</title><link>https://example.org/ja/bind-9-dns/</link><pubDate>Thu, 15 Jan 2026 18:06:05 +0800</pubDate><guid>https://example.org/ja/bind-9-dns/</guid><description>&lt;p&gt;BIND 9 は &lt;code&gt;named&lt;/code&gt; ネームサーバーを実行します。その設定によって、権威応答、再帰の提供、ゾーン転送、動的更新の受け入れが決まります。インターネットに公開する権威サーバーがオープンな再帰リゾルバーにならないよう、これらの役割は分離して扱ってください。&lt;/p&gt;
+&lt;h2 id="サーバー設定"&gt;
+ サーバー設定
+ &lt;a href="#%e3%82%b5%e3%83%bc%e3%83%90%e3%83%bc%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;named.conf&lt;/code&gt; はグローバルオプション、アクセス制御リスト、ゾーン、ログを定義します。最小限の権威設定では、再帰とゾーン転送を制限します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;named&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-named" data-lang="named"&gt;acl trusted-recursors { 192.0.2.0/24; 2001:db8:1::/48; };
+
+options {
+ directory &amp;#34;/var/named&amp;#34;;
+ listen-on { any; };
+ listen-on-v6 { any; };
+ recursion no;
+ allow-transfer { none; };
+ minimal-responses yes;
+};
+
+zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/example.net&amp;#34;;
+ allow-transfer { 192.0.2.53; };
+};&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;再帰リゾルバーには &lt;code&gt;recursion yes&lt;/code&gt; と、クライアントに限定した &lt;code&gt;allow-recursion&lt;/code&gt; または &lt;code&gt;allow-query-cache&lt;/code&gt; ACL が必要です。デプロイで乱用制御を備えた公開リゾルバーを明示的に提供する場合を除き、信頼できないネットワークに再帰を公開しないでください。&lt;/p&gt;
+&lt;p&gt;ACL は &lt;code&gt;allow-query&lt;/code&gt;、&lt;code&gt;allow-recursion&lt;/code&gt;、&lt;code&gt;allow-query-cache&lt;/code&gt;、&lt;code&gt;allow-transfer&lt;/code&gt;、&lt;code&gt;match-clients&lt;/code&gt; で再利用できます。BIND の &lt;code&gt;view&lt;/code&gt; ステートメントは、送信元アドレス、宛先アドレス、または TSIG アイデンティティに従って、異なるゾーンおよび再帰ポリシーを提示します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;named&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-named" data-lang="named"&gt;view &amp;#34;internal&amp;#34; {
+ match-clients { trusted-recursors; };
+ recursion yes;
+ allow-recursion { trusted-recursors; };
+
+ zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/internal/example.net&amp;#34;;
+ };
+};
+
+view &amp;#34;external&amp;#34; {
+ match-clients { any; };
+ recursion no;
+
+ zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/external/example.net&amp;#34;;
+ };
+};&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;ビューを有効にした場合は、クライアントから見える各ゾーンを該当するビューで定義します。最も具体的な &lt;code&gt;match-clients&lt;/code&gt; 規則を先に置いてください。BIND は最初に一致するビューを選択するためです。&lt;/p&gt;</description></item></channel></rss>

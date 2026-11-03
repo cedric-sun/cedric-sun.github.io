@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Spi on cesun.life</title><link>https://example.org/ja/tags/spi/</link><description>Recent content in Spi on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Tue, 01 Oct 2024 22:56:33 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/spi/index.xml" rel="self" type="application/rss+xml"/><item><title>Javaサービスプロバイダインターフェース</title><link>https://example.org/ja/java-service-provider-interface/</link><pubDate>Tue, 01 Oct 2024 22:56:33 +0800</pubDate><guid>https://example.org/ja/java-service-provider-interface/</guid><description>&lt;p&gt;Java SPIは、&lt;strong&gt;サービス&lt;/strong&gt;契約を1つ以上の&lt;strong&gt;プロバイダ&lt;/strong&gt;および、それらを選択する&lt;strong&gt;コンシューマ&lt;/strong&gt;から分離します。コンシューマはサービス型に依存し、&lt;code&gt;ServiceLoader&lt;/code&gt;を使用するため、アプリケーションが具象クラスに依存することなく、デプロイ時にプロバイダを追加できます。&lt;/p&gt;
+&lt;h2 id="クラスパスサービス"&gt;
+ クラスパスサービス
+ &lt;a href="#%e3%82%af%e3%83%a9%e3%82%b9%e3%83%91%e3%82%b9%e3%82%b5%e3%83%bc%e3%83%93%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;モジュール導入前は、プロバイダJARが
+&lt;code&gt;META-INF/services/&amp;lt;fully.qualified.ServiceName&amp;gt;&lt;/code&gt;に実装を記載していました。UTF-8ファイルには、1行につき1つのプロバイダクラス名を記載します。空行と&lt;code&gt;#&lt;/code&gt;コメントを使用できます。各プロバイダは、検出に使用されるローダーからアクセス可能であり、publicな引数なしコンストラクタを提供する必要があります。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ServiceLoader&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Codec&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; codecs &lt;span style="color:#f92672"&gt;=&lt;/span&gt; ServiceLoader.&lt;span style="color:#a6e22e"&gt;load&lt;/span&gt;(Codec.&lt;span style="color:#a6e22e"&gt;class&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;for&lt;/span&gt; (Codec codec : codecs) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (codec.&lt;span style="color:#a6e22e"&gt;supports&lt;/span&gt;(mediaType)) &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; codec;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;検出とプロバイダのインスタンス化は遅延実行されます。プロバイダの反復処理、ストリーミング、または&lt;code&gt;Provider.get()&lt;/code&gt;の呼び出しによって、プロバイダのロードと初期化が行われる可能性があります。そのため、不正な設定、依存関係の欠落、アクセスできない型、コンストラクタの失敗は&lt;code&gt;ServiceConfigurationError&lt;/code&gt;として表面化します。プロバイダコードはデプロイ時に供給されるコードとして扱い、コンテナやプラグインシステムでは明示的なクラスローダーを選択し、制御された起動境界で診断情報とともに失敗させてください。&lt;/p&gt;
+&lt;h2 id="モジュールサービス"&gt;
+ モジュールサービス
+ &lt;a href="#%e3%83%a2%e3%82%b8%e3%83%a5%e3%83%bc%e3%83%ab%e3%82%b5%e3%83%bc%e3%83%93%e3%82%b9" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;JPMSでは、コンシューマモジュールが&lt;code&gt;uses com.example.Codec&lt;/code&gt;を宣言し、プロバイダが&lt;code&gt;provides com.example.Codec with com.example.JsonCodec&lt;/code&gt;を宣言します。モジュール解決では、モジュールシステムの規則に従ってサービスプロバイダが考慮されます。&lt;code&gt;ServiceLoader&lt;/code&gt;のためだけにプロバイダクラスをexportする必要はありません。名前付きモジュールのプロバイダは、サービス宣言の制約に従う限り、publicな引数なしコンストラクタまたはpublicなstaticプロバイダメソッドを持つことができます。&lt;code&gt;ServiceLoader.load(service, loader)&lt;/code&gt;は指定されたローダーの可視性に従いますが、モジュール対応のオーバーロードはモジュールレイヤーを起点に動作します。ローダーとレイヤーはサービス境界の一部であり、偶然の実装詳細ではありません。&lt;/p&gt;
+&lt;p&gt;クラスパス構成は、unnamed moduleとautomatic moduleで引き続きサポートされるため、移行が可能です。解決されたプロバイダ集合をテストせずに両方の仕組みを公開することは避けてください。重複や順序に関する仮定によって、選択結果が移植不能になるためです。&lt;/p&gt;
+&lt;h2 id="進化の例としてのjdbc"&gt;
+ 進化の例としてのJDBC
+ &lt;a href="#%e9%80%b2%e5%8c%96%e3%81%ae%e4%be%8b%e3%81%a8%e3%81%97%e3%81%a6%e3%81%aejdbc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;初期のJDBCドライバ利用では、&lt;code&gt;Class.forName(&amp;quot;vendor.Driver&amp;quot;)&lt;/code&gt;を呼び出して、&lt;code&gt;DriverManager&lt;/code&gt;へのドライバのstatic登録を発生させることがよくありました。JDBC 4では&lt;code&gt;java.sql.Driver&lt;/code&gt;向けのサービスプロバイダローディングが導入され、互換性のあるドライバJARを&lt;code&gt;META-INF/services/java.sql.Driver&lt;/code&gt;から検出できるようになりました。現代のアプリケーションでも、使用するドライバと接続プロパティは明示的に構成すべきです。自動検出によって不要になるのはブートストラップ呼び出しであり、データベース認証やバージョン互換性に関する考慮ではありません。&lt;/p&gt;
+&lt;h2 id="参考資料"&gt;
+ 参考資料
+ &lt;a href="#%e5%8f%82%e8%80%83%e8%b3%87%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ServiceLoader.html"&gt;JDK &lt;code&gt;ServiceLoader&lt;/code&gt; API&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/specs/jar/jar.html#service-providers"&gt;JARファイル仕様、サービスプロバイダ&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DriverManager.html"&gt;JDBC &lt;code&gt;DriverManager&lt;/code&gt; API&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</description></item></channel></rss>

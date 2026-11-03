@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Computer Architecture on cesun.life</title><link>https://example.org/zh-tw/tags/computer-architecture/</link><description>Recent content in Computer Architecture on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sat, 07 Jun 2025 09:28:40 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/computer-architecture/index.xml" rel="self" type="application/rss+xml"/><item><title>ARM 架構簡介</title><link>https://example.org/zh-tw/arm-architecture/</link><pubDate>Sat, 07 Jun 2025 09:28:40 +0800</pubDate><guid>https://example.org/zh-tw/arm-architecture/</guid><description>&lt;p&gt;Arm 定義的是一系列指令集架構（ISA），而不是一種處理器實作。架構規範程式設計師可見的狀態、指令語意、例外、特權和記憶體順序。核心的管線、快取階層和分支預測器屬於微架構選擇。&lt;/p&gt;
+&lt;p&gt;架構設定檔用於區分部署需求。A-profile 以具備虛擬記憶體的應用程式處理器為目標，R-profile 以即時系統為目標，M-profile 以微控制器為目標。除非另有說明，以下介紹的執行狀態和特權模型均針對 A-profile 系統。&lt;/p&gt;
+&lt;h2 id="執行狀態與指令集"&gt;
+ 執行狀態與指令集
+ &lt;a href="#%e5%9f%b7%e8%a1%8c%e7%8b%80%e6%85%8b%e8%88%87%e6%8c%87%e4%bb%a4%e9%9b%86" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;strong&gt;AArch32&lt;/strong&gt; 提供 32 位元通用暫存器，可以執行 A32 指令集，或執行歷史上稱為 Thumb 的可變長度 T32 指令集。由 Armv8-A 引入的 &lt;strong&gt;AArch64&lt;/strong&gt; 提供 31 個 64 位元通用暫存器和固定寬度的 A64 指令集。&lt;code&gt;X0&lt;/code&gt; 到 &lt;code&gt;X30&lt;/code&gt; 表示 64 位元暫存器；&lt;code&gt;W0&lt;/code&gt; 到 &lt;code&gt;W30&lt;/code&gt; 表示對應暫存器的低 32 位元。寫入 &lt;code&gt;W&lt;/code&gt; 暫存器會清除其對應 &lt;code&gt;X&lt;/code&gt; 暫存器的高半部。&lt;/p&gt;
+&lt;p&gt;處理器可以實作多個執行狀態，但不能根據產品具備 64 位元能力來推斷其支援哪些狀態。Armv8-A 允許 AArch64 作業系統支援 AArch32 應用程式，而後續架構版本允許實作在選定的例外層級不支援 AArch32。因此，軟體必須使用平台文件和作業系統介面來判定可用的狀態。&lt;/p&gt;
+&lt;p&gt;執行狀態不只是暫存器寬度。AArch32 和 AArch64 具有不同的指令編碼、例外模型、系統暫存器和 ABI。程式碼不能透過普通分支切換狀態；必須透過例外返回或其他由架構定義的轉換來建立目標狀態。&lt;/p&gt;
+&lt;h2 id="暫存器與程序呼叫"&gt;
+ 暫存器與程序呼叫
+ &lt;a href="#%e6%9a%ab%e5%ad%98%e5%99%a8%e8%88%87%e7%a8%8b%e5%ba%8f%e5%91%bc%e5%8f%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;A64 是一種載入-儲存 ISA：算術運算在暫存器上執行，而明確的載入和儲存指令存取記憶體。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;asm&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-asm" data-lang="asm"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;ldr&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;w0&lt;/span&gt;, [&lt;span style="color:#66d9ef"&gt;x1&lt;/span&gt;] &lt;span style="color:#75715e"&gt;// 載入 32 位元值
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;add&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;w0&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;w0&lt;/span&gt;, &lt;span style="color:#75715e"&gt;#1
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;str&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;w0&lt;/span&gt;, [&lt;span style="color:#66d9ef"&gt;x1&lt;/span&gt;]&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;多個暫存器名稱具有架構規定或慣例上的角色：&lt;/p&gt;</description></item><item><title>RISC-V 架構簡介</title><link>https://example.org/zh-tw/risc-v-architecture/</link><pubDate>Sun, 29 Jan 2023 16:47:11 +0800</pubDate><guid>https://example.org/zh-tw/risc-v-architecture/</guid><description>&lt;p&gt;RISC-V 是一種開放的指令集架構，由基礎整數 ISA 和分別進行版本管理的擴充組成。ISA 定義指令行為和特權執行；平台設定檔、ABI 以及執行環境則補充執行可互通軟體所需的要求。&lt;/p&gt;
+&lt;h2 id="基礎整數-isa-與暫存器慣例"&gt;
+ 基礎整數 ISA 與暫存器慣例
+ &lt;a href="#%e5%9f%ba%e7%a4%8e%e6%95%b4%e6%95%b8-isa-%e8%88%87%e6%9a%ab%e5%ad%98%e5%99%a8%e6%85%a3%e4%be%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;RV32I&lt;/code&gt; 和 &lt;code&gt;RV64I&lt;/code&gt; 分別提供 32 位元和 64 位元整數暫存器。兩者都定義了從 &lt;code&gt;x0&lt;/code&gt; 到 &lt;code&gt;x31&lt;/code&gt; 的 32 個通用暫存器。&lt;code&gt;x0&lt;/code&gt; 永遠讀取為零，並捨棄寫入。程式計數器透過控制流程效果在架構上可見，而不是作為通用暫存器存在。&lt;/p&gt;
+&lt;p&gt;RISC-V 採用載入—儲存設計。整數算術讀取暫存器運算元並寫入暫存器；載入和儲存會在暫存器與記憶體之間移動值。基礎 ISA 使用固定的 32 位元編碼。&lt;code&gt;RV64I&lt;/code&gt; 增加了 64 位元暫存器和運算，以及對低 32 位元值執行符號延伸的 &lt;code&gt;*W&lt;/code&gt; 運算；因此，它並非只是位址較寬的 &lt;code&gt;RV32I&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;標準整數呼叫慣例分配以下 ABI 名稱和角色：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;Registers&lt;/th&gt;
+ &lt;th&gt;ABI names&lt;/th&gt;
+ &lt;th&gt;Role&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x0&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;zero&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;常數零&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x1&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;ra&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;返回位址&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x2&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;sp&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;堆疊指標&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x5&lt;/code&gt;-&lt;code&gt;x7&lt;/code&gt;, &lt;code&gt;x28&lt;/code&gt;-&lt;code&gt;x31&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;t0&lt;/code&gt;-&lt;code&gt;t6&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;caller-saved 暫存暫存器&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x8&lt;/code&gt;-&lt;code&gt;x9&lt;/code&gt;, &lt;code&gt;x18&lt;/code&gt;-&lt;code&gt;x27&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;s0&lt;/code&gt;-&lt;code&gt;s11&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;callee-saved 暫存器&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;x10&lt;/code&gt;-&lt;code&gt;x17&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;&lt;code&gt;a0&lt;/code&gt;-&lt;code&gt;a7&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;引數和返回值&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;浮點和向量呼叫慣例還會增加各自的規則。與編譯程式碼互通的組合語言必須遵循完整的 psABI，包括堆疊對齊、需保留的狀態、重定位以及程式碼模型。&lt;/p&gt;</description></item><item><title>x86 與 x86-64 架構概觀</title><link>https://example.org/zh-tw/x86-overview/</link><pubDate>Sat, 30 Oct 2021 22:12:19 +0800</pubDate><guid>https://example.org/zh-tw/x86-overview/</guid><description>&lt;p&gt;x86 源自 Intel 的 16 位元 8086。80286 引入保護模式，IA-32 建立 32 位元程式設計模型與分頁，而 AMD64 將架構擴充至 64 位元執行。Intel 將合併架構稱為 Intel 64 與 IA-32；AMD 文件使用 AMD64。供應商名稱不會決定每項功能，因此軟體必須明確探索擴充功能。&lt;/p&gt;
+&lt;h2 id="位元組順序與運算元大小"&gt;
+ 位元組順序與運算元大小
+ &lt;a href="#%e4%bd%8d%e5%85%83%e7%b5%84%e9%a0%86%e5%ba%8f%e8%88%87%e9%81%8b%e7%ae%97%e5%85%83%e5%a4%a7%e5%b0%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;x86 以位元組為單位定址記憶體，並以小端序儲存多位元組整數：最低有效位元組位於最低位址。對於從位址 &lt;code&gt;p&lt;/code&gt; 開始的 32 位元值 &lt;code&gt;0x12345678&lt;/code&gt;，記憶體內容為：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;address p p+1 p+2 p+3
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;byte 78 56 34 12&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;架構術語將 16 位元值稱為&lt;strong&gt;字&lt;/strong&gt;，32 位元值稱為&lt;strong&gt;雙字&lt;/strong&gt;，64 位元值稱為&lt;strong&gt;四字&lt;/strong&gt;，128 位元值稱為&lt;strong&gt;雙四字&lt;/strong&gt;。這些名稱獨立於 C 實作的型別大小。&lt;/p&gt;
+&lt;p&gt;指令運算元大小取決於執行模式、前綴、操作碼，以及 REX、VEX 或 EVEX 欄位。在 64 位元模式中，許多整數指令仍預設使用 32 位元運算元；在支援的位置，&lt;code&gt;REX.W&lt;/code&gt; 編碼會選取 64 位元。位址大小是獨立屬性，控制有效位址計算。&lt;/p&gt;
+&lt;p&gt;一般整數載入與儲存允許未對齊位址，但跨越快取行或頁面邊界可能增加延遲或改變錯誤行為。原子性保證取決於對齊、寬度、記憶體型別與指令，因此共用資料應符合架構的明確要求。&lt;/p&gt;
+&lt;h2 id="執行模式"&gt;
+ 執行模式
+ &lt;a href="#%e5%9f%b7%e8%a1%8c%e6%a8%a1%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;重設後，x86 處理器會在實體位址模式啟動。韌體建立後續模式所需的表格與控制暫存器。&lt;/p&gt;</description></item><item><title>CPU 架構概觀</title><link>https://example.org/zh-tw/cpu-overview/</link><pubDate>Thu, 15 Jul 2021 15:11:38 +0800</pubDate><guid>https://example.org/zh-tw/cpu-overview/</guid><description>&lt;p&gt;處理器實作指令集架構（ISA）：該契約定義指令、暫存器、資料型別、位址形成、例外與權限行為。&lt;strong&gt;微架構&lt;/strong&gt;使用管線、執行單元、快取、預測器與內部佇列實作該契約。程式會觀察架構狀態；效能則取決於微架構狀態。&lt;/p&gt;
+&lt;h2 id="從擷取到退休"&gt;
+ 從擷取到退休
+ &lt;a href="#%e5%be%9e%e6%93%b7%e5%8f%96%e5%88%b0%e9%80%80%e4%bc%91" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在概念層級，處理器會擷取指令位元組、解碼指令、取得運算元、執行操作、在需要時存取記憶體，並提交結果。簡單處理器可以循序執行這些步驟。管線化處理器會重疊多個指令的步驟，因此改善輸送量，而不要求每個指令都具有低延遲。&lt;/p&gt;
+&lt;p&gt;架構狀態包括通用暫存器、狀態暫存器、程式計數器與架構可見記憶體。微架構狀態包括已解碼操作快取、實體暫存器、重新排序緩衝區、分支歷史與快取替換中繼資料。內容切換必須保留 ABI 承諾的架構狀態；它既不儲存也不公開每個內部預測器或管線項目。&lt;/p&gt;
+&lt;p&gt;管線必須處理三類相依性：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;資料危害&lt;/strong&gt;：一個操作消耗另一個尚未產生的結果。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;結構危害&lt;/strong&gt;：操作競爭執行單元、連接埠、佇列或快取資源。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;控制危害&lt;/strong&gt;：分支可能變更下一個擷取位址。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;轉送會在暫存器寫回前提供結果。暫存器重新命名將架構名稱映射至更大的實體暫存器集合，從而移除虛假的讀後寫與寫後寫相依性。重新排序緩衝區讓獨立操作可以亂序執行，同時以保留精確架構例外的順序退休已完成操作。&lt;/p&gt;
+&lt;h2 id="超純量與推測執行"&gt;
+ 超純量與推測執行
+ &lt;a href="#%e8%b6%85%e7%b4%94%e9%87%8f%e8%88%87%e6%8e%a8%e6%b8%ac%e5%9f%b7%e8%a1%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;超純量前端每週期可以解碼或發出多個操作。發出寬度只是其中一項限制：真正相依性、執行連接埠壓力、快取遺漏與退休寬度都可能降低持續輸送量。&lt;/p&gt;
+&lt;p&gt;分支預測會在分支解析前選擇可能的控制流程路徑。正確預測會讓管線保持供應；預測錯誤會丟棄較年輕的推測工作，並在解析出的目標重新開始擷取。推測不得提交錯誤的架構狀態，但暫時執行可能影響快取與其他共享微架構資源。因此，隔離程式碼必須遵循平台對暫時執行弱點的指引，而不能只依賴架構權限檢查。&lt;/p&gt;
+&lt;h2 id="快取階層與記憶體延遲"&gt;
+ 快取階層與記憶體延遲
+ &lt;a href="#%e5%bf%ab%e5%8f%96%e9%9a%8e%e5%b1%a4%e8%88%87%e8%a8%98%e6%86%b6%e9%ab%94%e5%bb%b6%e9%81%b2" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;處理器核心透過階層存取 DRAM，因為快速儲存昂貴且受物理限制。L1 指令與資料快取小且靠近核心。較大的 L2 與末級快取以延遲換取容量。快取行會一併傳輸相鄰位元組，因此循序存取利用空間區域性，重用則利用時間區域性。&lt;/p&gt;
+&lt;p&gt;快取會將位址分為標籤、集合索引與行偏移。關聯性允許集合中存在多個行，以比較標籤與替換複雜度為代價減少衝突遺漏。硬體預取器可以隱藏可預測延遲，但指標追逐與容量遺漏仍會暴露較低階快取或 DRAM 延遲。&lt;/p&gt;
+&lt;p&gt;多核心系統使用一致性協定協調同一快取行的快取副本。一致性為單一位置的寫入建立順序；記憶體一致性模型則定義不同存取之間允許的順序。正確的並行軟體必須使用語言原子操作、鎖或其他同步，因為快取一致性不會使未同步的複合操作變成原子操作。&lt;/p&gt;
+&lt;p&gt;虛擬記憶體硬體透過頁表轉換虛擬位址。轉譯後備緩衝區快取最近的轉換，因此即使資料本身已快取，TLB 遺漏仍會增加頁表走訪。NUMA 系統加入另一種距離：核心存取本機記憶體時，延遲較低或頻寬可能高於連接至另一插槽的記憶體。&lt;/p&gt;
+&lt;h2 id="核心執行緒與-simd"&gt;
+ 核心、執行緒與 SIMD
+ &lt;a href="#%e6%a0%b8%e5%bf%83%e5%9f%b7%e8%a1%8c%e7%b7%92%e8%88%87-simd" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;strong&gt;核心&lt;/strong&gt;包含一個或多個架構執行內容。同步多執行緒（SMT）讓硬體執行緒共享核心的前端、快取與執行資源。SMT 可以填補原本閒置的發出槽，但競爭也可能降低每執行緒效能。作業系統執行緒是排程物件，數量可能超過核心與硬體執行緒。&lt;/p&gt;
+&lt;p&gt;多個核心會執行獨立指令串流。共享記憶體程式仍必須考慮同步、快取行競爭與錯誤共享。增加核心不會加速循序相依鏈。&lt;/p&gt;
+&lt;p&gt;SIMD 指令會將一項操作套用至向量暫存器中的多個通道。x86 提供 SSE、AVX 與 AVX-512 系列；Arm 與 RISC-V 提供自己的向量功能。名義向量寬度描述架構狀態，而不是延遲或輸送量。編譯器需要別名、對齊、相依性與目標功能資訊，才能安全地向量化。&lt;/p&gt;
+&lt;h2 id="組合語法與-abi-邊界"&gt;
+ 組合語法與 ABI 邊界
+ &lt;a href="#%e7%b5%84%e5%90%88%e8%aa%9e%e6%b3%95%e8%88%87-abi-%e9%82%8a%e7%95%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;組合語法是工具慣例，而不是 ISA 屬性。x86 Intel 語法將目的放在前面：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;asm&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-asm" data-lang="asm"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;mov&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;rax&lt;/span&gt;, &lt;span style="color:#66d9ef"&gt;rbx&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;AT&amp;amp;T 語法將來源放在前面，以 &lt;code&gt;%&lt;/code&gt; 為暫存器加前綴，並在許多助記符上加運算元大小後綴：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;asm&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-asm" data-lang="asm"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;movq&lt;/span&gt; %rbx, %rax&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;NASM 使用 Intel 語法，而 GNU &lt;code&gt;objdump -d&lt;/code&gt; 預設使用 AT&amp;amp;T 語法，並接受 &lt;code&gt;-Mintel&lt;/code&gt;。其他架構有自己的語法與工具特定指示詞。語法也不會定義呼叫慣例：引數暫存器、被呼叫端保存狀態、堆疊對齊與物件格式屬於 ABI。請參閱 &lt;a href="https://example.org/zh-tw/nasm/"&gt;NASM&lt;/a&gt; 了解組譯器工作流程。&lt;/p&gt;</description></item></channel></rss>

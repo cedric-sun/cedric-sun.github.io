@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Aur on cesun.life</title><link>https://example.org/zh-cn/tags/aur/</link><description>Recent content in Aur on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sun, 16 Mar 2025 08:23:44 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/aur/index.xml" rel="self" type="application/rss+xml"/><item><title>AUR 软件包依赖</title><link>https://example.org/zh-cn/aur-dependencies/</link><pubDate>Sun, 16 Mar 2025 08:23:44 +0800</pubDate><guid>https://example.org/zh-cn/aur-dependencies/</guid><description>&lt;p&gt;AUR 仓库提供的是 &lt;code&gt;PKGBUILD&lt;/code&gt;，即可执行的软件包元数据，而不是二进制软件包或依赖解析器。因此，要安全地构建软件包，必须区分使构建成为可能的依赖项与安装到最终系统中的依赖项。&lt;/p&gt;
+&lt;h2 id="pkgbuild-中的依赖类别"&gt;
+ &lt;code&gt;PKGBUILD&lt;/code&gt; 中的依赖类别
+ &lt;a href="#pkgbuild-%e4%b8%ad%e7%9a%84%e4%be%9d%e8%b5%96%e7%b1%bb%e5%88%ab" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;PKGBUILD(5)&lt;/code&gt; 定义了生命周期不同的依赖数组：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;depends&lt;/code&gt; 声明运行已安装软件包所需的软件包。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;makedepends&lt;/code&gt; 声明仅在构建期间需要的工具和库。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;checkdepends&lt;/code&gt; 声明 &lt;code&gt;check()&lt;/code&gt; 所需的软件包。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;版本约束使用 pacman 的依赖语法，例如 &lt;code&gt;depends=('libfoo&amp;gt;=2')&lt;/code&gt;。拆分软件包可以使用特定于软件包的依赖数组，例如 &lt;code&gt;package_client() { depends=('libclient') }&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;不要仅仅因为软件包没有某个运行时库也能构建，就将该库移入 &lt;code&gt;makedepends&lt;/code&gt;。反之，如果没有任何已安装文件需要编译器，也不要将编译器保留在 &lt;code&gt;depends&lt;/code&gt; 中。准确的依赖数组可以让 pacman 正确规划升级和删除操作。&lt;/p&gt;
+&lt;h2 id="makepkg-负责构建pacman-负责安装"&gt;
+ &lt;code&gt;makepkg&lt;/code&gt; 负责构建；&lt;code&gt;pacman&lt;/code&gt; 负责安装
+ &lt;a href="#makepkg-%e8%b4%9f%e8%b4%a3%e6%9e%84%e5%bb%bapacman-%e8%b4%9f%e8%b4%a3%e5%ae%89%e8%a3%85" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;请以非特权用户运行 &lt;code&gt;makepkg&lt;/code&gt;。它会下载并验证源代码、检查依赖项、执行 &lt;code&gt;prepare()&lt;/code&gt;、&lt;code&gt;build()&lt;/code&gt;、&lt;code&gt;check()&lt;/code&gt; 和 &lt;code&gt;package()&lt;/code&gt;，然后创建供 pacman 使用的归档文件。&lt;code&gt;makepkg -i&lt;/code&gt; 只会在构建成功后安装该归档文件；实际执行安装的是 pacman。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;git clone https://aur.archlinux.org/example.git
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;cd example
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;makepkg --cleanbuild --syncdeps
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo pacman -U ./*.pkg.tar.zst&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;--syncdeps&lt;/code&gt; 会要求 pacman 安装缺失的依赖项。因此，它只能解析已配置的二进制仓库中可用的软件包。AUR 分发的是构建配方，而不是仓库软件包，所以 &lt;code&gt;--syncdeps&lt;/code&gt; 无法获取 AUR 依赖项。&lt;/p&gt;
+&lt;p&gt;避免使用 &lt;code&gt;--nodeps&lt;/code&gt;，也绝不要使用 &lt;code&gt;sudo&lt;/code&gt; 运行 &lt;code&gt;makepkg&lt;/code&gt;；绕过依赖检查可能生成链接不正确的软件包，而以 root 身份执行未经审查的 &lt;code&gt;PKGBUILD&lt;/code&gt; shell 代码会赋予其不必要的权限。&lt;/p&gt;</description></item><item><title>维护 AUR 软件包</title><link>https://example.org/zh-cn/maintaining-aur-packages/</link><pubDate>Wed, 05 Oct 2022 15:39:56 +0800</pubDate><guid>https://example.org/zh-cn/maintaining-aur-packages/</guid><description>&lt;p&gt;Arch User Repository 存储包含软件包配方的 Git 仓库，而不是已构建的软件包。
+因此，维护 AUR 软件包意味着发布可审查的 &lt;code&gt;PKGBUILD&lt;/code&gt; 和匹配的 &lt;code&gt;.SRCINFO&lt;/code&gt;，
+然后在隔离的构建环境中验证该配方。&lt;/p&gt;
+&lt;h2 id="正确描述软件包"&gt;
+ 正确描述软件包
+ &lt;a href="#%e6%ad%a3%e7%a1%ae%e6%8f%8f%e8%bf%b0%e8%bd%af%e4%bb%b6%e5%8c%85" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;PKGBUILD&lt;/code&gt; 定义 &lt;code&gt;pkgname&lt;/code&gt;、&lt;code&gt;pkgver&lt;/code&gt;、&lt;code&gt;pkgrel&lt;/code&gt;、&lt;code&gt;arch&lt;/code&gt;、许可证、源、校验和和依赖数组等元数据。
+其函数划分各个阶段：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;prepare()&lt;/code&gt; 应用补丁或准备源代码。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;build()&lt;/code&gt; 编译或生成软件。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;check()&lt;/code&gt; 运行测试，并需要 &lt;code&gt;checkdepends&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;package()&lt;/code&gt; 只在 &lt;code&gt;$pkgdir&lt;/code&gt; 下安装文件。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;使用 &lt;code&gt;$srcdir&lt;/code&gt; 保存源代码和构建状态；软件包函数绝不能写入主机文件系统。
+在 &lt;code&gt;depends&lt;/code&gt; 中声明运行时依赖，在 &lt;code&gt;makedepends&lt;/code&gt; 中声明仅构建工具，
+在 &lt;code&gt;checkdepends&lt;/code&gt; 中声明仅测试软件包。缺失的声明可能在开发者工作站上隐藏，
+但会导致用户构建失败。&lt;/p&gt;
+&lt;p&gt;检查每个源 URL、补丁和 shell 表达式，因为 &lt;code&gt;makepkg&lt;/code&gt; 会以调用用户的权限执行配方。
+将发布软件包固定到不可变的上游工件，并使用校验和。上游发布签名版本时，
+通过 &lt;code&gt;validpgpkeys&lt;/code&gt; 验证签名；校验和能检测字节变化，但不能建立源的可信性。&lt;/p&gt;
+&lt;h2 id="在干净-chroot-中构建和检查"&gt;
+ 在干净 chroot 中构建和检查
+ &lt;a href="#%e5%9c%a8%e5%b9%b2%e5%87%80-chroot-%e4%b8%ad%e6%9e%84%e5%bb%ba%e5%92%8c%e6%a3%80%e6%9f%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;不要以 root 身份运行 &lt;code&gt;makepkg&lt;/code&gt;。在干净 chroot 中构建，以便主机依赖、配置和过时的构建工件
+不会使不完整的配方通过。配置好 &lt;code&gt;devtools&lt;/code&gt; 后：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;extra-x86_64-build&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在 chroot 外进行本地迭代时，从干净的源代码树开始，并允许 makepkg 解析仓库依赖：&lt;/p&gt;</description></item></channel></rss>

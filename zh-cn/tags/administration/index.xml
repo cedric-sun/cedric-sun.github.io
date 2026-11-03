@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Administration on cesun.life</title><link>https://example.org/zh-cn/tags/administration/</link><description>Recent content in Administration on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sat, 07 Oct 2023 01:45:35 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/administration/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 管理笔记</title><link>https://example.org/zh-cn/linux-administration-miscellaneous/</link><pubDate>Sat, 07 Oct 2023 01:45:35 +0800</pubDate><guid>https://example.org/zh-cn/linux-administration-miscellaneous/</guid><description>&lt;p&gt;本文汇集了几项相互独立的管理任务：可移动存储、能力、文件系统位置、图像合成以及 ELF 符号版本。每个章节都说明了自动化所需关注的操作边界。&lt;/p&gt;
+&lt;h2 id="安全操作可移动设备"&gt;
+ 安全操作可移动设备
+ &lt;a href="#%e5%ae%89%e5%85%a8%e6%93%8d%e4%bd%9c%e5%8f%af%e7%a7%bb%e5%8a%a8%e8%ae%be%e5%a4%87" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在关闭可移动介质的电源之前，先卸载所有已挂载的文件系统。&lt;code&gt;udisksctl&lt;/code&gt; 使用 UDisks 服务，因此会应用桌面会话授权并协调操作，而不是直接发出未经中介的设备命令。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;lsblk -o NAME,PATH,TYPE,FSTYPE,MOUNTPOINTS
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;udisksctl unmount -b /dev/sdb1
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;udisksctl power-off -b /dev/sdb&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;向 &lt;code&gt;unmount&lt;/code&gt; 传入 &lt;code&gt;/dev/sdb1&lt;/code&gt; 这样的分区，向 &lt;code&gt;power-off&lt;/code&gt; 传入 &lt;code&gt;/dev/sdb&lt;/code&gt; 这样的完整驱动器。后者会刷新缓冲区、使设备退出内核使用，并在硬件支持时关闭驱动器。由于设备名称可能在每次连接事件后发生变化，请在执行命令前立即确认设备名称。成功卸载并不保证 USB 外壳已经断电。&lt;/p&gt;
+&lt;h2 id="使用能力委派权限"&gt;
+ 使用能力委派权限
+ &lt;a href="#%e4%bd%bf%e7%94%a8%e8%83%bd%e5%8a%9b%e5%a7%94%e6%b4%be%e6%9d%83%e9%99%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Linux 能力将传统上拥有全部权限的 root 权限划分为相互独立、分别检查的单元。进程具有 permitted、effective、inheritable、bounding 和 ambient 能力集；文件也可以携带 permitted 和 inheritable 能力掩码以及 effective 位。每项能力对应特定的内核检查，因此请查阅 &lt;code&gt;capabilities(7)&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;例如，需要设置系统时钟的专用二进制文件可以获得 &lt;code&gt;CAP_SYS_TIME&lt;/code&gt;：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;bash&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;sudo setcap cap_sys_time&lt;span style="color:#f92672"&gt;=&lt;/span&gt;ep /opt/example/bin/clock-setter
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;getcap /opt/example/bin/clock-setter&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;=ep&lt;/code&gt; 会将该能力添加到文件的 permitted 集，并请求它进入所执行进程的 effective 集。对于作用范围明确且不可写的可执行文件，只授予最小能力集。复制、打包或不支持所需扩展属性的文件系统可能会移除文件能力，因此部署检查应运行 &lt;code&gt;getcap&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;能力并不是完整的沙箱。尤其是 &lt;code&gt;CAP_SYS_ADMIN&lt;/code&gt; 授权许多互不相关的操作，而特权二进制文件中的内存安全问题或命令注入漏洞仍可能导致系统被攻破。如果委派内容可以表示为一条经过审计的命令，那么受约束的 &lt;code&gt;sudoers&lt;/code&gt; 规则可能更易于检查。&lt;/p&gt;</description></item></channel></rss>

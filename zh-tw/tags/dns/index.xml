@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Dns on cesun.life</title><link>https://example.org/zh-tw/tags/dns/</link><description>Recent content in Dns on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Thu, 15 Jan 2026 18:06:05 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/dns/index.xml" rel="self" type="application/rss+xml"/><item><title>BIND 9 權威與遞迴 DNS</title><link>https://example.org/zh-tw/bind-9-dns/</link><pubDate>Thu, 15 Jan 2026 18:06:05 +0800</pubDate><guid>https://example.org/zh-tw/bind-9-dns/</guid><description>&lt;p&gt;BIND 9 會執行 &lt;code&gt;named&lt;/code&gt; 名稱伺服器。其設定決定它是否以權威方式回答、提供遞迴、傳送區域，或接受動態更新。將這些角色分開處理，因為面向網際網路的權威伺服器不應成為開放的遞迴解析器。&lt;/p&gt;
+&lt;h2 id="伺服器設定"&gt;
+ 伺服器設定
+ &lt;a href="#%e4%bc%ba%e6%9c%8d%e5%99%a8%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;named.conf&lt;/code&gt; 定義全域選項、存取控制清單、區域與記錄。最小的權威設定會限制遞迴與區域傳送：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;named&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-named" data-lang="named"&gt;acl trusted-recursors { 192.0.2.0/24; 2001:db8:1::/48; };
+
+options {
+ directory &amp;#34;/var/named&amp;#34;;
+ listen-on { any; };
+ listen-on-v6 { any; };
+ recursion no;
+ allow-transfer { none; };
+ minimal-responses yes;
+};
+
+zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/example.net&amp;#34;;
+ allow-transfer { 192.0.2.53; };
+};&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;遞迴解析器需要 &lt;code&gt;recursion yes&lt;/code&gt;，以及限制於其用戶端的 &lt;code&gt;allow-recursion&lt;/code&gt; 或 &lt;code&gt;allow-query-cache&lt;/code&gt; ACL。除非部署明確提供具有濫用控制的公開解析器，否則絕不要讓不受信任的網路使用遞迴。&lt;/p&gt;
+&lt;p&gt;ACL 可以由 &lt;code&gt;allow-query&lt;/code&gt;、&lt;code&gt;allow-recursion&lt;/code&gt;、&lt;code&gt;allow-query-cache&lt;/code&gt;、&lt;code&gt;allow-transfer&lt;/code&gt; 與 &lt;code&gt;match-clients&lt;/code&gt; 重複使用。BIND &lt;code&gt;view&lt;/code&gt; 陳述式會依來源位址、目的位址或 TSIG 身分，呈現不同的區域與遞迴政策：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;named&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;pre tabindex="0"&gt;&lt;code class="language-named" data-lang="named"&gt;view &amp;#34;internal&amp;#34; {
+ match-clients { trusted-recursors; };
+ recursion yes;
+ allow-recursion { trusted-recursors; };
+
+ zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/internal/example.net&amp;#34;;
+ };
+};
+
+view &amp;#34;external&amp;#34; {
+ match-clients { any; };
+ recursion no;
+
+ zone &amp;#34;example.net&amp;#34; {
+ type primary;
+ file &amp;#34;zones/external/example.net&amp;#34;;
+ };
+};&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;啟用 view 時，請在適用的 view 中定義每個用戶端可見的區域。將最具體的 &lt;code&gt;match-clients&lt;/code&gt; 規則放在前面，因為 BIND 會選取第一個相符的 view。&lt;/p&gt;</description></item><item><title>內容傳遞網路</title><link>https://example.org/zh-tw/content-delivery-networks/</link><pubDate>Thu, 10 Jul 2025 20:16:44 +0800</pubDate><guid>https://example.org/zh-tw/content-delivery-networks/</guid><description>&lt;p&gt;內容傳遞網路（CDN）會從接近使用者的邊緣位置提供內容。視供應商而定，它可以快取靜態資產、代理動態流量、
+終止 TLS、過濾攻擊並最佳化連線。來源站仍是具權威性的應用程式；CDN 則是具有明確快取與路由原則的中介者。&lt;/p&gt;
+&lt;h2 id="將網域連線至-cdn"&gt;
+ 將網域連線至 CDN
+ &lt;a href="#%e5%b0%87%e7%b6%b2%e5%9f%9f%e9%80%a3%e7%b7%9a%e8%87%b3-cdn" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;操作人員會設定來源站，例如 &lt;code&gt;https://origin.example.net&lt;/code&gt;，並為 &lt;code&gt;www.example.com&lt;/code&gt; 建立 CDN 分發。
+供應商會提供類似 &lt;code&gt;example.cdnprovider.net&lt;/code&gt; 的主機名稱；接著操作人員建立 DNS 記錄，通常是將
+&lt;code&gt;www.example.com&lt;/code&gt; 指向該主機的 CNAME：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;www.example.com. CNAME example.cdnprovider.net.&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在邊緣節點，CDN 會使用請求的主機名稱識別分發，並將適當的 &lt;code&gt;Host&lt;/code&gt; 標頭轉送至來源站。許多網站可以共用
+邊緣 IP 位址，因為 TLS SNI 與 HTTP 的 &lt;code&gt;Host&lt;/code&gt; 標頭會識別預定的虛擬主機。&lt;/p&gt;
+&lt;p&gt;DNS apex 通常不能包含 CNAME，因為它也必須保存 SOA 與 NS 記錄。供應商會透過 A/AAAA 別名功能、支援時的
+ANAME/ALIAS 記錄，或委派 DNS 來處理。確切行為取決於 DNS 供應商。&lt;/p&gt;
+&lt;h2 id="有意識地選擇快取行為"&gt;
+ 有意識地選擇快取行為
+ &lt;a href="#%e6%9c%89%e6%84%8f%e8%ad%98%e5%9c%b0%e9%81%b8%e6%93%87%e5%bf%ab%e5%8f%96%e8%a1%8c%e7%82%ba" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;快取鍵通常包含主機名稱、路徑、選定的查詢參數，以及選定的請求標頭或 Cookie。包含每個 Cookie 會破壞快取效率；
+省略會改變回應的值，則可能將一名使用者的內容洩漏給另一名使用者。&lt;/p&gt;
+&lt;p&gt;設定明確的 HTTP 快取指令。具版本的資產通常可以長時間快取：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;text&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-text" data-lang="text"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Cache-Control: public, max-age=31536000, immutable&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;HTML 與個人化回應通常需要較短的存留時間、重新驗證，或 &lt;code&gt;private&lt;/code&gt;/&lt;code&gt;no-store&lt;/code&gt;。清除操作適合處理特殊修正，
+但內容定址檔名與可預測的 TTL 是更可靠的日常失效機制。&lt;/p&gt;</description></item><item><title>DNS 線格式</title><link>https://example.org/zh-tw/dns-wire-format/</link><pubDate>Thu, 29 May 2025 15:04:54 +0800</pubDate><guid>https://example.org/zh-tw/dns-wire-format/</guid><description>&lt;p&gt;DNS 查詢和回應以 12 位元組標頭開頭，後面依序是 Question、Answer、Authority
+和 Additional 區段。所有多八位元組整數欄位都使用網路位元組順序。RFC 1035
+定義了基本格式；EDNS、DNSSEC 以及後續擴充在不變更基本標頭的情況下新增記錄
+和標頭語意。&lt;/p&gt;
+&lt;h2 id="標頭"&gt;
+ 標頭
+ &lt;a href="#%e6%a8%99%e9%a0%ad" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;欄位&lt;/th&gt;
+ &lt;th style="text-align: right"&gt;位元&lt;/th&gt;
+ &lt;th&gt;用途&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;ID&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;由用戶端選取並在回應中回送的識別碼&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;QR&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;查詢（&lt;code&gt;0&lt;/code&gt;）或回應（&lt;code&gt;1&lt;/code&gt;）&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;Opcode&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;4&lt;/td&gt;
+ &lt;td&gt;操作；&lt;code&gt;QUERY&lt;/code&gt; 為零&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;AA&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;回應中的權威回答指示&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;TC&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;訊息已被截斷&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;RD&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;用戶端要求遞迴&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;RA&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;1&lt;/td&gt;
+ &lt;td&gt;伺服器提供遞迴&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;Z&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;3&lt;/td&gt;
+ &lt;td&gt;保留的基本位元；擴充使用 AD 和 CD&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;RCODE&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;4&lt;/td&gt;
+ &lt;td&gt;基本回應碼&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;QDCOUNT&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;Question 數量&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;ANCOUNT&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;Answer 記錄數量&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;NSCOUNT&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;Authority 記錄數量&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;ARCOUNT&lt;/td&gt;
+ &lt;td style="text-align: right"&gt;16&lt;/td&gt;
+ &lt;td&gt;Additional 記錄數量&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;RD&lt;/code&gt; 要求接收伺服器執行遞迴；&lt;code&gt;RA&lt;/code&gt; 宣告伺服器能夠執行遞迴。&lt;code&gt;AA&lt;/code&gt; 表示回應
+伺服器對該回答具有權威性，不表示訊息中的每筆記錄都具有權威性。&lt;code&gt;TC&lt;/code&gt; 告知
+用戶端，當遭截斷的回應不足以完成處理時，必須透過 TCP 或其他支援的傳輸方式
+重試。&lt;/p&gt;</description></item><item><title>DNS 解析模型</title><link>https://example.org/zh-tw/dns-resolution-model/</link><pubDate>Fri, 02 Jul 2021 04:23:55 +0800</pubDate><guid>https://example.org/zh-tw/dns-resolution-model/</guid><description>&lt;p&gt;DNS 名稱構成一棵有根樹。網域是以某個名稱為根的子樹。區域
+是由權威資料服務的該樹之一部分管理範圍。因此，網域與區域並非同義詞：區域
+可以委派子樹，並不再包含其權威記錄。&lt;/p&gt;
+&lt;h2 id="委派與權威"&gt;
+ 委派與權威
+ &lt;a href="#%e5%a7%94%e6%b4%be%e8%88%87%e6%ac%8a%e5%a8%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;父區域透過在 &lt;code&gt;child.example.&lt;/code&gt; 該名稱發布 NS 記錄來進行委派。子區域發布自己的頂點 SOA 與 NS 記錄。解析器向父區域詢問該切點以下的資料時，會收到一則轉介，其 Authority 區段包含子區域的 NS RRset。&lt;/p&gt;
+&lt;p&gt;如果 NS 目標位於所委派的子區域內，父區域也會在 Additional 區段提供 glue A 或 AAAA 記錄。Glue 可打破在聯絡子區域名稱伺服器之前先解析該名稱伺服器的循環相依性。解析器必須將 glue 視為啟動用的位址資料，而非該目標位址的權威資料。&lt;/p&gt;
+&lt;p&gt;權威伺服器從其區域資料中回覆。遞迴解析器從其快取中回覆用戶端，或執行反覆查詢。Stub 解析器不會遍歷委派；它會要求已設定的遞迴解析器執行此操作。&lt;/p&gt;
+&lt;h2 id="回應語意"&gt;
+ 回應語意
+ &lt;a href="#%e5%9b%9e%e6%87%89%e8%aa%9e%e6%84%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;對於查詢，伺服器可以傳回答案、轉介或錯誤回應。
+&lt;code&gt;NXDOMAIN&lt;/code&gt; 表示查詢的名稱不存在。&lt;code&gt;NOERROR&lt;/code&gt; 搭配空答案時，則可能表示該名稱存在，但沒有查詢類型的記錄，通常稱為 NODATA。&lt;/p&gt;
+&lt;p&gt;CNAME 將其擁有者識別為別名。該擁有者不得同時存在其他資料，因為別名不得同時擁有獨立的權威資料。持續追蹤 CNAME 目標，直到取得所要求的類型、另一個別名或錯誤。DNAME 不同：它會為整個子樹建立別名，並對其擁有者以下的名稱觸發合成 CNAME 處理。&lt;/p&gt;
+&lt;h2 id="快取與-dnssec"&gt;
+ 快取與 DNSSEC
+ &lt;a href="#%e5%bf%ab%e5%8f%96%e8%88%87-dnssec" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;解析器會依據 TTL 快取 RRset。負面答案會依據 SOA 資訊進行快取。DNSSEC 讓驗證中的解析器能透過從已設定信任錨點開始、由 DS 到 DNSKEY 的信任鏈，驗證正面與負面答案。&lt;code&gt;NSEC&lt;/code&gt; 或 &lt;code&gt;NSEC3&lt;/code&gt; 證明可驗證否定結果；單獨的 NXDOMAIN 回應則不行。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Web-Server on cesun.life</title><link>https://example.org/zh-tw/tags/web-server/</link><description>Recent content in Web-Server on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Mon, 19 Dec 2022 02:06:42 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/web-server/index.xml" rel="self" type="application/rss+xml"/><item><title>Nginx 管理與內部機制</title><link>https://example.org/zh-tw/nginx/</link><pubDate>Mon, 19 Dec 2022 02:06:42 +0800</pubDate><guid>https://example.org/zh-tw/nginx/</guid><description>&lt;p&gt;Nginx 是事件驅動的 HTTP、串流與郵件代理伺服器。應將其設定、程序權限與上游逾時視同正式環境程式碼：重新載入前先驗證變更，並保留一份已知可用的設定。&lt;/p&gt;
+&lt;h2 id="事件驅動-io"&gt;
+ 事件驅動 I/O
+ &lt;a href="#%e4%ba%8b%e4%bb%b6%e9%a9%85%e5%8b%95-io" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Nginx 以非阻塞事件迴圈為核心。主程序讀取設定並啟動工作程序；每個工作程序接著在 epoll、kqueue 或平台提供的同等就緒通知後端等待。工作程序會為每個對端維護一筆連線記錄，並只在通訊端就緒時推進各項請求。&lt;/p&gt;
+&lt;p&gt;因此，單一事件迴圈不需要為每個請求建立執行緒，便能處理大量連線。此模型也說明了記錄與緩衝策略的重要性：上游、用戶端與磁碟寫入各自推進時，工作程序仍須保持回應能力。&lt;/p&gt;
+&lt;h2 id="隔離設定"&gt;
+ 隔離設定
+ &lt;a href="#%e9%9a%94%e9%9b%a2%e8%a8%ad%e5%ae%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;測試本機建置時，請以明確的前綴與設定啟動執行個體。記錄檔與暫存檔等相對路徑會以此前綴解析。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sh&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sh" data-lang="sh"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;nginx -p &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$PWD&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; -c nginx.conf
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;nginx -t -p &lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt;$PWD&lt;span style="color:#e6db74"&gt;&amp;#34;&lt;/span&gt; -c nginx.conf&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;對於非特權的本機程序，請使用非特權監聽連接埠，並將 &lt;code&gt;pid&lt;/code&gt;、記錄檔，以及每個請求主體或上游暫存路徑設為可寫入的位置。&lt;code&gt;daemon off;&lt;/code&gt; 與 &lt;code&gt;master_process off;&lt;/code&gt; 可簡化前景偵錯，但不適合正式環境。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;include&lt;/code&gt; 指令會以文字方式納入設定，其路徑可相對於前綴，也可使用絕對路徑。請以 &lt;code&gt;nginx -t&lt;/code&gt; 驗證完整的 include 關係圖，並以 &lt;code&gt;nginx -T&lt;/code&gt; 檢查展開後的設定。重新載入時，主程序會剖析並驗證新設定；成功後啟動新的工作程序，並要求舊工作程序完成目前工作後退出。若剖析或資源取得失敗，舊設定仍會繼續提供流量服務。&lt;/p&gt;
+&lt;h2 id="虛擬伺服器與-cors"&gt;
+ 虛擬伺服器與 CORS
+ &lt;a href="#%e8%99%9b%e6%93%ac%e4%bc%ba%e6%9c%8d%e5%99%a8%e8%88%87-cors" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Nginx 依據監聽器與 &lt;code&gt;Host&lt;/code&gt; 標頭選擇 HTTP 虛擬伺服器。在同一監聽器中，選擇順序依次為完全符合的 &lt;code&gt;server_name&lt;/code&gt;、最長的前置萬用字元、最長的後置萬用字元，最後才是第一個符合的規則運算式。&lt;code&gt;server_name .example.com&lt;/code&gt; 是頂層網域與 &lt;code&gt;*.example.com&lt;/code&gt; 的簡寫；單獨的 &lt;code&gt;*.example.com&lt;/code&gt; 不會符合頂層網域。&lt;/p&gt;
+&lt;p&gt;選定伺服器後，Nginx 會依前綴與規則運算式規則尋找 location。完全符合的 location 會立即勝出；否則，Nginx 會記住最長的前綴，並依序評估適用的規則運算式。&lt;code&gt;^~&lt;/code&gt; 修飾詞會在該前綴符合後阻止規則運算式檢查。內部重新寫入可能啟動另一次 location 搜尋，因此代理行為與可見請求不同時，應追蹤最終 URI。&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Aop on cesun.life</title><link>https://example.org/zh-cn/tags/aop/</link><description>Recent content in Aop on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sun, 25 May 2025 03:36:19 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/aop/index.xml" rel="self" type="application/rss+xml"/><item><title>Spring 概览与事务</title><link>https://example.org/zh-cn/spring-overview-and-transactions/</link><pubDate>Sun, 25 May 2025 03:36:19 +0800</pubDate><guid>https://example.org/zh-cn/spring-overview-and-transactions/</guid><description>&lt;p&gt;Spring Framework 提供依赖注入容器，以及面向 AOP、数据访问、事务、消息传递和 Web 应用的专用模块。事务管理体现了该框架的集成模型：应用程序代码声明边界，拦截器则协调特定资源的 &lt;code&gt;PlatformTransactionManager&lt;/code&gt; 或响应式事务管理器。&lt;/p&gt;
+&lt;h2 id="基于代理的声明式事务"&gt;
+ 基于代理的声明式事务
+ &lt;a href="#%e5%9f%ba%e4%ba%8e%e4%bb%a3%e7%90%86%e7%9a%84%e5%a3%b0%e6%98%8e%e5%bc%8f%e4%ba%8b%e5%8a%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在默认的通知模式下，Spring 会使用 AOP 代理包装符合条件的 Bean。进入与 &lt;code&gt;@Transactional&lt;/code&gt; 匹配的方法的调用会经过 &lt;code&gt;TransactionInterceptor&lt;/code&gt;，后者读取事务元数据，启动事务或加入现有事务，调用目标对象，然后提交或回滚。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Service&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;class&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;OrderService&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; OrderRepository orders;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;private&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;final&lt;/span&gt; PaymentGateway payments;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;@Transactional&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; Order &lt;span style="color:#a6e22e"&gt;place&lt;/span&gt;(CreateOrder command) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; Order order &lt;span style="color:#f92672"&gt;=&lt;/span&gt; orders.&lt;span style="color:#a6e22e"&gt;insert&lt;/span&gt;(command);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; payments.&lt;span style="color:#a6e22e"&gt;reserve&lt;/span&gt;(order);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; order;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;代理存在实际限制。调用必须经过代理进入，并且方法必须能够被所选代理机制拦截。基于接口的 JDK 代理会公开接口方法；基于类的代理会继承目标类，因此无法为 &lt;code&gt;final&lt;/code&gt; 方法提供通知。&lt;/p&gt;
+&lt;h2 id="自调用"&gt;
+ 自调用
+ &lt;a href="#%e8%87%aa%e8%b0%83%e7%94%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;this.reprice()&lt;/code&gt; 之类的调用会停留在目标对象内部，不会重新进入其代理。因此，如果只能通过自调用到达 &lt;code&gt;reprice()&lt;/code&gt;，该方法上的事务元数据会被忽略：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;void&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;importOrders&lt;/span&gt;(List&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Order&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; batch) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; batch.&lt;span style="color:#a6e22e"&gt;forEach&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;this&lt;/span&gt;::storeOne); &lt;span style="color:#75715e"&gt;// 绕过 storeOne 上的事务通知&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果事务操作代表一个真实边界，应将其移动到单独的注入式服务中。编程式事务管理或 AspectJ 编织也可以作为替代方案；注入 Bean 自身的代理会使领域代码耦合到容器机制，并增加测试难度。&lt;/p&gt;</description></item></channel></rss>

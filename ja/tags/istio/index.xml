@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Istio on cesun.life</title><link>https://example.org/ja/tags/istio/</link><description>Recent content in Istio on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Fri, 28 Apr 2023 08:11:31 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/istio/index.xml" rel="self" type="application/rss+xml"/><item><title>Istio</title><link>https://example.org/ja/istio/</link><pubDate>Fri, 28 Apr 2023 08:11:31 +0800</pubDate><guid>https://example.org/ja/istio/</guid><description>&lt;p&gt;Istio は、Envoy プロキシとコントロールプレーンの設定を通じて、ワークロードにトラフィックポリシー、アイデンティティ、テレメトリ、セキュリティポリシーを適用します。これらの横断的な要件が、追加される運用面を正当化する場合にのみ採用してください。&lt;/p&gt;
+&lt;h2 id="データプレーンとコントロールプレーン"&gt;
+ データプレーンとコントロールプレーン
+ &lt;a href="#%e3%83%87%e3%83%bc%e3%82%bf%e3%83%97%e3%83%ac%e3%83%bc%e3%83%b3%e3%81%a8%e3%82%b3%e3%83%b3%e3%83%88%e3%83%ad%e3%83%bc%e3%83%ab%e3%83%97%e3%83%ac%e3%83%bc%e3%83%b3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;データプレーンは、Envoy サイドカー、またはノードごとの ztunnel とオプションの waypoint プロキシで構成されるアンビエントデプロイメントで構成されます。&lt;code&gt;istiod&lt;/code&gt; は、xDS を通じてサービスディスカバリ、証明書、トラフィック設定を計算して配布します。ワークロードのパスは、選択したモードに応じてインバウンドおよびアウトバウンドトラフィックを捕捉します。このパスをバイパスするトラフィックはメッシュポリシーで管理できません。アンビエントモードとサイドカーでは L4/L7 の適用位置が異なるため、移行時には各ポリシーがどこで実行されるかを検証する必要があります。&lt;/p&gt;
+&lt;h2 id="トラフィック管理"&gt;
+ トラフィック管理
+ &lt;a href="#%e3%83%88%e3%83%a9%e3%83%95%e3%82%a3%e3%83%83%e3%82%af%e7%ae%a1%e7%90%86" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;Gateway&lt;/code&gt; と &lt;code&gt;VirtualService&lt;/code&gt; リソースは、イングレスリスナーとルーティングルールを定義します。&lt;code&gt;DestinationRule&lt;/code&gt; は、宛先に対するサブセット、ロードバランシング、接続、TLS のポリシーを定義します。&lt;code&gt;version&lt;/code&gt; などの安定したラベルでルーティングし、サブセットで使用するラベルがワークロードに存在することを確認してください。&lt;/p&gt;
+&lt;p&gt;重み付きルートを使用すると、測定した割合のトラフィックを安定版サブセットからカナリアへ移行できます。ヘッダーまたはアイデンティティのマッチ条件を使用して、最初にテストトラフィックを振り分けることもできます。各変更は、プロキシ設定の収束とワークロードの健全性を確認してから進めてください。ルートの重みでは、エンドポイントの欠落や誤ったサブセットセレクターを補償できません。&lt;/p&gt;
+&lt;p&gt;リトライ、タイムアウト、サーキットブレーカー、フォールトインジェクションは、障害時の挙動を変更します。呼び出し元のデッドラインに応じて予算を設定してください。制限のないリトライポリシーは、過負荷を増幅し、べき等でない処理を重複実行する可能性があります。&lt;/p&gt;
+&lt;h2 id="アイデンティティとセキュリティ"&gt;
+ アイデンティティとセキュリティ
+ &lt;a href="#%e3%82%a2%e3%82%a4%e3%83%87%e3%83%b3%e3%83%86%e3%82%a3%e3%83%86%e3%82%a3%e3%81%a8%e3%82%bb%e3%82%ad%e3%83%a5%e3%83%aa%e3%83%86%e3%82%a3" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;Istio は Kubernetes のサービスアカウントに基づくワークロードアイデンティティを発行し、プロキシ間の相互 TLS を使用できます。必要なすべてのワークロードがメッシュに参加していることを確認したうえで、&lt;code&gt;AuthorizationPolicy&lt;/code&gt; による認可を適用してください。移行時は、管理対象外のトラフィックを特定する目的に限って permissive から開始し、その後、明示的な移行計画に基づいて strict な相互 TLS に移行します。&lt;/p&gt;
+&lt;p&gt;mTLS の状態には &lt;code&gt;PeerAuthentication&lt;/code&gt; を使用し、必要に応じてエンドユーザーの JWT を検証するには &lt;code&gt;RequestAuthentication&lt;/code&gt; を使用し、アクセス判断には &lt;code&gt;AuthorizationPolicy&lt;/code&gt; を使用します。ワークロードアイデンティティは、テナントやビジネス権限に対するアプリケーション認可の代替にはなりません。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;istiod&lt;/code&gt; は認証局として動作するか、外部 CA と統合し、短期間有効なワークロード証明書を有効期限前にローテーションします。発行、ルートの移行、トラストドメインの設定、クロックスキューを監視してください。ルートをローテーションする際は、リーフ証明書を置き換える前に重複する信頼関係を配布し、古いワークロードと新しいワークロードが相互に認証できるようにします。&lt;/p&gt;
+&lt;h2 id="運用"&gt;
+ 運用
+ &lt;a href="#%e9%81%8b%e7%94%a8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;メッシュのコントロールプレーンとデータプレーンのバージョンを意図的に管理し、ロールアウト前にアナライザーの出力を確認して、プロキシのリソース使用量、証明書の有効期限、設定の収束を監視してください。意図した YAML に依存するのではなく、&lt;code&gt;istioctl proxy-status&lt;/code&gt; と &lt;code&gt;istioctl proxy-config&lt;/code&gt; を使用して、プロキシが受信した内容を診断します。&lt;/p&gt;
+&lt;p&gt;Envoy は、テレメトリ設定に従ってリクエストメトリクス、アクセスログ、トレースを出力します。イングレス、waypoint またはサイドカー、アプリケーション間でリクエスト ID とサンプリングポリシーを保持してください。テレメトリが欠落している場合、トラフィックがプロキシをバイパスした、設定が収束していない、または収集に失敗した可能性があります。&lt;/p&gt;</description></item></channel></rss>

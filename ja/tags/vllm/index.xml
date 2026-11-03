@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Vllm on cesun.life</title><link>https://example.org/ja/tags/vllm/</link><description>Recent content in Vllm on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Sat, 01 Mar 2025 23:50:26 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/vllm/index.xml" rel="self" type="application/rss+xml"/><item><title>Inference with vLLM</title><link>https://example.org/ja/vllm-adapters/</link><pubDate>Sat, 01 Mar 2025 23:50:26 +0800</pubDate><guid>https://example.org/ja/vllm-adapters/</guid><description>&lt;ul&gt;
+&lt;li&gt;生成モデル: &lt;code&gt;llm = LLM(model=..., task=&amp;quot;generate&amp;quot;) &lt;/code&gt;（task=generate のみ）&lt;/li&gt;
+&lt;li&gt;プーリングモデル: &lt;code&gt;llm = LLM(model=..., task=&amp;quot;embed&amp;quot;)&lt;/code&gt;（task={embed,classify,reward} のみ）&lt;/li&gt;
+&lt;li&gt;成功すると、生成モデルはテキストを返し、プーリングモデルは隠れ状態を返します。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="カスタムモデルの統合"&gt;
+ カスタムモデルの統合
+ &lt;a href="#%e3%82%ab%e3%82%b9%e3%82%bf%e3%83%a0%e3%83%a2%e3%83%87%e3%83%ab%e3%81%ae%e7%b5%b1%e5%90%88" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;git clone --depth 1 https://github.com/vllm-project/vllm/&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Transformers リポジトリにファイルを追加し、vllm/model_executor/models ディレクトリに配置します。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="既存のモデルエグゼキューター"&gt;
+ 既存のモデルエグゼキューター
+ &lt;a href="#%e6%97%a2%e5%ad%98%e3%81%ae%e3%83%a2%e3%83%87%e3%83%ab%e3%82%a8%e3%82%b0%e3%82%bc%e3%82%ad%e3%83%a5%e3%83%bc%e3%82%bf%e3%83%bc" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href="https://github.com/vllm-project/vllm/tree/main/vllm/model_executor/models"&gt;https://github.com/vllm-project/vllm/tree/main/vllm/model_executor/models&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="hugging-face-transformer-リポジトリ"&gt;
+ Hugging Face Transformer リポジトリ
+ &lt;a href="#hugging-face-transformer-%e3%83%aa%e3%83%9d%e3%82%b8%e3%83%88%e3%83%aa" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;.gitattributes&lt;/p&gt;
+&lt;p&gt;Git の動作を設定します。通常は大きな重みファイルの Git LFS 追跡を設定します。
+推論時には使用されません。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;config.json&lt;/p&gt;
+&lt;p&gt;モデルアーキテクチャとハイパーパラメーター（モデル種別、層数、隠れサイズ、
+アテンションヘッド数、語彙サイズ、位置エンコーディング、dtype、アーキテクチャ
+クラス）を定義します。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;generation_config.json&lt;/p&gt;
+&lt;p&gt;EOS/PAD トークン ID、サンプリング設定、最大出力長など、デフォルトの生成動作を
+定義します。呼び出し時のパラメーターで上書きできます。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;model.safetensors&lt;/code&gt; or &lt;code&gt;model-x-of-y.safetensors&lt;/code&gt;
+モデルの重みの一部です。シャーディングにより、巨大な単一ファイルを避けます。
+シャードの境界は必ずしも層に対応しません。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;model.safetensors.index.json&lt;/p&gt;
+&lt;p&gt;すべてのパラメーター名を、それを含むシャードに対応付けます。たとえば
+model.layers.0&amp;hellip; → model-00001-of-00024.safetensors のようになります。
+通常は重みの合計サイズも記録します。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;tokenizer_config.json&lt;/p&gt;
+&lt;p&gt;トークナイザーのメタデータ（トークナイザークラス、最大長、特殊トークン、
+正規化オプション、多くの場合はチャットテンプレート）です。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;tokenizer.json&lt;/p&gt;
+&lt;p&gt;語彙、分割、正規化、BPE ルール、後処理を含む、「fast tokenizer」パイプライン
+全体のシリアライズデータです。&lt;/p&gt;</description></item></channel></rss>

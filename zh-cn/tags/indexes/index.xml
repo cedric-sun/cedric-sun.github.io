@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Indexes on cesun.life</title><link>https://example.org/zh-cn/tags/indexes/</link><description>Recent content in Indexes on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Thu, 16 Jun 2022 20:46:43 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/indexes/index.xml" rel="self" type="application/rss+xml"/><item><title>MySQL 索引</title><link>https://example.org/zh-cn/mysql-indexes/</link><pubDate>Thu, 16 Jun 2022 20:46:43 +0800</pubDate><guid>https://example.org/zh-cn/mysql-indexes/</guid><description>&lt;p&gt;InnoDB 使用 B+ 树实现主索引和二级索引。当索引顺序符合选择性谓词、连接、范围扫描或排序要求时，它可以减少 I/O；但每个被索引的行都会增加写入工作和存储开销。&lt;/p&gt;
+&lt;h2 id="聚簇索引和二级索引"&gt;
+ 聚簇索引和二级索引
+ &lt;a href="#%e8%81%9a%e7%b0%87%e7%b4%a2%e5%bc%95%e5%92%8c%e4%ba%8c%e7%ba%a7%e7%b4%a2%e5%bc%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;InnoDB 表将行数据存储在其聚簇索引中。InnoDB 会选择声明的主键；否则会选择第一个合适的非空唯一键，或者创建内部隐藏键。应声明简短且稳定的主键，因为每个二级索引条目都会存储主键值。&lt;/p&gt;
+&lt;p&gt;二级索引存储其索引列和主键值。需要二级索引中不存在的列的查询，会为每个匹配条目执行一次聚簇索引查找。只有在经过测量的成本确实可以消除时，才添加覆盖索引；更宽的索引会降低页面扇出并增加写入开销。&lt;/p&gt;
+&lt;h2 id="复合索引"&gt;
+ 复合索引
+ &lt;a href="#%e5%a4%8d%e5%90%88%e7%b4%a2%e5%bc%95" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;对于 &lt;code&gt;(tenant_id, created_at, id)&lt;/code&gt;，B+ 树可以高效定位：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;仅从 &lt;code&gt;created_at&lt;/code&gt; 开始无法高效查找，因为树的顺序从 &lt;code&gt;tenant_id&lt;/code&gt; 开始。在常见设计中，等值谓词位于范围谓词之前，随后是满足排序或覆盖所需的列。使用 &lt;code&gt;EXPLAIN ANALYZE&lt;/code&gt; 验证选择；索引顺序取决于实际谓词、数据分布和结果大小。&lt;/p&gt;
+&lt;h2 id="索引类型和诊断"&gt;
+ 索引类型和诊断
+ &lt;a href="#%e7%b4%a2%e5%bc%95%e7%b1%bb%e5%9e%8b%e5%92%8c%e8%af%8a%e6%96%ad" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;UNIQUE&lt;/code&gt; 在创建访问路径的同时强制执行不变量。大多数 InnoDB 索引都是 B 树。
+&lt;code&gt;FULLTEXT&lt;/code&gt; 索引支持基于词元的文本搜索，&lt;code&gt;SPATIAL&lt;/code&gt; 索引对几何值使用 R 树。
+MySQL 还介绍了 &lt;code&gt;MEMORY&lt;/code&gt; 引擎的哈希索引；InnoDB 不会公开通用哈希索引，尽管其自适应哈希索引可以将频繁访问的 B 树页面缓存为内部优化。前缀索引可以减少长文本键的字节数，但前提是所选前缀仍具有选择性。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;sql&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-sql" data-lang="sql"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;EXPLAIN&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;ANALYZE&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;SELECT&lt;/span&gt; id, created_at
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;FROM&lt;/span&gt; event
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;WHERE&lt;/span&gt; tenant_id &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;7&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;AND&lt;/span&gt; created_at &lt;span style="color:#f92672"&gt;&amp;gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#39;2026-01-01&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;ORDER&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;BY&lt;/span&gt; created_at, id
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;LIMIT&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;100&lt;/span&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;应检查实际行数、循环次数和耗时，而不是假设索引会被使用。统计信息、基数估计和较小的结果集都可能使全表扫描比索引遍历更便宜。&lt;/p&gt;</description></item></channel></rss>

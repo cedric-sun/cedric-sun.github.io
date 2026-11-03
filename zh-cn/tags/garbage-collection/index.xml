@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Garbage-Collection on cesun.life</title><link>https://example.org/zh-cn/tags/garbage-collection/</link><description>Recent content in Garbage-Collection on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Mon, 27 Jan 2025 11:37:11 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/garbage-collection/index.xml" rel="self" type="application/rss+xml"/><item><title>JVM 垃圾回收</title><link>https://example.org/zh-cn/jvm-garbage-collection/</link><pubDate>Mon, 27 Jan 2025 11:37:11 +0800</pubDate><guid>https://example.org/zh-cn/jvm-garbage-collection/</guid><description>&lt;p&gt;JVM 规范要求自动存储管理，但不规定回收器或堆布局。因此，回收器的行为取决于
+所部署的 JVM、版本、标志、堆大小和工作负载。&lt;/p&gt;
+&lt;h2 id="可达性与内存池"&gt;
+ 可达性与内存池
+ &lt;a href="#%e5%8f%af%e8%be%be%e6%80%a7%e4%b8%8e%e5%86%85%e5%ad%98%e6%b1%a0" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;跟踪从 GC 根开始，包括活动线程的栈和寄存器、静态字段、JNI 句柄以及 VM 运行时
+结构。能够从根强可达的对象会保持存活。软引用可能在内存压力下被清除，弱引用不会
+保留其引用对象，虚引用则通过 &lt;code&gt;ReferenceQueue&lt;/code&gt; 支持事后协调。这些机制都不能替代
+确定性的资源清理；应使用 try-with-resources，并且仅将 &lt;code&gt;Cleaner&lt;/code&gt; 作为安全网。终结机制
+已被弃用，并计划移除。&lt;/p&gt;
+&lt;p&gt;Java 堆存储对象和数组。在 HotSpot 中，元空间、代码缓存、线程栈、直接缓冲区、
+GC 记账信息以及本地库会消耗堆外内存。&lt;code&gt;-Xmx&lt;/code&gt; 只限制 Java 堆，因此容器限制必须为
+本地内存预留余量。内存池名称和记账方式取决于回收器及具体实现。&lt;/p&gt;
+&lt;h2 id="分代与分配"&gt;
+ 分代与分配
+ &lt;a href="#%e5%88%86%e4%bb%a3%e4%b8%8e%e5%88%86%e9%85%8d" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;分代回收器利用了许多分配对象会很快失效这一事实。新对象会分配到年轻代区域；
+存活对象可能在幸存区之间移动，并晋升到老年代区域。为了避免每次年轻代回收都扫描
+所有老年代对象，写屏障会将老年代到年轻代的指针记录在卡表或记忆集内。分配速率、
+存活集大小、晋升速率以及可用的疏散空间，比单独观察堆占用率更能预测内存压力。&lt;/p&gt;
+&lt;h2 id="hotspot-回收器的权衡"&gt;
+ HotSpot 回收器的权衡
+ &lt;a href="#hotspot-%e5%9b%9e%e6%94%b6%e5%99%a8%e7%9a%84%e6%9d%83%e8%a1%a1" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;HotSpot 提供了目标不同的回收器：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Serial&lt;/strong&gt; 针对小堆，将实现开销降至最低。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Parallel&lt;/strong&gt; 通过并行的 stop-the-world 工作优先保证吞吐量。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;G1&lt;/strong&gt; 将堆划分为多个区域，在平衡并发工作与疏散工作的同时，朝暂停时间目标运行。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ZGC&lt;/strong&gt; 将大部分标记和重定位工作并发执行，以实现较短暂停，但代价是屏障以及
+并发资源使用。&lt;/li&gt;
+&lt;li&gt;如果所选发行版提供 &lt;strong&gt;Shenandoah&lt;/strong&gt;，它也会执行并发疏散，以缩短暂停时长。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;回收器的可用性和默认设置会随 JDK 供应商及版本变化。不要将历史默认值硬编码到
+运维指导中，而应使用 &lt;code&gt;java -XX:+PrintCommandLineFlags -version&lt;/code&gt; 以及对应版本的
+发布文档检查已部署的运行时。&lt;/p&gt;
+&lt;p&gt;所有跟踪式回收器都需要协调点。根处理、重新标记以及某些疏散工作可能会停止应用线程
+（STW）。并发阶段能够减少暂停时间，但会消耗 CPU 和内存带宽，需要屏障，并且需要
+为重定位保留空闲空间。因此，较低的暂停目标可能降低吞吐量，或在分配压力下失败。&lt;/p&gt;</description></item></channel></rss>

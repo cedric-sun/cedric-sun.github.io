@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Compression on cesun.life</title><link>https://example.org/zh-cn/tags/compression/</link><description>Recent content in Compression on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 04 Apr 2025 21:50:25 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/compression/index.xml" rel="self" type="application/rss+xml"/><item><title>Unix compress 和 LZW</title><link>https://example.org/zh-cn/unix-compress/</link><pubDate>Fri, 04 Apr 2025 21:50:25 +0800</pubDate><guid>https://example.org/zh-cn/unix-compress/</guid><description>&lt;p&gt;历史上的 Unix &lt;code&gt;compress&lt;/code&gt; 工具会写入通常命名为
+&lt;code&gt;.Z&lt;/code&gt; 的文件。它使用 LZW 系列字典编码器，而不是 DEFLATE。&lt;code&gt;uncompress&lt;/code&gt; 和
+&lt;code&gt;zcat&lt;/code&gt; 在提供该格式的系统上公开兼容的命令行接口。&lt;/p&gt;
+&lt;h2 id="lzw-初始化与同步"&gt;
+ LZW 初始化与同步
+ &lt;a href="#lzw-%e5%88%9d%e5%a7%8b%e5%8c%96%e4%b8%8e%e5%90%8c%e6%ad%a5" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;LZW 编码器从单字节字母表的条目开始。它维护当前短语 &lt;code&gt;w&lt;/code&gt;，读取下一个字节
+&lt;code&gt;k&lt;/code&gt;，并在 &lt;code&gt;w + k&lt;/code&gt; 位于字典中时继续处理。当该短语不存在时，它输出
+&lt;code&gt;w&lt;/code&gt; 的代码，添加 &lt;code&gt;w + k&lt;/code&gt;，并从 &lt;code&gt;k&lt;/code&gt; 开始。解码器输出每个代码对应的字符串；在第一个代码之后，它会添加前一个解码字符串与当前字符串的第一个字节。输入耗尽后，编码器输出其最终短语。因此，编码器和解码器会相差一个代码地添加相同的条目。&lt;/p&gt;
+&lt;p&gt;常见的 &lt;code&gt;KwKwK&lt;/code&gt; 情况发生在某个代码等于下一个字典索引时：解码器会将其展开为
+&lt;code&gt;previous + first(previous)&lt;/code&gt;。拒绝这种情况会拒绝有效的数据流；接受任何超过下一个索引的代码则会导致字典失去同步。&lt;/p&gt;
+&lt;h2 id="z-位流"&gt;
+ &lt;code&gt;.Z&lt;/code&gt; 位流
+ &lt;a href="#z-%e4%bd%8d%e6%b5%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;.Z&lt;/code&gt; 数据流以 &lt;code&gt;1f 9d&lt;/code&gt; 和一个标志字节开头。低五位指定最大代码宽度，通常为 9 至 16 位。第 7 位启用块模式；其余保留位必须根据实现的兼容性规则进行处理。代码从 9 位开始，当字典达到当前宽度的容量时逐步增加宽度。在块模式下，代码 256 表示 &lt;code&gt;CLEAR&lt;/code&gt;：编码器可以输出该代码以丢弃条目，并使用初始字母表重新开始。解码器必须在同一位置重置，然后恢复使用 9 位代码。非块模式数据流没有该重置代码。&lt;/p&gt;
+&lt;p&gt;代码宽度转换规则属于 &lt;code&gt;.Z&lt;/code&gt; 方言的一部分，因此读取器应遵循格式规定的时序，而不是根据下一个代码进行猜测。历史实现对边界情况的处理存在差异；应使用目标 &lt;code&gt;compress&lt;/code&gt; 实现进行互操作性测试。&lt;/p&gt;
+&lt;h2 id="兼容性与操作"&gt;
+ 兼容性与操作
+ &lt;a href="#%e5%85%bc%e5%ae%b9%e6%80%a7%e4%b8%8e%e6%93%8d%e4%bd%9c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;LZW 专利曾影响 &lt;code&gt;compress&lt;/code&gt; 的部署；相关专利已经到期，但旧归档和特定于平台的解码器仍然构成兼容性约束。对于新数据，应使用协议选定的格式。&lt;code&gt;tar&lt;/code&gt; 存储文件名和元数据，而压缩器转换的是字节流，因此 &lt;code&gt;.tar.Z&lt;/code&gt; 表示使用 &lt;code&gt;.Z&lt;/code&gt; 压缩的 tar 归档。&lt;/p&gt;</description></item><item><title>LZ77 滑动窗口压缩</title><link>https://example.org/zh-cn/lz77/</link><pubDate>Sat, 03 Aug 2024 21:49:43 +0800</pubDate><guid>https://example.org/zh-cn/lz77/</guid><description>&lt;p&gt;LZ77 是一类无损压缩器，它将重复输入替换为指向有限历史窗口的引用。最初的 1977
+年设计使用滑动字典；实际格式会自行选择令牌语法、匹配查找器和熵编码器。&lt;/p&gt;
+&lt;h2 id="字面量历史和匹配"&gt;
+ 字面量、历史和匹配
+ &lt;a href="#%e5%ad%97%e9%9d%a2%e9%87%8f%e5%8e%86%e5%8f%b2%e5%92%8c%e5%8c%b9%e9%85%8d" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;在输入位置上，编码器会在之前输出的字节中搜索匹配前缀。如果不存在有用的匹配，就输出字面量；否则输出至少包含距离和长度的回溯引用。某些格式在每次匹配后添加一个字面量；其他格式则输出独立字面量和匹配组成的流。解码器从当前输出位置之前 &lt;code&gt;distance&lt;/code&gt; 个字节处复制 &lt;code&gt;length&lt;/code&gt; 个字节。&lt;/p&gt;
+&lt;p&gt;复制可能与源重叠。如果历史以 &lt;code&gt;a&lt;/code&gt; 结尾，距离为 1、长度为 5 的匹配会产生 &lt;code&gt;aaaaa&lt;/code&gt;：每个复制的字节都会成为下一个字节的源。解码器必须按字节正向复制，或使用具有等价级联语义的循环。&lt;code&gt;memcpy&lt;/code&gt; 和快照式的 &lt;code&gt;memmove&lt;/code&gt; 都不能实现每一种有效的重叠匹配。&lt;/p&gt;
+&lt;h2 id="匹配搜索和解析"&gt;
+ 匹配搜索和解析
+ &lt;a href="#%e5%8c%b9%e9%85%8d%e6%90%9c%e7%b4%a2%e5%92%8c%e8%a7%a3%e6%9e%90" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;更大的窗口可以找到更远的重复内容，但会消耗更多内存，并需要更多距离位。哈希链、二叉树、后缀结构和有界候选搜索会在压缩比与 CPU 时间之间进行权衡。&lt;/p&gt;
+&lt;p&gt;贪心解析器会选择当前位置的最长匹配。懒惰解析器先记录一个候选匹配，检查下一个位置是否有更好的匹配，并在这样可以改善总成本时改为输出字面量。动态规划可以搜索更大的解析空间，但需要更多 CPU 和内存。这些编码器选择都不会影响解码器正确性，因为令牌流是自包含的。&lt;/p&gt;
+&lt;h2 id="边界和防御性解码"&gt;
+ 边界和防御性解码
+ &lt;a href="#%e8%be%b9%e7%95%8c%e5%92%8c%e9%98%b2%e5%be%a1%e6%80%a7%e8%a7%a3%e7%a0%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每种格式都会定义自己的最小匹配长度、最大长度、窗口大小和距离编码。例如，
+DEFLATE 允许距离最大为 32 KiB，长度最大为 258 字节。解码器必须拒绝大于当前已有历史的距离、无效的长度或距离代码、计算输出位置时的整数溢出，以及超出调用者限制的输出。资源限制应同时覆盖总输出量和工作量，因为很小的输入也可能扩展为非常大的输出流。&lt;/p&gt;
+&lt;h2 id="deflate-和相关格式"&gt;
+ DEFLATE 和相关格式
+ &lt;a href="#deflate-%e5%92%8c%e7%9b%b8%e5%85%b3%e6%a0%bc%e5%bc%8f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;DEFLATE 使用霍夫曼树对字面量/长度符号和距离符号进行熵编码，然后使用 LZ77 窗口获取被引用的字节。LZ4 围绕相同的复制操作使用紧凑的令牌格式，而 Zstandard 将窗口化 LZ 匹配阶段与不同的熵编码器结合起来。LZ78 和 LZW 则维护短语的显式字典；不能用它们的字典更新规则替代 LZ77 的历史引用。&lt;/p&gt;
+&lt;h2 id="参考资料"&gt;
+ 参考资料
+ &lt;a href="#%e5%8f%82%e8%80%83%e8%b5%84%e6%96%99" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;J. Ziv 和 A. Lempel，《&lt;a href="https://doi.org/10.1109/TIT.1977.1055714"&gt;Sequential Data Compression 的通用算法&lt;/a&gt;》，&lt;em&gt;IEEE Transactions on Information Theory&lt;/em&gt;，1977 年。&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.rfc-editor.org/rfc/rfc1951"&gt;RFC 1951：DEFLATE&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.rfc-editor.org/rfc/rfc7932"&gt;RFC 7932：Brotli 压缩数据格式&lt;/a&gt;，介绍另一种窗口化 LZ 设计。&lt;/li&gt;
+&lt;/ul&gt;</description></item><item><title>zlib 流式 API</title><link>https://example.org/zh-cn/zlib/</link><pubDate>Wed, 03 Apr 2024 14:47:29 +0800</pubDate><guid>https://example.org/zh-cn/zlib/</guid><description>&lt;p&gt;zlib 是实现 DEFLATE 及其常用封装的 C 库。其流式 API 使用 &lt;code&gt;z_stream&lt;/code&gt;，因此应用可以
+在有界缓冲区中处理输入和输出，而不必假设一次调用会消耗或生成完整消息。&lt;/p&gt;
+&lt;h2 id="流状态和初始化"&gt;
+ 流状态和初始化
+ &lt;a href="#%e6%b5%81%e7%8a%b6%e6%80%81%e5%92%8c%e5%88%9d%e5%a7%8b%e5%8c%96" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;应用提供 &lt;code&gt;next_in&lt;/code&gt;/&lt;code&gt;avail_in&lt;/code&gt; 和 &lt;code&gt;next_out&lt;/code&gt;/&lt;code&gt;avail_out&lt;/code&gt;。调用后，zlib 会推进指针并
+减少可用计数；&lt;code&gt;total_in&lt;/code&gt; 和 &lt;code&gt;total_out&lt;/code&gt; 提供累计计数器。应用必须在下一次调用前消耗
+已生成的字节并补充缓冲区，同时将其他状态字段留给 zlib。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;deflateInit()&lt;/code&gt; 生成 zlib 封装的流。&lt;code&gt;deflateInit2()&lt;/code&gt; 使用负的 &lt;code&gt;windowBits&lt;/code&gt; 选择原始
+DEFLATE，使用 &lt;code&gt;windowBits + 16&lt;/code&gt; 选择 gzip。在初始化前初始化分配器字段，并对每个成功
+初始化的流调用 &lt;code&gt;deflateEnd()&lt;/code&gt;，包括错误路径。压缩器可以使用
+&lt;code&gt;deflateSetDictionary()&lt;/code&gt; 预加载共享历史。zlib 封装携带 Adler-32 字典标识符，并允许
+&lt;code&gt;inflate()&lt;/code&gt; 返回 &lt;code&gt;Z_NEED_DICT&lt;/code&gt;；原始 DEFLATE 要求外层协议识别字典。gzip 封装没有定义
+预置字典信令。&lt;/p&gt;
+&lt;h2 id="正确的-deflate-循环"&gt;
+ 正确的 Deflate 循环
+ &lt;a href="#%e6%ad%a3%e7%a1%ae%e7%9a%84-deflate-%e5%be%aa%e7%8e%af" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;普通输入使用 &lt;code&gt;Z_NO_FLUSH&lt;/code&gt;；频繁刷新会降低压缩率。在输入仍存在或输出仍待处理时，
+继续调用 &lt;code&gt;deflate()&lt;/code&gt;。要完成压缩，应停止提供输入，并持续调用
+&lt;code&gt;deflate(..., Z_FINISH)&lt;/code&gt;，直到它返回 &lt;code&gt;Z_STREAM_END&lt;/code&gt;，期间在调用之间扩大或排空输出缓冲区。以下有界输入示例假设 &lt;code&gt;input_len&lt;/code&gt; 能放入 zlib 的 &lt;code&gt;uInt&lt;/code&gt; 计数：&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;z_stream strm &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (&lt;span style="color:#a6e22e"&gt;deflateInit&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm, Z_DEFAULT_COMPRESSION) &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; Z_OK) &lt;span style="color:#a6e22e"&gt;fail&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;strm.next_in &lt;span style="color:#f92672"&gt;=&lt;/span&gt; input;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;strm.avail_in &lt;span style="color:#f92672"&gt;=&lt;/span&gt; (uInt)input_len;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;for&lt;/span&gt; (;;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; strm.next_out &lt;span style="color:#f92672"&gt;=&lt;/span&gt; out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; strm.avail_out &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt; out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; uInt input_before &lt;span style="color:#f92672"&gt;=&lt;/span&gt; strm.avail_in;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; flush &lt;span style="color:#f92672"&gt;=&lt;/span&gt; strm.avail_in &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt; &lt;span style="color:#f92672"&gt;?&lt;/span&gt; Z_FINISH : Z_NO_FLUSH;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; rc &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;deflate&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm, flush);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;size_t&lt;/span&gt; produced &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt; out &lt;span style="color:#f92672"&gt;-&lt;/span&gt; strm.avail_out;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;write_bytes&lt;/span&gt;(out, produced);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (rc &lt;span style="color:#f92672"&gt;==&lt;/span&gt; Z_STREAM_END) &lt;span style="color:#66d9ef"&gt;break&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (rc &lt;span style="color:#f92672"&gt;!=&lt;/span&gt; Z_OK) &lt;span style="color:#a6e22e"&gt;fail&lt;/span&gt;(rc);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;if&lt;/span&gt; (input_before &lt;span style="color:#f92672"&gt;==&lt;/span&gt; strm.avail_in &lt;span style="color:#f92672"&gt;&amp;amp;&amp;amp;&lt;/span&gt; produced &lt;span style="color:#f92672"&gt;==&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;) &lt;span style="color:#a6e22e"&gt;fail_no_progress&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;deflateEnd&lt;/span&gt;(&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;strm);&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;实际代码必须在下一次 &lt;code&gt;Z_NO_FLUSH&lt;/code&gt; 调用前补充 &lt;code&gt;next_in&lt;/code&gt;，并跟踪两个游标的进度。
+&lt;code&gt;Z_BUF_ERROR&lt;/code&gt; 可能表示由于缓冲区为空或已满而无法取得进展；它本身不表示损坏。
+&lt;code&gt;Z_SYNC_FLUSH&lt;/code&gt; 使数据可供解码器使用但不结束流，而 &lt;code&gt;Z_FINISH&lt;/code&gt; 会结束流。&lt;/p&gt;</description></item><item><title>DEFLATE 和 Gzip 格式</title><link>https://example.org/zh-cn/deflate-and-gzip/</link><pubDate>Wed, 27 Sep 2023 03:10:18 +0800</pubDate><guid>https://example.org/zh-cn/deflate-and-gzip/</guid><description>&lt;p&gt;DEFLATE 是 RFC 1951 定义的位流格式。它将 LZ77 滑动窗口与霍夫曼编码
+结合起来。“zlib”和“gzip”通常指包含 DEFLATE 的文件，但它们分别是
+围绕原始位流的不同封装格式。&lt;/p&gt;
+&lt;h2 id="块边界和-btype"&gt;
+ 块边界和 BTYPE
+ &lt;a href="#%e5%9d%97%e8%be%b9%e7%95%8c%e5%92%8c-btype" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;DEFLATE 流由一系列块组成。每个块都从当前位位置开始，依次包含
+&lt;code&gt;BFINAL&lt;/code&gt;（1 位）和 &lt;code&gt;BTYPE&lt;/code&gt;（2 位）：&lt;/p&gt;
+&lt;table&gt;
+ &lt;thead&gt;
+ &lt;tr&gt;
+ &lt;th&gt;&lt;code&gt;BTYPE&lt;/code&gt;&lt;/th&gt;
+ &lt;th&gt;含义&lt;/th&gt;
+ &lt;/tr&gt;
+ &lt;/thead&gt;
+ &lt;tbody&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;00&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;未进行霍夫曼编码的存储字节&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;01&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;使用固定霍夫曼编码压缩&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;10&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;使用动态霍夫曼编码压缩&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;tr&gt;
+ &lt;td&gt;&lt;code&gt;11&lt;/code&gt;&lt;/td&gt;
+ &lt;td&gt;保留值，无效&lt;/td&gt;
+ &lt;/tr&gt;
+ &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;只有最后一个块的 &lt;code&gt;BFINAL&lt;/code&gt; 为 1。当字面量/长度流发出块结束符
+（EOB）符号 256 时，压缩块结束。下一个块头会紧接在下一个位处出现；
+压缩块不会填充到字节边界。存储块是例外：读取其头部后，解码器会丢弃
+当前字节中的剩余位，读取小端序的 &lt;code&gt;LEN&lt;/code&gt; 和 &lt;code&gt;NLEN&lt;/code&gt;（&lt;code&gt;LEN&lt;/code&gt; 的按位取反），
+然后准确复制 &lt;code&gt;LEN&lt;/code&gt; 个字节。&lt;code&gt;LEN&lt;/code&gt; 为 16 位，因此单个存储块最多容纳
+65,535 个字节。&lt;/p&gt;
+&lt;h2 id="lz77-符号和霍夫曼编码"&gt;
+ LZ77 符号和霍夫曼编码
+ &lt;a href="#lz77-%e7%ac%a6%e5%8f%b7%e5%92%8c%e9%9c%8d%e5%a4%ab%e6%9b%bc%e7%bc%96%e7%a0%81" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;压缩数据字母表包含字面量字节 0–255、EOB 256，以及长度符号 257–285。
+长度符号选择一个基础长度和额外位数。随后出现的距离符号选择一个基础
+距离和额外位数。由此得到的二元组会从已经生成的输出中复制字节，向后
+最多 32 KiB，长度最多 258 个字节；复制区域重叠是有效的。&lt;/p&gt;
+&lt;p&gt;固定块使用 RFC 1951 规定的编码长度。动态块包含 &lt;code&gt;HLIT&lt;/code&gt;（5 位）、
+&lt;code&gt;HDIST&lt;/code&gt;（5 位）和 &lt;code&gt;HCLEN&lt;/code&gt;（4 位），随后按照规定的排列传输编码长度
+字母表。该字母表描述字面量/长度编码和距离编码的编码长度，其中包括用于
+表示连续零或重复长度的重复符号。通过规范重建，可以将这些长度转换为
+实际编码。&lt;/p&gt;</description></item></channel></rss>

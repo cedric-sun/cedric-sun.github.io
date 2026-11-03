@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Bpf on cesun.life</title><link>https://example.org/ja/tags/bpf/</link><description>Recent content in Bpf on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Tue, 09 Jun 2026 02:54:06 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/bpf/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux eBPF</title><link>https://example.org/ja/linux-ebpf/</link><pubDate>Tue, 09 Jun 2026 02:54:06 +0800</pubDate><guid>https://example.org/ja/linux-ebpf/</guid><description>&lt;p&gt;eBPF は Linux カーネル内の検証済み実行環境です。アプリケーションはプログラムとマップをロードし、カーネルが定義したフックにプログラムをアタッチし、ファイルディスクリプターを介してデータを交換します。ネットワーク処理は依然として重要な用途ですが、トレーシング、セキュリティポリシー、性能分析は、もはやパケットキャプチャに依存しません。&lt;/p&gt;
+&lt;h2 id="パケットフィルターから-linux-ソケットフィルターへ"&gt;
+ パケットフィルターから Linux ソケットフィルターへ
+ &lt;a href="#%e3%83%91%e3%82%b1%e3%83%83%e3%83%88%e3%83%95%e3%82%a3%e3%83%ab%e3%82%bf%e3%83%bc%e3%81%8b%e3%82%89-linux-%e3%82%bd%e3%82%b1%e3%83%83%e3%83%88%e3%83%95%e3%82%a3%e3%83%ab%e3%82%bf%e3%83%bc%e3%81%b8" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;設計上の系譜は、ULTRIX や DIGITAL UNIX などのシステム向けに DEC が開発したパケットフィルターに始まります。プロセスはパケットフィルターデバイスを開き、インターフェイスを選択し、&lt;code&gt;ioctl()&lt;/code&gt; で &lt;code&gt;enfilter&lt;/code&gt; 命令列を設定して、受理されたリンク層パケットを読み取りました。フィルターはスタックマシンを使用し、複数のコンシューマーは優先度順に処理されました。&lt;/p&gt;
+&lt;p&gt;Steven McCanne と Van Jacobson は、パケットのコピーおよび解釈にかかるコストを削減するために Berkeley Packet Filter（BPF）を設計しました。1993 年の論文では、現在も認識できる次の 2 つの変更が説明されています。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;レジスタベースの仮想マシンが、パケットを受理するかどうか、および何バイトをコピーするかを決定する。&lt;/li&gt;
+&lt;li&gt;各オープン済みの &lt;code&gt;/dev/bpf&lt;/code&gt; インスタンスが独自のフィルターとパケットバッファーを持つため、パケットキャプチャは DEC の優先度チェーンではなくデバイスインスタンスとして表現される。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;現在 cBPF と呼ばれる Classic BPF には、32 ビットのアキュムレーター &lt;code&gt;A&lt;/code&gt;、インデックスレジスター &lt;code&gt;X&lt;/code&gt;、16 個のスクラッチワード、パケットロード命令、条件分岐、算術演算、戻り値があります。Linux はこの命令形式を Linux Socket Filtering（LSF）に採用しましたが、フィルターを &lt;code&gt;/dev/bpf&lt;/code&gt; ではなくソケットに直接アタッチします。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;c&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-c" data-lang="c"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; sock_filter code[] &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;BPF_STMT&lt;/span&gt;(BPF_LD &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_B &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_ABS, &lt;span style="color:#ae81ff"&gt;9&lt;/span&gt;), &lt;span style="color:#75715e"&gt;/* IPv4 protocol byte */&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;BPF_JUMP&lt;/span&gt;(BPF_JMP &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_JEQ &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_K, IPPROTO_TCP, &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;, &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;BPF_STMT&lt;/span&gt;(BPF_RET &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_K, &lt;span style="color:#ae81ff"&gt;0xffff&lt;/span&gt;),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;BPF_STMT&lt;/span&gt;(BPF_RET &lt;span style="color:#f92672"&gt;|&lt;/span&gt; BPF_K, &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; sock_fprog program &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .len &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;(code) &lt;span style="color:#f92672"&gt;/&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;(code[&lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;]),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .filter &lt;span style="color:#f92672"&gt;=&lt;/span&gt; code,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;};
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;setsockopt&lt;/span&gt;(fd, SOL_SOCKET, SO_ATTACH_FILTER,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;program, &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;(program));&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;この例では、ソケットのデータが IPv4 ヘッダーから始まることを想定しているため、9 バイト目がプロトコルフィールドになります。パケットレイアウトはソケットファミリーとフックによって異なります。ソケットフィルターでは、戻り値が保持するパケットバイト数を示し、ゼロはパケットを拒否します。カーネルはインストール前に命令列を検査します。&lt;code&gt;SO_LOCK_FILTER&lt;/code&gt; を使用すると置換または削除を防止できるため、プロセスはフィルターをアタッチしてから権限を放棄できます。libpcap と &lt;code&gt;tcpdump&lt;/code&gt; は、高レベルのキャプチャ式をこの命令モデルにコンパイルします。&lt;/p&gt;</description></item></channel></rss>

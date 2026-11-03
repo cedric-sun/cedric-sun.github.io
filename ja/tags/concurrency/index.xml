@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Concurrency on cesun.life</title><link>https://example.org/ja/tags/concurrency/</link><description>Recent content in Concurrency on cesun.life</description><generator>Hugo</generator><language>ja</language><lastBuildDate>Mon, 02 Jan 2023 16:27:18 +0800</lastBuildDate><atom:link href="https://example.org/ja/tags/concurrency/index.xml" rel="self" type="application/rss+xml"/><item><title>Spring のスレッドプール</title><link>https://example.org/ja/spring-thread-pools/</link><pubDate>Mon, 02 Jan 2023 16:27:18 +0800</pubDate><guid>https://example.org/ja/spring-thread-pools/</guid><description>&lt;p&gt;Spring の &lt;code&gt;TaskExecutor&lt;/code&gt; はタスクの送信を抽象化します。一般的な &lt;code&gt;ThreadPoolTaskExecutor&lt;/code&gt; は &lt;code&gt;ThreadPoolExecutor&lt;/code&gt; をラップする管理対象の JavaBean ですが、プール、キュー、拒否、ライフサイクルの選択がシステム容量を決定します。&lt;/p&gt;
+&lt;h2 id="エグゼキューターを定義して名前を付ける"&gt;
+ エグゼキューターを定義して名前を付ける
+ &lt;a href="#%e3%82%a8%e3%82%b0%e3%82%bc%e3%82%ad%e3%83%a5%e3%83%bc%e3%82%bf%e3%83%bc%e3%82%92%e5%ae%9a%e7%be%a9%e3%81%97%e3%81%a6%e5%90%8d%e5%89%8d%e3%82%92%e4%bb%98%e3%81%91%e3%82%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;呼び出し元が意図したリソースを選択できるよう、ワークロードに基づいてエグゼキューターに名前を付けます。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Bean&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;reportExecutor&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;ThreadPoolTaskExecutor &lt;span style="color:#a6e22e"&gt;reportExecutor&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;var&lt;/span&gt; executor &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ThreadPoolTaskExecutor();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setCorePoolSize&lt;/span&gt;(8);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setMaxPoolSize&lt;/span&gt;(24);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setQueueCapacity&lt;/span&gt;(100);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setKeepAliveSeconds&lt;/span&gt;(30);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setThreadNamePrefix&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;report-&amp;#34;&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; executor.&lt;span style="color:#a6e22e"&gt;setRejectedExecutionHandler&lt;/span&gt;(
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ThreadPoolExecutor.&lt;span style="color:#a6e22e"&gt;CallerRunsPolicy&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; executor;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Spring は管理対象 Bean として &lt;code&gt;ThreadPoolTaskExecutor&lt;/code&gt; を初期化してシャットダウンします。具体型を返すことで、ライフサイクル設定と監視メソッドが保持されます。レイテンシー、ブロッキング、優先度、下流容量の要件が異なるワークロードは、別々のエグゼキューターで分離します。&lt;/p&gt;
+&lt;h2 id="プールキュー飽和動作"&gt;
+ プール、キュー、飽和動作
+ &lt;a href="#%e3%83%97%e3%83%bc%e3%83%ab%e3%82%ad%e3%83%a5%e3%83%bc%e9%a3%bd%e5%92%8c%e5%8b%95%e4%bd%9c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;基盤となるエグゼキューターは、特定の受け入れ順序に従います。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;corePoolSize&lt;/code&gt; に達するまでワーカーを作成する。&lt;/li&gt;
+&lt;li&gt;ワークキューが受け入れる間、新しいタスクをキューに入れる。&lt;/li&gt;
+&lt;li&gt;キューが項目を拒否した後にのみ、&lt;code&gt;maxPoolSize&lt;/code&gt; までワーカーを作成する。&lt;/li&gt;
+&lt;li&gt;プールとキューがともに飽和したときに拒否ポリシーを適用する。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;したがって、無制限キューはコアサイズを超える拡張を防ぎ、過負荷を増大するレイテンシーとメモリ使用量に変換します。有限キューは過負荷を可視化します。&lt;code&gt;AbortPolicy&lt;/code&gt; は例外で拒否し、&lt;code&gt;CallerRunsPolicy&lt;/code&gt; は送信スレッドで実行してバックプレッシャーを適用し、破棄ポリシーは作業を失わせるため、明示的なプロダクト上の判断が必要です。&lt;/p&gt;
+&lt;p&gt;コアサイズ、最大サイズ、キュー容量、キープアライブは、測定されたタスクのサービス時間、ブロッキング率、到着バースト、下流制限に従う必要があります。大きなプールでもデータベースの接続容量は増やせません。&lt;/p&gt;
+&lt;h2 id="async-の選択と失敗"&gt;
+ &lt;code&gt;@Async&lt;/code&gt; の選択と失敗
+ &lt;a href="#async-%e3%81%ae%e9%81%b8%e6%8a%9e%e3%81%a8%e5%a4%b1%e6%95%97" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;@EnableAsync&lt;/code&gt; でメソッドインターセプションを有効にします。複数のエグゼキューターがある場合は、名前付きエグゼキューターを選択します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#a6e22e"&gt;@Async&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;reportExecutor&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;public&lt;/span&gt; CompletableFuture&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Report&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;render&lt;/span&gt;(ReportRequest request) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; CompletableFuture.&lt;span style="color:#a6e22e"&gt;completedFuture&lt;/span&gt;(renderer.&lt;span style="color:#a6e22e"&gt;render&lt;/span&gt;(request));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;アノテーションの修飾子がない場合、インフラストラクチャは一意の &lt;code&gt;TaskExecutor&lt;/code&gt;、または &lt;code&gt;taskExecutor&lt;/code&gt; という名前の &lt;code&gt;Executor&lt;/code&gt; Bean を探します。&lt;code&gt;AsyncConfigurer&lt;/code&gt; で明示的なデフォルトを提供できます。プロキシベースの &lt;code&gt;@Async&lt;/code&gt; には、他の Spring AOP アドバイスと同じ自己呼び出しの制約があります。&lt;/p&gt;</description></item><item><title>Java Concurrency and Executors</title><link>https://example.org/ja/java-concurrency-and-executors/</link><pubDate>Thu, 21 Oct 2021 19:20:35 +0800</pubDate><guid>https://example.org/ja/java-concurrency-and-executors/</guid><description>&lt;p&gt;&lt;code&gt;Executor&lt;/code&gt; は &lt;code&gt;Runnable&lt;/code&gt; の送信と実行場所の決定を分離します。&lt;code&gt;ExecutorService&lt;/code&gt; は
+ライフサイクル管理と &lt;code&gt;submit&lt;/code&gt; を追加します。&lt;code&gt;Callable&amp;lt;V&amp;gt;&lt;/code&gt; は値を返すか検査例外を
+スローでき、&lt;code&gt;Future&amp;lt;V&amp;gt;&lt;/code&gt; は最終的な結果を表します。&lt;code&gt;Future.get()&lt;/code&gt; は、タスクが完了
+する前に行ったアクションに必要な可視性を確立します。&lt;/p&gt;
+
+
+&lt;div class="jose-wrapper"&gt;
+ &lt;div class="jose-tools"&gt; &lt;span&gt;java&lt;/span&gt;
+ &lt;button&gt;Copy&lt;/button&gt;
+ &lt;/div&gt;
+
+ &lt;div class="jose-inner"&gt;&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-java" data-lang="java"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;Future&lt;span style="color:#f92672"&gt;&amp;lt;&lt;/span&gt;Result&lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; future &lt;span style="color:#f92672"&gt;=&lt;/span&gt; pool.&lt;span style="color:#a6e22e"&gt;submit&lt;/span&gt;(() &lt;span style="color:#f92672"&gt;-&amp;gt;&lt;/span&gt; compute(input));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;try&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; future.&lt;span style="color:#a6e22e"&gt;get&lt;/span&gt;();
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;} &lt;span style="color:#66d9ef"&gt;catch&lt;/span&gt; (ExecutionException e) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;throw&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;new&lt;/span&gt; ServiceException(e.&lt;span style="color:#a6e22e"&gt;getCause&lt;/span&gt;());
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;synchronized&lt;/code&gt;、&lt;code&gt;Lock&lt;/code&gt;、アトミック、並行コレクション、メッセージパッシングを使って
+happens-before 関係を確立します。エグゼキューターが提供するのはスケジューリングで
+あり、可変共有オブジェクトの自動的な安全性ではありません。&lt;/p&gt;
+&lt;h2 id="aqs-と同期化機構"&gt;
+ AQS と同期化機構
+ &lt;a href="#aqs-%e3%81%a8%e5%90%8c%e6%9c%9f%e5%8c%96%e6%a9%9f%e6%a7%8b" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;AbstractQueuedSynchronizer&lt;/code&gt;（AQS）は、ロック、セマフォ、ラッチなどの同期化機構向け
+フレームワークです。サブクラスはアトミックな整数状態を保持し、取得・解放の試行を
+実装します。競合時、AQS は待機スレッドを FIFO 形式の同期キューに追加し、
+&lt;code&gt;LockSupport&lt;/code&gt; で park します。解放時には適格な後続スレッドを unpark します。
+Condition は関連する条件キューを使い、通知時に待機者を同期キューへ戻します。
+キューの順序だけでは、普遍的な公平性は保証されません。&lt;/p&gt;
+&lt;h2 id="threadpoolexecutor-の受け入れ"&gt;
+ ThreadPoolExecutor の受け入れ
+ &lt;a href="#threadpoolexecutor-%e3%81%ae%e5%8f%97%e3%81%91%e5%85%a5%e3%82%8c" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;ThreadPoolExecutor&lt;/code&gt; はまず &lt;code&gt;corePoolSize&lt;/code&gt; までワーカーを作成し、その後タスクを
+キューに入れます。キューがタスクを拒否した場合にだけ &lt;code&gt;maximumPoolSize&lt;/code&gt; まで増加し、
+その後は拒否します。そのため、上限のない &lt;code&gt;LinkedBlockingQueue&lt;/code&gt; は実質的にコア
+スレッドを超える増加を防ぎます。一方、&lt;code&gt;SynchronousQueue&lt;/code&gt; は最大数まで積極的に
+ワーカーを作成します。コアサイズを超えるアイドルワーカーは &lt;code&gt;keepAliveTime&lt;/code&gt; 後に
+終了し、明示的に有効にすればコアスレッドもタイムアウトします。&lt;/p&gt;</description></item></channel></rss>

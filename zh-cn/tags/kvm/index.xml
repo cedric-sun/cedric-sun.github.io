@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Kvm on cesun.life</title><link>https://example.org/zh-cn/tags/kvm/</link><description>Recent content in Kvm on cesun.life</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sat, 12 Oct 2024 06:57:35 +0800</lastBuildDate><atom:link href="https://example.org/zh-cn/tags/kvm/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 内核虚拟化</title><link>https://example.org/zh-cn/linux-kernel-virtualization/</link><pubDate>Sat, 12 Oct 2024 06:57:35 +0800</pubDate><guid>https://example.org/zh-cn/linux-kernel-virtualization/</guid><description>&lt;p&gt;KVM 通过 &lt;code&gt;/dev/kvm&lt;/code&gt; 暴露 Linux 硬件虚拟化。KVM 提供内核执行机制，而 QEMU 等虚拟机监控器则构建并运行完整的客户机。&lt;/p&gt;
+&lt;h2 id="职责划分"&gt;
+ 职责划分
+ &lt;a href="#%e8%81%8c%e8%b4%a3%e5%88%92%e5%88%86" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;KVM 尽可能使用 Intel VT-x、AMD-V、Arm 虚拟化扩展或相应的主机设施直接执行客户机指令。内核代码管理 vCPU 状态、第二阶段内存转换、中断传递、定时器，以及客户机和主机执行之间的切换。KVM 有意不提供完整的固件和设备模型。&lt;/p&gt;
+&lt;p&gt;QEMU 提供该机器模型：固件接口、PCI 拓扑、存储和网络控制器、显示和输入设备、映像后端、迁移，以及通过 QMP 进行管理。使用 &lt;code&gt;-accel kvm&lt;/code&gt; 时，QEMU 将加速的 CPU 执行委托给 KVM；没有加速器时，它可以改用 TCG 指令翻译器。QEMU 支持的选项仍然特定于机器和架构。&lt;/p&gt;
+&lt;h2 id="客户机内存和内存槽"&gt;
+ 客户机内存和内存槽
+ &lt;a href="#%e5%ae%a2%e6%88%b7%e6%9c%ba%e5%86%85%e5%ad%98%e5%92%8c%e5%86%85%e5%ad%98%e6%a7%bd" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;QEMU 首先保留由匿名内存、&lt;code&gt;memfd&lt;/code&gt;、文件或大页支持的主机虚拟内存。随后，它使用
+&lt;code&gt;KVM_SET_USER_MEMORY_REGION&lt;/code&gt; 将该地址空间的一部分注册到 VM 文件描述符。每个区域描述：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;槽编号和标志；&lt;/li&gt;
+&lt;li&gt;客户机物理基址和大小；以及&lt;/li&gt;
+&lt;li&gt;支持该槽的用户空间虚拟地址。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;将槽大小设为零会移除该槽。槽描述的是映射，而不是分配客户机 RAM，因此在 KVM 使用支持映射期间，用户空间必须保留该映射。可选的脏页日志会记录写入，以协调迁移和快照。&lt;/p&gt;
+&lt;p&gt;客户机内存引用可能涉及两次转换。客户机页表将客户机虚拟地址转换为客户机物理地址；然后 KVM 和 MMU 硬件将该地址转换为与已注册用户空间映射对应的主机物理页。Intel 将硬件第二阶段称为 EPT，AMD 称为 NPT。KVM 处理缺失或无效的第二阶段映射，并且当访问目标是普通 RAM 时，可以在不退出到 QEMU 的情况下安装新映射。对仿真 MMIO 范围的访问则会导致退出或内核中的设备操作。&lt;/p&gt;
+&lt;p&gt;NUMA 放置、透明或显式大页、交换和内存过量分配会影响延迟，但不会改变客户机可见的地址模型。设备直通会增加 DMA 映射；因此 VFIO 依赖 IOMMU 和隔离边界，不能暴露无关的主机设备或内存。&lt;/p&gt;</description></item></channel></rss>

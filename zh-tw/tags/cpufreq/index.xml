@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Cpufreq on cesun.life</title><link>https://example.org/zh-tw/tags/cpufreq/</link><description>Recent content in Cpufreq on cesun.life</description><generator>Hugo</generator><language>zh-tw</language><lastBuildDate>Sun, 30 Oct 2022 03:35:16 +0800</lastBuildDate><atom:link href="https://example.org/zh-tw/tags/cpufreq/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux CPU 頻率調整</title><link>https://example.org/zh-tw/linux-cpu-frequency-scaling/</link><pubDate>Sun, 30 Oct 2022 03:35:16 +0800</pubDate><guid>https://example.org/zh-tw/linux-cpu-frequency-scaling/</guid><description>&lt;p&gt;現代處理器暴露在執行能力與功率、熱量之間取捨的效能狀態。Linux 透過 CPUFreq 提供這些控制。雖然硬體管理的 Intel HWP 與 AMD CPPC 是針對效能要求運作，而不是離散時脈表，「頻率」仍因相容性而保留在介面中。&lt;/p&gt;
+&lt;h2 id="cpufreq-的三個層級"&gt;
+ CPUFreq 的三個層級
+ &lt;a href="#cpufreq-%e7%9a%84%e4%b8%89%e5%80%8b%e5%b1%a4%e7%b4%9a" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;CPUFreq 包含：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;核心&lt;/strong&gt;，擁有原則物件與共用 sysfs 介面。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;調節器&lt;/strong&gt;，將工作負載需求轉為效能要求。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;調整驅動程式&lt;/strong&gt;，將要求轉譯為平台專用的暫存器、韌體或硬體作業。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;一次只能註冊一個 &lt;code&gt;struct cpufreq_driver&lt;/code&gt;。因此驅動程式必須處理 CPUFreq 可用的每個 CPU；異質系統仍使用原則物件表示不同的控制網域。&lt;/p&gt;
+&lt;p&gt;由排程器驅動的 &lt;code&gt;schedutil&lt;/code&gt; 調節器會在工作排入、取出與排程器 tick 等事件上接收使用率更新。它推導容量要求，並直接呼叫驅動程式，或依驅動程式是否支援快速轉換而透過延後工作呼叫。其他一般調節器包括 &lt;code&gt;performance&lt;/code&gt;、&lt;code&gt;powersave&lt;/code&gt;、&lt;code&gt;ondemand&lt;/code&gt;、&lt;code&gt;conservative&lt;/code&gt; 與 &lt;code&gt;userspace&lt;/code&gt;，但集合取決於核心設定與載入的模組。&lt;/p&gt;
+&lt;h2 id="原則表示硬體控制網域"&gt;
+ 原則表示硬體控制網域
+ &lt;a href="#%e5%8e%9f%e5%89%87%e8%a1%a8%e7%a4%ba%e7%a1%ac%e9%ab%94%e6%8e%a7%e5%88%b6%e7%b6%b2%e5%9f%9f" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;struct cpufreq_policy&lt;/code&gt; 表示共用效能控制介面的邏輯 CPU。原則可以涵蓋一個邏輯 CPU，或多個無法獨立控制的 CPU。核心為每個 CPU 保留原則指標；同一硬體網域中的 CPU 指標會參照相同物件。&lt;/p&gt;
+&lt;p&gt;驅動程式初始化新原則時，其 &lt;code&gt;-&amp;gt;init()&lt;/code&gt; 回呼提供：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;相關 CPU 遮罩；&lt;/li&gt;
+&lt;li&gt;硬體最小與最大頻率；&lt;/li&gt;
+&lt;li&gt;硬體使用離散表時的運作頻率表；&lt;/li&gt;
+&lt;li&gt;轉換屬性與驅動程式能力。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;核心接著附加調節器，並呼叫其 &lt;code&gt;-&amp;gt;init()&lt;/code&gt; 與 &lt;code&gt;-&amp;gt;start()&lt;/code&gt; 作業。啟動排程器感知的調節器會安裝每 CPU 使用率回呼。具有自身選擇演算法的驅動程式可以改為實作 &lt;code&gt;-&amp;gt;setpolicy()&lt;/code&gt;，繞過一般調節器。CPU 熱插拔可在最後一個 CPU 離線時停用原則，稍後重新啟用，而不改變底層控制網域模型。&lt;/p&gt;
+&lt;h2 id="檢查與控制原則"&gt;
+ 檢查與控制原則
+ &lt;a href="#%e6%aa%a2%e6%9f%a5%e8%88%87%e6%8e%a7%e5%88%b6%e5%8e%9f%e5%89%87" class="heading-anchor"&gt;
+ &lt;span&gt;#&lt;/span&gt;
+ &lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;每個原則都出現在 &lt;code&gt;/sys/devices/system/cpu/cpufreq/policyX/&lt;/code&gt;。&lt;code&gt;related_cpus&lt;/code&gt; 列出網域中的每個邏輯 CPU，包括離線 CPU；&lt;code&gt;affected_cpus&lt;/code&gt; 列出其線上成員。&lt;/p&gt;</description></item></channel></rss>
